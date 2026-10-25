@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { importInput,parseWorkerCsv,publicImport,importErrorsCsv,importFilenameHash,importFilenameMatches,importLabelHashes } from '../worker-import.mjs';
 import { validateWorkerInput } from '../people.mjs';
 import { domainTransaction,requirePrincipal,domainAudit } from './domain.mjs';
+import { requireWritableEntitlement } from './entitlements.mjs';
+import { requireWorkerCapacity } from './worker-capacity.mjs';
 
 const deletionImportExpiry=`EXISTS(SELECT 1 FROM worker_deletion_requests d JOIN workers w ON w.id=d.worker_id
   WHERE d.org_id=i.org_id AND (strpos(i.filename,w.code)>0 OR EXISTS(
@@ -85,8 +87,10 @@ export async function confirmWorkerImport(pool,session,id,{schema='public'}={}) 
       // Return errors after commit so an expired request's purge is not rolled back by its denial.
       if (row.status==='expired') return {error:'Import expired'};
       if (row.status==='imported') return {id,status:'imported',imported:row.imported_count,duplicate:true};
+      await requireWritableEntitlement(client,session.org_id);
       const {rows,crewIds}=await revalidate(client,session,row.rows_json,{lockCrews:true});
       if (row.errors_json.length || !rows.length || rows.some((entry) => !entry.valid)) throw new Error('Fix CSV errors before importing');
+      await requireWorkerCapacity(client, session.org_id, rows.length);
       for (const entry of rows) {
         const workerId=randomUUID();
         await client.query('INSERT INTO workers(id,org_id,site_id,code,language) VALUES($1,$2,$3,$4,$5)',[workerId,session.org_id,session.site_id,entry.workerId,entry.language]);

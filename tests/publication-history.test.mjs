@@ -94,5 +94,7 @@ test('version filter and client projections reject foreign, private, duplicate, 
   for(const change of [v=>v.briefingId='foreign',v=>v.page=2,v=>v.total=2,v=>v.items[0].snapshot={rubric:'PRIVATE'},v=>v.items[0].id='../foreign',v=>v.items[0].state='draft',v=>v.items[0].version=0,v=>{v.items.push(v.items[0]);v.total=2;}]){const value=structuredClone(page);change(value);assert.throws(()=>checkedPublicationHistory(value,'history',1,null),/unavailable/);}
   const detail={...row,briefingId:'history',snapshot:syntheticPrepare(CANONICAL_SOURCE),artifactAudio:null,withdrawal:null,metrics:{assigned:1,responses:0,matches:0,clarifications:0,unassessed:0,pending:1,completion:0}};
   checkedPublicationDetail(detail,'history','publication-1');
-  for(const change of [v=>v.id='foreign',v=>v.briefingId='foreign',v=>v.snapshot=null,v=>v.metrics.responses=1,v=>v.metrics.completion=80,v=>v.secret='private']){const value=structuredClone(detail);change(value);assert.throws(()=>checkedPublicationDetail(value,'history','publication-1'),/unavailable/);}
+  const acknowledged={...detail,metrics:{assigned:1,responses:1,matches:0,clarifications:0,unassessed:0,acknowledged:1,pending:0,completion:100}};
+  checkedPublicationDetail(acknowledged,'history','publication-1');
+  for(const change of [v=>v.id='foreign',v=>v.briefingId='foreign',v=>v.snapshot=null,v=>v.metrics.responses=0,v=>v.metrics.completion=80,v=>v.secret='private',v=>v.metrics.acknowledged=2,v=>v.metrics.unassessed=1]){const value=structuredClone(acknowledged);change(value);assert.throws(()=>checkedPublicationDetail(value,'history','publication-1'),/unavailable/);}
 });

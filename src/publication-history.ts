@@ -2,7 +2,7 @@ import type {PreparedArtifacts} from './language-artifacts';
 
 export type PublicationSummary={id:string;version:number;state:string;published_at:string};
 export type PublicationHistoryPage={briefingId:string;items:PublicationSummary[];total:number;page:number;pageSize:number;version:number|null};
-export type PublicationDetail=PublicationSummary & {briefingId:string;snapshot:PreparedArtifacts;artifactAudio:unknown;metrics:{assigned:number;responses:number;matches:number;clarifications:number;unassessed:number;pending:number;completion:number};withdrawal:{reason:string;withdrawn_by:string;occurred_at:string}|null};
+export type PublicationDetail=PublicationSummary & {briefingId:string;snapshot:PreparedArtifacts;artifactAudio:unknown;metrics:{assigned:number;responses:number;matches:number;clarifications:number;unassessed:number;pending:number;completion:number;acknowledged?:number};withdrawal:{reason:string;withdrawn_by:string;occurred_at:string}|null};
 const object=(value:unknown):value is Record<string,unknown>=>!!value && typeof value==='object' && !Array.isArray(value);
 const identity=(value:unknown)=>typeof value==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 const integer=(value:unknown,min=0)=>Number.isSafeInteger(value) && (value as number)>=min && (value as number)<=2147483647;
@@ -24,9 +24,11 @@ export function checkedPublicationHistory(value:unknown,briefingId:string,page:n
 export function checkedPublicationDetail(value:unknown,briefingId:string,publicationId:string):PublicationDetail {
   if(!summary(value) || !object(value) || value.id!==publicationId || value.briefingId!==briefingId || !object(value.snapshot) || !object(value.metrics)
     || Object.keys(value).some(key=>!['id','briefingId','version','state','published_at','snapshot','artifactAudio','metrics','withdrawal'].includes(key)))throw Error('Selected version unavailable');
-  const m=value.metrics;
-  if(Object.keys(m).length!==7 || !['assigned','responses','matches','clarifications','unassessed','pending','completion'].every(key=>integer(m[key]))
-    || (m.completion as number)>100 || m.responses!==Number(m.matches)+Number(m.clarifications)+Number(m.unassessed)
+  const m=value.metrics,base=['assigned','responses','matches','clarifications','unassessed','pending','completion'];
+  const acknowledged=Object.hasOwn(m,'acknowledged');
+  if(Object.keys(m).length!==(acknowledged?8:7) || Object.keys(m).some(key=>![...base,'acknowledged'].includes(key))
+    || !base.every(key=>integer(m[key])) || (acknowledged && !integer(m.acknowledged))
+    || (m.completion as number)>100 || m.responses!==Number(m.matches)+Number(m.clarifications)+Number(m.unassessed)+(acknowledged?Number(m.acknowledged):0)
     || m.assigned!==Number(m.responses)+Number(m.pending) || m.completion!==(m.assigned?Math.round(Number(m.responses)/Number(m.assigned)*100):0))throw Error('Selected version unavailable');
   if(value.withdrawal!==null && (!object(value.withdrawal) || typeof value.withdrawal.reason!=='string' || value.withdrawal.reason.length>1000 || !identity(value.withdrawal.withdrawn_by) || !date(value.withdrawal.occurred_at)))throw Error('Selected version unavailable');
   return value as unknown as PublicationDetail;

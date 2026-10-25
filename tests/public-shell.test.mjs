@@ -6,8 +6,8 @@ import {shellWorker} from '../scripts/public-shell.mjs';
 
 const bodies={'/index.html':'<html>Public application</html>','/assets/app-123.js':'export const app=true;'};
 const manifest=Object.entries(bodies).map(([path,body])=>({path,hash:createHash('sha256').update(body).digest('hex')}));
-function harness({badHash=false,failPut=false}={}) {
-  const handlers={},stores=new Map(),fetches=[];let claimed=0;
+function harness({badHash=false,failPut=false,windows=[]}={}) {
+  const handlers={},stores=new Map(),fetches=[],shown=[],opened=[],closed=[];let claimed=0;
   const caches={keys:async()=>[...stores.keys()],delete:async key=>stores.delete(key),open:async key=>{
     if(!stores.has(key))stores.set(key,new Map());const store=stores.get(key);
     return {put:async(path,response)=>{if(failPut)throw Error('Disk full');store.set(path,response.clone());},match:async path=>store.get(path)?.clone()};
@@ -16,11 +16,16 @@ function harness({badHash=false,failPut=false}={}) {
     fetches.push({path:typeof path==='string'?path:path.url,options});
     return new Response(badHash?'Changed':bodies[path] || 'Network',{status:200});
   };
-  runInNewContext(shellWorker(manifest),{self:{location:{origin:'https://example.test'},clients:{claim:async()=>claimed++},addEventListener:(name,handler)=>handlers[name]=handler},caches,crypto:webcrypto,Uint8Array,URL,Response,fetch:(...args)=>network(...args)});
-  return {stores,fetches,get claimed(){return claimed;},network(fn){network=fn;},lifecycle:async name=>{let work;handlers[name]({waitUntil:promise=>work=promise});await work;},fetch(path,options={}){
+  runInNewContext(shellWorker(manifest),{self:{location:{origin:'https://example.test'},clients:{claim:async()=>claimed++,matchAll:async()=>windows,openWindow:async url=>opened.push(url)},
+    registration:{showNotification:async(title,options)=>shown.push({title,options})},addEventListener:(name,handler)=>handlers[name]=handler},caches,crypto:webcrypto,Uint8Array,URL,Response,fetch:(...args)=>network(...args)});
+  return {stores,fetches,shown,opened,get closed(){return closed.length;},get claimed(){return claimed;},network(fn){network=fn;},lifecycle:async name=>{let work;handlers[name]({waitUntil:promise=>work=promise});await work;},fetch(path,options={}){
     let response;handlers.fetch({request:{url:new URL(path,'https://example.test').href,method:options.method || 'GET',mode:options.mode || 'cors',headers:new Headers(options.headers)},respondWith:value=>response=value});return response;
   },async message(data,source='https://example.test/#device'){
     let work,response;handlers.message({data,source:{url:source},ports:[{postMessage:value=>response=value}],waitUntil:promise=>work=promise});await work;return response;
+  },async push(data){
+    let work;handlers.push({data:data===null?null:{json:()=>{if(data instanceof Error)throw data;return data;}},waitUntil:promise=>work=promise});await work;
+  },async click(){
+    let work;handlers.notificationclick({notification:{close:()=>closed.push(true)},waitUntil:promise=>work=promise});await work;
   }};
 }
 test('public shell installs only integrity-checked anonymous build files',async()=>{
@@ -71,6 +76,40 @@ test('explicit public-cache repair reuses anonymous integrity checks and cannot 
   assert.equal([...h.stores.values()][0].size,0);
   assert.equal(await h.message({type:'understood-shell-status',repair:true},'https://other.test/'),undefined);
   assert.equal(await h.message({type:'unknown',repair:true}),undefined);
+});
+test('push shows the bounded generic alert and ignores payload links',async()=>{
+  const h=harness();await h.lifecycle('install');
+  await h.push({title:'New instruction',body:'Open Understood to review it.',tag:'understood-instruction.available',url:'https://foreign.test/#/takeover'});
+  assert.equal(h.shown.length,1);
+  assert.equal(h.shown[0].title,'New instruction');
+  assert.equal(h.shown[0].options.body,'Open Understood to review it.');
+  assert.equal(h.shown[0].options.tag,'understood-instruction.available');
+  assert.equal(h.shown[0].options.icon,'/icon-192.png');
+  assert.equal(h.shown[0].options.badge,'/icon-192.png');
+  assert.equal(h.shown[0].options.data.url,'/#notifications');
+});
+test('missing, malformed or oversized push payloads fall back to generic lock-screen copy',async()=>{
+  const h=harness();
+  await h.push(null);await h.push(Error('Invalid JSON'));await h.push({title:'x'.repeat(81),body:'line\nbreak',tag:'../../foreign'});
+  assert.deepEqual(h.shown.map(item=>item.title),['Understood','Understood','Understood']);
+  assert.equal(h.shown[0].options.body,'Open Understood to review new activity.');
+  assert.equal(h.shown[0].options.tag,'understood-update');
+  assert.equal(h.shown[2].options.body,'line break');
+  assert.equal(h.shown[2].options.tag,'understood-update');
+  for(const item of h.shown)assert.equal(item.options.data.url,'/#notifications');
+});
+test('notification click focuses a same-origin window, excludes foreign clients and ignores foreign URLs',async()=>{
+  const events=[];
+  const foreign={url:'https://foreign.test/#overview',focus:async()=>events.push('foreign-focus'),navigate:async()=>events.push('foreign-navigate')};
+  const broken={url:'not a url',focus:async()=>events.push('broken-focus'),navigate:async()=>events.push('broken-navigate')};
+  const own={url:'https://example.test/#briefings',focus:async()=>events.push('focus'),navigate:async url=>events.push(`navigate:${url}`)};
+  const h=harness({windows:[foreign,broken,own]});await h.click();
+  assert.equal(h.closed,1);assert.deepEqual(events,['focus','navigate:https://example.test/#notifications']);assert.deepEqual(h.opened,[]);
+});
+test('notification click does not re-navigate the current inbox and opens a window when none is usable',async()=>{
+  const events=[];const current={url:'https://example.test/#notifications',focus:async()=>events.push('focus'),navigate:async()=>events.push('navigate')};
+  const h=harness({windows:[current]});await h.click();assert.deepEqual(events,['focus']);assert.deepEqual(h.opened,[]);
+  const empty=harness();await empty.click();assert.deepEqual(empty.opened,['https://example.test/#notifications']);assert.equal(empty.closed,1);
 });
 test('manifest rejects protected paths, duplicates and absent public HTML',()=>{
   for(const invalid of [[],[manifest[0],manifest[0]],[manifest[1]],[...manifest,{path:'/api/session',hash:manifest[0].hash}],[{path:'/index.html',hash:'invalid'}]])assert.throws(()=>shellWorker(invalid));

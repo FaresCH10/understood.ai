@@ -19,3 +19,11 @@ export function consumeAuthBudget(db,keys,limit,{increment=true,now=new Date().t
   unique.forEach((key,index)=>save.run(key,(rows[index]?.count ?? 0)+(increment ? 1 : 0),rows[index]?.window_started_at ?? now));
   return true;
 }
+
+export function recordAuthFailure(db,key,now=new Date().toISOString()) {
+  const row=db.prepare('SELECT count,window_started_at FROM auth_attempts WHERE key_hash=?').get(key);
+  if(!row || Date.parse(now)-Date.parse(row.window_started_at)>=AUTH_WINDOW_MS){
+    db.prepare('INSERT INTO auth_attempts VALUES(?,?,?) ON CONFLICT(key_hash) DO UPDATE SET count=excluded.count,window_started_at=excluded.window_started_at')
+      .run(key,1,now);
+  } else db.prepare('UPDATE auth_attempts SET count=count+1 WHERE key_hash=?').run(key);
+}

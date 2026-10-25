@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, FileText, History, RefreshCw, Search, TriangleAlert, Users } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, FileText, History, MessageCircleCheck, RefreshCw, Search, TriangleAlert, Users } from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {useArtifactMutation} from './useArtifactMutation';
 import {checkedArtifactScope} from './artifact-request';
@@ -8,12 +8,15 @@ import {readPendingExport,savePendingExport,clearPendingExport,checkedExportRece
 import {CaseLocalePicker} from './CaseLocalePicker';
 import {reportLocale,reportText,reportErrorText,reportState,reportLanguage,reportTimestamp,type ReportLocale,type ReportTextKey} from './report-locale';
 
-type Counts = { assigned: number; responses: number; matches: number; clarifications: number; unassessed: number; pending: number; completion: number };
+type Counts = { assigned: number; responses: number; matches: number; clarifications: number; unassessed: number; pending: number; completion: number; acknowledged?: number; resolved?: number };
+type Delivery = { requestId: string; state: string; captured: number; delivered: number; undelivered: number;
+  undeliveredReasons: unknown[]; states: { preparing: number; available: number; blocked: number; failed: number; withdrawn: number } };
 type Publication = { id: string; title: string; version: number; state: string };
 type PublicationPage = {items:(Publication & {publishedAt:string})[];total:number;page:number;pageSize:number;timezone:string};
 type ReportFilters={crewId:string;responseFrom:string;responseThrough:string};
 type Report = { title: string; publicationId: string; version: number; metrics: Counts | null; timezone: string; asOf: string;
   filters?:ReportFilters;crewSnapshotAvailable?:boolean;availableCrews?:{id:string;name:string}[];
+  responseMode?:string;deliveryMode?:string;delivery?:Delivery|null;
   availablePublications: Publication[]; languages: { language: string; assigned: number; received: number; completion: number }[] };
 type Export = { id: string; status: string; createdAt: string; expiresAt: string; filename: string; attempts: number; error: string | null;filters?:ReportFilters & {timezone?:string} };
 
@@ -128,6 +131,7 @@ export function ReportsPage({refresh,authority,language='en',onLanguageChange}:{
     <div className="page-header report-header"><div><h1>{t('Briefing activity')}</h1><p>{report?.title ? <><bdi>{report.title}</bdi> · {reportText(locale,'Published v{version}',{version:report.version})}</> : t('Response activity at this site')}</p></div>
       <div className="actions">{onLanguageChange&&<CaseLocalePicker locale={locale} onChange={onLanguageChange}/>}<a className="button outline" href="#reports/activity"><History size={18} />{t('Activity history')}</a><button className="button primary" onClick={() => void exportReport()} disabled={loading || busy || !m || !canExport || !!operation.pending.current || !!recovery.error}><Download size={18} />{t(busy?'Working...':'Export CSV')}</button></div>
     </div>
+    {report?.publicationId && <p className="report-mode"><span><strong>{t('Response mode')}:</strong> {report.responseMode==='acknowledge'?t('Acknowledge only'):report.responseMode==='question'?t('Question'):t('Mode not recorded (legacy)')}</span><span><strong>{t('Delivery mode')}:</strong> {report.deliveryMode==='text'?t('Text'):report.deliveryMode==='voice'?t('Voice'):report.deliveryMode==='both'?t('Text and voice'):t('Mode not recorded (legacy)')}</span></p>}
     <div className="filters"><button ref={historyTrigger} className="button outline" disabled={busy} aria-expanded={historyOpen} aria-controls="report-publication-history" onClick={()=>setHistoryOpen(value=>!value)}><History size={18}/>{t('Briefing version')}<ChevronDown size={18}/></button>
       {report?.asOf && <span className="report-date">{date(report.asOf)} · <bdi>{report.timezone}</bdi></span>}</div>
     {historyOpen && <div id="report-publication-history"><PublicationHistory language={locale} authority={authority} disabled={busy} onSelect={id=>{if(!current())return;setPublicationId(id);setFilters(value=>({...value,crewId:''}));setChosenFilters(value=>({...value,crewId:''}));setHistoryOpen(false);historyTrigger.current?.focus();}}/></div>}
@@ -141,13 +145,21 @@ export function ReportsPage({refresh,authority,language='en',onLanguageChange}:{
     {report?.filters && !report.crewSnapshotAvailable && <p className="muted">{t('Historical crew snapshot unavailable for this version.')}</p>}
     {windowed && <p className="report-date">{t('Latest-response window')}: <bdi dir="ltr">{filters.responseFrom||t('Start')}</bdi> {t('to')} <bdi dir="ltr">{filters.responseThrough||t('Present')}</bdi> · <bdi>{report?.timezone}</bdi></p>}
     {loading ? <p role="status">{t('Loading report...')}</p> : error ? <div className="actions"><p role="alert" className="record-error">{reportErrorText(locale,error,'The report could not be loaded. Try again.')}</p><button className="icon-button" title={t('Retry report')} aria-label={t('Retry report')} disabled={busy} onClick={()=>setReportRefresh(value=>value+1)}><RefreshCw size={18}/></button></div> : !m ? <p>{t('No published briefing is available.')}</p> : <>
+      {report?.delivery && <section className="panel report-delivery" aria-label={t('Delivery')}>
+        <div className="people-panel-heading"><h2>{t('Delivery')}</h2><span className={`status status-${report.delivery.state==='published'?'green':report.delivery.state==='failed'?'red':'blue'}`}>{reportState(locale,report.delivery.state)}</span></div>
+        <div className="delivery-counts"><div><strong>{report.delivery.captured}</strong><span>{t('Captured audience')}</span></div><div><strong>{report.delivery.delivered}</strong><span>{t('Delivered')}</span></div><div><strong>{report.delivery.undelivered}</strong><span>{t('Not delivered')}</span></div></div>
+        {report.delivery.undelivered>0 && <p className="muted">{[report.delivery.states.preparing>0?`${report.delivery.states.preparing} ${t('Preparing')}`:'',report.delivery.states.blocked>0?`${report.delivery.states.blocked} ${t('Blocked')}`:'',report.delivery.states.failed>0?`${report.delivery.states.failed} ${t('Failed')}`:''].filter(Boolean).join(' · ')}</p>}
+        <p className="muted">{t('Unreleased recipients are not counted as failing to respond.')}</p>
+      </section>}
       <div className="metrics">{[
         { icon: FileText, value: m.assigned, label: t('assigned') }, { icon: Users, value: m.responses, label: t('responses') },
         { icon: CheckCircle2, value: m.matches, label: t('match key facts') }, { icon: TriangleAlert, value: m.clarifications, label: t('need clarification') },
+        ...(m.acknowledged ? [{ icon: CheckCircle2, value: m.acknowledged, label: t('acknowledged') }] : []),
+        ...(m.resolved ? [{ icon: MessageCircleCheck, value: m.resolved, label: t('resolved after follow-up') }] : []),
         { icon: Clock3, value: m.pending, label: t(windowed?'no response in window':'awaiting response') },
       ].map(({ icon: Icon, value, label }, index) => <div className={`metric ${index === 3 ? 'metric-warn' : ''}`} key={label}><div className="metric-icon"><Icon size={28} /></div><div><strong>{value}</strong><span>{label}</span></div></div>)}</div>
-      <section className="panel"><h2>{t('Response status')}</h2><div className="report-bar"><span style={{ width: width(m.matches) }} /><span style={{ width: width(m.clarifications) }} /><span style={{ width: width(m.unassessed) }} /><span style={{ width: width(m.pending) }} /></div>
-        <div className="report-bottom"><div className="legend"><span><i className="dot green" />{m.matches} {t('match the rubric')}</span><span><i className="dot amber" />{m.clarifications} {t('need clarification')}</span><span><i className="dot blue" />{m.unassessed} {t('awaiting assessment')}</span><span><i className="dot grey" />{m.pending} {t(windowed?'no response in window':'awaiting response')}</span></div><strong>{m.completion}% <small>{t('response completion')}</small></strong></div>
+      <section className="panel"><h2>{t('Response status')}</h2><div className="report-bar"><span style={{ width: width(m.matches) }} /><span style={{ width: width(m.clarifications) }} /><span style={{ width: width(m.unassessed) }} /><span style={{ width: width(m.pending) }} />{!!m.acknowledged && <span style={{ width: width(m.acknowledged),background:'#7c5cff' }} />}</div>
+        <div className="report-bottom"><div className="legend"><span><i className="dot green" />{m.matches} {t('match the rubric')}</span><span><i className="dot amber" />{m.clarifications} {t('need clarification')}</span><span><i className="dot blue" />{m.unassessed} {t('awaiting assessment')}</span>{!!m.acknowledged && <span><i className="dot violet" />{m.acknowledged} {t('acknowledged, not assessed')}</span>}<span><i className="dot grey" />{m.pending} {t(windowed?'no response in window':'awaiting response')}</span></div><strong>{m.completion}% <small>{t('response completion')}</small></strong></div>
       </section>
     </>}
     {message && <p role="status">{t(message)}</p>}

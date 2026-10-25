@@ -220,6 +220,28 @@ test('CLI retains passed and failed redacted evidence without modifying local se
   } finally {await rm(root, {recursive: true, force: true});}
 });
 
+test('explicit AWS field import preserves CRLF and accepts target key order', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'understood-neon-storage-import-order-'));
+  try {
+    const source = 'GEMINI_API_KEY=UNRELATED_PRIVATE\n'
+      + `AWS_ENDPOINT_URL_S3=${env[P + 'ENDPOINT']}\nAWS_REGION=eu-central-1\n`
+      + 'AWS_ACCESS_KEY_ID=TEST_PRIVATE_ACCESS\nAWS_SECRET_ACCESS_KEY=TEST_PRIVATE_SECRET\n';
+    const values = {...env, [P + 'ENDPOINT']: '', [P + 'REGION']: '',
+      [P + 'ACCESS_KEY_ID']: '', [P + 'SECRET_ACCESS_KEY']: ''};
+    const ordered = [...NEON_STORAGE_TEST_FIELDS].reverse();
+    const target = ordered.map(field => `${field}=${values[field]}`).join('\r\n') + '\r\n';
+    await writeFile(join(root, '.env'), source);
+    await writeFile(join(root, '.env.neon-storage-test'), target);
+    const result = importNeonStorageSettings(root);
+    assert.equal(result.imported, true);
+    assert.deepEqual(loadNeonStorageTestEnvironment(root), env);
+    const updated = await readFile(join(root, '.env.neon-storage-test'), 'utf8');
+    assert.equal(updated.split('\r\n').length, ordered.length + 1);
+    for (const field of ordered) assert.match(updated, new RegExp(`^${field}=.*\\r$`, 'm'));
+    assert.doesNotMatch(JSON.stringify(result), /TEST_PRIVATE|UNRELATED|neon\.tech/);
+  } finally {await rm(root, {recursive: true, force: true});}
+});
+
 test('explicit AWS field import validates a dedicated target, leaves source byte-identical and prints no secrets', async () => {
   const root = await mkdtemp(join(tmpdir(), 'understood-neon-storage-import-'));
   try {

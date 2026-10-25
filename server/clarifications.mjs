@@ -8,6 +8,9 @@ import {ensureClarificationActionSchema} from './clarification-action-schema.mjs
 import {clarificationActionCommand,clarificationActionId,clarificationCaseId,clarificationActionReceiptRow,exactClarificationAction} from './clarification-action-input.mjs';
 import {requireSiteOperational} from './site-lifecycle.mjs';
 import {ensureClarificationCreationSchema} from './clarification-create-schema.mjs';
+import {workerCredentialSessionValid} from './auth.mjs';
+import {requireWritableEntitlement} from './entitlements.mjs';
+import {recordStaffPushEvent} from './notification-events.mjs';
 
 function authority(db,session,type='staff',write=false) {
   if (session?.principal_type!==type || (type==='staff' && !(write ? ['owner','supervisor'] : ['owner','supervisor','auditor']).includes(session.role))) throw new Error('Forbidden');
@@ -15,8 +18,7 @@ function authority(db,session,type='staff',write=false) {
   const principal=db.prepare(`SELECT id FROM ${type==='staff' ? 'staff' : 'workers'} WHERE id=? AND org_id=? AND site_id=? AND active=1 ${type==='staff' ? 'AND role=?' : ''}`)
     .get(session.principal_id,session.org_id,session.site_id,...(type==='staff' ? [session.role] : []));
   if (!principal) throw new Error('Forbidden');
-  if (type==='worker' && session.access_mode==='credential' && !db.prepare(`SELECT id FROM worker_grants WHERE id=? AND org_id=? AND site_id=? AND worker_id=? AND revoked_at IS NULL AND redeemed_at IS NOT NULL AND expires_at>?`)
-    .get(session.grant_id,session.org_id,session.site_id,session.principal_id,NOW())) throw new Error('Forbidden');
+  if (type==='worker' && session.access_mode==='credential' && !workerCredentialSessionValid(db, session)) throw new Error('Forbidden');
 }
 export {authority as requireClarificationPrincipal};
 
@@ -64,7 +66,9 @@ export function ensureClarificationSchema(db) {
 }
 
 function audit(db,session,action,id) {
-  db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),session.org_id,session.site_id,session.principal_type,session.principal_id,action,id,NOW());
+  const auditId=randomUUID();
+  db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(auditId,session.org_id,session.site_id,session.principal_type,session.principal_id,action,id,NOW());
+  recordStaffPushEvent(db,{orgId:session.org_id,siteId:session.site_id,auditId,action,objectId:id});
 }
 
 const caseQuery=`SELECT c.id,c.reason,c.status,c.notes,c.created_at,c.owner_staff_id,c.assignment_id,c.attempt_id,
@@ -130,6 +134,7 @@ export function requestHelp(db,session,assignmentId,input) {
       if (old.org_id!==session.org_id || old.site_id!==session.site_id || old.assignment_id!==assignmentId || old.text!==text) throw new Error('Help request conflict');
       return {id:requestId,status:old.status,duplicate:true};
     }
+    requireWritableEntitlement(db,session.org_id);
     if (db.prepare('SELECT state FROM publications WHERE id=? AND org_id=? AND site_id=?').get(assignment.publication_id,session.org_id,session.site_id)?.state!=='published') throw new Error('Assignment unavailable');
     if (db.prepare('SELECT 1 FROM clarifications WHERE id=?').get(requestId)) throw new Error('Help request conflict');
     const now=NOW();

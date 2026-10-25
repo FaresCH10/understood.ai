@@ -20,8 +20,12 @@ test('Arabic scope applies only to actual directory routes, never untranslated u
 });
 
 test('directory language and bounded-page descriptions retain exact numeric evidence',()=>{
-  assert.deepEqual(peopleLanguageNames('en'),{en:'English',ar:'Arabic',ur:'Urdu'});
-  assert.deepEqual(peopleLanguageNames('ar'),{en:'الإنجليزية',ar:'العربية',ur:'الأردية'});
+  const english=peopleLanguageNames('en'),arabic=peopleLanguageNames('ar');
+  assert.equal(Object.keys(english).length,15);assert.equal(Object.keys(arabic).length,15);
+  assert.deepEqual({en:english.en,ar:english.ar,ur:english.ur},{en:'English',ar:'Arabic',ur:'Urdu'});
+  assert.deepEqual({en:arabic.en,ar:arabic.ar,ur:arabic.ur},{en:'الإنجليزية',ar:'العربية',ur:'الأردية'});
+  assert.equal(english.hi,'Hindi');assert.equal(english['pa-Guru'],'Punjabi (Gurmukhi)');assert.equal(english['pa-Arab'],'Punjabi (Shahmukhi)');
+  assert.equal(arabic.hi,'हिन्दी');assert.equal(arabic['pa-Arab'],'پنجابی');
   assert.equal(peoplePageText('en',2,7),'Page 2 of 7');assert.equal(peoplePageText('ar',2,7),'الصفحة 2 من 7');
   assert.equal(peopleShowingText('en',5,30),'Showing 5 of 30 workers');assert.equal(peopleShowingText('ar',5,30),'عرض 5 من 30 عامل');
   assert.equal(peopleCountText('en',1,'workers'),'1 worker');assert.equal(peopleCountText('en',0,'workers'),'0 workers');

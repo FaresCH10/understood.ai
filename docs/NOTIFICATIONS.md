@@ -1,5 +1,20 @@
 # Staff Notifications
 
+Update 2026-10-25: Phase 6 added worker in-app notifications, supervisor push alerts, a
+server-side push delivery outbox and the 15-locale worker notification inbox. This
+2026-10-08 checkpoint is preserved as historical evidence; where it states that there is no
+push or reminder scheduler, see the Phase 6 checkpoint in `BUILD_STATUS.md` for current
+behavior and its verified limits.
+
+Update 2026-10-25 (Phase 7): worker deletion now revokes push subscriptions
+(`worker_deleted`) and cancels queued/sending deliveries before revoking sessions on both
+SQLite and PostgreSQL. Restore quarantine revokes subscriptions (`restore_quarantine`) and
+cancels dispatch. Synthetic SQLite-to-PostgreSQL import preserves notification events and
+read receipts but omits push subscriptions and deliveries, so a cutover cannot revive device
+bindings. Delivery fanout rechecks recipient session and principal state at send time and
+expires rather than delivers to an unavailable recipient. See the Phase 7 checkpoint in
+`BUILD_STATUS.md`.
+
 Checkpoint: 2026-10-08. This is a site-scoped in-app inbox, not outbound delivery,
 scheduled reminders, a worker conversation inbox or production certification.
 

@@ -5,10 +5,12 @@ import type {PageSession} from './session-state';
 import type {RecordingScope} from './worker-audio-retry';
 import {usePrivateDevice} from './usePrivateDevice';
 import {sharedDeviceText} from './worker-device-policy';
+import {workerUiFallbackLanguage,type WorkerUiLanguage} from './worker-ui-language';
 
-export type AudioDraftProps={session:PageSession;interfaceLanguage?:'en'|'ar'|'ur';scope:RecordingScope;refresh:number;disabled:boolean;blocked:boolean;consent:boolean;current:()=>boolean;onConsent:(value:boolean)=>void;onSend:(bytes:Uint8Array,id:string)=>Promise<void>;onCheck:(id:string)=>Promise<void>};
+export type AudioDraftProps={session:PageSession;interfaceLanguage?:WorkerUiLanguage;scope:RecordingScope;refresh:number;disabled:boolean;blocked:boolean;consent:boolean;current:()=>boolean;onConsent:(value:boolean)=>void;onSend:(bytes:Uint8Array,id:string,presentationId:string|null)=>Promise<void>;onCheck:(id:string)=>Promise<void>};
 export function WorkerAudioDraft({session,interfaceLanguage,scope,refresh,disabled,blocked,consent,current,onConsent,onSend,onCheck}:AudioDraftProps){
-  const t=audioDraftCopy[(interfaceLanguage || session.language) as keyof typeof audioDraftCopy] || audioDraftCopy.en;
+  const language=interfaceLanguage??workerUiFallbackLanguage(session);
+  const t=audioDraftCopy[language];
   const [status,setStatus]=useState<'loading'|'empty'|'saved'|'other'|'failed'|'removed'|'received'>('loading');
   const privateDevice=usePrivateDevice(session.clientContext!);
   const [draft,setDraft]=useState<AudioDraft|null>(null),[tick,setTick]=useState(0),[working,setWorking]=useState(false),[url,setUrl]=useState('');
@@ -42,16 +44,16 @@ export function WorkerAudioDraft({session,interfaceLanguage,scope,refresh,disabl
       if(action==='remove'){await clearAudioDraft(await browserAudioDraftFor(scope),session.clientContext);if(live.current && allowed.current()){setDraft(null);setStatus('removed');}}
       else if(draft){
         if(Date.parse(draft.expiresAt)<=Date.now()){setDraft(null);setTick(value=>value+1);return;}
-        if(action==='send'){await onSend(new Uint8Array(draft.bytes),draft.submissionId);if(live.current && allowed.current())setStatus('received');}
+        if(action==='send'){await onSend(new Uint8Array(draft.bytes),draft.submissionId,draft.presentationId);if(live.current && allowed.current())setStatus('received');}
         else await onCheck(draft.submissionId);
       }
     }catch {if(live.current)setStatus('failed');}
     finally {if(live.current)setWorking(false);}
   };
   return <details className="worker-text-draft worker-audio-draft"><summary><HardDrive size={18}/>{t.title}</summary>
-    <p>{t.privacy}</p>{!privateDevice && <p>{sharedDeviceText[interfaceLanguage || (session.language==='ar' || session.language==='ur'?session.language:'en')].blocked}</p>}<label className="checkbox-label"><input type="checkbox" checked={consent} disabled={disabled || working || !privateDevice} onChange={event=>onConsent(event.target.checked)}/>{t.consent}</label>
+    <p>{t.privacy}</p>{!privateDevice && <p>{sharedDeviceText[language].blocked}</p>}<label className="checkbox-label"><input type="checkbox" checked={consent} disabled={disabled || working || !privateDevice} onChange={event=>onConsent(event.target.checked)}/>{t.consent}</label>
     <p role="status">{t[status]}</p>
-    {draft && !disabled && <><time dateTime={draft.capturedAt}>{new Intl.DateTimeFormat(interfaceLanguage || session.language,{dateStyle:'medium',timeStyle:'short'}).format(new Date(draft.capturedAt))}</time><audio controls preload="none" src={url || undefined} aria-label={t.title}/></>}
+    {draft && !disabled && <><time dateTime={draft.capturedAt}>{new Intl.DateTimeFormat(language,{dateStyle:'medium',timeStyle:'short'}).format(new Date(draft.capturedAt))}</time><audio controls preload="none" src={url || undefined} aria-label={t.title}/></>}
     <div className="actions"><button className="button outline" disabled={disabled || working || !draft || blocked || status==='received'} onClick={()=>void run('send')}><Send size={18}/>{t.send}</button>
       <button className="button outline" disabled={disabled || working || !draft} onClick={()=>void run('check')}><RefreshCw size={18}/>{t.check}</button>
       <button className="button subtle" disabled={disabled || working} onClick={()=>void run('remove')}><Trash2 size={18}/>{t.remove}</button>

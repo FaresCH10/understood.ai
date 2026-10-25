@@ -43,3 +43,12 @@ test('answer deadline closes answers without hiding independent help',()=>{
   const result=workerResponseState({state:'published',dueAt:'2026-10-04T11:00:00Z',assessmentStatus:'pending'},Date.parse('2026-10-04T11:00:00Z'));
   assert.equal(result.closed,true);assert.equal(result.received,true);assert.equal(result.canRespond,false);assert.equal(result.canHelp,true);
 });
+
+test('acknowledge-only instructions close response controls once receipt is recorded',()=>{
+  const base={state:'published',dueAt:null,responseMode:'acknowledge',deliveryMode:'text'};
+  assert.deepEqual(workerResponseState(base),{received:false,pending:false,closed:false,canRespond:true,canHelp:true});
+  const acknowledged=workerResponseState({...base,assessmentStatus:'complete',acknowledgedAt:'2026-10-23T08:00:00.000Z'});
+  assert.equal(acknowledged.received,true);assert.equal(acknowledged.pending,false);assert.equal(acknowledged.canRespond,false);
+  const expired=workerResponseState({...base,acknowledgedAt:'2026-10-23T08:00:00.000Z',contentExpired:true});
+  assert.equal(expired.received,true);assert.equal(expired.canRespond,false);assert.equal(expired.canHelp,false);
+});

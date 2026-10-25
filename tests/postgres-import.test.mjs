@@ -9,12 +9,12 @@ import { openDatabase,transaction } from '../server/db.mjs';
 import {linkAccountMembership} from '../server/accounts.mjs';
 import {provisionStaffCredential as provisionPgCredential} from '../server/postgres/auth.mjs';
 import { seed } from '../server/seed.mjs';
-import { metrics, submitAnswer,withdrawPublication,publish,syntheticPrepare } from '../server/domain.mjs';
+import { submitAnswer,withdrawPublication,publish,syntheticPrepare } from '../server/domain.mjs';
 import {createSchedule,cancelSchedule,processOneSchedule} from '../server/schedules.mjs';
 import {createSchedule as createPgSchedule,listSchedules as listPgSchedules,processOneSchedule as processPgSchedule} from '../server/postgres/schedules.mjs';
 import {processOneReminder} from '../server/reminders.mjs';
 import {processOneReminder as processPgReminder} from '../server/postgres/reminders.mjs';
-import { activityRows } from '../server/reports.mjs';
+import { reportActivity } from '../server/reports.mjs';
 import { ensureRecordingSchema, isCurrentRecording, receiveRecording } from '../server/recordings.mjs';
 import { createCrew, moveWorkerToCrew,restoreCrew,reenableWorker,ensurePeopleSchema } from '../server/people.mjs';
 import {restoreCrew as restorePgCrew,reenableWorker as reenablePgWorker} from '../server/postgres/people.mjs';
@@ -68,6 +68,10 @@ import {ensureCaseMessageSchema,sendCaseMessage} from '../server/case-messages.m
 import {createStaffClarification as createLocalClarification} from '../server/clarification-create.mjs';
 import {staffClarificationCreationReceipt as pgCreationReceipt} from '../server/postgres/clarification-create.mjs';
 import {listCaseMessages as listPgMessages,caseMessageReceiptLookup as pgMessageReceipt} from '../server/postgres/case-messages.mjs';
+import {startInstructionSend,completeInstructionSend} from '../server/instructions.mjs';
+import {instructionSendStatus} from '../server/postgres/instructions.mjs';
+import {processOne} from '../server/worker.mjs';
+import {recordWorkerEvent,readWorkerNotification,savePushSubscription} from '../server/notification-events.mjs';
 
 const maya = { principal_type: 'staff', principal_id: 'maya', org_id: 'cedar', site_id: 'beirut', role: 'owner' };
 const worker = { principal_type: 'worker', principal_id: 'worker-30', org_id: 'cedar', site_id: 'beirut' };
@@ -347,6 +351,40 @@ test('cutover preserves publication crew provenance and filtered export request/
   }finally{sqlite.close();await pg.close();assert.ok(resolve(root).startsWith(resolve(tmpdir())+sep+'understood-pg-import-'));await rm(root,{recursive:true});}
 });
 
+test('synthetic cutover preserves the automatic Send ledger, deliveries and retry receipts',async(context)=>{
+  context.mock.timers.enable({apis:['Date'],now:Date.now()});
+  const root=await mkdtemp(join(tmpdir(),'understood-pg-import-')),sqlite=openDatabase(join(root,'source.sqlite'));
+  const pg=new PGlite(),pool=poolFor(pg);
+  try{
+    seed(sqlite);
+    ensureRecordingSchema(sqlite);
+    const sendRequest={requestId:randomUUID(),title:'Cutover shelf instruction',source:CANONICAL_SOURCE,audience:{type:'all'},responseMode:'question',deliveryMode:'both'};
+    startInstructionSend(sqlite,maya,sendRequest);
+    while(processOne(sqlite)) {}
+    const sent=completeInstructionSend(sqlite,maya,sendRequest.requestId);
+    assert.equal(sent.state,'published');assert.equal(sent.delivered,30);assert.equal(sent.undelivered,0);
+    const retryId=randomUUID();
+    const retryAt=new Date().toISOString();
+    sqlite.prepare('INSERT INTO instruction_retries VALUES(?,?,?,?,?,?,?,?)')
+      .run(retryId,sendRequest.requestId,'cedar','beirut','maya',1,JSON.stringify({requestId:retryId}),retryAt);
+    const deliveries=sqlite.prepare('SELECT worker_id,language,state,assignment_id,content_hash FROM instruction_deliveries WHERE request_id=? ORDER BY worker_id').all(sendRequest.requestId).map(row=>({...row}));
+    assert.equal(deliveries.length,30);
+    await backupLocal({database:join(root,'source.sqlite'),audioRoot:join(root,'audio'),destination:join(root,'backup')});
+    await pg.exec(`CREATE SCHEMA ${schema}`);await runMigrations(pool,{schema});
+    const result=await importSqliteBackup(pool,{source:join(root,'backup'),schema,requestId:randomUUID(),dataClass:'synthetic',dryRun:false});
+    assert.equal(result.counts.instruction_sends,1);assert.equal(result.counts.instruction_deliveries,30);assert.equal(result.counts.instruction_retries,1);
+    const status=await instructionSendStatus(pool,maya,sendRequest.requestId,{schema});
+    assert.equal(status.state,'published');assert.equal(status.delivered,30);assert.equal(status.undelivered,0);
+    assert.equal(status.responseMode,'question');assert.equal(status.deliveryMode,'both');assert.equal(status.publicationId,sent.publicationId);
+    assert.deepEqual(status.deliveryStates,{preparing:0,available:30,blocked:0,failed:0,withdrawn:0});
+    assert.deepEqual((await pg.query(`SELECT worker_id,language,state,assignment_id,content_hash FROM ${schema}.instruction_deliveries ORDER BY worker_id`)).rows.map(row=>({...row})),deliveries);
+    const retry=(await pg.query(`SELECT * FROM ${schema}.instruction_retries WHERE request_id=$1`,[retryId])).rows[0];
+    assert.equal(retry.send_request_id,sendRequest.requestId);assert.equal(retry.generation,1);assert.equal(retry.created_at.toISOString(),retryAt);
+    await assert.rejects(pg.exec(`UPDATE ${schema}.instruction_retries SET generation=2 WHERE request_id='${retryId}'`),/immutable/);
+    await assert.rejects(pg.exec(`DELETE FROM ${schema}.instruction_deliveries WHERE request_id='${sendRequest.requestId}'`),/immutable/);
+  }finally{sqlite.close();await pg.close();assert.ok(resolve(root).startsWith(resolve(tmpdir())+sep+'understood-pg-import-'));await rm(root,{recursive:true});}
+});
+
 test('PostgreSQL synthetic migration dry-runs, preserves evidence and scopes reports, then replays exactly once', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: Date.now() });
   const root = await mkdtemp(join(tmpdir(),'understood-pg-import-'));
@@ -404,8 +442,8 @@ test('PostgreSQL synthetic migration dry-runs, preserves evidence and scopes rep
     const routingBefore=sqlite.prepare('SELECT due_at,manual,routed_owner_id FROM case_routing WHERE case_id=?').get(modernHelpId);
     resolveLocalHelp(sqlite,maya,modernHelpId,{notes:'Resolved before migration; original text stays saved.'});
     sqlite.prepare("UPDATE workers SET language='en' WHERE id='worker-30'").run();
-    const before = metrics(sqlite,'cedar','shelf-v3');
-    const beforeRows = activityRows(sqlite,maya,sqlite.prepare("SELECT * FROM publications WHERE id='shelf-v3'").get());
+    const beforeReport = reportActivity(sqlite,maya,sqlite.prepare("SELECT * FROM publications WHERE id='shelf-v3'").get());
+    const before = beforeReport.metrics, beforeRows = beforeReport.rows;
     const withdrawal={requestId:randomUUID(),publicationId:'shelf-v3',version:3,reason:'Preserve withdrawn history during cutover'};
     withdrawPublication(sqlite,maya,'shelf',withdrawal);
     const glossaryRequest={requestId:randomUUID(),term:'blue shelf',sourceLanguage:'en',targetLanguage:'ar',override:'',confirmed:true};changeGlossary(sqlite,maya,'create',null,glossaryRequest);
@@ -562,6 +600,36 @@ test('legacy synthetic backup without captured language imports current preferen
     await importSqliteBackup(pool,{source:join(root,'backup'),schema,requestId:randomUUID(),dataClass:'synthetic',dryRun:false});
     assert.equal((await pg.query(`SELECT language FROM ${schema}.assignments WHERE id='assignment-30'`)).rows[0].language,'en');
     assert.equal((await pg.query(`SELECT COUNT(*)::int AS n FROM ${schema}.attempts`)).rows[0].n,24);
+  } finally {
+    sqlite.close(); await pg.close();
+    assert.ok(resolve(root).startsWith(resolve(tmpdir())+sep+'understood-pg-import-'));
+    await rm(root,{recursive:true});
+  }
+});
+
+test('synthetic cutover retains notification events and read receipts but never revives push bindings or deliveries', async () => {
+  const root=await mkdtemp(join(tmpdir(),'understood-pg-import-'));
+  const sqlite=openDatabase(join(root,'source.sqlite')); seed(sqlite); ensureRecordingSchema(sqlite);
+  const pg=new PGlite(),pool=poolFor(pg);
+  try {
+    const token='a'.repeat(64),expires=new Date(Date.now()+86400000).toISOString();
+    sqlite.prepare(`INSERT INTO sessions(token_hash,org_id,site_id,principal_type,principal_id,expires_at,revoked_at,grant_id,access_mode)
+      VALUES(?,?,?,?,?,?,NULL,NULL,?)`).run(token,'cedar','beirut','worker','worker-30',expires,'demo');
+    const session={principal_type:'worker',principal_id:'worker-30',org_id:'cedar',site_id:'beirut',token_hash:token,access_mode:'demo'};
+    const saved=savePushSubscription(sqlite,session,{endpoint:'https://fcm.googleapis.com/fcm/send/import-notify',
+      keys:{p256dh:Buffer.alloc(65,7).toString('base64url'),auth:Buffer.alloc(16,9).toString('base64url')},expirationTime:null});
+    recordWorkerEvent(sqlite,{orgId:'cedar',siteId:'beirut',workerId:'worker-30',kind:'instruction.available',
+      objectType:'assignment',objectId:'assignment-30',dedupeKey:'import:notification'});
+    const event=sqlite.prepare("SELECT id FROM notification_events WHERE dedupe_key='import:notification'").get();
+    readWorkerNotification(sqlite,session,event.id);
+    assert.equal(sqlite.prepare('SELECT state FROM push_deliveries WHERE subscription_id=?').get(saved.id).state,'queued');
+    await backupLocal({database:join(root,'source.sqlite'),audioRoot:join(root,'audio'),destination:join(root,'backup')});
+    await pg.exec(`CREATE SCHEMA ${schema}`); await runMigrations(pool,{schema});
+    await importSqliteBackup(pool,{source:join(root,'backup'),schema,requestId:randomUUID(),dataClass:'synthetic',dryRun:false});
+    assert.equal((await pg.query(`SELECT COUNT(*)::int AS n FROM ${schema}.notification_events WHERE dedupe_key='import:notification'`)).rows[0].n,1);
+    assert.equal((await pg.query(`SELECT COUNT(*)::int AS n FROM ${schema}.notification_event_reads`)).rows[0].n,1);
+    assert.equal((await pg.query(`SELECT COUNT(*)::int AS n FROM ${schema}.push_subscriptions`)).rows[0].n,0);
+    assert.equal((await pg.query(`SELECT COUNT(*)::int AS n FROM ${schema}.push_deliveries`)).rows[0].n,0);
   } finally {
     sqlite.close(); await pg.close();
     assert.ok(resolve(root).startsWith(resolve(tmpdir())+sep+'understood-pg-import-'));

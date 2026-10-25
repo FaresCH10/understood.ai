@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {NOW,transaction} from './db.mjs';
 import {ensureSettingsSchema} from './settings.mjs';
+import {recordStaffPushEvent} from './notification-events.mjs';
 
 export function ensureCaseRoutingSchema(db) {
   ensureSettingsSchema(db);
@@ -26,7 +27,9 @@ export function ensureCaseRoutingSchema(db) {
 }
 
 function routingAudit(db,orgId,siteId,action,id) {
-  db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),orgId,siteId,'system','case-routing-worker',action,id,NOW());
+  const auditId=randomUUID();
+  db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(auditId,orgId,siteId,'system','case-routing-worker',action,id,NOW());
+  recordStaffPushEvent(db,{orgId,siteId,auditId,action,objectId:id});
 }
 
 export function routeNewCase(db,orgId,siteId,id) {

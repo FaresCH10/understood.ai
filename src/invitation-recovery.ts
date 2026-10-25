@@ -57,9 +57,10 @@ export function checkedInvitationPreview(value:unknown):InvitationPreview {
   if(!strictObject(row,['organization','site','name','role','emailHint','expiresAt']) || [row.organization,row.site,row.name,row.emailHint,row.expiresAt].some(field=>typeof field!=='string' || field.length<1 || field.length>300)
     || !['owner','administrator','supervisor','auditor'].includes(row.role) || !Number.isFinite(Date.parse(row.expiresAt))) throw new Error('Invitation details cannot be verified.');return row;
 }
-export function checkedInvitationPage(value:unknown,page:number):InvitationPage {
+export function checkedInvitationPage(value:unknown,page:number,pageSize=5):InvitationPage {
   const row=value as InvitationPage;
-  if(!strictObject(row,['items','total','page','pageSize','canWrite']) || !Array.isArray(row.items) || row.items.length>5 || !Number.isSafeInteger(row.total) || row.total<row.items.length || row.page!==page || row.pageSize!==5 || typeof row.canWrite!=='boolean') throw new Error('Invitation list cannot be verified.');
+  if(!Number.isInteger(pageSize) || pageSize<1 || pageSize>50) throw new Error('Invitation list cannot be verified.');
+  if(!strictObject(row,['items','total','page','pageSize','canWrite']) || !Array.isArray(row.items) || row.items.length>pageSize || !Number.isSafeInteger(row.total) || row.total<row.items.length || row.page!==page || row.pageSize!==pageSize || typeof row.canWrite!=='boolean') throw new Error('Invitation list cannot be verified.');
   const ids=new Set<string>();
   for(const item of row.items) {
     if(!strictObject(item,['id','name','role','emailHint','state','revision','createdAt','expiresAt','delivery']) || [item.name,item.emailHint].some(text=>typeof text!=='string' || !text.length || text.length>300) || !['owner','administrator','supervisor','auditor'].includes(item.role) || !['pending','accepted','cancelled','expired'].includes(item.state) || !Number.isSafeInteger(item.revision) || item.revision<1 || [item.createdAt,item.expiresAt].some(date=>typeof date!=='string' || !Number.isFinite(Date.parse(date))) || (item.delivery!==null && !['queued','processing','sent','ignored','failed','expired'].includes(item.delivery))) throw new Error('Invitation list cannot be verified.');

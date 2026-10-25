@@ -155,3 +155,53 @@ test('report scope admits only bounded crew identity and real ordered civil date
   for(const input of [null,[],{orgId:'other'},{crewId:[]},{crewId:'x'.repeat(101)},{crewId:'a/b'},{responseFrom:'2026-02-29'},{responseFrom:'2026-10-03',responseThrough:'2026-10-02'}])assert.throws(()=>reportScope(input),/Invalid/);
   assert.deepEqual(reportScope({responseFrom:'2028-02-29'}),{crewId:'',responseFrom:'2028-02-29',responseThrough:''});
 });
+
+test('human-resolved follow-up is counted and exported separately from assessment and delivery',()=>{
+  const at='2026-10-24T10:00:00.000Z';
+  const row={assignment_id:'assignment',code:'worker',language:'en',attempt_at:at,outcome:'clarification',audio_status:null,audio_at:null,acknowledged_at:null};
+  const selection=selectReport([row],3,reportScope(),'UTC',[],{responseMode:'question',deliveryMode:'voice',resolvedAssignmentIds:['assignment']});
+  assert.equal(selection.metrics.clarifications,1);assert.equal(selection.metrics.resolved,1);
+  assert.equal(selection.rows[0].length,9);assert.equal(selection.rows[0][8],'resolved');
+  const unrelated=selectReport([row],3,reportScope(),'UTC',[],{resolvedAssignmentIds:['foreign']});
+  assert.equal(Object.hasOwn(unrelated.metrics,'resolved'),false);assert.equal(unrelated.rows[0][8],'');
+  const csv=exports.exportCsv(selection.rows);
+  assert.match(csv,/"response_mode","delivery_mode","follow_up_status"/);assert.match(csv,/"resolved"/);
+  assert.throws(()=>exports.exportCsv([[...Array(7)].fill('x')]),/Invalid snapshot/);
+});
+
+for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} report exposes resolved follow-up without inflating responses or denominators`,async()=>{
+  const f=await fixture(pg);
+  try{
+    await f.receive(0,'2026-10-24T09:00:00.000Z');
+    const assignment=f.assignments.find(row=>row.worker_id===f.workers[0]).id;
+    if(pg)await f.query("INSERT INTO clarifications(id,org_id,site_id,assignment_id,reason,status,notes) VALUES('case-resolved',?,?,?, 'clarification','resolved','Synthetic')",[f.owner.org_id,f.owner.site_id,assignment]);
+    else await f.query("INSERT INTO clarifications(id,org_id,assignment_id,reason,status,notes,created_at) VALUES('case-resolved',?,?,'clarification','resolved','Synthetic',?)",[f.owner.org_id,assignment,'2026-10-24T09:05:00.000Z']);
+    const report=await f.read({});
+    assert.equal(report.metrics.assigned,3);assert.equal(report.metrics.responses,1);assert.equal(report.metrics.matches,1);
+    assert.equal(report.metrics.clarifications,0);assert.equal(report.metrics.resolved,1);assert.equal(report.metrics.pending,2);
+    assert.equal(report.rows[0].length,9);assert.equal(report.rows[0][8],'resolved');
+    const second=await f.read({crewId:'second'});
+    assert.equal(Object.hasOwn(second.metrics,'resolved'),false);assert.equal(second.rows[0][8],'');
+  }finally{await f.close();}
+});
+
+test('acknowledgment rows are counted as receipts, not awaiting assessment, and exports keep legacy and mode-aware widths distinct',()=>{
+  const at='2026-10-24T10:00:00.000Z';
+  const row={assignment_id:'assignment',code:'worker',language:'en',attempt_at:null,outcome:null,audio_status:null,audio_at:null,acknowledged_at:at};
+  const delivery={requestId:'send',state:'published',captured:29,delivered:28,undelivered:1,undeliveredReasons:[{reason:'language_unavailable',language:'hi',count:1}],states:{preparing:0,available:28,blocked:0,failed:1,withdrawn:0}};
+  const selection=selectReport([row],3,reportScope(),'UTC',[],{responseMode:'acknowledge',deliveryMode:'both',delivery});
+  assert.deepEqual(selection.metrics,{assigned:1,responses:1,matches:0,clarifications:0,unassessed:0,acknowledged:1,pending:0,completion:100});
+  assert.equal(selection.rows[0][2],'acknowledged');assert.equal(selection.rows[0][3],'');assert.equal(selection.rows[0][4],at);
+  assert.equal(selection.rows[0][6],'acknowledge');assert.equal(selection.rows[0][7],'both');
+  assert.equal(selection.responseMode,'acknowledge');assert.equal(selection.deliveryMode,'both');assert.deepEqual(selection.delivery,delivery);
+  const legacy=selectReport([{...row,acknowledged_at:null}],1,reportScope(),'UTC',[]);
+  assert.equal(legacy.rows[0][2],'awaiting_response');assert.equal(legacy.rows[0][6],'legacy');assert.equal(legacy.rows[0][7],'legacy');
+  assert.equal(Object.hasOwn(legacy.metrics,'acknowledged'),false);
+
+  const plain=exports.exportCsv([['worker','en','awaiting_response','','','1']]);
+  assert.match(plain,/^\uFEFF"worker_id","language","response_status","assessment","received_at","briefing_version"\r\n/);
+  const modes=exports.exportCsv([['worker','en','acknowledged','',at,'1','acknowledge','both']]);
+  assert.match(modes,/"response_mode","delivery_mode"/);assert.match(modes,/"acknowledged"/);
+  assert.throws(()=>exports.exportCsv([['worker','en','awaiting_response','','','1'],[...Array(8).fill('x')]]),/Invalid snapshot/);
+  assert.throws(()=>exports.exportCsv([['worker','en','acknowledged','',at,'1','acknowledge',true]]),/Invalid snapshot/);
+});

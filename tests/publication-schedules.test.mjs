@@ -19,8 +19,8 @@ import {createSession} from '../server/auth.mjs';
 const owner={principal_type:'staff',principal_id:'owner',role:'owner',org_id:'a',site_id:'a'},origin='http://127.0.0.1:3020';
 async function fixture(postgres) {
   const db=postgres?new PGlite():openDatabase(':memory:'),schema='understood_test_publication_schedules';let fail=false,clock=null;
-  if(!postgres){const prepare=db.prepare.bind(db);db.prepare=sql=>{if(fail && sql.startsWith('SELECT id,language FROM workers'))throw Error('Private scheduler database sentinel');return prepare(sql);};}
-  const client={async query(sql,values){if(fail && sql.startsWith('SELECT id,language FROM workers'))throw Error('Private scheduler database sentinel');if(clock!==null)sql=sql.replaceAll('clock_timestamp()',`'${new Date(clock).toISOString()}'::timestamptz`);return values?.length?db.query(sql,values):(await db.exec(sql)).at(-1) || {rows:[]};},release(){}};
+  if(!postgres){const prepare=db.prepare.bind(db);db.prepare=sql=>{if(fail && sql.startsWith('SELECT id,language,language_selection_required FROM workers'))throw Error('Private scheduler database sentinel');return prepare(sql);};}
+  const client={async query(sql,values){if(fail && sql.startsWith('SELECT id,language,language_selection_required::int AS language_selection_required'))throw Error('Private scheduler database sentinel');if(clock!==null)sql=sql.replaceAll('clock_timestamp()',`'${new Date(clock).toISOString()}'::timestamptz`);return values?.length?db.query(sql,values):(await db.exec(sql)).at(-1) || {rows:[]};},release(){}};
   const pool={async connect(){return client;}},options={schema,integrationMode:'synthetic'};
   const exec=async(sql,values=[])=>{if(!postgres)return {rows:db.prepare(sql).all(...values)};let n=0;return db.query(sql.replaceAll('?',()=>`$${++n}`),values);};
   if(postgres){await db.exec(`CREATE SCHEMA ${schema};SET search_path TO ${schema},pg_catalog`);await runMigrations(pool,{schema});}else seed(db);

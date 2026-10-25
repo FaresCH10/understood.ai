@@ -34,6 +34,26 @@ See OPERATOR_COLUMN_PROFILE.md for setup/admission and remaining release gates.
 
 Use `.env.hosted.example` as the environment contract. Supply server-only secrets through hosting secret settings, never browser fields or committed files. Build with `npm ci` and `npm run build`; run the web process with `npm start` and a separate worker with `npm run hosted:worker`. `npm run hosted:check` verifies the migration ledger and application runtime role; `npm run hosted:check-worker` requires the narrower worker profile. Use separate API and worker database login URLs. API/worker startup rejects unsafe roles, schema-owner credentials and fenced read-only source roles. RUNTIME_PERMISSIONS.md documents separate maintenance ACL setup; the staged worker profile is not a complete least-privilege or separate operator-HTTP profile. These commands do not create schemas, seed identities, migrate data, provision cloud resources or verify cloud storage/provider connections.
 
+## Packaged deployment
+
+`Dockerfile`, `compose.yaml`, optional `compose.operator.yaml`, `deploy/Caddyfile*`,
+`scripts/deploy-preflight.mjs` and [DEPLOY_RUNBOOK.md](DEPLOY_RUNBOOK.md) package the
+same launcher behind Caddy. Only Caddy publishes 80/443; API, worker and operator run
+read-only, non-root and capability-free on a fixed subnet, and trust only Caddy's
+fixed address. Compose replaces the example's empty proxy list with `172.30.0.10/32`.
+The multi-stage image uses production dependencies only. Its build stage must copy
+`server/` because the TypeScript build imports server contracts.
+
+Local validation on 21 October 2026 used a throwaway PostgreSQL 18.4 cluster: 95
+migrations were applied, the API/worker/operator ACL profiles were configured, and
+each service's hosted check passed over certificate-checked TLS. The API served
+health/static assets while rejecting missing or altered proxy headers; the worker
+published a health row; the operator origin rejected the customer host and customer
+APIs. Evidence is in `artifacts/deploy-validation-2026-10-21.json`.
+The Docker image build, Caddy startup/TLS issuance, public DNS, Neon connectivity and
+any deployed acceptance were not executed; Docker Hub blob downloads stalled. No
+host, cloud account or real data was used.
+
 The web process binds `0.0.0.0` on `PORT`. It loads a bounded allowlist of optimized `dist` files at startup with correct MIME types, hashes, immutable hashed assets, revalidated HTML/worker script and a self-only CSP. Protected APIs/audio, source files, maps and environment files are not in this map. Preserve older hashed assets across rolling releases; deployment-level verification remains required.
 
 The PostgreSQL client requires certificate-verified TLS to Neon Free. The selected

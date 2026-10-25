@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {recorderHasUnsent,workerLeaveRequired,workerLeaveText,workerNavigationDecision,retainWorkerDetail,workerRefreshText,workerInputAvailability} from '../src/worker-unsent.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 test('worker answer, help and conversation drafts block competing writers, never their own continuation',()=>{
   const empty={answer:' \n',help:' ',audio:false,helpVoice:false,conversation:false};
@@ -19,14 +20,13 @@ test('worker leave warnings distinguish retained typed text from discarded recor
   for(const action of ['back','logout'])for(const work of [{...blank,answer:'unsent'},{...blank,help:'unsent'},{...blank,audio:true}])assert.equal(workerLeaveRequired(action,work),true);
   assert.equal(workerLeaveRequired('type',{...blank,answer:'retained',help:'retained'}),false);
   assert.equal(workerLeaveRequired('type',{...blank,audio:true}),true);
-  for(const language of ['en','ar','ur'])for(const text of Object.values(workerLeaveText[language]))assert.ok(text.trim().length>0);
-  for(const language of ['ar','ur'])for(const text of Object.values(workerLeaveText[language]))assert.match(text,/[\u0600-\u06ff]/);
+  assertWorkerDictionary(workerLeaveText,'workerLeaveText');
 });
 test('only same-assignment unsent work survives transient detail refresh failures, never access denials',()=>{
   for(const status of [0,500,502,503,504,599])assert.equal(retainWorkerDetail('one','one',true,status),true);
   for(const status of [null,200,400,401,403,404,409,429,600])assert.equal(retainWorkerDetail('one','one',true,status),false);
   for(const [current,loaded,unsent] of [[null,'one',true],['two','one',true],['one',null,true],['one','one',false]])assert.equal(retainWorkerDetail(current,loaded,unsent,503),false);
-  for(const language of ['en','ar','ur'])for(const value of Object.values(workerRefreshText[language]))assert.ok(value.trim());
+  assertWorkerDictionary(workerRefreshText,'workerRefreshText');
 });
 test('worker route changes hold busy submissions and require confirmation only for actual unsent navigation',()=>{
   for(const unsent of [false,true])for(const busy of [false,true]) {

@@ -25,7 +25,10 @@ export async function handleRecordingRoute(req, res, db, session, path, audioRoo
   if (upload && req.method === 'POST') {
     const {clientContext}=clientSessionContext(session);
     const bytes = await readWav(req);
-    const result = await receiveRecording(db, session, upload[1], req.headers['x-submission-id'], bytes, audioRoot);
+    const header = req.headers['x-presentation-id'];
+    if (Array.isArray(header)) throw new Error('Presentation unavailable');
+    const presentationId = typeof header === 'string' && header ? header : null;
+    const result = await receiveRecording(db, session, upload[1], req.headers['x-submission-id'], bytes, audioRoot, presentationId);
     json(res, result.duplicate ? 200 : 201, {...result,assignmentId:upload[1],requestId:req.headers['x-submission-id'],clientContext});
     return true;
   }

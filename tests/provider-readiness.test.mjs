@@ -6,6 +6,7 @@ import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {pipelineStatus} from '../server/ai/pipeline-status.mjs';
 import {languageReadinessModel} from '../server/language-readiness.mjs';
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import {rehearsalConfig} from '../server/postgres/runtime.mjs';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
@@ -42,10 +43,16 @@ test('runtime stage projection is bounded, immutable, synthetic-only and never c
 test('inspection separates stored content, declared capabilities and unperformed verification',()=>{
   const pipeline=pipelineStatus(rehearsalConfig(env)),model=languageReadinessModel({pipeline,testedAt:'2026-10-10T00:00:00Z',
     publication:{id:'p',version:1,state:'published',snapshot:{title:'Synthetic',source:'Synthetic source',question:'Question?',languages:{ar:{title:'Synthetic',text:'Synthetic',question:'Synthetic?'}}}}});
+  assert.deepEqual(model.languages.map(row=>row.code),WORKER_LANGUAGE_CODES);
+  assert.ok(model.languages.every(row=>row.ui.state==='ready'));
+  assert.match(model.languages.find(row=>row.code==='hi').ui.evidence,/native-speaker review/);
   assert.equal(model.languages.find(row=>row.code==='ar').content.state,'ready');
   assert.equal(model.languages.find(row=>row.code==='ar').translation.state,'not_tested');
   assert.equal(model.languages.find(row=>row.code==='ar').speech.state,'not_tested');
   assert.equal(model.languages.find(row=>row.code==='ur').speech.state,'unavailable');
+  assert.equal(model.languages.find(row=>row.code==='hi').translation.state,'unavailable');
+  assert.equal(model.languages.find(row=>row.code==='hi').speech.state,'unavailable');
+  assert.equal(model.languages.find(row=>row.code==='hi').content.state,'missing');
   assert.ok(Object.values(model.tests).every(row=>row.state==='not_tested'));secretFree(model);
   assert.equal(model.provider.adapter,'gemini-synthetic-runtime');assert.equal(model.realDataAllowed,false);
   assert.ok(languageReadinessModel().pipeline.stages.every(stage=>stage.configuration==='disabled'));

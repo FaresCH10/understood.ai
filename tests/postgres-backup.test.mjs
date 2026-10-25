@@ -162,6 +162,13 @@ test('quarantine is audit-atomic, revokes access, stops dispatch and preserves p
       VALUES('grant','org-a','site-a','worker',$1,clock_timestamp()+interval '1 hour')`,['1'.repeat(64)]);
     await f.db.query(`INSERT INTO sessions(token_hash,org_id,site_id,principal_type,principal_id,expires_at,grant_id,access_mode)
       VALUES($1,'org-a','site-a','worker','worker',clock_timestamp()+interval '1 hour','grant','credential')`,['2'.repeat(64)]);
+    await f.db.query(`INSERT INTO notification_events(id,org_id,site_id,audience,recipient_id,kind,object_type,object_id,dedupe_key,created_at)
+      VALUES('quarantine-event','org-a','site-a','worker','worker','instruction.available','assignment','assignment','quarantine',$1)`,['2026-10-01T00:00:00.000Z']);
+    await f.db.query(`INSERT INTO push_subscriptions(id,org_id,site_id,principal_type,principal_id,session_hash,endpoint_hash,endpoint,p256dh,auth,created_at,updated_at,last_seen_at)
+      VALUES('quarantine-sub','org-a','site-a','worker','worker',$1,$2,'https://fcm.googleapis.com/fcm/send/quarantine',$3,$3,clock_timestamp(),clock_timestamp(),clock_timestamp())`,
+    ['2'.repeat(64),'a'.repeat(64),'x'.repeat(40)]);
+    await f.db.query(`INSERT INTO push_deliveries(id,event_id,subscription_id,state,attempts,next_attempt_at,created_at,updated_at)
+      VALUES('quarantine-delivery','quarantine-event','quarantine-sub','queued',0,clock_timestamp(),clock_timestamp(),clock_timestamp())`);
     await f.db.query("INSERT INTO provider_policies VALUES('global',NULL,1,true,20,clock_timestamp())");
     await f.db.query("INSERT INTO platform_operators(id,email,name,password_salt,password_hash) VALUES('operator','operator@example.test','Synthetic Operator','salt','hash')");
     await f.db.query("INSERT INTO operator_sessions VALUES('synthetic-operator-session','operator',1,clock_timestamp()+interval '1 hour',NULL)");
@@ -184,6 +191,10 @@ test('quarantine is audit-atomic, revokes access, stops dispatch and preserves p
     const result=await quarantineRestoredDatabase(f.pool,{...options,backupId:id,expected:before});assert.equal(result.activationAllowed,false);
     assert.equal(result.state.format,'understood-restore-quarantine-state-v1');
     assert.equal((await f.db.query('SELECT revoked_at IS NOT NULL AS revoked FROM sessions')).rows[0].revoked,true);
+    assert.deepEqual((await f.db.query("SELECT revoked_at IS NOT NULL AS revoked,revoke_reason FROM push_subscriptions WHERE id='quarantine-sub'")).rows[0],
+      {revoked:true,revoke_reason:'restore_quarantine'});
+    assert.deepEqual((await f.db.query("SELECT state,last_error FROM push_deliveries WHERE id='quarantine-delivery'")).rows[0],
+      {state:'cancelled',last_error:'restore_quarantine'});
     assert.equal((await f.db.query('SELECT revoked_at IS NOT NULL AS revoked FROM operator_sessions')).rows[0].revoked,true);
     assert.equal((await f.db.query('SELECT revoked_at IS NOT NULL AS revoked FROM worker_grants')).rows[0].revoked,true);
     assert.equal((await f.db.query('SELECT revoked_at IS NOT NULL AS revoked FROM staff_recovery_tokens')).rows[0].revoked,true);

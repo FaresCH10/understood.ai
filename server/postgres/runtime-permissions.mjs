@@ -18,13 +18,16 @@ assessment_jobs publication_requests help_requests publication_withdrawals direc
 invoices invoice_payments invoice_voids organization_settings site_settings settings_requests draft_reviews briefing_review_requests
 templates template_versions template_requests glossary_terms glossary_versions glossary_requests staff_access_revisions staff_access_requests
 staff_recovery_mail staff_recovery_tokens staff_accounts staff_account_memberships staff_invitations staff_invitation_tokens staff_invitation_mail
-staff_invitation_requests staff_invitation_acceptances generated_bundles generated_audio briefing_regeneration_requests preparation_stage_events
+staff_invitation_requests staff_invitation_acceptances organization_registrations registration_mail registration_tokens generated_bundles generated_audio briefing_regeneration_requests preparation_stage_events
 retention_policies retention_requests recording_purges worker_deletion_requests worker_deletion_redactions worker_deletion_pseudonyms
-worker_deletion_completions notification_reads publication_schedules recording_notices recording_notice_requests assignment_reminders draft_creations
+worker_deletion_completions notification_reads notification_events notification_event_reads push_subscriptions push_deliveries publication_schedules recording_notices recording_notice_requests assignment_reminders draft_creations
 source_audio_requests source_audio_purges source_audio_retries briefing_language_requests pilot_inquiries site_onboarding onboarding_requests
 platform_operators operator_sessions operator_auth_attempts tenant_controls system_controls operator_requests operator_audit worker_health provider_policies provider_operations
 provider_requests provider_verifications provider_verification_authorities provider_verification_jobs provider_verification_workers storage_probes workspace_bootstraps site_creations site_access_controls site_access_requests site_lifecycle
 site_lifecycle_requests case_routing case_messages case_followups case_followup_audio case_repeats case_reviews case_voice clarification_action_receipts clarification_creations preparation_authorities
+instruction_sends instruction_deliveries instruction_retries acknowledgments worker_language_requests worker_credentials worker_setup_tokens
+organization_entitlements organization_entitlement_transitions organization_activation_requests
+presentation_artifacts answer_presentation_bindings
 generated_bundle_operations text_retention_policies text_retention_requests text_retention_purges restore_privacy_retirements case_retention_policies
 case_retention_requests case_content_purges generated_retention_policies generated_retention_requests generated_audio_retirements generated_audio_removals
 restore_access_restrictions publication_report_audience usage_change_requests activity_retention_policies activity_retention_requests activity_identity_purges
@@ -33,14 +36,17 @@ operational_audit_receipts briefing_content_origins schema_migrations`.split(/\s
 const known=new Set(tables),maintenance=new Set(['schema_migrations','sqlite_import_runs','workspace_bootstraps',...tables.filter(name=>name.startsWith('restore_'))]);
 const workerReadOnly=new Set(`invoices invoice_payments invoice_voids organization_settings settings_requests
 templates template_versions glossary_terms glossary_versions
-staff_account_memberships
+staff_account_memberships organization_entitlements
 provider_policies provider_verifications provider_verification_authorities system_controls tenant_controls operator_requests platform_operators operator_sessions
 usage_change_requests site_creations site_access_requests site_lifecycle_requests onboarding_requests
 template_requests glossary_requests staff_access_requests staff_invitation_requests recording_notice_requests
 retention_requests text_retention_requests case_retention_requests generated_retention_requests activity_retention_requests briefing_retention_requests`.split(/\s+/));
-const workerHidden=new Set(['invoices','invoice_payments','invoice_voids','platform_operators','operator_sessions','operator_auth_attempts','operator_requests','provider_verifications','operator_audit','clarification_action_receipts','clarification_creations']);
+const workerHidden=new Set(['invoices','invoice_payments','invoice_voids','platform_operators','operator_sessions','operator_auth_attempts','operator_requests','provider_verifications','operator_audit','clarification_action_receipts','clarification_creations','worker_credentials','worker_setup_tokens','organization_entitlement_transitions','organization_activation_requests']);
 const applicationHidden=new Set(['platform_operators','operator_sessions','operator_auth_attempts','operator_audit','provider_verification_authorities','provider_verification_jobs','provider_verification_workers']);
-const applicationReadOnly=new Set(['operator_requests','provider_verifications','tenant_controls','system_controls','provider_policies']);
+const applicationReadOnly=new Set(['operator_requests','provider_verifications','tenant_controls','system_controls','provider_policies',
+  'organization_entitlements','organization_entitlement_transitions']);
+// Verified registration creates its own revision-1 trial; the application may insert but never alter entitlements.
+const applicationInsertOnly=new Set(['organization_entitlements','organization_entitlement_transitions']);
 export function runtimeProfile(value='application'){
   if(!['application','worker','operator'].includes(value))throw Error('Invalid runtime permission profile');return value;
 }
@@ -52,12 +58,15 @@ export function runtimeTablePolicy(profile='application'){
   }
   const hidden=profile==='worker'?workerHidden:applicationHidden;
   const readOnly=profile==='worker'?workerReadOnly:applicationReadOnly;
-  return tables.map(table=>({table,readable:!hidden.has(table),writable:!hidden.has(table) && !maintenance.has(table) && !readOnly.has(table)}));
+  const insertOnly=profile==='application'?applicationInsertOnly:new Set();
+  return tables.map(table=>({table,readable:!hidden.has(table),writable:!hidden.has(table) && !maintenance.has(table) && !readOnly.has(table),
+    insertable:!hidden.has(table) && !maintenance.has(table) && insertOnly.has(table)}));
 }
 function profilePolicy(profile){
   const policy=runtimeTablePolicy(profile);
   const writable=policy.filter(row=>row.writable).map(row=>row.table);
   return {readable:policy.filter(row=>row.readable).map(row=>row.table),writable,
+    insertable:policy.filter(row=>row.insertable).map(row=>row.table),
     sequenceWritable:writable.filter(table=>profile!=='worker'||!workerColumnTables.includes(table))};
 }
 const quote=value=>'"'+value.replaceAll('"','""')+'"';
@@ -108,7 +117,8 @@ async function inspect(client,{schema,role,profile='application'}){
   else {
   const invalidTable=(await client.query(`WITH permissions AS (
     SELECT c.oid,p.privilege,CASE WHEN p.privilege='SELECT' THEN c.relname=ANY($3::text[])
-      WHEN p.privilege IN ('INSERT','UPDATE','DELETE') THEN c.relname=ANY($4::text[]) AND c.relkind IN ('r','p')
+      WHEN p.privilege='INSERT' THEN c.relkind IN ('r','p') AND (c.relname=ANY($4::text[]) OR c.relname=ANY($6::text[]))
+      WHEN p.privilege IN ('UPDATE','DELETE') THEN c.relname=ANY($4::text[]) AND c.relkind IN ('r','p')
       ELSE false END AS expected
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) AS p(privilege)
@@ -117,7 +127,7 @@ async function inspect(client,{schema,role,profile='application'}){
       OR has_table_privilege($1,oid,privilege||' WITH GRANT OPTION')
       OR CASE WHEN privilege IN ('SELECT','INSERT','UPDATE','REFERENCES') THEN
         has_any_column_privilege($1,oid,privilege) IS DISTINCT FROM expected
-        OR has_any_column_privilege($1,oid,privilege||' WITH GRANT OPTION') ELSE false END LIMIT 1`,[role,schema,policy.readable,policy.writable,profile==='worker'?workerColumnTables:[]])).rows.length;
+        OR has_any_column_privilege($1,oid,privilege||' WITH GRANT OPTION') ELSE false END LIMIT 1`,[role,schema,policy.readable,policy.writable,profile==='worker'?workerColumnTables:[],policy.insertable])).rows.length;
   if(invalidTable)throw Error('Runtime table or column privileges do not match policy');
   if(profile==='worker'){
     await inspectColumnRuntimeGuards(client,schema);
@@ -255,7 +265,8 @@ export async function configureRuntimePermissions(pool,{schema='public',role,pro
       }else if(profile==='worker' && Object.hasOwn(workerColumnUpdates,row.name)) {
         await client.query(`GRANT SELECT ON TABLE ${row.identifier} TO ${target}`);
         await client.query(`GRANT UPDATE (${workerColumnUpdates[row.name].map(quote).join(',')}) ON TABLE ${row.identifier} TO ${target}`);
-      }else if(known.has(row.name) && policy.readable.includes(row.name))await client.query(`GRANT ${policy.writable.includes(row.name)?'SELECT,INSERT,UPDATE,DELETE':'SELECT'} ON TABLE ${row.identifier} TO ${target}`);
+      }else if(known.has(row.name) && policy.readable.includes(row.name))
+        await client.query(`GRANT ${policy.writable.includes(row.name)?'SELECT,INSERT,UPDATE,DELETE':policy.insertable.includes(row.name)?'SELECT,INSERT':'SELECT'} ON TABLE ${row.identifier} TO ${target}`);
     }
     await client.query(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA ${namespace} TO ${target}`);
     // Never automatically grant a newly migrated or unrelated future table.

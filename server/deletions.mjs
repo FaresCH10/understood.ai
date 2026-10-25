@@ -4,6 +4,7 @@ import {deletionInput,deletionFilters} from './deletion-input.mjs';
 import {applicationCleanupEvidence} from './deletion-scope.mjs';
 import {ensureRecordingSchema} from './recordings.mjs';
 import {ensureDeletionRedactionSchema} from './deletion-redactions.mjs';
+import {ensureNotificationEventSchema} from './notification-event-schema.mjs';
 
 export function ensureDeletionSchema(db){
   db.exec(`CREATE TABLE IF NOT EXISTS worker_deletion_requests (
@@ -33,7 +34,8 @@ export function ensureDeletionSchema(db){
   CREATE TRIGGER IF NOT EXISTS deleted_worker_identity_fence BEFORE UPDATE ON workers WHEN
     EXISTS(SELECT 1 FROM worker_deletion_requests WHERE worker_id=OLD.id) AND
     (NEW.id IS NOT OLD.id OR NEW.org_id IS NOT OLD.org_id OR NEW.site_id IS NOT OLD.site_id OR NEW.language IS NOT OLD.language
-      OR (NEW.code IS NOT OLD.code AND NOT EXISTS(SELECT 1 FROM worker_deletion_pseudonyms p WHERE p.worker_id=OLD.id AND p.pseudonym=NEW.code)))
+      OR (NEW.code IS NOT OLD.code AND NOT EXISTS(SELECT 1 FROM worker_deletion_pseudonyms p WHERE p.worker_id=OLD.id AND p.pseudonym=NEW.code))
+      OR (NEW.name IS NOT OLD.name AND NOT (NEW.name IS NULL AND EXISTS(SELECT 1 FROM worker_deletion_pseudonyms p WHERE p.worker_id=OLD.id))))
     BEGIN SELECT RAISE(ABORT,'Worker deletion pending'); END;
   CREATE TRIGGER IF NOT EXISTS worker_deletion_scope BEFORE INSERT ON worker_deletion_requests WHEN
     NOT EXISTS(SELECT 1 FROM workers WHERE id=NEW.worker_id AND org_id=NEW.org_id AND site_id=NEW.site_id AND active=0)
@@ -93,7 +95,7 @@ export function getWorkerDeletion(db,session,workerId){
 }
 
 export function requestWorkerDeletion(db,session,workerId,input){
-  const fingerprint=deletionInput(workerId,input);ensureDeletionSchema(db);ensureRecordingSchema(db);
+  const fingerprint=deletionInput(workerId,input);ensureDeletionSchema(db);ensureRecordingSchema(db);ensureNotificationEventSchema(db);
   return transaction(db,()=>{
     authority(db,session);
     const old=db.prepare('SELECT * FROM worker_deletion_requests WHERE id=?').get(input.requestId);
@@ -110,6 +112,12 @@ export function requestWorkerDeletion(db,session,workerId,input){
     db.prepare('UPDATE workers SET active=0 WHERE id=?').run(workerId);
     db.prepare('INSERT INTO worker_deletion_requests VALUES(?,?,?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,workerId,session.principal_id,fingerprint,input.reason,now);
     db.prepare('UPDATE worker_grants SET revoked_at=? WHERE worker_id=? AND revoked_at IS NULL').run(now,workerId);
+    db.prepare('UPDATE worker_setup_tokens SET revoked_at=? WHERE worker_id=? AND revoked_at IS NULL').run(now,workerId);
+    db.prepare(`UPDATE push_subscriptions SET revoked_at=?,revoke_reason='worker_deleted',updated_at=?
+      WHERE principal_type='worker' AND principal_id=? AND revoked_at IS NULL`).run(now,now,workerId);
+    db.prepare(`UPDATE push_deliveries SET state='cancelled',last_error='worker_deleted',updated_at=?
+      WHERE state IN ('queued','sending') AND subscription_id IN (SELECT id FROM push_subscriptions
+        WHERE principal_type='worker' AND principal_id=?)`).run(now,workerId);
     db.prepare("UPDATE sessions SET revoked_at=? WHERE principal_type='worker' AND principal_id=? AND revoked_at IS NULL").run(now,workerId);
     db.prepare(`UPDATE recordings SET status='failed',transcript=NULL,lease_token=NULL,lease_until=NULL,retry_at=NULL,error='Worker deletion pending'
       WHERE status<>'storing' AND assignment_id IN (SELECT id FROM assignments WHERE worker_id=?)`).run(workerId);

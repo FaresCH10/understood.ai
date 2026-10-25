@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {workerRequestId,WorkerRequestError,workerRequestText,checkedWorkerReceipt,readWorkerRequestReceipt,workerReceiptCheckText} from '../src/worker-request.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 const now=()=>Date.parse('2026-10-07T12:00:00.000Z');
 const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2026-10-07T20:00:00.000Z'};
 const key='understood:worker-requests:v1';
@@ -31,7 +32,7 @@ test('manual receipt reads never resend, stay unknown on 404 and reject changed 
   const prior=requests.length;
   for(const args of [[{...current,expiresAt:'2000-01-01T00:00:00.000Z'},'one','answer',requestId],[current,'','answer',requestId],[current,12,'answer',requestId],[current,'one','bad',requestId],[current,'one','answer','bad'],[current,'one','answer',null]])await assert.rejects(readWorkerRequestReceipt(send,...args),error('receipt'));
   assert.equal(requests.length,prior);
-  for(const language of ['en','ar','ur'])for(const text of Object.values(workerReceiptCheckText[language]))assert.ok(text.trim());
+  assertWorkerDictionary(workerReceiptCheckText,'workerReceiptCheckText');
 });
 test('worker request IDs survive exact trimmed retries without storing names or response text',async()=>{
   const store=storage(),answer='Finished on blue, unfinished on yellow.';
@@ -70,8 +71,7 @@ test('corrupt and overfull ledgers cannot silently forget request identities',as
 test('invalid inputs and every failure copy remain bounded and localized',async()=>{
   const store=storage();for(const [id,kind,text] of [['','answer','x'],['x'.repeat(101),'answer','x'],['one','other','x'],['one','answer',' '],['one','answer','x'.repeat(2001)],['one','help','xx'],['one','help','x'.repeat(501)]])await assert.rejects(workerRequestId(store,session,id,kind,text,now),error('input'));
   assert.equal(store.map.size,0);
-  for(const language of ['en','ar','ur'])for(const value of Object.values(workerRequestText[language]))assert.ok(value.trim());
-  for(const language of ['ar','ur'])for(const value of Object.values(workerRequestText[language]))assert.match(value,/[\u0600-\u06ff]/);
+  assertWorkerDictionary(workerRequestText,'workerRequestText');
 });
 test('worker acknowledgements distinguish complete and pending answers and bind help identity',()=>{
   const id=crypto.randomUUID(),expected={requestId:id,assignmentId:'one',clientContext:'a'.repeat(64)};

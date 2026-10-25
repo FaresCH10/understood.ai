@@ -9,7 +9,7 @@ const keys=(value,names)=>value && typeof value==='object' && !Array.isArray(val
 export function preparationStageProvenance(provider,stage) {
   if(!keys(provider,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion']) || provider.dataClass!=='synthetic'
     || !Object.values(stages).includes(stage)
-    || !['adapter','textModel','speechModel','voice','promptVersion','schemaVersion'].every(key=>typeof provider[key]==='string' && /^[A-Za-z0-9._-]{1,100}$/.test(provider[key])))throw Error('Preparation provenance unavailable');
+    || !['adapter','textModel','speechModel','voice','promptVersion','schemaVersion'].every(key=>typeof provider[key]==='string' && /^[A-Za-z0-9._:/-]{1,100}$/.test(provider[key])))throw Error('Preparation provenance unavailable');
   return Object.freeze({adapter:provider.adapter,dataClass:'synthetic',model:provider[stage==='speech'?'speechModel':'textModel'],
     promptVersion:`${provider.promptVersion}-${stage.replaceAll('_','-')}`,schemaVersion:provider.schemaVersion});
 }

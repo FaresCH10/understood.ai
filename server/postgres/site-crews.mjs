@@ -2,7 +2,7 @@ import {crewFilters} from '../people.mjs';
 import {crewOverviewResult,crewActivityActions} from '../crew-overview.mjs';
 import {readCrewPage} from './people.mjs';
 import {responseRead} from './responses.mjs';
-import {responseColumns} from '../recordings.mjs';
+import {postgresResponseColumns as responseColumns} from '../recordings.mjs';
 
 export async function siteCrewOverview(pool,session,input={},{schema='public'}={}) {
   const filters=crewFilters(input);

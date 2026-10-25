@@ -90,6 +90,9 @@ test('actual owned command saves output and returns terminal status',async t=>{
 
 test('CI builds files before tests that load the hosted public shell',async()=>{
   const text=await readFile(new URL('../.github/workflows/verify.yml',import.meta.url),'utf8');
-  assert.ok(text.indexOf('run: npm run build')>text.indexOf('run: npm ci'));
-  assert.ok(text.indexOf('run: npm run build')<text.indexOf('run: npm test'));
+  const buildIndex=text.indexOf('run: npm run build'),testIndexes=['run: npm test','run: npm run test:shard']
+    .map(command=>text.indexOf(command)).filter(index=>index>=0);
+  assert.equal(testIndexes.length,1);
+  assert.ok(buildIndex>text.indexOf('run: npm ci'));
+  assert.ok(buildIndex<testIndexes[0]);
 });

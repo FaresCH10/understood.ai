@@ -22,8 +22,10 @@ export function processOneDeletionPseudonym(db){
     const pseudonym=`Deleted ${randomUUID()}`,now=NOW();
     db.prepare('INSERT INTO worker_deletion_pseudonyms VALUES(?,?,?,?,?,?,?)')
       .run(row.id,row.org_id,row.site_id,row.worker_id,createHash('sha256').update(row.code).digest('hex'),pseudonym,now);
-    db.prepare('UPDATE workers SET code=? WHERE id=?').run(pseudonym,row.worker_id);
+    db.prepare('UPDATE workers SET code=?,name=NULL WHERE id=?').run(pseudonym,row.worker_id);
     db.prepare('DELETE FROM crew_memberships WHERE worker_id=?').run(row.worker_id);
+    db.prepare('DELETE FROM worker_credentials WHERE worker_id=?').run(row.worker_id);
+    db.prepare('DELETE FROM worker_setup_tokens WHERE worker_id=?').run(row.worker_id);
     db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),row.org_id,row.site_id,'system','deletion-worker','worker.identity.pseudonymized',row.worker_id,now);
     return true;
   });

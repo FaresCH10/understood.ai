@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {workerEntryIdentity,workerEntryLanguages,workerEntryText} from '../src/worker-entry-presentation.ts';
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 
 const now=Date.parse('2026-10-16T06:00:00.000Z'),worker={authenticated:true,role:'worker',clientContext:'a'.repeat(64),workerId:'worker-014',language:'en',mode:'synthetic-credential',expiresAt:'2026-10-16T07:00:00.000Z',name:'Worker 014',organization:'Synthetic Entry QA',site:'Beirut QA'};
-test('entry choices and complete localized copy preserve supported EN/AR/UR without deriving identity from a link',()=>{
-  assert.deepEqual(workerEntryLanguages.map(item=>item.value).sort(),['ar','en','ur']);
+test('entry choices and complete localized copy cover every worker locale without deriving identity from a link',()=>{
+  assert.deepEqual(workerEntryLanguages.map(item=>item.value).sort(),[...WORKER_LANGUAGE_CODES].sort());
   const keys=Object.keys(workerEntryText.en).sort();
-  for(const language of ['en','ar','ur']){
+  for(const language of WORKER_LANGUAGE_CODES){
     assert.deepEqual(Object.keys(workerEntryText[language]).sort(),keys);
     for(const value of Object.values(workerEntryText[language]))assert.ok(value.trim().length);
     assert.deepEqual(workerEntryIdentity(worker,language,now),{name:worker.name,organization:worker.organization,site:worker.site});

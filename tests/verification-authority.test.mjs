@@ -40,7 +40,7 @@ test('worker sees only minimal approval metadata and cannot create, extend, revo
   const f=await fixture();try{
     const login=await f.login(),id=await f.approve(login.session);f.queries.length=0;await f.check(id);
     await f.as('worker',async()=>{
-      assert.equal((await verifyRuntimePermissions(f.pool,{schema,profile:'worker'})).readOnlyTables,34);
+      assert.equal((await verifyRuntimePermissions(f.pool,{schema,profile:'worker'})).readOnlyTables,35);
       const rows=(await f.db.query('SELECT * FROM provider_verification_authorities')).rows;
       assert.deepEqual(Object.keys(rows[0]).sort(),['expires_at','request_id','revoked']);assert.equal(rows[0].request_id,id);
       for(const sql of ['SELECT * FROM operator_sessions','SELECT * FROM platform_operators','SELECT * FROM provider_verifications',
@@ -121,7 +121,7 @@ test('89 migration backfills real88 verification rows conservatively without reo
         [requestId,operatorId,sessionHash,operationId,'f'.repeat(64),JSON.stringify({kind:'provider-verification',maxRequests:1,confirmed:true}),kind==='completed'?'failed':'pending']);
     }
     const before=(await db.query('SELECT * FROM provider_verifications ORDER BY request_id')).rows;
-    assert.deepEqual(await runMigrations(pool),['089_provider_verification_authorities.sql', '090_provider_verification_jobs.sql', '091_provider_verification_workers.sql', '092_worker_identity_locks.sql', '093_clarification_action_receipts.sql', '094_staff_clarification_creations.sql', '095_staff_inperson_recordings.sql']);
+    assert.deepEqual(await runMigrations(pool),['089_provider_verification_authorities.sql', '090_provider_verification_jobs.sql', '091_provider_verification_workers.sql', '092_worker_identity_locks.sql', '093_clarification_action_receipts.sql', '094_staff_clarification_creations.sql', '095_staff_inperson_recordings.sql','096_instruction_modes_and_acknowledgments.sql','097_worker_language_identity.sql','098_worker_password_credentials.sql','099_worker_language_locales.sql','100_presentation_artifacts.sql','101_presentation_retention.sql','102_recording_presentation_guard.sql','103_instruction_deliveries.sql','104_instruction_content_retention.sql','105_organization_entitlements.sql','106_owner_registration.sql','107_first_run_onboarding.sql','108_notification_events.sql']);
     assert.deepEqual((await db.query('SELECT * FROM provider_verifications ORDER BY request_id')).rows,before);
     for(const kind of cases){
       const check=()=>domainTransaction(pool,'public',client=>currentVerificationAuthority(client,ids.get(kind)));

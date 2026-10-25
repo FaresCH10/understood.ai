@@ -6,6 +6,7 @@ import { createPostgresRehearsalServer } from './http.mjs';
 import { verifyMigrations } from './migrate.mjs';
 import {verifyRuntimePermissions} from './runtime-permissions.mjs';
 import { processOnePreparation } from './preparation.mjs';
+import { processOneInstructionSend } from './instructions.mjs';
 import { processOneAssessment } from './assessment-worker.mjs';
 import { processOneExport,expireExports } from './exports.mjs';
 import { expireWorkerImports } from './worker-import.mjs';
@@ -17,6 +18,7 @@ import {expireGeneratedBundle} from './generated-audio.mjs';
 import {resolveMailConfig} from '../auth-mail.mjs';
 import {expireRecovery,processOneRecovery} from './account-recovery.mjs';
 import {expireInvitations,processOneInvitation} from './invitations.mjs';
+import {expireRegistrations,processOneRegistration} from './registration.mjs';
 import {processOneAudioPurge} from './retention.mjs';
 import {processOneTextPurge} from './text-retention.mjs';
 import {processOneActivityPurge} from './activity-retention.mjs';
@@ -35,6 +37,8 @@ import {recordWorkerPresence} from './worker-health.mjs';
 import {resolveProviderVerification} from '../ai/provider-verification-config.mjs';
 import {processStorageProbe} from './storage-health.mjs';
 import {processOneCaseEscalation} from './case-routing.mjs';
+import {expirePushSubscriptions,processOnePushDelivery,sweepOverdueAssignments} from './notification-events.mjs';
+import {resolvePushAdapter} from '../push-adapter.mjs';
 import {processOneCaseFollowup,processOneCaseFollowupPurge} from './case-followups.mjs';
 import {resolveCaseFollowup} from '../ai/case-followup-config.mjs';
 import {processOneCaseVoicePurge} from './case-voice.mjs';
@@ -82,9 +86,13 @@ export function rehearsalTasks(pool,storage,config,{verificationSignal}={}) {
     storageProbe:()=>processStorageProbe(pool,storage,{...options,adapter:config.storageAdapter ?? 'local',enabled:config.storageChecks ?? false}),
     providerVerification:()=>config.runtimeRoleProfile==='application'?false:processOneProviderVerification(pool,config.providerVerification,{...options,signal:verificationSignal}),
     preparation:() => processOnePreparation(pool,{...options,...(config.preparationAdapter ? {adapter:config.preparationAdapter,storage,languages:config.preparationLanguages} : {})}),
+    instructionSend:() => processOneInstructionSend(pool,options),
     sourceTranscription:() => processOneSourceAudio(pool,config.sourceAdapter,storage,options),
     publicationSchedule:() => processOneSchedule(pool,{...options,storage}),
     assignmentReminder:() => processOneReminder(pool,options),
+    notificationSweep:() => sweepOverdueAssignments(pool,options),
+    pushExpiry:() => expirePushSubscriptions(pool,options),
+    pushDelivery:() => processOnePushDelivery(pool,config.pushAdapter ?? resolvePushAdapter(),options),
     caseEscalation:() => processOneCaseEscalation(pool,options),
     caseFollowup:()=>config.caseFollowupAdapter?processOneCaseFollowup(pool,config.caseFollowupAdapter,storage,{...options,dataClass:config.dataClass}):false,
     caseFollowupRetention:()=>processOneCaseFollowupPurge(pool,storage,options),
@@ -111,6 +119,8 @@ export function rehearsalTasks(pool,storage,config,{verificationSignal}={}) {
     recoveryMail:() => processOneRecovery(pool,config.mail ?? {available:false},options),
     invitationExpiry:() => expireInvitations(pool,options),
     invitationMail:() => processOneInvitation(pool,config.mail ?? {available:false},options),
+    registrationExpiry:() => expireRegistrations(pool,options),
+    registrationMail:() => processOneRegistration(pool,config.mail ?? {available:false},options),
     pilotMail:() => processOnePilot(pool,config.mail ?? {available:false},{...options,destination:pilotDestination(config.pilotDestination)}),
   };
 }

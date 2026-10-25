@@ -6,6 +6,7 @@ import { verifyLocalBackup } from '../../scripts/local-backup.mjs';
 import { createPostgresPool, acquirePostgresClient } from './db.mjs';
 import { runMigrations, schemaName } from './migrate.mjs';
 import {validateImportedCaseVoice,normalizeImportedCaseVoice} from './staff-case-recording-import.mjs';
+import {isWorkerLanguage} from '../languages.mjs';
 import {inspectCaseWorkflowRuntimeGuards} from './case-workflow-permissions.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,16 +26,22 @@ const columns = {
   source_audio_requests:'request_id org_id site_id requested_by request_hash title generation_languages_json id sha256 bytes duration_seconds original_id original_sha256 original_bytes original_type authority_json status created_at received_at briefing_id lease_token lease_until error attempts retry_at',
   publications: 'id org_id site_id briefing_id version snapshot_json published_at state',
   assignments: 'id org_id site_id publication_id worker_id due_at created_at',
+  presentation_artifacts: 'id org_id site_id worker_id assignment_id publication_id publication_version source_kind source_id original_language target_language source_hash status title text question provider live error_code lease_token lease_until created_at updated_at ready_at',
   publication_report_audience:'assignment_id org_id site_id publication_id crew_id crew_name',
   assignment_reminders:'assignment_id org_id site_id publication_id worker_id requested_by authority_json due_at state finished_at',
   attempts: 'id org_id assignment_id submission_id answer_text outcome reasons_json received_at',
+  answer_presentation_bindings: 'attempt_id org_id site_id assignment_id presentation_id presentation_language presented_question created_at',
   clarifications: 'id org_id assignment_id attempt_id reason owner_staff_id status notes created_at',
   jobs: 'id org_id site_id briefing_id revision kind status attempts due_at lease_until error created_at',
   preparation_requests:'request_id org_id site_id briefing_id revision job_id generation request_json requested_by created_at',
   worker_grants: 'id org_id site_id worker_id token_hash expires_at redeemed_at revoked_at created_at',
+  worker_credentials: 'worker_id org_id site_id login_id state password_salt password_hash credential_revision setup_issued_at password_changed_at created_at updated_at',
+  worker_setup_tokens: 'id org_id site_id worker_id token_hash expires_at used_at revoked_at created_by created_at',
   sessions: 'token_hash org_id site_id principal_type principal_id expires_at revoked_at grant_id access_mode',
   audit: 'id org_id site_id actor_type actor_id action object_id occurred_at',
   notification_reads:'event_id staff_id org_id site_id read_at',
+  notification_events:'id org_id site_id audience recipient_id kind object_type object_id dedupe_key created_at',
+  notification_event_reads:'event_id principal_type principal_id org_id site_id read_at',
   recordings: 'id org_id site_id assignment_id submission_id sha256 duration_seconds bytes status transcript error created_at attempts lease_until retry_at received_at lease_token',
   processing_retries:'request_id org_id site_id requested_by kind job_id publication_id assignment_id generation request_json created_at',
   submission_receipts: 'sequence org_id assignment_id submission_id kind received_at',
@@ -89,11 +96,19 @@ const columns = {
   // Restore the freeze policy only after all retained operational history is imported.
   site_lifecycle:'site_id org_id revision state reason updated_at',
   site_lifecycle_requests:'request_id org_id origin_site_id site_id actor_id request_json revision created_at',
+  instruction_sends:'request_id org_id site_id briefing_id publication_request_id audience_json response_mode delivery_mode state publication_id audience_count delivered undelivered undelivered_json error request_json requested_by created_at updated_at',
+  instruction_deliveries:'request_id org_id site_id worker_id language state reason attempts assignment_id content_json content_hash updated_at',
+  instruction_retries:'request_id send_request_id org_id site_id requested_by generation request_json created_at',
+  acknowledgments:'request_id org_id site_id assignment_id worker_id received_at',
+  worker_language_requests:'id org_id site_id worker_id current_language requested_language reason state requested_at decided_at decided_by decision_note',
+  organization_entitlements:'org_id state started_at ends_at worker_limit plan terms_reference revision updated_by updated_at',
+  organization_entitlement_transitions:'org_id revision state started_at ends_at worker_limit plan terms_reference reason actor_type actor_id request_id created_at',
+  organization_activation_requests:'request_id org_id site_id requested_by note entitlement_revision state created_at decided_at decided_by decision_ref',
 };
 const tables = Object.keys(columns);
-const omitted = ['staff_credentials', 'auth_attempts'];
+const omitted = ['staff_credentials', 'auth_attempts', 'push_subscriptions', 'push_deliveries'];
 // Local credentials are not migrated, so their recovery secrets and pending delivery must not be replayed either.
-const sourceOnlyAuth = ['staff_recovery_mail', 'staff_recovery_tokens'];
+const sourceOnlyAuth = ['staff_recovery_mail', 'staff_recovery_tokens', 'organization_registrations', 'registration_mail', 'registration_tokens'];
 const optional = new Set(['organization_settings','site_settings','settings_requests','invoices','invoice_payments','invoice_voids','crews','crew_memberships','report_exports','worker_imports','recordings','help_requests','publication_requests','publication_withdrawals','directory_reactivations','briefing_copies','briefing_archives']);
 optional.add('draft_reviews');optional.add('briefing_review_requests');
 optional.add('report_export_retries');
@@ -113,6 +128,7 @@ optional.add('clarification_action_receipts');
 optional.add('clarification_creations');
 optional.add('recording_notices');optional.add('recording_notice_requests');
 optional.add('notification_reads');
+optional.add('notification_events');optional.add('notification_event_reads');
 optional.add('publication_schedules');
 optional.add('assignment_reminders');
 optional.add('draft_creations');
@@ -123,6 +139,11 @@ for(const table of ['glossary_terms','glossary_versions','glossary_requests']) o
 for(const table of ['staff_access_revisions','staff_access_requests']) optional.add(table);
 for(const table of ['staff_accounts','staff_account_memberships']) optional.add(table);
 for(const table of ['staff_invitations','staff_invitation_tokens','staff_invitation_mail','staff_invitation_requests','staff_invitation_acceptances']) optional.add(table);
+optional.add('instruction_sends');optional.add('instruction_deliveries');optional.add('instruction_retries');optional.add('acknowledgments');
+optional.add('worker_language_requests');
+optional.add('organization_entitlements');optional.add('organization_entitlement_transitions');optional.add('organization_activation_requests');
+optional.add('worker_credentials');optional.add('worker_setup_tokens');
+optional.add('presentation_artifacts');optional.add('answer_presentation_bindings');
 
 function snapshotRows(path) {
   const db = new DatabaseSync(path, { readOnly: true });
@@ -138,12 +159,17 @@ function snapshotRows(path) {
       }
       const fields = columns[table].split(' ');
       const actual = db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name);
+      if (table === 'workers') for (const field of ['name','language_selection_required','language_selected_at','language_selected_by','language_selection_request_id'])
+        if (actual.includes(field)) fields.push(field);
       if (table === 'assignments' && actual.includes('language')) fields.push('language');
+      if (table === 'sessions' && actual.includes('credential_revision')) fields.push('credential_revision');
       if (table === 'worker_imports' && actual.includes('filename_hash')) fields.push('filename_hash');
       if (table === 'site_settings' && actual.includes('generation_languages_json')) fields.push('generation_languages_json');
       if(table==='site_settings')for(const field of ['primary_contact_id','deputy_contact_id'])if(actual.includes(field))fields.push(field);
+      if(table==='site_settings')for(const field of ['staff_interface_language','first_run_completed_at'])if(actual.includes(field))fields.push(field);
       if (table === 'draft_creations' && actual.includes('generation_languages_json')) fields.push('generation_languages_json');
       if(table==='report_exports' && actual.includes('filters_json'))fields.push('filters_json');
+      if(table==='recordings')for(const field of ['presentation_id','presentation_language','presented_question'])if(actual.includes(field))fields.push(field);
       if (actual.length !== fields.length || actual.some((field) => !fields.includes(field))) throw new Error('Unsupported source columns');
       result[table] = db.prepare(`SELECT ${fields.join(',')} FROM ${table} LIMIT 100001`).all();
       total += result[table].length;
@@ -151,6 +177,7 @@ function snapshotRows(path) {
     }
     const assignments = new Map(result.assignments.map((row) => [row.id, row]));
     const workers = new Map(result.workers.map((row) => [row.id,row]));
+    for (const worker of result.workers) if (!isWorkerLanguage(worker.language)) throw new Error('Invalid source worker language');
     const publications = new Map(result.publications.map((row) => [row.id,row]));
     for (const row of result.assignments) {
       const worker=workers.get(row.worker_id);
@@ -169,6 +196,58 @@ function snapshotRows(path) {
     const receiptKeys = new Set(result.submission_receipts.map((row) => `${row.assignment_id}\0${row.submission_id}`));
     for (const row of [...result.attempts, ...result.recordings.filter((row) => row.received_at)]) {
       if (!receiptKeys.has(`${row.assignment_id}\0${row.submission_id}`)) throw new Error('Missing source submission receipt');
+    }
+    for (const row of result.acknowledgments) {
+      const assignment = assignments.get(row.assignment_id);
+      if (!assignment || assignment.org_id !== row.org_id || assignment.site_id !== row.site_id || assignment.worker_id !== row.worker_id) throw new Error('Source scope mismatch');
+    }
+    const staffIds = new Set(result.staff.map((row) => row.id));
+    for (const row of result.worker_language_requests) {
+      const worker=workers.get(row.worker_id);
+      if(!worker || worker.org_id!==row.org_id || worker.site_id!==row.site_id) throw new Error('Source scope mismatch');
+      if(!isWorkerLanguage(row.current_language) || !isWorkerLanguage(row.requested_language)
+        || row.current_language===row.requested_language) throw new Error('Invalid source language request');
+      if(!['pending','approved','rejected'].includes(row.state) || typeof row.reason!=='string' || row.reason.length>500)
+        throw new Error('Invalid source language request');
+      const pending=row.state==='pending';
+      if(pending ? (row.decided_at!=null || row.decided_by!=null || row.decision_note!=null)
+        : (!row.decided_at || !row.decided_by || !staffIds.has(row.decided_by))) throw new Error('Invalid source language decision');
+    }
+    const briefings = new Map(result.briefings.map((row) => [row.id, row]));
+    const sends = new Map(result.instruction_sends.map((row) => [row.request_id, row]));
+    for (const row of result.instruction_sends) {
+      const briefing = briefings.get(row.briefing_id);
+      if (!briefing || briefing.org_id !== row.org_id || briefing.site_id !== row.site_id) throw new Error('Source scope mismatch');
+      if (row.publication_id) {
+        const publication = publications.get(row.publication_id);
+        if (!publication || publication.org_id !== row.org_id || publication.site_id !== row.site_id || publication.briefing_id !== row.briefing_id) throw new Error('Source scope mismatch');
+      }
+      if (!['question','acknowledge'].includes(row.response_mode) || !['text','voice','both'].includes(row.delivery_mode)) throw new Error('Unsupported source instruction mode');
+      if (!Number.isSafeInteger(row.delivered) || !Number.isSafeInteger(row.undelivered) || row.delivered < 0 || row.undelivered < 0 || row.delivered + row.undelivered !== row.audience_count) throw new Error('Invalid source delivery count');
+    }
+    for (const row of result.instruction_deliveries) {
+      const send = sends.get(row.request_id);
+      if (!send || send.org_id !== row.org_id || send.site_id !== row.site_id) throw new Error('Source scope mismatch');
+      const worker = workers.get(row.worker_id);
+      if (!worker || worker.org_id !== row.org_id || worker.site_id !== row.site_id) throw new Error('Source scope mismatch');
+      if (!isWorkerLanguage(row.language) || !['preparing','available','blocked','failed','withdrawn'].includes(row.state)
+        || !Number.isSafeInteger(row.attempts) || row.attempts < 0 || row.attempts > 3) throw new Error('Invalid source instruction delivery');
+      if (row.state === 'available') {
+        const assignment = assignments.get(row.assignment_id);
+        if (!assignment || assignment.org_id !== row.org_id || assignment.site_id !== row.site_id
+          || assignment.worker_id !== row.worker_id || assignment.publication_id !== send.publication_id
+          || assignment.language !== row.language || typeof row.content_hash !== 'string') throw new Error('Source scope mismatch');
+      } else if (row.assignment_id !== null || row.content_hash !== null) throw new Error('Invalid source instruction delivery');
+      if (row.content_json !== null) {
+        let content;
+        try { content = JSON.parse(row.content_json); } catch { throw new Error('Invalid source instruction delivery content'); }
+        if (!content || typeof content !== 'object' || Array.isArray(content) || row.state !== 'available') throw new Error('Invalid source instruction delivery content');
+      }
+    }
+    for (const row of result.instruction_retries) {
+      const send = sends.get(row.send_request_id);
+      if (!send || send.org_id !== row.org_id || send.site_id !== row.site_id || !staffIds.has(row.requested_by)) throw new Error('Source scope mismatch');
+      if (!Number.isSafeInteger(row.generation) || row.generation < 0) throw new Error('Invalid source instruction retry');
     }
     for (const row of result.submission_receipts) if (!Number.isSafeInteger(row.sequence) || row.sequence < 1) throw new Error('Invalid receipt sequence');
     const evidence = new Map(result.attempts.map((row) => [`${row.assignment_id}\0${row.submission_id}`, { ...row, kind: 'typed' }]));
@@ -198,11 +277,17 @@ function valuesFor(table, row, now) {
     if (![0,1].includes(copy.active)) throw new Error('Invalid source active flag');
     copy.active = !!copy.active;
   }
+  if(table==='workers') {
+    copy.name ??= null;
+    if (![undefined,0,1,false,true].includes(copy.language_selection_required)) throw new Error('Invalid source language selection flag');
+    copy.language_selection_required = copy.language_selection_required===1 || copy.language_selection_required===true;
+    copy.language_selected_at ??= null;copy.language_selected_by ??= null;copy.language_selection_request_id ??= null;
+  }
   if(table==='case_routing') {
     if(![0,1].includes(copy.manual))throw Error('Invalid case routing flag');
     copy.manual=!!copy.manual;
   }
-  if (['sessions','worker_grants'].includes(table)) copy.revoked_at ||= now;
+  if (['sessions','worker_grants','worker_setup_tokens'].includes(table)) copy.revoked_at ||= now;
   if(table==='staff_invitations') {copy.email_payload=null;if(copy.state==='pending') copy.state='expired';}
   if(table==='staff_invitation_tokens') copy.revoked_at ||= now;
   if(table==='staff_invitation_mail') {
@@ -221,7 +306,24 @@ function valuesFor(table, row, now) {
   if (table === 'recordings' && copy.status === 'processing') {
     copy.status = 'received'; copy.lease_token = null; copy.lease_until = null; copy.retry_at = now;
   }
-  if (table === 'recordings' && copy.status === 'storing') { copy.status = 'failed'; copy.error = 'Storage interrupted before migration'; }
+  if(table==='recordings' && copy.status === 'storing') { copy.status = 'failed'; copy.error = 'Storage interrupted before migration'; }
+  if(table==='recordings') {
+    copy.presentation_id ??= null;copy.presentation_language ??= null;copy.presented_question ??= null;
+    const attached=copy.presentation_id!==null || copy.presentation_language!==null || copy.presented_question!==null;
+    if(attached && (copy.presentation_id===null || copy.presentation_language===null
+      || typeof copy.presented_question!=='string' || !copy.presented_question.trim())) throw new Error('Invalid source recording presentation');
+    if(attached && !isWorkerLanguage(copy.presentation_language)) throw new Error('Invalid source recording presentation');
+  }
+  if(table==='presentation_artifacts') {
+    if(!isWorkerLanguage(copy.original_language) || !isWorkerLanguage(copy.target_language)
+      || copy.original_language===copy.target_language) throw new Error('Invalid source presentation language');
+    if(copy.live!==null && copy.live!==undefined) {
+      if(![0,1,false,true].includes(copy.live)) throw new Error('Invalid source presentation live flag');
+      copy.live=copy.live===1 || copy.live===true;
+    }
+  }
+  if(table==='answer_presentation_bindings' && !isWorkerLanguage(copy.presentation_language))
+    throw new Error('Invalid source presentation language');
   if(table==='source_audio_requests') {
     if(copy.status==='processing')copy.status='received';
     copy.lease_token=null;copy.lease_until=null;
@@ -269,28 +371,37 @@ export async function importSqliteBackup(pool, { source, schema, requestId, data
     const now = new Date().toISOString();
     if(snapshot.case_voice.length)await inspectCaseWorkflowRuntimeGuards(client,schema);
     for (const table of tables) {
-      const fields = columns[table].split(' ');
+      const fields = columns[table].split(' ');      if(table==='workers')fields.push('name','language_selection_required','language_selected_at','language_selected_by','language_selection_request_id');
       if (table === 'assignments') fields.push('language');
+      if(table==='sessions')fields.push('credential_revision');
       if (['attempts','clarifications'].includes(table)) fields.push('site_id');
       if(table==='attempts')fields.push('evidence_json');
       if(table==='worker_imports')fields.push('filename_hash');
-      if(table==='site_settings')fields.push('generation_languages_json','primary_contact_id','deputy_contact_id');
+      if(table==='site_settings')fields.push('generation_languages_json','primary_contact_id','deputy_contact_id','staff_interface_language','first_run_completed_at');
       if(table==='draft_creations')fields.push('generation_languages_json');
       if(table==='report_exports')fields.push('filters_json');
+      if(table==='recordings')fields.push('presentation_id','presentation_language','presented_question');
       const placeholders = fields.map((_, index) => `$${index + 1}`).join(',');
       const sql = `INSERT INTO "${table}" (${fields.map((field) => `"${field}"`).join(',')}) ${table === 'submission_receipts' ? 'OVERRIDING SYSTEM VALUE ' : ''}VALUES (${placeholders})`;
       // Maintenance-only, empty-target import of validated history. Runtime roles
       // cannot ALTER, and rollback restores the guard even on insertion failure.
       if(table==='case_voice'&&snapshot[table].length)await client.query('ALTER TABLE case_voice DISABLE TRIGGER case_voice_guard');
+      // Entitlement guards require the live revision sequence; the preserved history is already consistent.
+      const entitlementHistory=['organization_entitlements','organization_entitlement_transitions','organization_activation_requests'].includes(table);
+      if(entitlementHistory&&snapshot[table].length)await client.query(`ALTER TABLE "${table}" DISABLE TRIGGER USER`);
       for (const row of snapshot[table]) {
         const copy = valuesFor(table, row, now);
         if(table==='site_settings')copy.generation_languages_json ??= '["en","ar","ur"]';
         if(table==='site_settings'){copy.primary_contact_id ??= null;copy.deputy_contact_id ??= null;}
+        // Sites imported from pre-onboarding backups were already configured; nullable new registrations stay pending.
+        if(table==='site_settings'){if(!Object.hasOwn(copy,'staff_interface_language'))copy.staff_interface_language='en';
+          if(!Object.hasOwn(copy,'first_run_completed_at'))copy.first_run_completed_at=now;}
         if(table==='draft_creations')copy.generation_languages_json ??= null;
         if(table==='report_exports')copy.filters_json ??= '{"crewId":"","responseFrom":"","responseThrough":""}';
         await client.query(sql, fields.map((field) => copy[field]));
       }
       if(table==='case_voice'&&snapshot[table].length)await client.query('ALTER TABLE case_voice ENABLE TRIGGER case_voice_guard');
+      if(entitlementHistory&&snapshot[table].length)await client.query(`ALTER TABLE "${table}" ENABLE TRIGGER USER`);
       const count = (await client.query(`SELECT COUNT(*)::int AS n FROM "${table}"`)).rows[0].n;
       if (count !== counts[table]) throw new Error('Migration count mismatch');
     }

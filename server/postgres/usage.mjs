@@ -2,7 +2,9 @@ import { responseRead } from './responses.mjs';
 import { requirePrincipal } from './domain.mjs';
 import { publicationResponses } from './reports.mjs';
 import { metricsFromResponses } from '../domain.mjs';
-import { usageModel } from '../usage.mjs';
+import { usageModel,usageEntitlement } from '../usage.mjs';
+import { entitlementState } from './entitlements.mjs';
+import { countActiveWorkers } from './worker-capacity.mjs';
 
 async function readProviderAllowance(client,orgId) {
   const day=(await client.query("SELECT (clock_timestamp() AT TIME ZONE 'UTC')::date::text AS day")).rows[0].day;
@@ -29,6 +31,7 @@ export function getUsage(pool, session, { schema = 'public' } = {}) {
     await requirePrincipal(client, session, 'staff', ['owner', 'administrator', 'supervisor', 'auditor']);
     const publication = (await client.query(`SELECT id,version,state FROM publications WHERE org_id=$1 AND site_id=$2 AND state='published' ORDER BY published_at DESC,id LIMIT 1`, [session.org_id, session.site_id])).rows[0] || null;
     const metrics = publication ? metricsFromResponses(await publicationResponses(client, session, publication.id)) : null;
-    return {...usageModel({ mode: 'synthetic-credential', metrics, latestPublication: publication,providerAllowance:await readProviderAllowance(client,session.org_id) }),changeRequestsAvailable:['owner','administrator','supervisor'].includes(session.role)};
+    const entitlement=usageEntitlement(await entitlementState(client,session.org_id),await countActiveWorkers(client,session.org_id));
+    return {...usageModel({ mode: 'synthetic-credential', metrics, latestPublication: publication,providerAllowance:await readProviderAllowance(client,session.org_id),entitlement }),changeRequestsAvailable:['owner','administrator','supervisor'].includes(session.role)};
   });
 }

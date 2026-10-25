@@ -212,6 +212,9 @@ export function queuePreparation(db,session,id,revision) {
   expectedRevision(revision);
   return transaction(db,() => queuePreparationTransaction(db,session,id,revision));
 }
+export function queuePreparationInTransaction(db,session,id,revision) {
+  return queuePreparationTransaction(db,session,id,revision);
+}
 function queuePreparationTransaction(db,session,id,revision) {
     briefingAuthority(db,session);
     const row=db.prepare('SELECT revision,state FROM briefings WHERE id=? AND org_id=? AND site_id=?').get(id,session.org_id,session.site_id);

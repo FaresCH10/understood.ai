@@ -10,8 +10,13 @@ permissions:
 
 jobs:
   verify:
+    name: Tests shard ${{ matrix.shard }}/4
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
     services:
       postgres:
         image: postgres:18
@@ -43,7 +48,23 @@ jobs:
       - name: Typecheck And Build
         run: npm run build
       - name: Tests Including Real PostgreSQL
-        run: npm test
+        run: npm run test:shard -- ${{ matrix.shard }}/4
+  evaluations:
+    name: Synthetic evaluations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.5.0
+          package-manager-cache: false
+      - name: Install Locked Dependencies
+        run: npm ci
       - name: Versioned Synthetic Provider Contract Evaluation
         run: npm run evaluate:contract
       - name: Isolated Synthetic Backend Pipeline Rehearsal

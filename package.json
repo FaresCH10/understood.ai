@@ -17,11 +17,13 @@
     "postgres:api": "node scripts/postgres-rehearsal.mjs api",
     "postgres:worker": "node scripts/postgres-rehearsal.mjs worker",
     "seed": "node server/seed.mjs",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test --test-timeout=300000 tests/*.test.mjs",
+    "test:shard": "node scripts/test-shard.mjs",
     "evaluate:contract": "node scripts/evaluate-synthetic.mjs contract",
     "evaluate:local": "node scripts/evaluate-synthetic.mjs local",
     "evaluate:runtime": "node scripts/evaluate-runtime.mjs",
     "evaluate:rehearsal": "node scripts/evaluate-rehearsal.mjs",
+    "deploy:preflight": "node scripts/deploy-preflight.mjs",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 3020"
@@ -34,7 +36,8 @@
     "pg": "8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "wavefile": "11.0.0"
+    "wavefile": "11.0.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
@@ -48,6 +51,6 @@
     "vite": "8.3.2"
   },
   "engines": {
-    "node": ">=24.5.0"
+    "node": "24.x"
   }
 }

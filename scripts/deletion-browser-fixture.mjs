@@ -51,7 +51,7 @@ if(process.argv.includes('--publish-crews') || process.argv.includes('--schedule
   db.prepare('INSERT INTO crews VALUES(?,?,?,?,?)').run('qa-crew','cedar','beirut','ZZ Warehouse crew with a deliberately long name for mobile review',1);
   for(let n=0;n<25;n++)db.prepare('INSERT INTO crews VALUES(?,?,?,?,?)').run(`qa-catalog-${n}`,'cedar','beirut',`Crew catalog ${String(n).padStart(2,'0')}`,1);
   for(let n=0;n<126;n++) {
-    db.prepare('INSERT INTO workers VALUES(?,?,?,?,?,?)').run(`qa-member-${n}`,'cedar','beirut',`QA Member ${String(n).padStart(3,'0')}`,'en',n===125?0:1);
+    db.prepare('INSERT INTO workers(id,org_id,site_id,code,language,active) VALUES(?,?,?,?,?,?)').run(`qa-member-${n}`,'cedar','beirut',`QA Member ${String(n).padStart(3,'0')}`,'en',n===125?0:1);
     db.prepare('INSERT INTO crew_memberships VALUES(?,?,?,?,?)').run(`qa-member-${n}`,'cedar','beirut','qa-crew',now);
   }
 }
@@ -78,15 +78,15 @@ saveRecordingNotice(db,owner,{requestId:randomUUID(),revision:0,confirmed:true,s
 db.prepare("INSERT INTO staff VALUES('qa-admin','cedar','beirut','QA administrator','administrator',1)").run();
 if(accessMode==='credential' && process.argv.includes('--site-contacts'))provisionStaffCredential(db,'qa-admin','administrator@example.test','Disposable synthetic password only');
 if(process.argv.includes('--site-contacts'))for(let n=0;n<18;n++)db.prepare('INSERT INTO staff VALUES(?,?,?,?,?,1)').run(`qa-contact-${n}`,'cedar','beirut',`Site contact ${String(n).padStart(2,'0')}${n===17?' with a deliberately long mixed-direction name - مسؤول الموقع':''}`,'supervisor');
-db.prepare("INSERT INTO workers VALUES('qa-new','cedar','beirut','QA Worker New','en',1)").run();
-db.prepare("INSERT INTO workers VALUES('qa-ar','cedar','beirut','QA Worker Arabic','ar',1)").run();
-db.prepare("INSERT INTO workers VALUES('qa-ur','cedar','beirut','QA Worker Urdu','ur',1)").run();
+db.prepare("INSERT INTO workers(id,org_id,site_id,code,language,active) VALUES('qa-new','cedar','beirut','QA Worker New','en',1)").run();
+db.prepare("INSERT INTO workers(id,org_id,site_id,code,language,active) VALUES('qa-ar','cedar','beirut','QA Worker Arabic','ar',1)").run();
+db.prepare("INSERT INTO workers(id,org_id,site_id,code,language,active) VALUES('qa-ur','cedar','beirut','QA Worker Urdu','ur',1)").run();
 for(const [id,worker,language] of process.argv.includes('--site-crews')?[]:[['qa-answer-new','qa-new','en'],['qa-answer-ar','qa-ar','ar'],['qa-answer-ur','qa-ur','ur']]){
   db.prepare('INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,due_at,created_at,language) VALUES(?,?,?,?,?,?,?,?)')
     .run(id,'cedar','beirut','shelf-v3',worker,null,new Date().toISOString(),language);
 }
-db.prepare("INSERT INTO workers VALUES('qa-complete','cedar','beirut','QA Worker Complete','en',1)").run();
-db.prepare("INSERT INTO workers VALUES('qa-pending','cedar','beirut','QA Worker Pending','en',1)").run();
+db.prepare("INSERT INTO workers(id,org_id,site_id,code,language,active) VALUES('qa-complete','cedar','beirut','QA Worker Complete','en',1)").run();
+db.prepare("INSERT INTO workers(id,org_id,site_id,code,language,active) VALUES('qa-pending','cedar','beirut','QA Worker Pending','en',1)").run();
 requestWorkerDeletion(db,owner,'qa-complete',{requestId:randomUUID(),expectedCode:'QA Worker Complete',reason:'worker_request',confirmed:true});
 processOneDeletionRedaction(db);processOneDeletionPseudonym(db);await processOneDeletionCompletion(db,{});
 requestWorkerDeletion(db,owner,'qa-pending',{requestId:randomUUID(),expectedCode:'QA Worker Pending',reason:'customer_policy',confirmed:true});

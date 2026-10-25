@@ -32,7 +32,7 @@ export function createSite(pool,session,input,{schema='public'}={}) {
     await client.query('INSERT INTO sites VALUES($1,$2,$3,$4)',[id,session.org_id,value.name,value.timezone]);
     await client.query("INSERT INTO staff(id,org_id,site_id,name,role) VALUES($1,$2,$3,$4,'owner')",[ownerId,session.org_id,id,name]);
     await linkAccountMembership(client,account.account_id,ownerId);
-    await client.query('INSERT INTO site_settings(site_id,org_id,revision,generation_languages_json,primary_contact_id) VALUES($1,$2,0,$3,$4)',[id,session.org_id,JSON.stringify(value.generationLanguages),ownerId]);
+    await client.query('INSERT INTO site_settings(site_id,org_id,revision,generation_languages_json,primary_contact_id,first_run_completed_at) VALUES($1,$2,0,$3,$4,clock_timestamp())',[id,session.org_id,JSON.stringify(value.generationLanguages),ownerId]);
     await client.query('INSERT INTO site_creations(request_id,org_id,origin_site_id,site_id,created_by,owner_id,request_json) VALUES($1,$2,$3,$4,$5,$6,$7)',[input.requestId,session.org_id,session.site_id,id,session.principal_id,ownerId,JSON.stringify(value)]);
     await domainAudit(client,session,'site.created',id);return {id,ownerId,duplicate:false};});
 }
@@ -57,6 +57,7 @@ export function saveSiteAccess(pool,session,input,{schema='public'}={}) {
     if(value.state==='paused'){
       await client.query("UPDATE sessions SET revoked_at=clock_timestamp() WHERE org_id=$1 AND site_id=$2 AND principal_type='worker' AND revoked_at IS NULL",[session.org_id,value.siteId]);
       await client.query('UPDATE worker_grants SET revoked_at=clock_timestamp() WHERE org_id=$1 AND site_id=$2 AND revoked_at IS NULL',[session.org_id,value.siteId]);
+      await client.query('UPDATE worker_setup_tokens SET revoked_at=clock_timestamp() WHERE org_id=$1 AND site_id=$2 AND revoked_at IS NULL',[session.org_id,value.siteId]);
     }
     await client.query('INSERT INTO site_access_requests(request_id,org_id,origin_site_id,site_id,actor_id,request_json,revision) VALUES($1,$2,$3,$4,$5,$6,$7)',[input.requestId,session.org_id,session.site_id,value.siteId,session.principal_id,JSON.stringify(value),revision]);
     await domainAudit(client,session,`site.worker_access_${value.state}`,value.siteId);return {revision,state:value.state,siteId:value.siteId,duplicate:false};});
@@ -84,6 +85,7 @@ export function saveSiteLifecycle(pool,session,input,{schema='public'}={}) {
     if(value.state==='archived'){
       await client.query("UPDATE sessions SET revoked_at=clock_timestamp() WHERE org_id=$1 AND site_id=$2 AND principal_type='worker' AND revoked_at IS NULL",[session.org_id,value.siteId]);
       await client.query('UPDATE worker_grants SET revoked_at=clock_timestamp() WHERE org_id=$1 AND site_id=$2 AND revoked_at IS NULL',[session.org_id,value.siteId]);
+      await client.query('UPDATE worker_setup_tokens SET revoked_at=clock_timestamp() WHERE org_id=$1 AND site_id=$2 AND revoked_at IS NULL',[session.org_id,value.siteId]);
       await client.query(`INSERT INTO site_access_controls(site_id,org_id,revision,state,reason) VALUES($1,$2,1,'paused','operational') ON CONFLICT(site_id) DO UPDATE SET revision=site_access_controls.revision+1,state='paused',reason='operational',updated_at=clock_timestamp()`,[value.siteId,session.org_id]);
     }
     await client.query('INSERT INTO site_lifecycle_requests(request_id,org_id,origin_site_id,site_id,actor_id,request_json,revision) VALUES($1,$2,$3,$4,$5,$6,$7)',[input.requestId,session.org_id,session.site_id,value.siteId,session.principal_id,JSON.stringify(value),revision]);

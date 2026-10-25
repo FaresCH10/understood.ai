@@ -316,5 +316,5 @@ export function caseTimestamp(locale:CaseLocale,value:string,timezone='UTC'){
   let zone=timezone;try{new Intl.DateTimeFormat('en',{timeZone:zone});}catch{zone='UTC';}
   const text=date.toLocaleString(locale,{timeZone:zone});
   const offset=new Intl.DateTimeFormat('en',{timeZone:zone,timeZoneName:'shortOffset',hour:'2-digit'}).formatToParts(date).find(part=>part.type==='timeZoneName')?.value;
-  if(!offset)throw Error('Case offset unavailable');return {text,offset};
+  if(!offset)throw Error('Case offset unavailable');return {text,offset:offset==='GMT+0'||offset==='GMT-0'?'GMT':offset};
 }

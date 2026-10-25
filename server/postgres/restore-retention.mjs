@@ -30,6 +30,7 @@ export async function requireQuarantine(client,backupId){
   if(!control?.jobs_paused || !control?.provider_paused)throw Error('Restore dispatch quarantine required');
   const denied=(await client.query(`SELECT EXISTS(SELECT 1 FROM organizations o LEFT JOIN tenant_controls t ON t.org_id=o.id WHERE t.state IS DISTINCT FROM 'suspended')
     OR EXISTS(SELECT 1 FROM sessions WHERE revoked_at IS NULL) OR EXISTS(SELECT 1 FROM worker_grants WHERE revoked_at IS NULL)
+    OR EXISTS(SELECT 1 FROM worker_credentials) OR EXISTS(SELECT 1 FROM worker_setup_tokens WHERE revoked_at IS NULL AND used_at IS NULL)
     OR EXISTS(SELECT 1 FROM operator_sessions WHERE revoked_at IS NULL)
     OR EXISTS(SELECT 1 FROM staff_accounts WHERE active=true)
     OR EXISTS(SELECT 1 FROM platform_operators WHERE active=true)

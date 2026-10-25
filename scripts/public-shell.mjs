@@ -10,6 +10,17 @@ export function shellWorker(manifest) {
   return `const files=${JSON.stringify(manifest)};
 const cacheName='understood-shell-v1-${version}';
 const paths=new Set(files.map(file=>file.path));
+const notificationPath='/#notifications';
+function notificationCopy(event) {
+  const fallback={title:'Understood',body:'Open Understood to review new activity.',tag:'understood-update'};
+  let payload;
+  try {payload=event.data?.json();}catch{return fallback;}
+  if(!payload || typeof payload!=='object' || Array.isArray(payload))return fallback;
+  const text=(value,max)=>typeof value==='string' && value.trim() && value.length<=max && !/[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f]/.test(value)
+    ? value.replace(/[\\r\\n\\t]+/g,' ').trim() : '';
+  return {title:text(payload.title,80) || fallback.title,body:text(payload.body,200) || fallback.body,
+    tag:/^understood-[a-z._-]{1,40}$/.test(payload.tag) ? payload.tag : fallback.tag};
+}
 async function matches(response,expected) {
   if(!response?.ok)return false;
   const digest=await crypto.subtle.digest('SHA-256',await response.clone().arrayBuffer());
@@ -36,6 +47,25 @@ self.addEventListener('message',event=>{
     let available=false;
     try {if(event.data.repair===true && !await ready())await prepare();available=await ready();}catch{}
     event.ports[0].postMessage({type:'understood-shell-status',ready:available});
+  })());
+});
+self.addEventListener('push',event=>{
+  const copy=notificationCopy(event);
+  event.waitUntil(self.registration.showNotification(copy.title,{body:copy.body,tag:copy.tag,
+    icon:'/icon-192.png',badge:'/icon-192.png',data:{url:notificationPath}}));
+});
+self.addEventListener('notificationclick',event=>{
+  event.notification.close();
+  event.waitUntil((async()=>{
+    const target=new URL(notificationPath,self.location.origin).href;
+    const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+    const client=clients.find(item=>{try{return new URL(item.url).origin===self.location.origin;}catch{return false;}});
+    if(client){
+      await client.focus();
+      if(client.url!==target && typeof client.navigate==='function')await client.navigate(target);
+      return;
+    }
+    await self.clients.openWindow(target);
   })());
 });
 self.addEventListener('activate',event=>event.waitUntil((async()=>{

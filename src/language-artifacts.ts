@@ -7,6 +7,7 @@ export const artifactLanguages = [
 type StoredLanguage = { title?:unknown; text?:unknown; question?:unknown; speech?:unknown };
 export type PreparedArtifacts = {
   source?:unknown; question?:unknown; facts?:unknown; rubric?:{askedFacts?:unknown};
+  responseMode?:unknown; deliveryMode?:unknown;
   languages?:Record<string,StoredLanguage>; provenance?:{adapter?:unknown;live?:unknown;dataClass?:unknown};
 };
 export type ArtifactField = { value:string; status:'present'|'missing'|'invalid' };

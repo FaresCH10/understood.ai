@@ -13,7 +13,7 @@ export function getBriefingRetention(pool,session,{schema='public'}={}) {
     const scope=staffRecoveryScope(session);
     return {revision:policy?.revision ?? 0,days:policy?.days ?? null,canWrite:['owner','administrator'].includes(session.role),
       recoveryScope:scope?`briefing:${scope}`:null,options:textRetentionDays,completed,
-      limitations:'Archived briefing content expires after the archive, last answer and case resolution have all aged past the policy. Active briefings, pending checks and open cases are not purged. Generated audio must finish its separate cleanup first. Source/title, prepared content, publication snapshots, review receipts, regeneration baselines and cleaned manifests are redacted; version identities, audiences, outcomes and content hashes remain. Independently created copies, case content, templates/glossary, operational notes, backups and downloaded/device copies have separate lifecycles. Disabling cleanup cannot restore content.'};
+      limitations:'Archived briefing content expires after the archive, last answer and case resolution have all aged past the policy. Active briefings, pending checks and open cases are not purged. Generated audio must finish its separate cleanup first. Source/title, prepared content, publication snapshots, review receipts, regeneration baselines, cleaned manifests, translated presentation copies and presented-question provenance are redacted; version identities, audiences, outcomes and content hashes remain. Independently created copies, case content, templates/glossary, operational notes, backups and downloaded/device copies have separate lifecycles. Disabling cleanup cannot restore content.'};
   });
 }
 export function briefingRetentionReceipt(pool,session,requestId,{schema='public'}={}) {
@@ -75,6 +75,44 @@ export async function redactExpiredBriefingContent(client,id) {
   await client.query("UPDATE generated_bundles SET manifest_json='{}' WHERE briefing_id=$1",[id]);
   await client.query("UPDATE briefing_copies SET title='[Expired]' WHERE copy_briefing_id=$1",[id]);
   await client.query("UPDATE source_audio_requests SET title='[Expired]' WHERE briefing_id=$1",[id]);
+  const sends=(await client.query(`SELECT to_regclass('instruction_sends') IS NOT NULL
+    AND to_regclass('instruction_deliveries') IS NOT NULL
+    AND to_regprocedure('instruction_send_request_tombstone(jsonb)') IS NOT NULL AS present`)).rows[0].present;
+  if(sends){
+    await client.query(`UPDATE instruction_sends SET request_json=instruction_send_request_tombstone(request_json)
+      WHERE briefing_id=$1 AND request_json IS DISTINCT FROM instruction_send_request_tombstone(request_json)`,[id]);
+    await client.query(`UPDATE instruction_deliveries SET state='blocked',reason='content_expired',updated_at=clock_timestamp()
+      WHERE state='preparing' AND request_id IN (SELECT request_id FROM instruction_sends WHERE briefing_id=$1)`,[id]);
+    await client.query(`UPDATE instruction_deliveries SET content_json=NULL,updated_at=clock_timestamp()
+      WHERE content_json IS NOT NULL AND request_id IN (SELECT request_id FROM instruction_sends WHERE briefing_id=$1)`,[id]);
+    await client.query(`UPDATE instruction_sends s SET undelivered_json=COALESCE((
+        SELECT jsonb_agg(jsonb_build_object('reason',g.reason,'language',g.language,'count',g.n) ORDER BY g.first_worker)
+        FROM (SELECT d.reason,d.language,count(*)::integer AS n,min(d.worker_id) AS first_worker
+          FROM instruction_deliveries d WHERE d.request_id=s.request_id AND d.state<>'available' AND d.reason IS NOT NULL
+          GROUP BY d.reason,d.language) g),'[]'::jsonb),updated_at=clock_timestamp()
+      WHERE s.briefing_id=$1 AND EXISTS(SELECT 1 FROM instruction_deliveries d
+        WHERE d.request_id=s.request_id AND d.reason='content_expired')`,[id]);
+  }
+  const presentations=(await client.query(`SELECT to_regclass('presentation_artifacts') IS NOT NULL
+    AND to_regclass('answer_presentation_bindings') IS NOT NULL
+    AND EXISTS(SELECT 1 FROM pg_attribute WHERE attrelid=to_regclass('recordings') AND attname='presented_question' AND NOT attisdropped) AS present`)).rows[0].present;
+  if(presentations){
+    await client.query(`UPDATE presentation_artifacts p SET title=CASE WHEN p.title IS NULL THEN NULL ELSE '[Expired]' END,
+      text='[Expired]',question=CASE WHEN p.question IS NULL THEN NULL ELSE '[Expired]' END,updated_at=clock_timestamp()
+      WHERE p.assignment_id IN (SELECT a.id FROM assignments a JOIN publications pub ON pub.id=a.publication_id WHERE pub.briefing_id=$1)
+        AND p.status='ready' AND p.text NOT IN ('[Deleted]','[Expired]')`,[id]);
+    await client.query(`UPDATE presentation_artifacts p SET status='failed',title=NULL,text=NULL,question=NULL,provider=NULL,live=NULL,
+      error_code='Briefing content retention expired',lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp()
+      WHERE p.assignment_id IN (SELECT a.id FROM assignments a JOIN publications pub ON pub.id=a.publication_id WHERE pub.briefing_id=$1)
+        AND p.status='pending'`,[id]);
+    await client.query(`UPDATE answer_presentation_bindings SET presented_question='[Expired]'
+      WHERE presentation_id IN (SELECT p.id FROM presentation_artifacts p JOIN assignments a ON a.id=p.assignment_id
+        JOIN publications pub ON pub.id=a.publication_id WHERE pub.briefing_id=$1)
+        AND presented_question NOT IN ('[Deleted]','[Expired]')`,[id]);
+    await client.query(`UPDATE recordings SET presented_question='[Expired]'
+      WHERE assignment_id IN (SELECT a.id FROM assignments a JOIN publications pub ON pub.id=a.publication_id WHERE pub.briefing_id=$1)
+        AND presented_question IS NOT NULL AND presented_question NOT IN ('[Deleted]','[Expired]')`,[id]);
+  }
 }
 
 export async function expiredBriefingContentMatches(client,briefingId,kind,key,content) {

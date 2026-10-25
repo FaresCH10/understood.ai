@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {allowPrivateDevice,enableSharedDevice,privateDeviceAllowed,sharedDeviceText} from '../src/worker-device-policy.ts';
 import {saveTextDraft} from '../src/worker-text-draft.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 const time=Date.parse('2026-10-10T12:00:00.000Z');
 const session={authenticated:true,role:'worker',workerId:'fixture-worker',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:new Date(time+60000).toISOString()};
@@ -32,7 +33,7 @@ test('unavailable, malformed and unverified storage fails closed',()=>{
   assert.equal(privateDeviceAllowed(session.clientContext,{...tab,getItem:()=>{throw Error();}},device,time),false);
   assert.throws(()=>allowPrivateDevice(session,{...tab,setItem:()=>{}},device,time));
   device.setItem('understood:device-barrier:v1','bad');assert.throws(()=>allowPrivateDevice(session,tab,device,time));
-  for(const language of ['en','ar','ur'])for(const value of Object.values(sharedDeviceText[language]))assert.ok(value.trim());
+  assertWorkerDictionary(sharedDeviceText,'sharedDeviceText');
 });
 test('actual browser text-save boundary rejects shared mode and stale private choice without changing the draft',async()=>{
   const tab=storage(),device=storage(),originalTab=Object.getOwnPropertyDescriptor(globalThis,'sessionStorage'),originalDevice=Object.getOwnPropertyDescriptor(globalThis,'localStorage');

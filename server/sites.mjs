@@ -33,7 +33,7 @@ export function createSite(db,session,input) {
     db.prepare('INSERT INTO sites VALUES(?,?,?,?)').run(id,session.org_id,value.name,value.timezone);
     db.prepare("INSERT INTO staff VALUES(?,?,?,?, 'owner',1)").run(ownerId,session.org_id,id,name);
     linkAccountMembership(db,account.account_id,ownerId);
-    db.prepare('INSERT INTO site_settings(site_id,org_id,revision,generation_languages_json,primary_contact_id) VALUES(?,?,0,?,?)').run(id,session.org_id,JSON.stringify(value.generationLanguages),ownerId);
+    db.prepare('INSERT INTO site_settings(site_id,org_id,revision,generation_languages_json,primary_contact_id,first_run_completed_at) VALUES(?,?,0,?,?,?)').run(id,session.org_id,JSON.stringify(value.generationLanguages),ownerId,NOW());
     db.prepare('INSERT INTO site_creations VALUES(?,?,?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,id,session.principal_id,ownerId,JSON.stringify(value),NOW());
     db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),session.org_id,session.site_id,'staff',session.principal_id,'site.created',id,NOW());
     return {id,ownerId,duplicate:false};});
@@ -57,6 +57,7 @@ export function saveSiteAccess(db,session,input) {
     if(value.state==='paused'){
       db.prepare("UPDATE sessions SET revoked_at=? WHERE org_id=? AND site_id=? AND principal_type='worker' AND revoked_at IS NULL").run(now,session.org_id,value.siteId);
       db.prepare('UPDATE worker_grants SET revoked_at=? WHERE org_id=? AND site_id=? AND revoked_at IS NULL').run(now,session.org_id,value.siteId);
+      db.prepare('UPDATE worker_setup_tokens SET revoked_at=? WHERE org_id=? AND site_id=? AND revoked_at IS NULL').run(now,session.org_id,value.siteId);
     }
     db.prepare('INSERT INTO site_access_requests VALUES(?,?,?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,value.siteId,session.principal_id,JSON.stringify(value),revision,now);
     db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),session.org_id,session.site_id,'staff',session.principal_id,`site.worker_access_${value.state}`,value.siteId,now);
@@ -85,6 +86,7 @@ export function saveSiteLifecycle(db,session,input) {
     if(value.state==='archived'){
       db.prepare("UPDATE sessions SET revoked_at=? WHERE org_id=? AND site_id=? AND principal_type='worker' AND revoked_at IS NULL").run(now,session.org_id,value.siteId);
       db.prepare('UPDATE worker_grants SET revoked_at=? WHERE org_id=? AND site_id=? AND revoked_at IS NULL').run(now,session.org_id,value.siteId);
+      db.prepare('UPDATE worker_setup_tokens SET revoked_at=? WHERE org_id=? AND site_id=? AND revoked_at IS NULL').run(now,session.org_id,value.siteId);
       db.prepare(`INSERT INTO site_access_controls VALUES(?,?,1,'paused','operational',?) ON CONFLICT(site_id) DO UPDATE SET revision=site_access_controls.revision+1,state='paused',reason='operational',updated_at=excluded.updated_at`).run(value.siteId,session.org_id,now);
     }
     db.prepare('INSERT INTO site_lifecycle_requests VALUES(?,?,?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,value.siteId,session.principal_id,JSON.stringify(value),revision,now);

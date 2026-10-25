@@ -25,6 +25,13 @@ export function ensureSettingsSchema(db) {
   if(!db.prepare('PRAGMA table_info(site_settings)').all().some(row=>row.name==='generation_languages_json'))db.exec(`ALTER TABLE site_settings ADD COLUMN generation_languages_json TEXT NOT NULL DEFAULT '["en","ar","ur"]'
     CHECK(generation_languages_json IN ('["en"]','["en","ar"]','["en","ur"]','["en","ar","ur"]'));`);
   for(const field of ['primary_contact_id','deputy_contact_id'])if(!db.prepare('PRAGMA table_info(site_settings)').all().some(row=>row.name===field))db.exec(`ALTER TABLE site_settings ADD COLUMN ${field} TEXT REFERENCES staff(id);`);
+  if(!db.prepare('PRAGMA table_info(site_settings)').all().some(row=>row.name==='staff_interface_language'))
+    db.exec("ALTER TABLE site_settings ADD COLUMN staff_interface_language TEXT NOT NULL DEFAULT 'en' CHECK(staff_interface_language IN ('en','ar'));");
+  if(!db.prepare('PRAGMA table_info(site_settings)').all().some(row=>row.name==='first_run_completed_at')){
+    db.exec('ALTER TABLE site_settings ADD COLUMN first_run_completed_at TEXT;');
+    // Workspaces that predate first-run onboarding have already been configured.
+    db.prepare('UPDATE site_settings SET first_run_completed_at=?').run(NOW());
+  }
   for(const action of ['INSERT','UPDATE'])db.exec(`CREATE TRIGGER IF NOT EXISTS site_contacts_scope_${action.toLowerCase()} BEFORE ${action} ON site_settings WHEN
     (NEW.primary_contact_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM staff WHERE id=NEW.primary_contact_id AND org_id=NEW.org_id AND site_id=NEW.site_id)) OR
     (NEW.deputy_contact_id IS NOT NULL AND (NEW.primary_contact_id IS NULL OR NEW.primary_contact_id=NEW.deputy_contact_id OR NOT EXISTS(SELECT 1 FROM staff WHERE id=NEW.deputy_contact_id AND org_id=NEW.org_id AND site_id=NEW.site_id)))

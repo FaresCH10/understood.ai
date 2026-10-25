@@ -5,7 +5,9 @@ export function clientSessionContext(session) {
   if(!/^[a-f0-9]{64}$/.test(session.token_hash || '') || !Number.isFinite(Date.parse(session.expires_at)))
     throw new Error('Sign in required');
   const identity=[session.token_hash,session.org_id,session.site_id,session.principal_type,session.principal_id,
-    session.access_mode,session.principal_type==='worker' ? session.language : session.role];
+    session.access_mode,session.principal_type==='worker' ? session.language : session.role,
+    session.principal_type==='worker' ? (session.language_selection_required ? 1 : 0) : 0];
+  if(session.principal_type==='worker')identity.push(session.credential_revision ?? null);
   return {clientContext:createHash('sha256').update('understood:page-session:v1\0').update(JSON.stringify(identity)).digest('hex'),
     expiresAt:new Date(session.expires_at).toISOString()};
 }
@@ -28,12 +30,13 @@ export function staffBillingContextRequired(path,method) {
 }
 
 export function staffPeopleContextRequired(path,method) {
-  return ['GET','HEAD'].includes(method) && (/^\/api\/people\/(workers|crews)$/.test(path) || /^\/api\/people\/crews\/[^/]+$/.test(path) || /^\/api\/people\/imports\/[^/]+$/.test(path)
-      || /^\/api\/people\/workers\/[^/]+\/(access|deletion|assignments)$/.test(path) || path==='/api/privacy/workers')
+  return ['GET','HEAD'].includes(method) && (/^\/api\/people\/(workers|crews|language-requests)$/.test(path) || /^\/api\/people\/crews\/[^/]+$/.test(path) || /^\/api\/people\/imports\/[^/]+$/.test(path)
+      || /^\/api\/people\/workers\/[^/]+\/(access|credentials|deletion|assignments|language-requests)$/.test(path) || path==='/api/privacy/workers')
     || method==='PATCH' && /^\/api\/people\/(workers|crews)\/[^/]+$/.test(path)
     || method==='POST' && (/^\/api\/people\/(workers|crews)$/.test(path)
-      || /^\/api\/people\/workers\/[^/]+\/(crew|disable|reenable|deletion)$/.test(path) || /^\/api\/people\/crews\/[^/]+\/(archive|restore)$/.test(path)
+      || /^\/api\/people\/workers\/[^/]+\/(crew|disable|reenable|deletion|credentials\/setup)$/.test(path) || /^\/api\/people\/crews\/[^/]+\/(archive|restore)$/.test(path)
       || path==='/api/people/imports/preview' || /^\/api\/people\/imports\/[^/]+\/confirm$/.test(path)
+      || /^\/api\/people\/language-requests\/[^/]+\/decision$/.test(path)
       || path==='/api/worker-grants' || /^\/api\/worker-grants\/[^/]+\/revoke$/.test(path));
 }
 
@@ -78,16 +81,18 @@ export function staffOnboardingContextRequired(path,method) {
 }
 
 export function staffUsageContextRequired(path,method) {
-  return ['GET','HEAD'].includes(method) && (path==='/api/usage' || /^\/api\/usage\/requests(?:\/[^/]+)?$/.test(path))
-    || method==='POST' && path==='/api/usage/requests';
+  return ['GET','HEAD'].includes(method) && (path==='/api/usage' || /^\/api\/usage\/requests(?:\/[^/]+)?$/.test(path) || /^\/api\/entitlement\/requests\/[^/]+$/.test(path))
+    || method==='POST' && (path==='/api/usage/requests' || path==='/api/entitlement/requests');
 }
 
 export function staffApplicationContextRequired(path,method) {
   return ['GET','HEAD'].includes(method) && (path==='/api/overview' || /^\/api\/processing(?:\/[^/]+)?$/.test(path)
     || /^\/api\/processing\/[^/]+\/retries(?:\/[^/]+)?$/.test(path)
     || /^\/api\/processing\/[^/]+\/provenance$/.test(path)
-    || /^\/api\/audit(?:\/[^/]+)?$/.test(path) || path==='/api/language-readiness')
-    || method==='POST' && (path==='/api/language-readiness/test' || /^\/api\/processing\/[^/]+\/retries$/.test(path));
+    || /^\/api\/audit(?:\/[^/]+)?$/.test(path) || path==='/api/language-readiness'
+    || path==='/api/instructions/audience' || /^\/api\/instructions\/sends\/[^/]+$/.test(path))
+    || method==='POST' && (path==='/api/language-readiness/test' || /^\/api\/processing\/[^/]+\/retries$/.test(path) || path==='/api/instructions/send'
+      || /^\/api\/instructions\/sends\/[^/]+\/retry$/.test(path));
 }
 
 export function staffClarificationContextRequired(path,method) {

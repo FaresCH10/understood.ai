@@ -1,18 +1,22 @@
 import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, Bell, Check, CheckCircle2, ChevronDown, ChevronLeft,ChevronRight, Clock3,
+  Eye, EyeOff,
   FileText, HelpCircle, Home, Languages, LogOut, MessageCircle, Plus,
-  Search, Send, Settings, Sparkles, TriangleAlert, Users, Volume2,
+  Search, Send, Settings, Sparkles, TriangleAlert, Users, Volume2, X,
   BarChart3, Download, Play, RefreshCw, ShieldCheck,KeyRound,Smartphone,
 } from 'lucide-react';
 import './styles.css';
 import { WorkerRecorderView } from './WorkerRecorderView';
+import { WorkerPresentationView } from './WorkerPresentationView';
 import {WorkerDeviceView} from './WorkerDeviceView';
 import {WorkerAccessEntry} from './WorkerAccessEntry';
 import {WorkerHelpHub} from './WorkerHelpHub';
+import {WorkerNotifications} from './WorkerNotifications';
+import {workerNotificationText} from './worker-notifications';
 import {WorkerAudioPlayer} from './WorkerAudioPlayer';
 import {workerInboxPath,workerNavigationText,type WorkerInboxTab} from './worker-navigation';
-import {readWorkerUiLanguage,readWorkerLockLanguage,saveWorkerUiLanguage,workerUiLanguageText,type WorkerUiLanguage} from './worker-ui-language';
+import {readWorkerUiLanguage,readWorkerLockLanguage,saveWorkerUiLanguage,workerBrowserLanguage,workerUiDirection,workerUiFallbackLanguage,workerUiLanguageText,workerUiLanguages,workerUiNativeName,type WorkerUiLanguage} from './worker-ui-language';
 import {workerLeaveRequired,workerLeaveText,workerNavigationDecision,retainWorkerDetail,workerRefreshText,workerInputAvailability,type WorkerLeaveAction} from './worker-unsent';
 import {keepDialogFocus} from './dialog-focus';
 import {useWorkerSessionGuard} from './useWorkerSessionGuard';
@@ -50,6 +54,7 @@ import {staffRequestBinding} from './staff-request';
 import {useArtifactRead} from './useArtifactRead';
 import {appStaffAction,checkedPreparationAcknowledgement} from './app-staff-action';
 const PublishForm=lazy(()=>import('./PublishForm'));
+const SendInstruction=lazy(()=>import('./SendInstruction'));
 const NewBriefing=lazy(()=>import('./NewBriefing'));
 const PublicProduct=lazy(()=>import('./PublicProduct'));
 const Onboarding=lazy(()=>import('./Onboarding'));
@@ -69,6 +74,7 @@ import {WorkerSubmissionReceipt} from './WorkerSubmissionReceipt';
 import { canManageStaff,staffDate,staffGreeting } from './staff-policy';
 import { WorkerHelpHistory, workerStatusText, workerVersionText } from './WorkerHelpHistory';
 import {CaseVoiceRecorder} from './CaseVoiceRecorder';
+import type {RecordingLanguage} from './recording-notice';
 import {readWorkerRecordingNotice,WorkerRecordingNoticeError} from './worker-recording-notice';
 import { workerResponseState, type WorkerResponse } from './worker-state.ts';
 import { workerAccessToken } from './worker-access';
@@ -104,6 +110,10 @@ import {accountRecoveryToken} from './account-recovery-link';
 import {AccountSiteSwitcher} from './AccountSiteSwitcher';
 import {checkedSiteSession,selectAccountSite,type SiteSession} from './account-site';
 import {invitationLinkToken} from './invitation-link';
+import {RegistrationPage,VerifyRegistration,type RegistrationLanguage} from './Register';
+import {verificationToken} from './registration';
+import {FirstRunOnboarding} from './FirstRunOnboarding';
+import type {FirstRunLanguage} from './first-run';
 const StaffInvitations=lazy(()=>import('./StaffInvitations').then(module=>({default:module.StaffInvitations})));
 const AcceptInvitation=lazy(()=>import('./AcceptInvitation').then(module=>({default:module.AcceptInvitation})));
 class InvitationView extends React.Component<{children:React.ReactNode},{failed:boolean}> {
@@ -112,16 +122,29 @@ class InvitationView extends React.Component<{children:React.ReactNode},{failed:
   render() {return this.state.failed ? <section role="alert"><h1>Invitation view unavailable</h1><p>Reload this page to try again. For acceptance, reopen the original email link.</p><button className="button outline" onClick={()=>location.reload()}><RefreshCw size={18}/>Reload</button></section> : <Suspense fallback={<p role="status">Loading invitation...</p>}>{this.props.children}</Suspense>;}
 }
 
-type Session = PageSession & { authenticated: boolean; mode: string; role?: 'staff' | 'worker'; staffRole?: 'owner' | 'administrator' | 'supervisor' | 'auditor' | null; name?: string; organization?: string; site?: string;siteState?:'active'|'archived';timezone?:string; language?: string;staffScope?:string|null;billingRecoveryScope?:string|null;templateRecoveryScope?:string|null;staffRecoveryScope?:string|null };
-type Counts = { assigned: number; responses: number; matches: number; clarifications: number; unassessed: number; pending: number; completion: number };
+type Session = PageSession & { authenticated: boolean; mode: string; role?: 'staff' | 'worker'; staffRole?: 'owner' | 'administrator' | 'supervisor' | 'auditor' | null; name?: string; organization?: string; site?: string;siteState?:'active'|'archived';timezone?:string; language?: string;languageSelectionRequired?:boolean;staffScope?:string|null;billingRecoveryScope?:string|null;templateRecoveryScope?:string|null;staffRecoveryScope?:string|null;staffInterfaceLanguage?:'en'|'ar'|null;firstRunRequired?:boolean };
+type Counts = { assigned: number; responses: number; matches: number; clarifications: number; unassessed: number; pending: number; completion: number; acknowledged?: number };
 type Case = { id: string; worker: string; language: string; title: string; reason: string; status: string; created_at: string };
 type Briefing = { id: string; title: string; state: string; next_version: number; published_version: number | null;publication_state:string|null;archived_at:string|null; schedule_state:string|null;scheduled_for:string|null; updated_at: string };
 type WorkerBriefing = WorkerResponse & { id: string; title: string; language: string; version: number; reminderAt?:string };
 type WorkerBriefingPage={items:WorkerBriefing[];total:number;page:number;pageSize:number;counts:{todo:number;sent:number;history:number;followup:number};asOf:string};
-const workerPagingText={
+type WorkerPagingText={previous:string;next:string;refresh:string;first:string;emptyHistory:string};
+const workerPagingText:Record<WorkerUiLanguage,WorkerPagingText>={
   en:{previous:'Previous briefings',next:'Next briefings',refresh:'Refresh briefings',first:'First page',emptyHistory:'No assigned briefing history yet.'},
   ar:{previous:'التعليمات السابقة',next:'التعليمات التالية',refresh:'تحديث التعليمات',first:'الصفحة الأولى',emptyHistory:'لا يوجد سجل تعليمات مسندة بعد.'},
   ur:{previous:'پچھلی ہدایات',next:'اگلی ہدایات',refresh:'ہدایات تازہ کریں',first:'پہلا صفحہ',emptyHistory:'ابھی کوئی تفویض کردہ ہدایات نہیں ہیں۔'},
+  hi:{previous:'पिछले निर्देश',next:'अगले निर्देश',refresh:'निर्देश ताज़ा करें',first:'पहला पृष्ठ',emptyHistory:'अभी तक कोई सौंपा गया निर्देश इतिहास नहीं।'},
+  bn:{previous:'আগের নির্দেশনা',next:'পরের নির্দেশনা',refresh:'নির্দেশনা রিফ্রেশ করুন',first:'প্রথম পৃষ্ঠা',emptyHistory:'এখনও কোনো বরাদ্দকৃত নির্দেশনার ইতিহাস নেই।'},
+  ml:{previous:'മുമ്പത്തെ നിർദ്ദേശങ്ങൾ',next:'അടുത്ത നിർദ്ദേശങ്ങൾ',refresh:'നിർദ്ദേശങ്ങൾ പുതുക്കുക',first:'ആദ്യ പേജ്',emptyHistory:'ഇതുവരെ നൽകിയ നിർദ്ദേശ ചരിത്രമില്ല.'},
+  ta:{previous:'முந்தைய அறிவுறுத்தல்கள்',next:'அடுத்த அறிவுறுத்தல்கள்',refresh:'அறிவுறுத்தல்களைப் புதுப்பி',first:'முதல் பக்கம்',emptyHistory:'இதுவரை ஒதுக்கப்பட்ட அறிவுறுத்தல் வரலாறு இல்லை.'},
+  te:{previous:'మునుపటి సూచనలు',next:'తదుపరి సూచనలు',refresh:'సూచనలను రిఫ్రెష్ చేయండి',first:'మొదటి పేజీ',emptyHistory:'ఇంకా కేటాయించిన సూచనల చరిత్ర లేదు.'},
+  ne:{previous:'अघिल्ला निर्देशनहरू',next:'अर्का निर्देशनहरू',refresh:'निर्देशनहरू ताजा गर्नुहोस्',first:'पहिलो पृष्ठ',emptyHistory:'अहिलेसम्म तोकिएको निर्देशन इतिहास छैन।'},
+  fil:{previous:'Mga nakaraang tagubilin',next:'Mga susunod na tagubilin',refresh:'I-refresh ang mga tagubilin',first:'Unang pahina',emptyHistory:'Wala pang history ng nakatalagang tagubilin.'},
+  si:{previous:'පෙර උපදෙස්',next:'ඊළඟ උපදෙස්',refresh:'උපදෙස් නැවුම් කරන්න',first:'පළමු පිටුව',emptyHistory:'තවම පවරන ලද උපදෙස් ඉතිහාසයක් නැත.'},
+  ru:{previous:'Предыдущие инструкции',next:'Следующие инструкции',refresh:'Обновить инструкции',first:'Первая страница',emptyHistory:'Истории назначенных инструкций пока нет.'},
+  'pa-Guru':{previous:'ਪਿਛਲੀਆਂ ਹਦਾਇਤਾਂ',next:'ਅਗਲੀਆਂ ਹਦਾਇਤਾਂ',refresh:'ਹਦਾਇਤਾਂ ਤਾਜ਼ਾ ਕਰੋ',first:'ਪਹਿਲਾ ਪੰਨਾ',emptyHistory:'ਹਾਲੇ ਕੋਈ ਸੌਂਪੀ ਹਦਾਇਤ ਦਾ ਇਤਿਹਾਸ ਨਹੀਂ।'},
+  'pa-Arab':{previous:'پچھلیاں ہدایتاں',next:'اگلیاں ہدایتاں',refresh:'ہدایتاں تازہ کرو',first:'پہلا صفحہ',emptyHistory:'ہالے کوئی سونپی ہدایت دی تریخ نئیں۔'},
+  id:{previous:'Instruksi sebelumnya',next:'Instruksi berikutnya',refresh:'Muat ulang instruksi',first:'Halaman pertama',emptyHistory:'Belum ada riwayat instruksi yang ditugaskan.'},
 };
 
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -177,15 +200,23 @@ function Notice({ children, tone = 'amber' }: { children: React.ReactNode; tone?
   return <div className={`notice notice-${tone}`}><TriangleAlert size={22} /><span>{children}</span></div>;
 }
 
-const staffNavigation = [
-  { key: 'overview', label: 'Overview', icon: Home },
-  { key: 'briefings', label: 'Briefings', icon: FileText },
-  { key: 'clarifications', label: 'Clarifications', icon: MessageCircle },
-  { key: 'people', label: 'People', icon: Users },
-  { key: 'processing', label: 'AI processing', icon: Sparkles },
-  { key: 'reports', label: 'Reports', icon: BarChart3 },
-  { key: 'settings', label: 'Settings', icon: Settings },
+const staffPrimaryNavigation = [
+  { key: 'overview', label: 'today', icon: Home },
+  { key: 'briefings', label: 'instructions', icon: FileText },
+  { key: 'people', label: 'team', icon: Users },
 ];
+const staffSecondaryNavigation = [
+  { key: 'reports', label: 'reports', icon: BarChart3 },
+  { key: 'settings', label: 'settings', icon: Settings },
+];
+function staffNavigationActive(key:string,view:string) {
+  if(key==='overview')return view==='overview';
+  if(key==='briefings')return ['briefings','clarifications','processing','language-readiness','source-audio'].some(route=>view===route||view.startsWith(`${route}/`))||view.startsWith('templates')||view.startsWith('glossary');
+  if(key==='people')return view==='people'||view.startsWith('people/');
+  if(key==='reports')return view==='reports'||view.startsWith('reports/');
+  if(key==='settings')return view==='settings'||view.startsWith('settings/');
+  return view===key||view.startsWith(`${key}/`);
+}
 
 // The one-time mount lives in entry.tsx, outside the Fast Refresh boundary.
 export default function App() {
@@ -200,12 +231,19 @@ export default function App() {
   const staffUiLanguage=reportsRoute(view)?reportUiLanguage:clarificationRoute(view)?caseUiLanguage:peopleRouteLocale(view,directoryLanguage),staffUi=peopleShellText[staffUiLanguage];
   const [refresh, setRefresh] = useState(0);
   const [message, setMessage] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(()=>{try{const value=localStorage.getItem('understood:sign-in-email');return value && value.length<=254?value:'';}catch{return '';}});
   const [password, setPassword] = useState('');
+  const [rememberDevice,setRememberDevice]=useState(()=>{try{return Boolean(localStorage.getItem('understood:sign-in-email'));}catch{return false;}});
+  const [showPassword,setShowPassword]=useState(false);
+  const [inviteOpen,setInviteOpen]=useState(false),[inviteLink,setInviteLink]=useState(''),[inviteError,setInviteError]=useState('');
   const [workerToken, setWorkerToken] = useState(() => workerAccessToken(location.hash));
+  const [workerLinkSignal,setWorkerLinkSignal]=useState(0);
   const [workerEntryLanguage,setWorkerEntryLanguage]=useState<WorkerUiLanguage>(()=>navigator.language.startsWith('ar')?'ar':navigator.language.startsWith('ur')?'ur':'en');
   const [recoveryToken,setRecoveryToken]=useState(()=>accountRecoveryToken(location.hash));
   const [invitationToken,setInvitationToken]=useState(()=>invitationLinkToken(location.hash));
+  const [registrationToken,setRegistrationToken]=useState(()=>verificationToken(location.hash));
+  const [registrationLanguage,setRegistrationLanguage]=useState<RegistrationLanguage>(()=>navigator.language.startsWith('ar')?'ar':'en');
+  const appliedStaffLanguage=useRef('');
   const authInFlight=useRef(false);
   const [authBusy,setAuthBusy]=useState(false);
   const [localCleanupFailed,setLocalCleanupFailed]=useState(false);
@@ -223,16 +261,20 @@ export default function App() {
       if(location.hash.startsWith('#accept-invitation/')) {
         setInvitationToken(invitationLinkToken(location.hash));
         history.replaceState(null,'',`${location.pathname}${location.search}#accept-invitation`);setView('accept-invitation');
+      } else if(location.hash.startsWith('#verify-registration/')) {
+        setRegistrationToken(verificationToken(location.hash));
+        history.replaceState(null,'',`${location.pathname}${location.search}#verify-registration`);setView('verify-registration');
       } else if(location.hash.startsWith('#reset-password/')) {
         setRecoveryToken(accountRecoveryToken(location.hash));
         history.replaceState(null,'',`${location.pathname}${location.search}#reset-password`);setView('reset-password');
       } else if(location.hash.startsWith('#worker-access/')) {
-        setWorkerToken(workerAccessToken(location.hash));
+        setWorkerToken(workerAccessToken(location.hash));setWorkerLinkSignal(n=>n+1);
         history.replaceState(null,'',`${location.pathname}${location.search}#worker-access`);setView('worker-access');
       } else {
         if(location.hash!=='#worker-access') setWorkerToken('');
         if(location.hash!=='#reset-password') setRecoveryToken('');
         if(location.hash!=='#accept-invitation') setInvitationToken('');
+        if(location.hash!=='#verify-registration' && location.hash!=='#register') setRegistrationToken('');
         setView(location.hash.slice(1) || 'overview');
       }
     };
@@ -251,7 +293,16 @@ export default function App() {
     return()=>controller.abort();
   },[sessionRetry]);
   const navigate = (next: string) => {if(navigationGuard.current && !navigationGuard.current(next))return;location.hash = next; setView(next); window.scrollTo(0, 0); };
-  useEffect(()=>{if(session?.authenticated && session.staffRole==='administrator' && !view.startsWith('settings') && !['operations','home','walkthrough','pilot','sign-in','account-recovery','reset-password','accept-invitation'].includes(view)) navigate('settings/staff');},[session?.authenticated,session?.staffRole,view]);
+  useEffect(()=>{if(session?.authenticated && session.staffRole==='administrator' && !view.startsWith('settings') && !['operations','home','walkthrough','pilot','sign-in','account-recovery','reset-password','accept-invitation','register','verify-registration'].includes(view)) navigate('settings/staff');},[session?.authenticated,session?.staffRole,view]);
+  useEffect(()=>{if(session?.authenticated && session.role==='staff' && session.firstRunRequired && view!=='onboarding/first-run' && !['operations','home','walkthrough','pilot','sign-in','account-recovery','reset-password','accept-invitation','register','verify-registration','worker-access'].includes(view)) navigate('onboarding/first-run');},[session?.authenticated,session?.role,session?.firstRunRequired,view]);
+  useEffect(()=>{
+    const value=session?.role==='staff'?session.staffInterfaceLanguage:null;
+    if(value!=='en' && value!=='ar') return;
+    const key=`${session?.clientContext}:${value}`;
+    if(appliedStaffLanguage.current===key) return;
+    appliedStaffLanguage.current=key;
+    setDirectoryLanguage(value);setCaseUiLanguage(value);setReportUiLanguage(value);
+  },[session?.clientContext,session?.role,session?.staffInterfaceLanguage]);
   const reload = () => setRefresh((n) => n + 1);
   const applySiteSession=(next:SiteSession)=>{
     setSession(next);navigate(!next.authenticated ? 'overview' : next.role==='worker' ? 'inbox' : 'overview');
@@ -275,6 +326,10 @@ export default function App() {
     try {applySiteSession(checkedSiteSession(await api('/session')));}
     catch {setSiteTransitionError('The current site could not be verified. Recheck your session before continuing.');}
     finally {selectingSite.current=false;}
+  };
+  const refreshSession=async()=>{
+    try {setSession(checkedSiteSession(await api('/session',{cache:'no-store'})) as Session);return true;}
+    catch {return false;}
   };
   const act = async (path: string, body?: unknown) => {
     if(session?.role==='staff'){
@@ -327,6 +382,7 @@ export default function App() {
         finishWorkerEntry(recovered,entry!);return;
       }
       const signedIn = checkedSiteSession(await api<Session>('/session')) as Session;
+      try {if(rememberDevice && email.trim())localStorage.setItem('understood:sign-in-email',email.trim());else localStorage.removeItem('understood:sign-in-email');}catch {}
       setSession(signedIn);
       setPassword(''); setWorkerToken('');
       navigate(signedIn.role === 'worker' ? 'inbox' : 'overview');
@@ -338,6 +394,25 @@ export default function App() {
     setWorkerToken('');setWorkerEntryRecovery({pending:null,error:''});
     location.hash='inbox';location.reload();
   }
+  const signInWorkerPassword = async (mode:'login'|'setup',input:{company:string;workerId:string;password:string;code?:string}) => {
+    if(authInFlight.current || localCleanupFailed || workerEntryRecovery.pending || workerEntryRecovery.error)return;
+    if(mode==='setup' && !input.code)return;
+    authInFlight.current=true;setAuthBusy(true);setMessage('');
+    try {
+      if(!await clearWorkerLocalData()){setLocalCleanupFailed(true);return;}
+      if(session?.authenticated) {
+        await api('/logout',{method:'POST',headers:{'content-type':'application/json',...(session.clientContext ? {'x-client-session-context':session.clientContext} : {})},body:'{}'});
+        setSession({authenticated:false,mode:session.mode,language:session.language});
+      }
+      await api(mode==='setup' ? '/auth/worker/setup' : '/auth/worker/login',{method:'POST',
+        body:JSON.stringify(mode==='setup' ? {company:input.company,workerId:input.workerId,code:input.code,password:input.password} : {company:input.company,workerId:input.workerId,password:input.password})});
+      const signedIn=await api<Session>('/session',{cache:'no-store'});
+      if(!validWorkerSession(signedIn))throw Error('Worker access could not be confirmed.');
+      try{saveWorkerUiLanguage(sessionStorage,signedIn,workerEntryLanguage);}catch{}
+      location.hash='inbox';location.reload();
+    } catch(error){setMessage((error as Error).message);}
+    finally {authInFlight.current=false;setAuthBusy(false);}
+  };
   async function anotherWorkerLink(){
     const current=checkedSiteSession(await api('/session',{cache:'no-store'}));
     if(!await clearWorkerLocalData()){
@@ -347,6 +422,12 @@ export default function App() {
     setSession(current);setWorkerToken('');setWorkerEntryRecovery({pending:null,error:''});
     location.hash='worker-access';location.reload();
   }
+  const openInvitation=()=>{
+    const raw=inviteLink.trim();
+    const token=/^[A-Za-z0-9_-]{43}$/.test(raw)?raw:invitationLinkToken(`#${raw.split('#').pop() || ''}`);
+    if(!token){setInviteError('That invitation link is not valid. Paste the full link from your invitation email, or ask the inviter for a new one.');return;}
+    setInviteError('');setInvitationToken(token);location.hash=`accept-invitation/${token}`;
+  };
   const logout = async () => {
     if(session?.role!=='worker' && navigationGuard.current && !navigationGuard.current('sign-out',()=>void logout()))return false;
     if(authInFlight.current)return false;
@@ -362,12 +443,14 @@ export default function App() {
 
   if(workerEntryRecovery.pending || workerEntryRecovery.error)return <main className="entry-page"><Brand/><WorkerEntryRecovery pending={workerEntryRecovery.pending} storageError={workerEntryRecovery.error} paused={authBusy} request={api} onResolved={signedIn=>finishWorkerEntry(signedIn,workerEntryRecovery.pending!)} onAnother={anotherWorkerLink}/></main>;
   if(view==='operations')return <BriefingView label="Platform operations"><Operations/></BriefingView>;
-  if(['home','walkthrough','pilot'].includes(view) || (session?.authenticated===false && view==='overview'))return <BriefingView label="public site"><PublicProduct view={view}/></BriefingView>;
+  if(view==='register')return <main className="entry-page"><Brand/><RegistrationPage language={registrationLanguage} onLanguage={setRegistrationLanguage} authenticated={!!session?.authenticated} available={session?.mode==='synthetic-credential'} onBack={()=>navigate('home')} onSignIn={()=>navigate('sign-in')} onOpenWorkspace={()=>navigate('overview')}/></main>;
+  if(view==='verify-registration')return <main className="entry-page"><Brand/><VerifyRegistration key={registrationToken} token={registrationToken} language={registrationLanguage} onLanguage={setRegistrationLanguage} onRegister={()=>navigate('register')} onSignIn={()=>navigate('sign-in')}/></main>;
+  if(['home','walkthrough','pilot'].includes(view) || (session?.authenticated===false && view==='overview'))return <BriefingView label="public site"><PublicProduct view={view} registrationAvailable={session?.mode==='synthetic-credential'}/></BriefingView>;
   if (!session) {
-    const language=navigator.language.startsWith('ar')?'ar':navigator.language.startsWith('ur')?'ur':'en';
+    const language=workerBrowserLanguage();
     const text=sessionLoadText[language];
     if(offlineAllowed && offlineOpen)return <WorkerOfflineEntryView onBack={()=>{setOfflineOpen(false);setSessionRetry(value=>value+1);}}/>;
-    return sessionLoadError ? <main className="entry-page" lang={language} dir={language==='en'?'ltr':'rtl'}><Brand/><section role="alert"><h1>{text.title}</h1><p>{text.body}</p><button className="button primary" onClick={()=>{setSessionLoadError(false);setSessionRetry(value=>value+1);}}><RefreshCw size={18}/>{text.retry}</button>{offlineAllowed && <button className="button outline" onClick={()=>setOfflineOpen(true)}><Download size={18}/>{language==='ar'?'افتح التعليمات المحفوظة':language==='ur'?'محفوظ ہدایات کھولیں':'Open saved briefings'}</button>}</section></main> : <div className="loading-page">Loading Understood...</div>;
+    return sessionLoadError ? <main className="entry-page" lang={language} dir={workerUiDirection(language)}><Brand/><section role="alert"><h1>{text.title}</h1><p>{text.body}</p><button className="button primary" onClick={()=>{setSessionLoadError(false);setSessionRetry(value=>value+1);}}><RefreshCw size={18}/>{text.retry}</button>{offlineAllowed && <button className="button outline" onClick={()=>setOfflineOpen(true)}><Download size={18}/>{text.saved}</button>}</section></main> : <div className="loading-page">{text.loading}</div>;
   }
   if(session.authenticated && session.role==='staff' && (sessionGuard.locked || !validStaffSession(session)))return <StaffSessionLock key={session.clientContext} session={session} uiLanguage={staffUiLanguage} onVerified={verified=>{
     if(activeSession.current?.clientContext!==session.clientContext || verified.authenticated && !validStaffSession(verified))return;
@@ -375,14 +458,14 @@ export default function App() {
     location.hash=verified.authenticated?'overview':'sign-in';setView(verified.authenticated?'overview':'sign-in');reload();window.scrollTo(0,0);
   }}/>;
   if(sessionGuard.locked || (session.authenticated && session.role==='worker' && !validWorkerSession(session))) {
-    let language:WorkerUiLanguage=session.language==='ar'||session.language==='ur'?session.language:'en';
+    let language:WorkerUiLanguage=workerUiFallbackLanguage(session);
     try{language=readWorkerLockLanguage(sessionStorage,session);}catch{}
     const text=workerSessionText[language];
-    return <main className="entry-page" lang={language} dir={language==='en' ? 'ltr' : 'rtl'}><Brand/><section role="alert"><h1>{text.title}</h1><p>{text.body}</p><p>{text.next}</p><button className="button primary" onClick={()=>location.reload()}><RefreshCw size={18}/>{text.reload}</button></section></main>;
+    return <main className="entry-page" lang={language} dir={workerUiDirection(language)}><Brand/><section role="alert"><h1>{text.title}</h1><p>{text.body}</p><p>{text.next}</p><button className="button primary" onClick={()=>location.reload()}><RefreshCw size={18}/>{text.reload}</button></section></main>;
   }
   if(view==='accept-invitation') return <main className="entry-page"><Brand/><InvitationView key={invitationToken}><AcceptInvitation token={invitationToken} identity={session} onBack={()=>{setInvitationToken('');navigate('overview');}} onIdentityChanged={async()=>{setSession(checkedSiteSession(await api('/session')));}} onOpenSite={changeSite}/></InvitationView></main>;
   if(['account-recovery','reset-password'].includes(view)) return <main className="entry-page"><Brand/><AccountRecovery key={view} reset={view==='reset-password'} token={recoveryToken} onBack={()=>{setRecoveryToken('');navigate('overview');}} onReset={()=>{setPassword('');setSession({authenticated:false,mode:session.mode});}}/></main>;
-  if(view==='worker-access')return <WorkerAccessEntry language={workerEntryLanguage} onLanguage={setWorkerEntryLanguage} token={workerToken} onToken={setWorkerToken} busy={authBusy} blocked={localCleanupFailed} authenticated={session.authenticated} session={session} supported={session.mode!=='synthetic-demo'} failed={!!message} onSubmit={()=>void signInCredential('worker')} onCancel={()=>{setWorkerToken('');setMessage('');navigate('overview');}}><Brand/>{localCleanupFailed && <section role="alert"><p>{localCleanupText[workerEntryLanguage].failed}</p><button className="button outline" disabled={authBusy} onClick={async()=>{if(authInFlight.current)return;authInFlight.current=true;setAuthBusy(true);try{setLocalCleanupFailed(!await clearWorkerLocalData());}finally{authInFlight.current=false;setAuthBusy(false);}}}>{localCleanupText[workerEntryLanguage].remove}</button></section>}</WorkerAccessEntry>;
+  if(view==='worker-access')return <WorkerAccessEntry language={workerEntryLanguage} onLanguage={setWorkerEntryLanguage} token={workerToken} linkSignal={workerLinkSignal} onToken={setWorkerToken} busy={authBusy} blocked={localCleanupFailed} authenticated={session.authenticated} session={session} supported={session.mode!=='synthetic-demo'} failed={!!message} onSubmit={()=>void signInCredential('worker')} onPasswordLogin={(input)=>void signInWorkerPassword('login',input)} onSetupClaim={(input)=>void signInWorkerPassword('setup',input)} onClearFailure={()=>setMessage('')} onCancel={()=>{setWorkerToken('');setMessage('');navigate('overview');}}><Brand/>{localCleanupFailed && <section role="alert"><p>{localCleanupText[workerEntryLanguage].failed}</p><button className="button outline" disabled={authBusy} onClick={async()=>{if(authInFlight.current)return;authInFlight.current=true;setAuthBusy(true);try{setLocalCleanupFailed(!await clearWorkerLocalData());}finally{authInFlight.current=false;setAuthBusy(false);}}}>{localCleanupText[workerEntryLanguage].remove}</button></section>}</WorkerAccessEntry>;
   if (!session.authenticated || view==='worker-access') return (
     <main className="entry-page">
       <Brand />
@@ -396,7 +479,6 @@ export default function App() {
         </div>
         {session.mode === 'synthetic-demo' ? (
           <Panel title="Open the local demo">
-            {view==='worker-access' && <p role="status">Worker access links require credential mode. This profile demo cannot redeem them.</p>}
             <p>Use a synthetic profile. This is not a live account or a real AI service.</p>
             <div className="entry-actions">
               <button className="button primary" disabled={authBusy || localCleanupFailed} onClick={() => signIn('maya')}><Users size={20} /> Continue as Maya, supervisor</button>
@@ -405,50 +487,65 @@ export default function App() {
             </div>
           </Panel>
         ) : (
-          <Panel title="Sign in to the local workspace">
-            <p>Credential access is local. AI processing is still synthetic and not approved for real worker data.</p>
-            {view!=='worker-access' && <form className="entry-form" onSubmit={(event) => { event.preventDefault(); void signInCredential('staff'); }}>
-              <label className="field">Staff email<input type="email" autoComplete="username" value={email} disabled={authBusy || localCleanupFailed} onChange={(event) => setEmail(event.target.value)} required /></label>
-              <label className="field">Password<input type="password" autoComplete="current-password" value={password} disabled={authBusy || localCleanupFailed} onChange={(event) => setPassword(event.target.value)} required /></label>
-              <button className="button primary full" type="submit" disabled={authBusy || localCleanupFailed}>{authBusy ? 'Signing in...' : 'Sign in'}</button>
-              <button className="button subtle" type="button" disabled={authBusy} onClick={()=>navigate('account-recovery')}><KeyRound size={18}/>Forgot password?</button>
-            </form>}
-            <form className="entry-form worker-grant-form" onSubmit={(event) => { event.preventDefault(); void signInCredential('worker'); }}>
-              <h3>Worker access link</h3>
-              <label className="field">Interface language<select value={workerEntryLanguage} disabled={authBusy || localCleanupFailed} onChange={event=>setWorkerEntryLanguage(event.target.value as WorkerUiLanguage)}><option value="en">English</option><option value="ar" lang="ar">العربية</option><option value="ur" lang="ur">اردو</option></select></label>
-              {session.authenticated && <p>Opening this worker access link will end your current session.</p>}
-              <label className="field">One-time access token<input type="password" autoComplete="off" value={workerToken} disabled={authBusy || localCleanupFailed} onChange={(event) => setWorkerToken(event.target.value)} required /></label>
-              <button className="button outline full" type="submit" disabled={authBusy || localCleanupFailed}>{authBusy ? 'Signing in...' : 'Open my briefings'}</button>
+          <Panel title="Welcome back.">
+            <p>Sign in to your Understood account.</p>
+            <p className="muted">Credential access is local. AI processing is still synthetic and not approved for real worker data.</p>
+            <form className="entry-form" onSubmit={(event) => { event.preventDefault(); void signInCredential('staff'); }}>
+              <label className="field">Work email<input type="email" autoComplete="username" value={email} disabled={authBusy || localCleanupFailed} onChange={(event) => setEmail(event.target.value)} required /></label>
+              <div className="field"><label htmlFor="staff-password">Password</label><span className="password-control"><input id="staff-password" type={showPassword?'text':'password'} autoComplete="current-password" value={password} disabled={authBusy || localCleanupFailed} onChange={(event) => setPassword(event.target.value)} required /><button type="button" className="password-toggle" aria-label={showPassword?'Hide password':'Show password'} title={showPassword?'Hide password':'Show password'} disabled={authBusy || localCleanupFailed} onClick={()=>setShowPassword(value=>!value)}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></span></div>
+              <div className="signin-options">
+                <label className="signin-remember" title="Saves your work email in this browser. It does not extend your session."><input type="checkbox" checked={rememberDevice} disabled={authBusy || localCleanupFailed} onChange={event=>setRememberDevice(event.target.checked)}/><span>Remember this device</span></label>
+                <button className="button subtle" type="button" disabled={authBusy} onClick={()=>navigate('account-recovery')}><KeyRound size={18}/>Forgot password?</button>
+              </div>
+              <button className="button primary full" type="submit" disabled={authBusy || localCleanupFailed}>{authBusy ? 'Signing in...' : <>Sign in <ArrowRight size={18}/></>}</button>
             </form>
+            <div className="signin-invite">
+              <p>Joining a team?</p>
+              {inviteOpen?<form className="invite-link-form" onSubmit={event=>{event.preventDefault();openInvitation();}}><label className="field">Invitation link<input value={inviteLink} disabled={authBusy} onChange={event=>{setInviteLink(event.target.value);setInviteError('');}} placeholder="Paste the link from your invitation email" /></label>{inviteError && <p role="alert" className="record-error">{inviteError}</p>}<div className="actions"><button className="button outline" type="submit" disabled={!inviteLink.trim()}><ArrowRight size={18}/>Open invitation</button><button className="button subtle" type="button" onClick={()=>{setInviteOpen(false);setInviteError('');}}>Cancel</button></div></form>
+                :<button className="text-link" type="button" onClick={()=>setInviteOpen(true)}>Use your invitation link <ChevronRight size={16}/></button>}
+            </div>
+            <div className="signin-worker">
+              <p>Worker signing in?</p>
+              <a className="button outline full" href="#worker-access">Company ID and password <ArrowRight size={18}/></a>
+            </div>
+            {session.mode==='synthetic-credential' && <div className="signin-invite">
+              <p>New to Understood?</p>
+              <a className="button outline full" href="#register">Start a free 14-day trial <ArrowRight size={18}/></a>
+              <p className="muted">Up to 25 workers. No card required.</p>
+            </div>}
           </Panel>
         )}
-        {view==='worker-access' && <button className="button outline" disabled={authBusy} onClick={() => {setWorkerToken('');navigate('overview');}}>Cancel worker access</button>}
       </div>
       {message && <div className="toast" role="alert">{message}</div>}
     </main>
   );
 
-  if (session.role === 'worker') return <WorkerApp key={session.clientContext} session={session} view={view} navigate={navigate} refresh={refresh} act={act} logout={logout} message={message} onSessionLost={sessionGuard.invalidate} sessionInvalid={sessionGuard.isLocked} navigationGuard={navigationGuard} />;
+  if (session.role === 'worker') return <WorkerApp key={session.clientContext} session={session} view={view} navigate={navigate} refresh={refresh} act={act} logout={logout} message={message} onSessionLost={sessionGuard.invalidate} sessionInvalid={sessionGuard.isLocked} navigationGuard={navigationGuard} onSessionRefresh={refreshSession} />;
   const canWrite=canManageStaff(session.staffRole) && session.siteState!=='archived';
   const canSearch=['owner','supervisor','auditor'].includes(session.staffRole || '');
   if(session.staffRole==='administrator' && !view.startsWith('settings')) return <div className="loading-page">Loading site settings...</div>;
   const blockStaffInput=(event:React.SyntheticEvent)=>{if(sessionGuard.isLocked()){event.preventDefault();event.stopPropagation();}};
   const staffAuthority:StaffRequestAuthority={session,isCurrent:()=>sameStaffSession(session,activeSession.current) && !sessionGuard.isInvalidated() && !selectingSite.current && !authInFlight.current,canMutate:()=>!sessionGuard.isLocked(),onSessionLost:sessionGuard.invalidate};
+  const navGroups=[{label:null,items:staffPrimaryNavigation},{label:staffUi.more,items:staffSecondaryNavigation}]
+    .map(group=>({...group,items:group.items.filter(({key})=>(session.staffRole!=='administrator'||key==='settings')&&(key!=='people'||canWrite))}))
+    .filter(group=>group.items.length);
 return <div className="staff-shell" lang={staffUiLanguage} dir={staffUiLanguage==='en'?'ltr':'rtl'} inert={sessionGuard.checking} aria-busy={sessionGuard.checking} onClickCapture={blockStaffInput} onSubmitCapture={blockStaffInput} onKeyDownCapture={blockStaffInput}>
-  <aside className="sidebar" inert={siteTransition}><Brand /><nav aria-label={staffUi.navigation}>{staffNavigation.filter(({key}) => (session.staffRole!=='administrator' || key==='settings') && (key!=='people' || canWrite) && (key!=='settings/invoices' || ['owner','auditor'].includes(session.staffRole || ''))).map(({ key, icon: Icon }) => <button key={key} onClick={() => navigate(key)} className={`sidebar-link ${(key==='briefings' && view.startsWith('templates')) || (key==='processing' && (view.startsWith('glossary') || view==='language-readiness')) || view === key || view.startsWith(`${key}/`) ? 'active' : ''}`}><Icon size={23} />{staffUi[key as keyof typeof staffUi]}</button>)}</nav>
+  <a className="skip-link" href="#staff-main" onClick={event=>{event.preventDefault();document.getElementById('staff-main')?.focus();}}>{staffUiLanguage==='ar'?'انتقل إلى المحتوى الرئيسي':staffUiLanguage==='ur'?'مرکزی مواد پر جائیں':'Skip to main content'}</a>
+  <aside className="sidebar" inert={siteTransition}><Brand /><nav aria-label={staffUi.navigation}>{navGroups.map((group,groupIndex)=><div className="sidebar-group" key={group.label || 'primary'}>{group.label && <span className="sidebar-group-label">{group.label}</span>}{group.items.map(({key,label,icon:Icon})=><button key={key} onClick={()=>navigate(key)} className={`sidebar-link ${staffNavigationActive(key,view)?'active':''}`}><Icon size={23}/>{staffUi[label as keyof typeof staffUi]}</button>)}</div>)}</nav>
     <button className="profile" onClick={logout}><span className="avatar">{session.name?.split(' ').map((word) => word[0]).join('').slice(0, 2)}</span><span><strong><bdi>{session.name}</bdi></strong><small>{staffIdentityLabel(session.staffRole,staffUiLanguage,true)} · {staffUi.signOut}</small></span><LogOut size={18} /></button>
   </aside><div className="staff-main"><header className="topbar">
     {session.mode!=='synthetic-demo' ? <AccountSiteSwitcher language={staffUiLanguage} organization={session.organization} site={session.site} disabled={siteTransition} onSelect={changeSite}/> : <div className="site-label"><span className="pin">●</span><bdi>{session.organization}</bdi><span>·</span><bdi>{session.site}</bdi></div>}
     <span className="top-date" role={sessionGuard.checking?'status':undefined}>{sessionGuard.checking?staffUi.checking:staffDate(session.timezone,clock,staffUiLanguage)}</span>
     {canSearch && <StaffSearchBox language={staffUiLanguage} key={`${session.clientContext}:${session.siteState}`} navigate={navigate} disabled={siteTransition} canPeople={canWrite}/>}
     {['owner','supervisor','auditor'].includes(session.staffRole || '') && <button className="icon-button bell" aria-label={staffUi.notifications} title={staffUi.notifications} disabled={siteTransition} onClick={()=>navigate('notifications')}><Bell size={21}/></button>}<button className="icon-button mobile-logout" aria-label={staffUi.signOut} disabled={siteTransition} onClick={logout}><LogOut size={20} /></button>
-  </header>{siteTransition ? <main className="staff-content"><h1>{staffUi.siteSession}</h1>{siteTransitionError ? <><p role="alert">{staffUi.siteError}</p><button className="button outline" onClick={()=>void recheckSite()}><RefreshCw size={18}/>{staffUi.recheck}</button></> : <p role="status">{staffUi.checkingSite}</p>}</main> : <main className="staff-content" key={`${session.staffScope}:${session.staffRole}`}>
+  </header>{siteTransition ? <main className="staff-content" id="staff-main" tabIndex={-1}><h1>{staffUi.siteSession}</h1>{siteTransitionError ? <><p role="alert">{staffUi.siteError}</p><button className="button outline" onClick={()=>void recheckSite()}><RefreshCw size={18}/>{staffUi.recheck}</button></> : <p role="status">{staffUi.checkingSite}</p>}</main> : <main className="staff-content" id="staff-main" tabIndex={-1} key={`${session.staffScope}:${session.staffRole}`}>
 {session.siteState==='archived' && <Notice tone="blue">{staffUi.archived}</Notice>}
-{view === 'overview' && <Overview key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} name={session.name} greeting={staffGreeting(session.timezone,clock)} />}{view === 'briefings' && <Briefings key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} />}{view === 'briefings/new' && (canWrite ? <BriefingView label="New briefing"><NewBriefing key={`${session.clientContext}:${session.templateRecoveryScope}`} authority={staffAuthority} scope={session.templateRecoveryScope} uploadSession={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} navigate={navigate} navigationGuard={navigationGuard}/></BriefingView> : <Notice tone="blue">Your role cannot create briefings.</Notice>)}{view.startsWith('briefings/') && view !== 'briefings/new' && <BriefingDetail key={`${view.split('/')[1]}:${session.clientContext}:${session.templateRecoveryScope}`} authority={staffAuthority} id={view.split('/')[1]} scope={session.templateRecoveryScope} languageSession={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} refresh={refresh} act={act} navigate={navigate} onChanged={reload} canWrite={canWrite} timezone={session.timezone} />}
+{view === 'overview' && <Overview key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} name={session.name} greeting={staffGreeting(session.timezone,clock)} />}{view==='send' && (canWrite ? <Suspense fallback={<p role="status">Loading the send form...</p>}><SendInstruction key={`${session.clientContext}:${session.templateRecoveryScope}`} authority={staffAuthority} scope={session.templateRecoveryScope || session.clientContext || null} navigate={navigate} onSent={reload}/></Suspense> : <Notice tone="blue">Your role cannot send instructions.</Notice>)}{view === 'briefings' && <Briefings key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} />}{view === 'briefings/new' && (canWrite ? <BriefingView label="New briefing"><NewBriefing key={`${session.clientContext}:${session.templateRecoveryScope}`} authority={staffAuthority} scope={session.templateRecoveryScope} site={session.site} uploadSession={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} navigate={navigate} navigationGuard={navigationGuard}/></BriefingView> : <Notice tone="blue">Your role cannot create briefings.</Notice>)}{view.startsWith('briefings/') && view !== 'briefings/new' && <BriefingDetail key={`${view.split('/')[1]}:${session.clientContext}:${session.templateRecoveryScope}`} authority={staffAuthority} id={view.split('/')[1]} scope={session.templateRecoveryScope} languageSession={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} refresh={refresh} act={act} navigate={navigate} onChanged={reload} canWrite={canWrite} timezone={session.timezone} />}
     {view==='source-audio' && (canWrite ? <BriefingView label="Source audio uploads"><SourceAudioUploads key={session.clientContext} authority={staffAuthority} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} navigate={navigate}/></BriefingView> : <Notice>Your role cannot access source audio uploads.</Notice>)}
     {view==='settings/onboarding' && (session.staffRole==='owner'?<BriefingView key={staffRequestBinding(session)} label="Pilot setup"><Onboarding authority={staffAuthority} navigate={navigate}/></BriefingView>:<Notice>Only the workspace owner can save pilot setup progress.</Notice>)}
+    {view==='onboarding/first-run' && (session.staffRole==='owner'?<FirstRunOnboarding key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} onCompleted={(language:FirstRunLanguage)=>{setSession(old=>old?{...old,firstRunRequired:false,staffInterfaceLanguage:language}:old);reload();}} onNavigate={navigate} onRefresh={reload}/>:<Notice tone="blue">Only the workspace owner can finish workspace setup.</Notice>)}
     {view==='notifications' && (['owner','supervisor','auditor'].includes(session.staffRole || '') ? <BriefingView key={staffRequestBinding(session)} label="Notifications"><Notifications authority={staffAuthority} refresh={refresh} navigate={navigate} timezone={session.timezone}/></BriefingView> : <Notice>Your role cannot access site notifications.</Notice>)}
-    {(view==='templates' || view.startsWith('templates/')) && <Templates authority={staffAuthority} key={`${view}:${staffRequestBinding(session)}`} id={view.split('/')[1]==='new' ? undefined : view.split('/')[1]} newTemplate={view==='templates/new'} canWrite={canWrite} scope={session.templateRecoveryScope} navigate={navigate}/>}
+    {(view==='templates' || view.startsWith('templates/')) && <Templates authority={staffAuthority} key={`${view}:${staffRequestBinding(session)}`} id={view.split('/')[1]==='new' ? undefined : view.split('/')[1]} newTemplate={view==='templates/new'} initialUse={view.endsWith('/use')} canWrite={canWrite} scope={session.templateRecoveryScope} navigate={navigate}/>}
     {(view==='glossary' || view.startsWith('glossary/')) && <Glossary authority={staffAuthority} key={`${view}:${staffRequestBinding(session)}`} id={view.split('/')[1]==='new' ? undefined : view.split('/')[1]} newTerm={view==='glossary/new'} canWrite={canWrite} scope={session.templateRecoveryScope} navigate={navigate}/>}
     {view === 'clarifications' && <BriefingView label="Clarifications" language={caseUiLanguage}><ClarificationsPage key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} timezone={session.timezone} language={caseUiLanguage} onLanguageChange={setCaseUiLanguage} canWrite={canWrite && ['owner','supervisor'].includes(session.staffRole || '')} /></BriefingView>}
     {view === 'clarifications/new' && <BriefingView label="New clarification" language={caseUiLanguage}>{['owner','supervisor'].includes(session.staffRole || '')?<ClarificationCreate key={staffRequestBinding(session)} authority={staffAuthority} canWrite={canWrite} navigate={navigate} navigationGuard={navigationGuard} timezone={session.timezone} language={caseUiLanguage} onLanguageChange={setCaseUiLanguage}/>:<p role="alert">{caseText(caseUiLanguage,'Your role cannot create clarifications.')}</p>}</BriefingView>}
@@ -476,27 +573,80 @@ return <div className="staff-shell" lang={staffUiLanguage} dir={staffUiLanguage=
 function Overview({ refresh, navigate:onNavigate,canWrite,name,greeting,authority }: { refresh: number; navigate: (path: string) => void;canWrite:boolean;name?:string;greeting:string;authority:StaffRequestAuthority }) {
   const {current}=useBriefingRequest(authority),navigate=(path:string)=>{if(current())onNavigate(path);};
   const { data, error, loading } = useArtifactRead<any>(authority,'/api/overview',refresh);
+  const briefings=useArtifactRead<{items:BriefingRow[]}>(authority,'/api/briefings?archiveStatus=active&sort=updated&page=1&pageSize=5',refresh);
   if (loading) return <p className="loading">Loading overview...</p>;
   if (error || !data) return <Notice>{error || 'Overview unavailable'}</Notice>;
   const m: Counts = data.metrics;
-  return <><div className="page-header"><div><h1>{greeting}{name ? `, ${name.split(' ')[0]}` : '' }.</h1><p>Here's the status of your team's briefings.</p></div>{canWrite && <button className="button primary" onClick={() => navigate('briefings/new')}><Plus size={22} /> New briefing</button>}</div><div className="metrics"><Metric icon={FileText} value={m.assigned} label="assigned" /><Metric icon={Users} value={m.responses} label="responses" /><Metric icon={CheckCircle2} value={m.matches} label="match key facts" /><Metric icon={MessageCircle} value={m.clarifications} label="need clarification" warn /><Metric icon={Clock3} value={m.pending} label="awaiting response" /></div><div className="overview-grid"><Panel title="Briefing activity"><div className="progress-row"><strong>{m.completion}%</strong><span>response completion · {m.responses} of {m.assigned} received</span></div><div className="progress"><span style={{ width: `${m.completion}%` }} /></div><div className="legend"><span><i className="dot green" />{m.matches} match the key facts</span><span><i className="dot amber" />{m.clarifications} need clarification</span>{m.unassessed > 0 && <span><i className="dot blue" />{m.unassessed} awaiting assessment</span>}<span><i className="dot grey" />{m.pending} awaiting response</span></div>{data.publication && <button className="text-link" onClick={() => navigate(`briefings/${data.publication.briefingId}`)}>{data.publication.title} · Published v{data.publication.version}<ChevronRight size={18} /></button>}</Panel><Panel title="Clarifications to follow up"><div className="row-list">{data.cases.map((item: Case) => <button className="item-row" key={item.id} onClick={() => navigate(`clarifications/${item.id}`)}><span className="small-avatar"><MessageCircle size={20} /></span><span className="item-main"><strong>{item.worker}</strong><small>{item.title} · {item.reason}</small></span><ChevronRight size={18} /></button>)}</div><button className="text-link" onClick={() => navigate('clarifications')}>View all clarifications <ChevronRight size={18} /></button></Panel></div><Notice tone="blue">A matching answer records the key facts asked. It does not certify understanding or safe work.</Notice></>;
+  const partial=(item:BriefingRow)=>item.sendState==='published' && (item.undelivered || 0)>0;
+  return <><div className="page-header"><div><h1>{greeting}{name ? `, ${name.split(' ')[0]}` : '' }.</h1><p>What needs attention today, and what your team is working on.</p></div>{canWrite && <button className="button primary" onClick={() => navigate('send')}><Send size={20} /> Send instruction</button>}</div><div className="metrics"><Metric icon={Users} value={m.assigned} label="instruction recipients" /><Metric icon={FileText} value={m.responses} label="responses received" /><Metric icon={MessageCircle} value={m.clarifications} label="need clarification" warn /><Metric icon={Clock3} value={m.pending} label="waiting to answer" /></div>
+  <div className="overview-dashboard">
+    <div className="overview-primary">
+      <Panel title={`Needs your attention (${data.cases.length})`}>{data.cases.length?<div className="row-list">{data.cases.map((item: Case) => <button className="item-row overview-case" key={item.id} onClick={() => navigate(`clarifications/${item.id}`)}><span className="small-avatar"><MessageCircle size={20} /></span><span className="item-main"><strong>{item.worker} · {item.language.toUpperCase()}</strong><small>{item.title} · {item.reason.replaceAll('_',' ')}</small></span><ChevronRight size={18} /></button>)}</div>:<p>No open clarifications. Responses that need a person appear here.</p>}<button className="text-link" onClick={() => navigate('clarifications')}>Open clarifications <ChevronRight size={16} /></button></Panel>
+      <Panel title="Recent instructions">
+        {briefings.loading?<p role="status">Loading instructions...</p>:briefings.error?<p className="muted">{briefings.error}</p>:briefings.data?.items.length?<div className="table-wrap"><table className="overview-briefing-table"><thead><tr><th>Title</th><th>Languages</th><th>Responses</th><th>Status</th><th><span className="sr-only">Open</span></th></tr></thead><tbody>
+          {briefings.data.items.map(item=><tr key={item.id}><td><button className="briefing-title-button" onClick={()=>navigate(`briefings/${item.id}`)}><strong>{item.title}</strong></button></td><td><span className="language-chips">{(item.languages || []).map(code=><i key={code}>{code.toUpperCase()}</i>)}{!item.languages?.length && <span className="muted">—</span>}</span></td><td>{item.metrics?item.metrics.assigned?`${item.metrics.responses} / ${item.metrics.assigned}`:item.state==='processing'?'Draft':'—':item.state==='processing'?'Draft':'Scheduled'}</td><td>{partial(item)?<span className="status status-amber"><span className="status-dot" />partly sent · {item.undelivered} not delivered</span>:<Status value={item.publication_state || item.state}/>}</td><td><button className="icon-button" aria-label={`Open ${item.title}`} title={`Open ${item.title}`} onClick={()=>navigate(`briefings/${item.id}`)}><ChevronRight size={17}/></button></td></tr>)}
+        </tbody></table></div>:<p>No instructions yet.</p>}
+        <button className="text-link" onClick={()=>navigate('briefings')}>View all instructions <ChevronRight size={16}/></button>
+      </Panel>
+      <Panel title="Response completion"><div className="progress-row"><strong>{m.completion}%</strong><span>answered · {m.responses} of {m.assigned} recipients</span></div><div className="progress"><span style={{ width: `${m.completion}%` }} /></div><div className="legend"><span><i className="dot green" />{m.matches} match the key facts</span><span><i className="dot amber" />{m.clarifications} need clarification</span>{m.unassessed > 0 && <span><i className="dot blue" />{m.unassessed} awaiting assessment</span>}{!!m.acknowledged && <span><i className="dot violet" />{m.acknowledged} acknowledged</span>}<span><i className="dot grey" />{m.pending} waiting to answer</span></div>{data.publication && <button className="text-link" onClick={() => navigate(`briefings/${data.publication.briefingId}`)}>{data.publication.title} · Published v{data.publication.version}<ChevronRight size={18} /></button>}</Panel>
+    </div>
+    <div className="overview-secondary">
+      <Panel title="More for supervisors"><div className="row-list"><button className="item-row" onClick={()=>navigate('templates')}><span className="small-avatar"><FileText size={19}/></span><span className="item-main"><strong>Templates</strong><small>Reuse wording from earlier instructions</small></span><ChevronRight size={17}/></button><button className="item-row" onClick={()=>navigate('source-audio')}><span className="small-avatar"><Volume2 size={19}/></span><span className="item-main"><strong>Audio uploads</strong><small>Upload and review recorded sources</small></span><ChevronRight size={17}/></button><button className="item-row" onClick={()=>navigate('processing')}><span className="small-avatar"><Sparkles size={19}/></span><span className="item-main"><strong>AI processing</strong><small>Preparation status and retries</small></span><ChevronRight size={17}/></button></div></Panel>
+      <Panel title="Team"><div className="progress-row"><strong>{m.pending}</strong><span>still to answer</span></div><button className="text-link" onClick={() => navigate('people')}>Open team <ChevronRight size={16}/></button><p className="muted">Manage worker access, crews and languages in Team.</p></Panel>
+    </div>
+  </div><Notice tone="blue">Matching answers record the key facts asked. This does not certify understanding or safe work.</Notice></>;
 }
 
+type BriefingRow=Briefing & {languages?:string[];metrics?:Counts|null;responseMode?:string;deliveryMode?:string;sendState?:string;delivered?:number;undelivered?:number};
 function Briefings({ refresh, navigate:onNavigate,canWrite,authority }: { refresh: number; navigate: (path: string) => void;canWrite:boolean;authority:StaffRequestAuthority }) {
   const {current}=useBriefingRequest(authority),navigate=(path:string)=>{if(current())onNavigate(path);};
-  const [search,setSearch]=useState(''),[status,setStatus]=useState('all'),[publicationStatus,setPublicationStatus]=useState('all'),[scheduleStatus,setScheduleStatus]=useState('all'),[archiveStatus,setArchiveStatus]=useState('active'),[sort,setSort]=useState('updated'),[page,setPage]=useState(1);
+  const [search,setSearch]=useState(''),[status,setStatus]=useState('all'),[publicationStatus,setPublicationStatus]=useState('all'),[scheduleStatus,setScheduleStatus]=useState('all'),[archiveStatus,setArchiveStatus]=useState('all'),[sort,setSort]=useState('updated'),[page,setPage]=useState(1),[tab,setTab]=useState('all');
   const query=new URLSearchParams({search,status,publicationStatus,scheduleStatus,archiveStatus,sort,page:String(page),pageSize:'20'}).toString();
-  const {data,error,loading}=useArtifactRead<{items:Briefing[];total:number;page:number;pageSize:number}>(authority,`/api/briefings?${query}`,refresh);
+  const {data,error,loading}=useArtifactRead<{items:BriefingRow[];total:number;page:number;pageSize:number;counts?:{total:number;processing:number;ready:number;published:number;archived:number}}>(authority,`/api/briefings?${query}`,refresh);
   const pages=Math.max(1,Math.ceil((data?.total || 0)/20));
-  return <><div className="page-header"><div><h1>Briefings</h1><p>Create, publish and follow the versions your team receives.</p></div><div className="actions"><button className="button outline" onClick={()=>navigate('templates')}><FileText size={20}/>Templates</button>{canWrite && <><button className="button outline" onClick={()=>navigate('source-audio')}><FileText size={20}/>My audio uploads</button><button className="button primary" onClick={() => navigate('briefings/new')}><Plus size={22} /> New briefing</button></>}</div></div>
-    <div className="filters briefing-filters"><label className="search-box"><Search size={18} /><span className="sr-only">Search briefings</span><input value={search} maxLength={80} onChange={(event) => {setSearch(event.target.value);setPage(1);}} placeholder="Search briefings" /></label>
-      <label className="select-label">Draft status<select value={status} onChange={(event) => {setStatus(event.target.value);setPage(1);}}><option value="all">All draft states</option><option value="draft">Draft</option><option value="processing">Processing</option><option value="ready">Ready</option><option value="failed">Failed</option></select></label>
-      <label className="select-label">Latest publication<select value={publicationStatus} onChange={(event) => {setPublicationStatus(event.target.value);setPage(1);}}><option value="all">All versions</option><option value="unpublished">Unpublished</option><option value="published">Published</option><option value="withdrawn">Withdrawn</option><option value="superseded">Superseded</option><option value="archived">Archived</option></select></label>
-      <label className="select-label">Latest schedule<select value={scheduleStatus} onChange={event=>{setScheduleStatus(event.target.value);setPage(1);}}><option value="all">All schedules</option><option value="none">No saved schedule</option><option value="queued">Queued</option><option value="published">Published by schedule</option><option value="cancelled">Cancelled</option><option value="failed">Failed</option></select></label>
-      <label className="select-label">Archive status<select value={archiveStatus} onChange={event=>{setArchiveStatus(event.target.value);setPage(1);}}><option value="active">Active briefings</option><option value="archived">Archived briefings</option><option value="all">All briefings</option></select></label>
+  const chooseTab=(next:string)=>{
+    const filters=next==='processing'?{status:'processing',publication:'all',archive:'active'}
+      :next==='ready'?{status:'ready',publication:'all',archive:'active'}
+      :next==='published'?{status:'all',publication:'published',archive:'all'}
+      :next==='archived'?{status:'all',publication:'all',archive:'archived'}
+      :{status:'all',publication:'all',archive:'all'};
+    setTab(next);setStatus(filters.status);setPublicationStatus(filters.publication);setArchiveStatus(filters.archive);setPage(1);
+  };
+  const counts=data?.counts;
+  const tabs=[{key:'all',label:'All',count:counts?.total},{key:'processing',label:'Preparing',count:counts?.processing},{key:'ready',label:'Ready',count:counts?.ready},{key:'published',label:'Sent',count:counts?.published},{key:'archived',label:'Archived',count:counts?.archived}];
+  const languageLabel=(code:string)=>code.toUpperCase();
+  const deliveryLabel=(item:BriefingRow)=>[item.responseMode==='acknowledge'?'Acknowledge only':item.responseMode==='question'?'Question':null,item.deliveryMode==='text'?'Text':item.deliveryMode==='voice'?'Voice':item.deliveryMode==='both'?'Text and voice':null].filter(Boolean).join(' · ');
+  return <><div className="page-header"><div><h1>Instructions</h1><p>Send work instructions and follow who has answered.</p></div><div className="actions"><details className="send-more briefing-more"><summary className="button outline">More tools<ChevronDown size={17}/></summary><div className="actions"><button className="button outline" onClick={()=>navigate('templates')}><FileText size={18}/>Templates</button><button className="button outline" onClick={()=>navigate('source-audio')}><Volume2 size={18}/>Audio uploads</button><button className="button outline" onClick={()=>navigate('processing')}><Sparkles size={18}/>Processing</button></div></details>{canWrite && <button className="button primary" onClick={() => navigate('send')}><Send size={20} /> Send instruction</button>}</div></div>
+    <div className="filters briefing-filters"><label className="search-box"><Search size={18} /><span className="sr-only">Search instructions</span><input value={search} maxLength={80} onChange={(event) => {setSearch(event.target.value);setPage(1);}} placeholder="Search by title or version..." /></label>
+      <label className="select-label">Site<select value={authority.session.site || ''} disabled><option value={authority.session.site || ''}>{authority.session.site || 'This site'}</option></select></label>
+      <label className="select-label">Language<select value="all" disabled title="Language filtering is available in the instruction languages view"><option value="all">All languages</option></select></label>
+      <label className="select-label">Owner<select value="all" disabled title="Instruction ownership is not recorded for this workspace"><option value="all">All owners</option></select></label>
+    </div>
+    <nav className="briefing-status-tabs" aria-label="Instruction status">{tabs.map(item=><button key={item.key} type="button" aria-pressed={tab===item.key} onClick={()=>chooseTab(item.key)} disabled={loading}>{item.label}{item.count!==undefined?` (${item.count})`:''}</button>)}</nav>
+    <details className="briefing-advanced-filters"><summary>Schedule, sort and advanced filters</summary><div className="filters">
+      <label className="select-label">Draft status<select value={status} onChange={(event) => {setStatus(event.target.value);setTab('all');setPage(1);}}><option value="all">All draft states</option><option value="draft">Draft</option><option value="processing">Preparing</option><option value="ready">Ready</option><option value="failed">Failed</option></select></label>
+      <label className="select-label">Latest publication<select value={publicationStatus} onChange={(event) => {setPublicationStatus(event.target.value);setTab('all');setPage(1);}}><option value="all">All versions</option><option value="unpublished">Unpublished</option><option value="published">Sent</option><option value="withdrawn">Withdrawn</option><option value="superseded">Superseded</option><option value="archived">Archived</option></select></label>
+      <label className="select-label">Latest schedule<select value={scheduleStatus} onChange={event=>{setScheduleStatus(event.target.value);setPage(1);}}><option value="all">All schedules</option><option value="none">No saved schedule</option><option value="queued">Queued</option><option value="published">Sent by schedule</option><option value="cancelled">Cancelled</option><option value="failed">Failed</option></select></label>
+      <label className="select-label">Archive status<select value={archiveStatus} onChange={event=>{setArchiveStatus(event.target.value);setTab('all');setPage(1);}}><option value="active">Active instructions</option><option value="archived">Archived instructions</option><option value="all">All instructions</option></select></label>
       <label className="select-label">Sort by<select value={sort} onChange={(event) => {setSort(event.target.value);setPage(1);}}><option value="updated">Recently updated</option><option value="oldest">Oldest updated</option><option value="title">Title</option></select></label>
-    </div><Panel title={loading ? 'Briefings' : `Briefings (${data?.total || 0})`}>{loading ? <p role="status">Loading briefings...</p> : error ? <Notice>{error}</Notice> : data?.items.length ? <div className="row-list">{data.items.map((item) => <button className="item-row" key={item.id} onClick={() => navigate(`briefings/${item.id}`)}><span className="small-avatar"><FileText size={22} /></span><span className="item-main"><strong>{item.title}</strong><small>{item.published_version ? `v${item.published_version} ${item.publication_state} · ` : 'Unpublished · '}Draft v{item.next_version} {item.state}</small>{item.schedule_state && <small>Schedule {item.schedule_state}{item.schedule_state==='queued' && item.scheduled_for && <> · <time dateTime={item.scheduled_for}>{new Date(item.scheduled_for).toLocaleString('en-GB',{timeZone:'UTC'})} UTC</time></>}</small>}</span><Status value={item.archived_at ? 'archived' : item.state} /><ChevronRight size={19} /></button>)}</div> : <p>{page>pages ? 'This page is no longer available.' : 'No briefings match these filters.'}</p>}
-      {!loading && !error && data && <div className="audit-pagination"><span>Page {page} of {pages} · {data.total} briefings</span><div className="actions"><button className="icon-button" aria-label="Previous briefing page" title="Previous briefing page" disabled={page<=1} onClick={() => setPage((value) => value-1)}><ChevronLeft size={18} /></button><button className="icon-button" aria-label="Next briefing page" title="Next briefing page" disabled={page>=pages} onClick={() => setPage((value) => value+1)}><ChevronRight size={18} /></button>{page>pages && <button className="button outline" onClick={() => setPage(1)}>First page</button>}</div></div>}
+    </div></details>
+    <Panel title={loading ? 'Instructions' : `Instructions (${data?.total || 0})`}>{loading ? <p role="status">Loading instructions...</p> : error ? <Notice>{error}</Notice> : data?.items.length ? <div className="table-wrap"><table className="briefing-table"><thead><tr><th>Title</th><th>Version</th><th>Delivery</th><th>Languages</th><th>Status</th><th>Progress</th><th>Updated</th><th><span className="sr-only">Open</span></th></tr></thead><tbody>
+      {data.items.map(item=>{
+        const progress=item.metrics;
+        const partial=item.sendState==='published' && (item.undelivered || 0)>0;
+        return <tr key={item.id} className={item.archived_at?'briefing-row-archived':''}>
+          <td><button className="briefing-title-button" onClick={()=>navigate(`briefings/${item.id}`)}><strong>{item.title}</strong>{item.schedule_state && <small>Schedule {item.schedule_state}{item.schedule_state==='queued' && item.scheduled_for && <> · <time dateTime={item.scheduled_for}>{new Date(item.scheduled_for).toLocaleString('en-GB',{timeZone:'UTC'})} UTC</time></>}</small>}</button></td>
+          <td>{item.published_version?`v${item.published_version}`:<span className="muted">v{item.next_version} draft</span>}</td>
+          <td>{deliveryLabel(item)||<span className="muted">—</span>}</td>
+          <td><span className="language-chips">{(item.languages || []).map(code=><i key={code}>{languageLabel(code)}</i>)}{!item.languages?.length && <span className="muted">—</span>}</span></td>
+          <td>{partial?<span className="status status-amber"><span className="status-dot"/>partly sent</span>:<Status value={item.archived_at?'archived':item.publication_state || item.state}/>}</td>
+          <td>{progress && progress.assigned>0?<div className="briefing-progress"><div className="briefing-progress-bar"><span style={{width:`${progress.completion}%`}}/></div><small>{progress.responses} / {progress.assigned} · {progress.matches} matches{progress.clarifications?` · ${progress.clarifications} clarifications`:''}</small></div>:<span className="muted">{item.state==='processing'?'Preparing':item.schedule_state==='queued'?'Scheduled':'Not sent'}</span>}</td>
+          <td><time dateTime={item.updated_at}>{new Date(item.updated_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</time></td>
+          <td><button className="icon-button" aria-label={`Open ${item.title}`} title={`Open ${item.title}`} onClick={()=>navigate(`briefings/${item.id}`)}><ChevronRight size={18}/></button></td>
+        </tr>;
+      })}
+    </tbody></table></div> : <p>{page>pages ? 'This page is no longer available.' : 'No instructions match these filters.'}</p>}
+      {!loading && !error && data && <div className="audit-pagination"><span>Page {page} of {pages} · {data.total} instructions</span><div className="actions"><button className="icon-button" aria-label="Previous instruction page" title="Previous instruction page" disabled={page<=1} onClick={() => setPage((value) => value-1)}><ChevronLeft size={18} /></button><button className="icon-button" aria-label="Next instruction page" title="Next instruction page" disabled={page>=pages} onClick={() => setPage((value) => value+1)}><ChevronRight size={18} /></button>{page>pages && <button className="button outline" onClick={() => setPage(1)}>First page</button>}</div></div>}
     </Panel></>;
 }
 
@@ -528,7 +678,7 @@ function BriefingDetail({ id, refresh, act, navigate,onChanged,canWrite,scope,la
   const current = data.publications?.[0];
   const readyToPublish=draftSteps(data)[3].available;
   return <div className="briefing-draft-detail">
-    <button className="back-link" onClick={() => navigate('briefings')}><ArrowLeft size={18} /> Briefings</button>
+    <button className="back-link" onClick={() => navigate('briefings')}><ArrowLeft size={18} /> Instructions</button>
     <div className="page-header"><div><h1 ref={titleRef} tabIndex={-1}>{data.title}</h1><p>Draft v{data.next_version} · revision {data.revision} · {current ? `v${current.version} ${current.state}` : 'Not published'}</p></div><div className="actions"><Status value={data.archive ? 'archived' : data.state}/>{canWrite && !data.contentExpired && <CopyDraftControl authority={authority} id={id} revision={data.revision} title={data.title} disabled={editing || loading} onCopied={copyId=>navigate(`briefings/${copyId}`)}/>} {canWrite && !data.archive && <ArchiveBriefingControl authority={authority} id={id} revision={data.revision} nextVersion={data.next_version} disabled={editing || loading} onChanged={()=>{onChanged();titleRef.current?.focus();}}/>}</div></div>
     {data.archive && <Notice tone="blue">Archived {new Date(data.archive.occurred_at).toLocaleString()} · {data.archive.reason}</Notice>}
     {data.contentExpired && <Notice tone="blue">Briefing content expired. Version identities, audience and response outcomes remain in history.</Notice>}
@@ -601,32 +751,135 @@ function Reports({refresh,authority,language,onLanguageChange}:{refresh:number;a
   return <BriefingView label="Reports" fallbackCopy={{loading:reportText(language,'Loading reports...'),unavailable:reportText(language,'Reports page unavailable. Your saved export requests are unchanged.'),reload:reportText(language,'Reload')}}><ReportsPage authority={authority} refresh={refresh} language={language} onLanguageChange={onLanguageChange}/></BriefingView>;
 }
 
-const workerText = {
-  en: { mine: 'My briefings', todo: 'To do', completed: 'Completed', listen: 'Listen and respond', open: 'Open briefing', help: 'I need help', back: 'Back', question: 'Your turn', answer: 'Answer in your own words', send: 'Send answer', received: 'Your answer was received', review: 'Your supervisor may follow up if anything is unclear.', text: 'Read text', play: 'Play briefing', playQuestion: 'Play question', reply: 'Type your answer', helpTitle: 'Ask your supervisor for help', helpPrompt: 'What do you need help with?', saved: 'Your request was saved.', version: 'Briefing' },
-  ar: { mine: 'تعليماتي', todo: 'للمتابعة', completed: 'مكتملة', listen: 'استمع وأجب', open: 'افتح التعليمات', help: 'أحتاج مساعدة', back: 'رجوع', question: 'دورك', answer: 'أجب بكلماتك الخاصة', send: 'أرسل الإجابة', received: 'تم استلام إجابتك', review: 'قد يتابع معك المشرف إذا كان هناك شيء غير واضح.', text: 'اقرأ النص', play: 'شغّل التعليمات', playQuestion: 'شغّل السؤال', reply: 'اكتب إجابتك', helpTitle: 'اطلب المساعدة من المشرف', helpPrompt: 'بماذا تحتاج المساعدة؟', saved: 'تم حفظ طلبك.', version: 'التعليمات' },
-  ur: { mine: 'میری ہدایات', todo: 'کرنا ہے', completed: 'مکمل', listen: 'سنیں اور جواب دیں', open: 'ہدایات کھولیں', help: 'مجھے مدد چاہیے', back: 'واپس', question: 'آپ کی باری', answer: 'اپنے الفاظ میں جواب دیں', send: 'جواب بھیجیں', received: 'آپ کا جواب موصول ہو گیا', review: 'اگر کوئی بات واضح نہ ہوئی تو آپ کا سپروائزر رابطہ کر سکتا ہے۔', text: 'متن پڑھیں', play: 'ہدایات سنیں', playQuestion: 'سوال سنیں', reply: 'اپنا جواب لکھیں', helpTitle: 'سپروائزر سے مدد مانگیں', helpPrompt: 'آپ کو کس چیز میں مدد چاہیے؟', saved: 'آپ کی درخواست محفوظ ہو گئی۔', version: 'ہدایت' },
+type WorkerText={mine:string;todo:string;completed:string;listen:string;ack:string;open:string;help:string;back:string;question:string;answer:string;send:string;received:string;review:string;text:string;play:string;playQuestion:string;reply:string;helpTitle:string;helpPrompt:string;saved:string;version:string;skip:string;more:string;due:string;repeat:string;repeatSaved:string;reminder:string;thisDevice:string;receipt:string;ackTitle:string;ackBody:string;saving:string;ackAction:string;reviewTitle:string;reviewBody:string;edit:string;reviewAnswer:string;readInstruction:string;expired:string;emptyFollowup:string;followupShort:string;deadlinePassed:string};
+const workerText:Record<WorkerUiLanguage,WorkerText> = {
+  en: { mine: 'My briefings', todo: 'To do', completed: 'Completed', listen: 'Listen and respond', ack: 'Read and confirm', open: 'Open briefing', help: 'I need help', back: 'Back', question: 'Your turn', answer: 'Answer in your own words', send: 'Send answer', received: 'Your answer was received', review: 'Your supervisor may follow up if anything is unclear.', text: 'Read text', play: 'Play briefing', playQuestion: 'Play question', reply: 'Type your answer', helpTitle: 'Ask your supervisor for help', helpPrompt: 'What do you need help with?', saved: 'Your request was saved.', version: 'Briefing', skip: 'Skip to main content', more: 'More', due: 'Due', repeat: 'Your supervisor requested another answer', repeatSaved: 'Your supervisor requested another answer. Your earlier answer is preserved.', reminder: 'Reminder: your answer has not been received yet.', thisDevice: 'This device', receipt: 'Receipt', ackTitle: 'Acknowledge this instruction', ackBody: 'You are not being asked to answer. Confirm only that you have read or listened to the instruction.', saving: 'Saving...', ackAction: 'Acknowledge receipt', reviewTitle: 'Review your answer', reviewBody: 'This text will be sent to your supervisor.', edit: 'Edit', reviewAnswer: 'Review answer', readInstruction: 'Read the instruction', expired: 'Briefing content expired. Your response history remains below.', emptyFollowup: 'No open follow-up conversations.', followupShort: 'Follow-up', deadlinePassed: 'The answer deadline has passed. You can still ask for help.' },
+  ar: { mine: 'تعليماتي', todo: 'للمتابعة', completed: 'مكتملة', listen: 'استمع وأجب', ack: 'اقرأ وأكّد', open: 'افتح التعليمات', help: 'أحتاج مساعدة', back: 'رجوع', question: 'دورك', answer: 'أجب بكلماتك الخاصة', send: 'أرسل الإجابة', received: 'تم استلام إجابتك', review: 'قد يتابع معك المشرف إذا كان هناك شيء غير واضح.', text: 'اقرأ النص', play: 'شغّل التعليمات', playQuestion: 'شغّل السؤال', reply: 'اكتب إجابتك', helpTitle: 'اطلب المساعدة من المشرف', helpPrompt: 'بماذا تحتاج المساعدة؟', saved: 'تم حفظ طلبك.', version: 'التعليمات', skip: 'انتقل إلى المحتوى الرئيسي', more: 'المزيد', due: 'الموعد النهائي', repeat: 'طلب المشرف إجابة جديدة', repeatSaved: 'طلب المشرف إجابة جديدة. إجابتك السابقة محفوظة.', reminder: 'تذكير: لم يُستلم ردك بعد.', thisDevice: 'هذا الجهاز', receipt: 'إيصال', ackTitle: 'أكّد استلام التعليمات', ackBody: 'لا يُطلب منك جواب. أكّد فقط أنك قرأت التعليمات أو استمعت إليها.', saving: 'جارٍ الحفظ...', ackAction: 'أؤكد الاستلام', reviewTitle: 'راجع إجابتك', reviewBody: 'سيتم إرسال هذا النص إلى مشرفك.', edit: 'تعديل', reviewAnswer: 'راجع إجابتك', readInstruction: 'اقرأ التعليمات', expired: 'انتهت مدة الاحتفاظ بمحتوى التعليمات. يظل سجل إجاباتك أدناه.', emptyFollowup: 'لا توجد محادثات متابعة مفتوحة.', followupShort: 'المتابعة', deadlinePassed: 'انتهى موعد الإجابة. لا يزال بإمكانك طلب المساعدة.' },
+  ur: { mine: 'میری ہدایات', todo: 'کرنا ہے', completed: 'مکمل', listen: 'سنیں اور جواب دیں', ack: 'پڑھیں اور تصدیق کریں', open: 'ہدایات کھولیں', help: 'مجھے مدد چاہیے', back: 'واپس', question: 'آپ کی باری', answer: 'اپنے الفاظ میں جواب دیں', send: 'جواب بھیجیں', received: 'آپ کا جواب موصول ہو گیا', review: 'اگر کوئی بات واضح نہ ہوئی تو آپ کا سپروائزر رابطہ کر سکتا ہے۔', text: 'متن پڑھیں', play: 'ہدایات سنیں', playQuestion: 'سوال سنیں', reply: 'اپنا جواب لکھیں', helpTitle: 'سپروائزر سے مدد مانگیں', helpPrompt: 'آپ کو کس چیز میں مدد چاہیے؟', saved: 'آپ کی درخواست محفوظ ہو گئی۔', version: 'ہدایت', skip: 'مرکزی مواد پر جائیں', more: 'مزید', due: 'آخری وقت', repeat: 'سپروائزر نے نیا جواب مانگا ہے', repeatSaved: 'سپروائزر نے نیا جواب مانگا ہے۔ آپ کا پچھلا جواب محفوظ ہے۔', reminder: 'یاد دہانی: آپ کا جواب ابھی موصول نہیں ہوا۔', thisDevice: 'یہ آلہ', receipt: 'وصولی', ackTitle: 'ہدایات موصول ہونے کی تصدیق کریں', ackBody: 'آپ سے جواب نہیں مانگا جا رہا۔ صرف تصدیق کریں کہ آپ نے ہدایات پڑھ یا سن لی ہیں۔', saving: 'محفوظ ہو رہا ہے...', ackAction: 'موصول ہونے کی تصدیق کریں', reviewTitle: 'اپنا جواب دیکھیں', reviewBody: 'یہ متن آپ کے سپروائزر کو بھیجا جائے گا۔', edit: 'ترمیم', reviewAnswer: 'اپنا جواب دیکھیں', readInstruction: 'ہدایات پڑھیں', expired: 'بریفنگ کے مواد کی مدت ختم ہو گئی ہے۔ آپ کے جوابات کی تاریخ نیچے موجود ہے۔', emptyFollowup: 'ابھی کوئی کھلی گفتگو نہیں۔', followupShort: 'رابطہ', deadlinePassed: 'جواب کی آخری تاریخ گزر گئی ہے۔ آپ اب بھی مدد مانگ سکتے ہیں۔' },
+  hi: { mine: 'मेरे निर्देश', todo: 'करना है', completed: 'पूर्ण', listen: 'सुनें और उत्तर दें', ack: 'पढ़ें और पुष्टि करें', open: 'निर्देश खोलें', help: 'मुझे सहायता चाहिए', back: 'वापस', question: 'आपकी बारी', answer: 'अपने शब्दों में उत्तर दें', send: 'उत्तर भेजें', received: 'आपका उत्तर प्राप्त हुआ', review: 'अगर कुछ स्पष्ट न हो तो आपका सुपरवाइज़र संपर्क कर सकता है।', text: 'पाठ पढ़ें', play: 'निर्देश सुनें', playQuestion: 'प्रश्न सुनें', reply: 'अपना उत्तर लिखें', helpTitle: 'सुपरवाइज़र से सहायता माँगें', helpPrompt: 'आपको किस चीज़ में सहायता चाहिए?', saved: 'आपका अनुरोध सहेजा गया।', version: 'निर्देश', skip: 'मुख्य सामग्री पर जाएँ', more: 'और', due: 'अंतिम समय', repeat: 'सुपरवाइज़र ने नया उत्तर माँगा है', repeatSaved: 'सुपरवाइज़र ने नया उत्तर माँगा है। आपका पिछला उत्तर सुरक्षित है।', reminder: 'याद दिलाना: आपका उत्तर अभी प्राप्त नहीं हुआ।', thisDevice: 'यह डिवाइस', receipt: 'प्राप्ति', ackTitle: 'इस निर्देश की प्राप्ति की पुष्टि करें', ackBody: 'आपसे उत्तर नहीं माँगा जा रहा। केवल पुष्टि करें कि आपने निर्देश पढ़ या सुन लिया है।', saving: 'सहेजा जा रहा है...', ackAction: 'प्राप्ति की पुष्टि करें', reviewTitle: 'अपना उत्तर देखें', reviewBody: 'यह पाठ आपके सुपरवाइज़र को भेजा जाएगा।', edit: 'संपादित करें', reviewAnswer: 'उत्तर देखें', readInstruction: 'निर्देश पढ़ें', expired: 'निर्देश की सामग्री की अवधि समाप्त हो गई है। आपके उत्तरों का इतिहास नीचे है।', emptyFollowup: 'अभी कोई खुली फ़ॉलो-अप बातचीत नहीं।', followupShort: 'फ़ॉलो-अप', deadlinePassed: 'उत्तर की अंतिम तिथि बीत गई है। आप अभी भी सहायता माँग सकते हैं।' },
+  bn: { mine: 'আমার নির্দেশনা', todo: 'করতে হবে', completed: 'সম্পন্ন', listen: 'শুনুন ও উত্তর দিন', ack: 'পড়ুন ও নিশ্চিত করুন', open: 'নির্দেশনা খুলুন', help: 'আমার সাহায্য দরকার', back: 'ফিরে যান', question: 'আপনার পালা', answer: 'নিজের ভাষায় উত্তর দিন', send: 'উত্তর পাঠান', received: 'আপনার উত্তর পাওয়া গেছে', review: 'কিছু স্পষ্ট না হলে আপনার সুপারভাইজার যোগাযোগ করতে পারেন।', text: 'পাঠ পড়ুন', play: 'নির্দেশনা শুনুন', playQuestion: 'প্রশ্ন শুনুন', reply: 'আপনার উত্তর লিখুন', helpTitle: 'সুপারভাইজারের সাহায্য নিন', helpPrompt: 'কী বিষয়ে সাহায্য দরকার?', saved: 'আপনার অনুরোধ সংরক্ষণ করা হয়েছে।', version: 'নির্দেশনা', skip: 'মূল বিষয়বস্তুতে যান', more: 'আরও', due: 'শেষ সময়', repeat: 'সুপারভাইজার নতুন উত্তর চেয়েছেন', repeatSaved: 'সুপারভাইজার নতুন উত্তর চেয়েছেন। আপনার আগের উত্তর সংরক্ষিত আছে।', reminder: 'মনে করানো হচ্ছে: আপনার উত্তর এখনও পাওয়া যায়নি।', thisDevice: 'এই ডিভাইস', receipt: 'প্রাপ্তি', ackTitle: 'এই নির্দেশনার প্রাপ্তি নিশ্চিত করুন', ackBody: 'আপনার কাছে উত্তর চাওয়া হচ্ছে না। শুধু নিশ্চিত করুন যে আপনি নির্দেশনাটি পড়েছেন বা শুনেছেন।', saving: 'সংরক্ষণ হচ্ছে...', ackAction: 'প্রাপ্তি নিশ্চিত করুন', reviewTitle: 'আপনার উত্তর দেখুন', reviewBody: 'এই পাঠটি আপনার সুপারভাইজারের কাছে পাঠানো হবে।', edit: 'সম্পাদনা', reviewAnswer: 'উত্তর দেখুন', readInstruction: 'নির্দেশনা পড়ুন', expired: 'নির্দেশনার বিষয়বস্তুর সময় শেষ হয়েছে। আপনার উত্তরের ইতিহাস নিচে আছে।', emptyFollowup: 'এখনও কোনো খোলা ফলো-আপ আলাপ নেই।', followupShort: 'ফলো-আপ', deadlinePassed: 'উত্তরের শেষ সময় পেরিয়ে গেছে। আপনি এখনও সাহায্য চাইতে পারেন।' },
+  ml: { mine: 'എന്റെ നിർദ്ദേശങ്ങൾ', todo: 'ചെയ്യാനുള്ളത്', completed: 'പൂർത്തിയായി', listen: 'കേട്ട് ഉത്തരം നൽകുക', ack: 'വായിച്ച് സ്ഥിരീകരിക്കുക', open: 'നിർദ്ദേശം തുറക്കുക', help: 'എനിക്ക് സഹായം വേണം', back: 'പിന്നോട്ട്', question: 'നിങ്ങളുടെ ഊഴം', answer: 'നിങ്ങളുടെ വാക്കുകളിൽ ഉത്തരം നൽകുക', send: 'ഉത്തരം അയക്കുക', received: 'നിങ്ങളുടെ ഉത്തരം ലഭിച്ചു', review: 'എന്തെങ്കിലും വ്യക്തമല്ലെങ്കിൽ നിങ്ങളുടെ സൂപ്പർവൈസർ ബന്ധപ്പെടാം.', text: 'പാഠം വായിക്കുക', play: 'നിർദ്ദേശം കേൾക്കുക', playQuestion: 'ചോദ്യം കേൾക്കുക', reply: 'നിങ്ങളുടെ ഉത്തരം എഴുതുക', helpTitle: 'സൂപ്പർവൈസറിനോട് സഹായം ചോദിക്കുക', helpPrompt: 'എന്തിലാണ് സഹായം വേണ്ടത്?', saved: 'നിങ്ങളുടെ അഭ്യർത്ഥന സംരക്ഷിച്ചു.', version: 'നിർദ്ദേശം', skip: 'പ്രധാന ഉള്ളടക്കത്തിലേക്ക് പോകുക', more: 'കൂടുതൽ', due: 'അവസാന സമയം', repeat: 'സൂപ്പർവൈസർ പുതിയ ഉത്തരം ആവശ്യപ്പെട്ടു', repeatSaved: 'സൂപ്പർവൈസർ പുതിയ ഉത്തരം ആവശ്യപ്പെട്ടു. നിങ്ങളുടെ മുൻ ഉത്തരം സംരക്ഷിച്ചിരിക്കുന്നു.', reminder: 'ഓർമ്മപ്പെടുത്തൽ: നിങ്ങളുടെ ഉത്തരം ഇതുവരെ ലഭിച്ചിട്ടില്ല.', thisDevice: 'ഈ ഉപകരണം', receipt: 'സ്വീകരണം', ackTitle: 'ഈ നിർദ്ദേശത്തിന്റെ സ്വീകരണം സ്ഥിരീകരിക്കുക', ackBody: 'നിങ്ങളോട് ഉത്തരം ആവശ്യപ്പെടുന്നില്ല. നിർദ്ദേശം വായിച്ചു അല്ലെങ്കിൽ കേട്ടു എന്ന് മാത്രം സ്ഥിരീകരിക്കുക.', saving: 'സംരക്ഷിക്കുന്നു...', ackAction: 'സ്വീകരണം സ്ഥിരീകരിക്കുക', reviewTitle: 'നിങ്ങളുടെ ഉത്തരം പരിശോധിക്കുക', reviewBody: 'ഈ പാഠം നിങ്ങളുടെ സൂപ്പർവൈസറിന് അയക്കും.', edit: 'തിരുത്തുക', reviewAnswer: 'ഉത്തരം പരിശോധിക്കുക', readInstruction: 'നിർദ്ദേശം വായിക്കുക', expired: 'നിർദ്ദേശ ഉള്ളടക്കത്തിന്റെ കാലാവധി കഴിഞ്ഞു. നിങ്ങളുടെ ഉത്തര ചരിത്രം താഴെയുണ്ട്.', emptyFollowup: 'ഇപ്പോൾ തുറന്ന ഫോളോ-അപ്പ് സംഭാഷണമില്ല.', followupShort: 'ഫോളോ-അപ്പ്', deadlinePassed: 'ഉത്തരത്തിന്റെ അവസാന സമയം കഴിഞ്ഞു. നിങ്ങൾക്ക് ഇപ്പോഴും സഹായം ചോദിക്കാം.' },
+  ta: { mine: 'எனது அறிவுறுத்தல்கள்', todo: 'செய்ய வேண்டியவை', completed: 'முடிந்தது', listen: 'கேட்டு பதிலளிக்கவும்', ack: 'படித்து உறுதிப்படுத்தவும்', open: 'அறிவுறுத்தலைத் திற', help: 'எனக்கு உதவி வேண்டும்', back: 'பின்செல்', question: 'உங்கள் முறை', answer: 'உங்கள் சொந்த வார்த்தைகளில் பதிலளிக்கவும்', send: 'பதிலை அனுப்பு', received: 'உங்கள் பதில் பெறப்பட்டது', review: 'ஏதேனும் தெளிவில்லை என்றால் உங்கள் மேற்பார்வையாளர் தொடர்பு கொள்ளலாம்.', text: 'உரையைப் படி', play: 'அறிவுறுத்தலைக் கேள்', playQuestion: 'கேள்வியைக் கேள்', reply: 'உங்கள் பதிலை எழுதுங்கள்', helpTitle: 'மேற்பார்வையாளரிடம் உதவி கேளுங்கள்', helpPrompt: 'எதற்கு உதவி தேவை?', saved: 'உங்கள் கோரிக்கை சேமிக்கப்பட்டது.', version: 'அறிவுறுத்தல்', skip: 'முக்கிய உள்ளடக்கத்திற்குச் செல்', more: 'மேலும்', due: 'கடைசி நேரம்', repeat: 'மேற்பார்வையாளர் புதிய பதிலைக் கோரியுள்ளார்', repeatSaved: 'மேற்பார்வையாளர் புதிய பதிலைக் கோரியுள்ளார். உங்கள் முந்தைய பதில் பாதுகாக்கப்பட்டுள்ளது.', reminder: 'நினைவூட்டல்: உங்கள் பதில் இன்னும் பெறப்படவில்லை.', thisDevice: 'இந்தச் சாதனம்', receipt: 'பெறுதல்', ackTitle: 'இந்த அறிவுறுத்தலின் பெறுதலை உறுதிப்படுத்தவும்', ackBody: 'உங்களிடம் பதில் கேட்கப்படவில்லை. அறிவுறுத்தலைப் படித்தீர்கள் அல்லது கேட்டீர்கள் என்பதை மட்டும் உறுதிப்படுத்தவும்.', saving: 'சேமிக்கப்படுகிறது...', ackAction: 'பெறுதலை உறுதிப்படுத்து', reviewTitle: 'உங்கள் பதிலை மதிப்பாய்வு செய்யவும்', reviewBody: 'இந்த உரை உங்கள் மேற்பார்வையாளருக்கு அனுப்பப்படும்.', edit: 'திருத்து', reviewAnswer: 'பதிலை மதிப்பாய்வு செய்', readInstruction: 'அறிவுறுத்தலைப் படி', expired: 'அறிவுறுத்தல் உள்ளடக்கத்தின் காலம் முடிந்தது. உங்கள் பதில் வரலாறு கீழே உள்ளது.', emptyFollowup: 'இப்போது திறந்த பின்தொடர்வு உரையாடல்கள் இல்லை.', followupShort: 'பின்தொடர்வு', deadlinePassed: 'பதிலுக்கான கடைசி நேரம் கடந்துவிட்டது. நீங்கள் இன்னும் உதவி கேட்கலாம்.' },
+  te: { mine: 'నా సూచనలు', todo: 'చేయాల్సినవి', completed: 'పూర్తయింది', listen: 'వినండి మరియు సమాధానం ఇవ్వండి', ack: 'చదివి నిర్ధారించండి', open: 'సూచనను తెరవండి', help: 'నాకు సహాయం కావాలి', back: 'వెనుకకు', question: 'మీ వంతు', answer: 'మీ మాటల్లో సమాధానం ఇవ్వండి', send: 'సమాధానం పంపండి', received: 'మీ సమాధానం అందింది', review: 'ఏదైనా స్పష్టంగా లేకపోతే మీ సూపర్‌వైజర్ సంప్రదించవచ్చు.', text: 'పాఠ్యం చదవండి', play: 'సూచనను వినండి', playQuestion: 'ప్రశ్నను వినండి', reply: 'మీ సమాధానం రాయండి', helpTitle: 'సూపర్‌వైజర్‌ను సహాయం అడగండి', helpPrompt: 'ఏ విషయంలో సహాయం కావాలి?', saved: 'మీ అభ్యర్థన సేవ్ చేయబడింది.', version: 'సూచన', skip: 'ప్రధాన కంటెంట్‌కు వెళ్లండి', more: 'మరిన్ని', due: 'చివరి సమయం', repeat: 'సూపర్‌వైజర్ కొత్త సమాధానం అడిగారు', repeatSaved: 'సూపర్‌వైజర్ కొత్త సమాధానం అడిగారు. మీ మునుపటి సమాధానం భద్రంగా ఉంది.', reminder: 'గుర్తుచేస్తున్నాం: మీ సమాధానం ఇంకా అందలేదు.', thisDevice: 'ఈ పరికరం', receipt: 'అందుబాటు', ackTitle: 'ఈ సూచన అందుబాటును నిర్ధారించండి', ackBody: 'మీ నుండి సమాధానం అడగడం లేదు. మీరు సూచనను చదివారు లేదా విన్నారు అని మాత్రమే నిర్ధారించండి.', saving: 'సేవ్ అవుతోంది...', ackAction: 'అందుబాటును నిర్ధారించండి', reviewTitle: 'మీ సమాధానాన్ని సమీక్షించండి', reviewBody: 'ఈ పాఠ్యం మీ సూపర్‌వైజర్‌కు పంపబడుతుంది.', edit: 'మార్చండి', reviewAnswer: 'సమాధానాన్ని సమీక్షించండి', readInstruction: 'సూచనను చదవండి', expired: 'సూచన కంటెంట్ గడువు ముగిసింది. మీ సమాధానాల చరిత్ర క్రింద ఉంది.', emptyFollowup: 'ఇప్పుడు తెరిచిన ఫాలో-అప్ సంభాషణలు లేవు.', followupShort: 'ఫాలో-అప్', deadlinePassed: 'సమాధానం గడువు ముగిసింది. మీరు ఇంకా సహాయం అడగవచ్చు.' },
+  ne: { mine: 'मेरा निर्देशनहरू', todo: 'गर्न बाँकी', completed: 'सम्पन्न', listen: 'सुन्नुहोस् र जवाफ दिनुहोस्', ack: 'पढ्नुहोस् र पुष्टि गर्नुहोस्', open: 'निर्देशन खोल्नुहोस्', help: 'मलाई सहयोग चाहिन्छ', back: 'फर्कनुहोस्', question: 'तपाईंको पालो', answer: 'आफ्नै शब्दमा जवाफ दिनुहोस्', send: 'जवाफ पठाउनुहोस्', received: 'तपाईंको जवाफ प्राप्त भयो', review: 'केही स्पष्ट नभएमा तपाईंको सुपरभाइजरले सम्पर्क गर्न सक्छ।', text: 'पाठ पढ्नुहोस्', play: 'निर्देशन सुन्नुहोस्', playQuestion: 'प्रश्न सुन्नुहोस्', reply: 'आफ्नो जवाफ लेख्नुहोस्', helpTitle: 'सुपरभाइजरसँग मद्दत माग्नुहोस्', helpPrompt: 'कुन कुरामा मद्दत चाहिन्छ?', saved: 'तपाईंको अनुरोध सुरक्षित भयो।', version: 'निर्देशन', skip: 'मुख्य सामग्रीमा जानुहोस्', more: 'थप', due: 'अन्तिम समय', repeat: 'सुपरभाइजरले नयाँ जवाफ माग्नुभयो', repeatSaved: 'सुपरभाइजरले नयाँ जवाफ माग्नुभयो। तपाईंको अघिल्लो जवाफ सुरक्षित छ।', reminder: 'सम्झना: तपाईंको जवाफ अझै प्राप्त भएको छैन।', thisDevice: 'यो उपकरण', receipt: 'प्राप्ति', ackTitle: 'यो निर्देशनको प्राप्ति पुष्टि गर्नुहोस्', ackBody: 'तपाईंसँग जवाफ मागिएको छैन। तपाईंले निर्देशन पढ्नुभयो वा सुन्नुभयो भन्ने मात्र पुष्टि गर्नुहोस्।', saving: 'सुरक्षित हुँदै...', ackAction: 'प्राप्ति पुष्टि गर्नुहोस्', reviewTitle: 'आफ्नो जवाफ समीक्षा गर्नुहोस्', reviewBody: 'यो पाठ तपाईंको सुपरभाइजरलाई पठाइनेछ।', edit: 'सम्पादन', reviewAnswer: 'जवाफ समीक्षा गर्नुहोस्', readInstruction: 'निर्देशन पढ्नुहोस्', expired: 'निर्देशन सामग्रीको अवधि सकियो। तपाईंको जवाफ इतिहास तल छ।', emptyFollowup: 'अहिले कुनै खुला फलो-अप कुराकानी छैन।', followupShort: 'फलो-अप', deadlinePassed: 'जवाफको अन्तिम समय बितिसक्यो। तपाईं अझै मद्दत माग्न सक्नुहुन्छ।' },
+  fil: { mine: 'Mga tagubilin ko', todo: 'Gawin', completed: 'Tapos na', listen: 'Makinig at sumagot', ack: 'Basahin at kumpirmahin', open: 'Buksan ang tagubilin', help: 'Kailangan ko ng tulong', back: 'Bumalik', question: 'Iyong pagkakataon', answer: 'Sumagot sa sariling salita', send: 'Ipadala ang sagot', received: 'Natanggap ang sagot mo', review: 'Maaaring makipag-ugnayan ang supervisor mo kung may hindi malinaw.', text: 'Basahin ang teksto', play: 'Pakinggan ang tagubilin', playQuestion: 'Pakinggan ang tanong', reply: 'I-type ang sagot mo', helpTitle: 'Humingi ng tulong sa supervisor', helpPrompt: 'Ano ang kailangan mong tulong?', saved: 'Na-save ang request mo.', version: 'Tagubilin', skip: 'Lumaktaw sa pangunahing nilalaman', more: 'Higit pa', due: 'Takdang oras', repeat: 'Humiling ang supervisor ng bagong sagot', repeatSaved: 'Humiling ang supervisor ng bagong sagot. Naka-save ang dating sagot mo.', reminder: 'Paalala: hindi pa natatanggap ang sagot mo.', thisDevice: 'Device na ito', receipt: 'Resibo', ackTitle: 'Kumpirmahin ang pagtanggap ng tagubiling ito', ackBody: 'Hindi ka hinihilingang sumagot. Kumpirmahin lang na nabasa o napakinggan mo ang tagubilin.', saving: 'Nagse-save...', ackAction: 'Kumpirmahin ang pagtanggap', reviewTitle: 'Suriin ang sagot mo', reviewBody: 'Ipadadala ang tekstong ito sa supervisor mo.', edit: 'I-edit', reviewAnswer: 'Suriin ang sagot', readInstruction: 'Basahin ang tagubilin', expired: 'Nag-expire na ang nilalaman ng tagubilin. Nasa ibaba ang history ng sagot mo.', emptyFollowup: 'Walang bukas na follow-up na usapan.', followupShort: 'Follow-up', deadlinePassed: 'Lampas na ang deadline ng sagot. Maaari ka pa ring humingi ng tulong.' },
+  si: { mine: 'මගේ උපදෙස්', todo: 'කළ යුතුයි', completed: 'සම්පූර්ණයි', listen: 'අසා පිළිතුරු දෙන්න', ack: 'කියවා තහවුරු කරන්න', open: 'උපදෙස් විවෘත කරන්න', help: 'මට උදව් අවශ්‍යයි', back: 'ආපසු', question: 'ඔබේ වාරය', answer: 'ඔබේම වචනවලින් පිළිතුරු දෙන්න', send: 'පිළිතුර යවන්න', received: 'ඔබේ පිළිතුර ලැබුණි', review: 'යමක් පැහැදිලි නැත්නම් ඔබේ අධීක්ෂකට සම්බන්ධ විය හැක.', text: 'පෙළ කියවන්න', play: 'උපදෙස් අසන්න', playQuestion: 'ප්‍රශ්නය අසන්න', reply: 'ඔබේ පිළිතුර ලියන්න', helpTitle: 'අධීක්ෂකගෙන් උදව් ඉල්ලන්න', helpPrompt: 'කුමකට උදව් අවශ්‍යද?', saved: 'ඔබේ ඉල්ලීම සුරැකිණි.', version: 'උපදෙස', skip: 'ප්‍රධාන අන්තර්ගතයට යන්න', more: 'තව', due: 'අවසන් වේලාව', repeat: 'අධීක්ෂක නව පිළිතුරක් ඉල්ලා ඇත', repeatSaved: 'අධීක්ෂක නව පිළිතුරක් ඉල්ලා ඇත. ඔබේ පෙර පිළිතුර සුරකිනු ලැබේ.', reminder: 'සිහිකැඳවීම: ඔබේ පිළිතුර තවම ලැබී නැත.', thisDevice: 'මෙම උපාංගය', receipt: 'ලැබීම', ackTitle: 'මෙම උපදෙස ලැබීම තහවුරු කරන්න', ackBody: 'ඔබෙන් පිළිතුරක් ඉල්ලා නොමැත. ඔබ උපදෙස කියවා හෝ අසා ඇති බව පමණක් තහවුරු කරන්න.', saving: 'සුරකිමින්...', ackAction: 'ලැබීම තහවුරු කරන්න', reviewTitle: 'ඔබේ පිළිතුර සමාලෝචනය කරන්න', reviewBody: 'මෙම පෙළ ඔබේ අධීක්ෂකට යැවෙනු ඇත.', edit: 'සංස්කරණය', reviewAnswer: 'පිළිතුර සමාලෝචනය', readInstruction: 'උපදෙස කියවන්න', expired: 'උපදෙස් අන්තර්ගතයේ කාලය අවසන්. ඔබේ පිළිතුරු ඉතිහාසය පහතින් ඇත.', emptyFollowup: 'දැනට විවෘත පසුවිපරම් සංවාද නැත.', followupShort: 'පසුවිපරම', deadlinePassed: 'පිළිතුරේ අවසන් වේලාව ඉක්මවා ඇත. ඔබට තවමත් උදව් ඉල්ලිය හැක.' },
+  ru: { mine: 'Мои инструкции', todo: 'К выполнению', completed: 'Выполнено', listen: 'Слушайте и отвечайте', ack: 'Прочитайте и подтвердите', open: 'Открыть инструкцию', help: 'Мне нужна помощь', back: 'Назад', question: 'Ваша очередь', answer: 'Ответьте своими словами', send: 'Отправить ответ', received: 'Ваш ответ получен', review: 'Руководитель может связаться с вами, если что-то неясно.', text: 'Прочитать текст', play: 'Прослушать инструкцию', playQuestion: 'Прослушать вопрос', reply: 'Введите ваш ответ', helpTitle: 'Попросите помощи у руководителя', helpPrompt: 'В чём вам нужна помощь?', saved: 'Ваш запрос сохранён.', version: 'Инструкция', skip: 'Перейти к основному содержанию', more: 'Ещё', due: 'Срок', repeat: 'Руководитель запросил новый ответ', repeatSaved: 'Руководитель запросил новый ответ. Ваш предыдущий ответ сохранён.', reminder: 'Напоминание: ваш ответ пока не получен.', thisDevice: 'Это устройство', receipt: 'Получение', ackTitle: 'Подтвердите получение инструкции', ackBody: 'Отвечать не требуется. Подтвердите только, что вы прочитали или прослушали инструкцию.', saving: 'Сохранение...', ackAction: 'Подтвердить получение', reviewTitle: 'Проверьте ваш ответ', reviewBody: 'Этот текст будет отправлен вашему руководителю.', edit: 'Изменить', reviewAnswer: 'Проверить ответ', readInstruction: 'Прочитать инструкцию', expired: 'Срок хранения содержания инструкции истёк. История ваших ответов ниже.', emptyFollowup: 'Открытых бесед для уточнений пока нет.', followupShort: 'Уточнение', deadlinePassed: 'Срок ответа истёк. Вы всё ещё можете попросить помощи.' },
+  'pa-Guru': { mine: 'ਮੇਰੀਆਂ ਹਦਾਇਤਾਂ', todo: 'ਕਰਨਾ ਹੈ', completed: 'ਪੂਰਾ ਹੋਇਆ', listen: 'ਸੁਣੋ ਅਤੇ ਜਵਾਬ ਦਿਓ', ack: 'ਪੜ੍ਹੋ ਅਤੇ ਪੁਸ਼ਟੀ ਕਰੋ', open: 'ਹਦਾਇਤ ਖੋਲ੍ਹੋ', help: 'ਮੈਨੂੰ ਮਦਦ ਚਾਹੀਦੀ ਹੈ', back: 'ਵਾਪਸ', question: 'ਤੁਹਾਡੀ ਵਾਰੀ', answer: 'ਆਪਣੇ ਸ਼ਬਦਾਂ ਵਿੱਚ ਜਵਾਬ ਦਿਓ', send: 'ਜਵਾਬ ਭੇਜੋ', received: 'ਤੁਹਾਡਾ ਜਵਾਬ ਪ੍ਰਾਪਤ ਹੋਇਆ', review: 'ਜੇ ਕੁਝ ਸਪੱਸ਼ਟ ਨਾ ਹੋਵੇ ਤਾਂ ਤੁਹਾਡਾ ਸੁਪਰਵਾਈਜ਼ਰ ਸੰਪਰਕ ਕਰ ਸਕਦਾ ਹੈ।', text: 'ਪਾਠ ਪੜ੍ਹੋ', play: 'ਹਦਾਇਤ ਸੁਣੋ', playQuestion: 'ਸਵਾਲ ਸੁਣੋ', reply: 'ਆਪਣਾ ਜਵਾਬ ਲਿਖੋ', helpTitle: 'ਸੁਪਰਵਾਈਜ਼ਰ ਤੋਂ ਮਦਦ ਮੰਗੋ', helpPrompt: 'ਤੁਹਾਨੂੰ ਕਿਸ ਚੀਜ਼ ਵਿੱਚ ਮਦਦ ਚਾਹੀਦੀ ਹੈ?', saved: 'ਤੁਹਾਡੀ ਬੇਨਤੀ ਸੰਭਾਲੀ ਗਈ।', version: 'ਹਦਾਇਤ', skip: 'ਮੁੱਖ ਸਮੱਗਰੀ ਤੇ ਜਾਓ', more: 'ਹੋਰ', due: 'ਆਖਰੀ ਸਮਾਂ', repeat: 'ਸੁਪਰਵਾਈਜ਼ਰ ਨੇ ਨਵਾਂ ਜਵਾਬ ਮੰਗਿਆ ਹੈ', repeatSaved: 'ਸੁਪਰਵਾਈਜ਼ਰ ਨੇ ਨਵਾਂ ਜਵਾਬ ਮੰਗਿਆ ਹੈ। ਤੁਹਾਡਾ ਪਿਛਲਾ ਜਵਾਬ ਸੰਭਾਲਿਆ ਹੈ।', reminder: 'ਯਾਦ ਦਿਹਾਣੀ: ਤੁਹਾਡਾ ਜਵਾਬ ਅਜੇ ਪ੍ਰਾਪਤ ਨਹੀਂ ਹੋਇਆ।', thisDevice: 'ਇਹ ਡਿਵਾਈਸ', receipt: 'ਪ੍ਰਾਪਤੀ', ackTitle: 'ਇਸ ਹਦਾਇਤ ਦੀ ਪ੍ਰਾਪਤੀ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ', ackBody: 'ਤੁਹਾਡੇ ਤੋਂ ਜਵਾਬ ਨਹੀਂ ਮੰਗਿਆ ਜਾ ਰਿਹਾ। ਸਿਰਫ਼ ਪੁਸ਼ਟੀ ਕਰੋ ਕਿ ਤੁਸੀਂ ਹਦਾਇਤ ਪੜ੍ਹੀ ਜਾਂ ਸੁਣੀ ਹੈ।', saving: 'ਸੰਭਾਲਿਆ ਜਾ ਰਿਹਾ ਹੈ...', ackAction: 'ਪ੍ਰਾਪਤੀ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ', reviewTitle: 'ਆਪਣਾ ਜਵਾਬ ਵੇਖੋ', reviewBody: 'ਇਹ ਪਾਠ ਤੁਹਾਡੇ ਸੁਪਰਵਾਈਜ਼ਰ ਨੂੰ ਭੇਜਿਆ ਜਾਵੇਗਾ।', edit: 'ਸੋਧੋ', reviewAnswer: 'ਜਵਾਬ ਵੇਖੋ', readInstruction: 'ਹਦਾਇਤ ਪੜ੍ਹੋ', expired: 'ਹਦਾਇਤ ਦੀ ਸਮੱਗਰੀ ਦੀ ਮਿਆਦ ਖ਼ਤਮ ਹੋ ਗਈ ਹੈ। ਤੁਹਾਡੇ ਜਵਾਬਾਂ ਦਾ ਇਤਿਹਾਸ ਹੇਠਾਂ ਹੈ।', emptyFollowup: 'ਹਾਲੇ ਕੋਈ ਖੁੱਲ੍ਹੀ ਫ਼ਾਲੋ-ਅੱਪ ਗੱਲਬਾਤ ਨਹੀਂ।', followupShort: 'ਫ਼ਾਲੋ-ਅੱਪ', deadlinePassed: 'ਜਵਾਬ ਦੀ ਆਖਰੀ ਮਿਆਦ ਲੰਘ ਗਈ ਹੈ। ਤੁਸੀਂ ਅਜੇ ਵੀ ਮਦਦ ਮੰਗ ਸਕਦੇ ਹੋ।' },
+  'pa-Arab': { mine: 'میریاں ہدایتاں', todo: 'کرنا اے', completed: 'مکمل', listen: 'سنو تے جواب دیو', ack: 'پڑھو تے تصدیق کرو', open: 'ہدایت کھولو', help: 'مینوں مدد چاہیدی اے', back: 'واپس', question: 'تہاڈی واری', answer: 'اپنے لفظاں وچ جواب دیو', send: 'جواب بھیجو', received: 'تہاڈا جواب موصول ہو گیا', review: 'جے کوئی گل واضح نہ ہووے تے تہاڈا سپروائزر رابطہ کر سکدا اے۔', text: 'متن پڑھو', play: 'ہدایت سنو', playQuestion: 'سوال سنو', reply: 'اپنا جواب لکھو', helpTitle: 'سپروائزر توں مدد منگو', helpPrompt: 'تہانوں کیہڑی گل وچ مدد چاہیدی اے؟', saved: 'تہاڈی درخواست محفوظ ہو گئی۔', version: 'ہدایت', skip: 'مرکزی مواد تے جاؤ', more: 'ہور', due: 'آخری ویلہ', repeat: 'سپروائزر نے نواں جواب منگیا اے', repeatSaved: 'سپروائزر نے نواں جواب منگیا اے۔ تہاڈا پچھلا جواب محفوظ اے۔', reminder: 'یاد دہانی: تہاڈا جواب ہالے موصول نئیں ہویا۔', thisDevice: 'ایہ آلہ', receipt: 'وصولی', ackTitle: 'ایس ہدایت دی وصولی دی تصدیق کرو', ackBody: 'تہاڈے توں جواب نئیں منگیا جا ریا۔ صرف تصدیق کرو کہ تسیں ہدایت پڑھی یا سنی اے۔', saving: 'محفوظ ہو ریا اے...', ackAction: 'وصولی دی تصدیق کرو', reviewTitle: 'اپنا جواب ویکھو', reviewBody: 'ایہ متن تہاڈے سپروائزر نوں بھیجیا جائے گا۔', edit: 'ترمیم', reviewAnswer: 'جواب ویکھو', readInstruction: 'ہدایت پڑھو', expired: 'ہدایت دے مواد دی مدت ختم ہو گئی اے۔ تہاڈے جواباں دی تریخ تھلے اے۔', emptyFollowup: 'ہالے کوئی کھلی گل بات نئیں۔', followupShort: 'رابطہ', deadlinePassed: 'جواب دی آخری مدت لنگھ گئی اے۔ تسیں ہالے وی مدد منگ سکدے او۔' },
+  id: { mine: 'Instruksi saya', todo: 'Perlu dikerjakan', completed: 'Selesai', listen: 'Dengarkan dan jawab', ack: 'Baca dan konfirmasi', open: 'Buka instruksi', help: 'Saya butuh bantuan', back: 'Kembali', question: 'Giliran Anda', answer: 'Jawab dengan kata-kata Anda sendiri', send: 'Kirim jawaban', received: 'Jawaban Anda diterima', review: 'Supervisor Anda dapat menghubungi jika ada yang kurang jelas.', text: 'Baca teks', play: 'Putar instruksi', playQuestion: 'Putar pertanyaan', reply: 'Ketik jawaban Anda', helpTitle: 'Minta bantuan supervisor', helpPrompt: 'Bantuan apa yang Anda butuhkan?', saved: 'Permintaan Anda tersimpan.', version: 'Instruksi', skip: 'Lompat ke konten utama', more: 'Lainnya', due: 'Tenggat', repeat: 'Supervisor meminta jawaban baru', repeatSaved: 'Supervisor meminta jawaban baru. Jawaban Anda sebelumnya tetap tersimpan.', reminder: 'Pengingat: jawaban Anda belum diterima.', thisDevice: 'Perangkat ini', receipt: 'Tanda terima', ackTitle: 'Konfirmasi penerimaan instruksi ini', ackBody: 'Anda tidak diminta menjawab. Konfirmasikan hanya bahwa Anda telah membaca atau mendengarkan instruksi.', saving: 'Menyimpan...', ackAction: 'Konfirmasi penerimaan', reviewTitle: 'Tinjau jawaban Anda', reviewBody: 'Teks ini akan dikirim ke supervisor Anda.', edit: 'Ubah', reviewAnswer: 'Tinjau jawaban', readInstruction: 'Baca instruksi', expired: 'Konten instruksi telah kedaluwarsa. Riwayat jawaban Anda tetap ada di bawah.', emptyFollowup: 'Belum ada percakapan tindak lanjut yang terbuka.', followupShort: 'Tindak lanjut', deadlinePassed: 'Tenggat jawaban telah lewat. Anda masih dapat meminta bantuan.' },
 };
 
-const workerAux = {
+type WorkerAux={demo:string;label:string;emptyTodo:string;emptyDone:string;loading:string;unavailable:string;outcome:string;assessment:string;audioPending:string;audioDemo:string;audioFailed:string;typeInstead:string;recordInstead:string;matched:string;clarification:string;unassessable:string;saved:string};
+const workerAux:Record<WorkerUiLanguage,WorkerAux> = {
   en: { demo: 'Synthetic local demo. A matching response does not certify understanding.', label: 'Synthetic local demo', emptyTodo: 'No briefings to do.', emptyDone: 'No completed briefings yet.', loading: 'Loading...', unavailable: 'Briefing unavailable', outcome: 'Recorded outcome', assessment: 'Synthetic local assessment. Your supervisor can review the original response.', audioPending: 'Recording received. The AI check is pending.', audioDemo: 'Recording received. Live transcription is not connected in this local demo.', audioFailed: 'The recording could not be checked. Please ask your supervisor or record again.', typeInstead: 'Type', recordInstead: 'Record', matched: 'Matched key facts', clarification: 'Needs clarification', unassessable: 'Could not assess', saved: 'Saved in the demo.' },
   ar: { demo: 'عرض تجريبي محلي. تطابق الإجابة لا يثبت الفهم.', label: 'عرض تجريبي محلي', emptyTodo: 'لا توجد تعليمات للمتابعة.', emptyDone: 'لا توجد تعليمات مكتملة بعد.', loading: 'جار التحميل...', unavailable: 'التعليمات غير متاحة', outcome: 'نتيجة مسجلة', assessment: 'تقييم تجريبي محلي. يمكن للمشرف مراجعة إجابتك الأصلية.', audioPending: 'تم استلام التسجيل. التحقق الآلي قيد الانتظار.', audioDemo: 'تم استلام التسجيل. النسخ الصوتي المباشر غير متصل بهذا العرض المحلي.', audioFailed: 'تعذّر التحقق من التسجيل. اطلب المساعدة من المشرف أو سجّل مرة أخرى.', typeInstead: 'كتابة', recordInstead: 'تسجيل', matched: 'طابقت المعلومات المطلوبة', clarification: 'تحتاج إلى توضيح', unassessable: 'تعذر التقييم', saved: 'تم الحفظ في العرض التجريبي.' },
   ur: { demo: 'یہ مقامی آزمائشی نمونہ ہے۔ درست جواب سمجھ کی تصدیق نہیں کرتا۔', label: 'مقامی آزمائشی نمونہ', emptyTodo: 'ابھی کوئی ہدایت باقی نہیں۔', emptyDone: 'ابھی کوئی مکمل ہدایت نہیں۔', loading: 'لوڈ ہو رہا ہے...', unavailable: 'ہدایت دستیاب نہیں', outcome: 'درج شدہ نتیجہ', assessment: 'یہ مقامی آزمائشی جانچ ہے۔ سپروائزر اصل جواب دیکھ سکتا ہے۔', audioPending: 'ریکارڈنگ موصول ہو گئی۔ خودکار جانچ زیر التوا ہے۔', audioDemo: 'ریکارڈنگ موصول ہو گئی۔ اس مقامی نمونے میں لائیو نقل نویسی منسلک نہیں۔', audioFailed: 'ریکارڈنگ کی جانچ نہ ہو سکی۔ سپروائزر سے مدد لیں یا دوبارہ ریکارڈ کریں۔', typeInstead: 'لکھیں', recordInstead: 'ریکارڈ کریں', matched: 'اہم حقائق درست ہیں', clarification: 'وضاحت درکار ہے', unassessable: 'جانچ ممکن نہیں', saved: 'نمونے میں محفوظ ہو گیا۔' },
+  hi: { demo: 'स्थानीय कृत्रिम डेमो। मिलता हुआ उत्तर समझ का प्रमाण नहीं है।', label: 'स्थानीय कृत्रिम डेमो', emptyTodo: 'करने के लिए कोई निर्देश नहीं।', emptyDone: 'अभी कोई पूर्ण निर्देश नहीं।', loading: 'लोड हो रहा है...', unavailable: 'निर्देश उपलब्ध नहीं', outcome: 'दर्ज परिणाम', assessment: 'यह स्थानीय कृत्रिम जाँच है। आपका सुपरवाइज़र मूल उत्तर देख सकता है।', audioPending: 'रिकॉर्डिंग प्राप्त हुई। AI जाँच लंबित है।', audioDemo: 'रिकॉर्डिंग प्राप्त हुई। इस स्थानीय डेमो में लाइव ट्रांसक्रिप्शन जुड़ा नहीं है।', audioFailed: 'रिकॉर्डिंग की जाँच नहीं हो सकी। सुपरवाइज़र से मदद माँगें या फिर से रिकॉर्ड करें।', typeInstead: 'लिखें', recordInstead: 'रिकॉर्ड करें', matched: 'मुख्य तथ्य मेल खाते हैं', clarification: 'स्पष्टीकरण चाहिए', unassessable: 'जाँच संभव नहीं', saved: 'डेमो में सहेजा गया।' },
+  bn: { demo: 'স্থানীয় কৃত্রিম ডেমো। মিলে যাওয়া উত্তর বোঝার প্রমাণ নয়।', label: 'স্থানীয় কৃত্রিম ডেমো', emptyTodo: 'করার মতো কোনো নির্দেশনা নেই।', emptyDone: 'এখনও কোনো সম্পন্ন নির্দেশনা নেই।', loading: 'লোড হচ্ছে...', unavailable: 'নির্দেশনা পাওয়া যাচ্ছে না', outcome: 'রেকর্ড করা ফলাফল', assessment: 'এটি স্থানীয় কৃত্রিম যাচাই। আপনার সুপারভাইজার মূল উত্তর দেখতে পারেন।', audioPending: 'রেকর্ডিং পাওয়া গেছে। AI যাচাই অপেক্ষমাণ।', audioDemo: 'রেকর্ডিং পাওয়া গেছে। এই স্থানীয় ডেমোতে লাইভ ট্রান্সক্রিপশন সংযুক্ত নয়।', audioFailed: 'রেকর্ডিং যাচাই করা যায়নি। সুপারভাইজারের সাহায্য নিন বা আবার রেকর্ড করুন।', typeInstead: 'লিখুন', recordInstead: 'রেকর্ড করুন', matched: 'মূল তথ্য মিলেছে', clarification: 'স্পষ্টীকরণ দরকার', unassessable: 'যাচাই করা যায়নি', saved: 'ডেমোতে সংরক্ষিত।' },
+  ml: { demo: 'പ്രാദേശിക കൃത്രിമ ഡെമോ. പൊരുത്തമുള്ള ഉത്തരം മനസ്സിലാക്കലിന്റെ തെളിവല്ല.', label: 'പ്രാദേശിക കൃത്രിമ ഡെമോ', emptyTodo: 'ചെയ്യാനുള്ള നിർദ്ദേശങ്ങളില്ല.', emptyDone: 'ഇതുവരെ പൂർത്തിയായ നിർദ്ദേശങ്ങളില്ല.', loading: 'ലോഡ് ചെയ്യുന്നു...', unavailable: 'നിർദ്ദേശം ലഭ്യമല്ല', outcome: 'രേഖപ്പെടുത്തിയ ഫലം', assessment: 'ഇത് പ്രാദേശിക കൃത്രിമ പരിശോധനയാണ്. നിങ്ങളുടെ സൂപ്പർവൈസർ യഥാർത്ഥ ഉത്തരം കാണാം.', audioPending: 'റെക്കോർഡിംഗ് ലഭിച്ചു. AI പരിശോധന കാത്തിരിക്കുന്നു.', audioDemo: 'റെക്കോർഡിംഗ് ലഭിച്ചു. ഈ പ്രാദേശിക ഡെമോയിൽ ലൈവ് ട്രാൻസ്ക്രിപ്ഷൻ ബന്ധിപ്പിച്ചിട്ടില്ല.', audioFailed: 'റെക്കോർഡിംഗ് പരിശോധിക്കാനായില്ല. സൂപ്പർവൈസറിനോട് സഹായം ചോദിക്കുക അല്ലെങ്കിൽ വീണ്ടും റെക്കോർഡ് ചെയ്യുക.', typeInstead: 'ടൈപ്പ് ചെയ്യുക', recordInstead: 'റെക്കോർഡ് ചെയ്യുക', matched: 'പ്രധാന വസ്തുതകൾ പൊരുത്തപ്പെട്ടു', clarification: 'വ്യക്തത ആവശ്യമാണ്', unassessable: 'പരിശോധിക്കാനായില്ല', saved: 'ഡെമോയിൽ സംരക്ഷിച്ചു.' },
+  ta: { demo: 'உள்ளூர் செயற்கை டெமோ. பொருந்தும் பதில் புரிதலுக்கான சான்று அல்ல.', label: 'உள்ளூர் செயற்கை டெமோ', emptyTodo: 'செய்ய வேண்டிய அறிவுறுத்தல்கள் இல்லை.', emptyDone: 'இதுவரை முடிந்த அறிவுறுத்தல்கள் இல்லை.', loading: 'ஏற்றப்படுகிறது...', unavailable: 'அறிவுறுத்தல் கிடைக்கவில்லை', outcome: 'பதிவு செய்யப்பட்ட முடிவு', assessment: 'இது உள்ளூர் செயற்கை சரிபார்ப்பு. உங்கள் மேற்பார்வையாளர் அசல் பதிலைப் பார்க்கலாம்.', audioPending: 'பதிவு பெறப்பட்டது. AI சரிபார்ப்பு நிலுவையில் உள்ளது.', audioDemo: 'பதிவு பெறப்பட்டது. இந்த உள்ளூர் டெமோவில் நேரடி எழுத்துப்பெயர்ப்பு இணைக்கப்படவில்லை.', audioFailed: 'பதிவைச் சரிபார்க்க முடியவில்லை. மேற்பார்வையாளரிடம் உதவி கேளுங்கள் அல்லது மீண்டும் பதிவு செய்யுங்கள்.', typeInstead: 'தட்டச்சு', recordInstead: 'பதிவு', matched: 'முக்கிய தகவல்கள் பொருந்தின', clarification: 'விளக்கம் தேவை', unassessable: 'சரிபார்க்க முடியவில்லை', saved: 'டெமோவில் சேமிக்கப்பட்டது.' },
+  te: { demo: 'స్థానిక కృత్రిమ డెమో. సరిపోలిన సమాధానం అవగాహనకు రుజువు కాదు.', label: 'స్థానిక కృత్రిమ డెమో', emptyTodo: 'చేయాల్సిన సూచనలు లేవు.', emptyDone: 'ఇంకా పూర్తయిన సూచనలు లేవు.', loading: 'లోడ్ అవుతోంది...', unavailable: 'సూచన అందుబాటులో లేదు', outcome: 'నమోదైన ఫలితం', assessment: 'ఇది స్థానిక కృత్రిమ పరిశీలన. మీ సూపర్‌వైజర్ అసలు సమాధానాన్ని చూడగలరు.', audioPending: 'రికార్డింగ్ అందింది. AI పరిశీలన పెండింగ్‌లో ఉంది.', audioDemo: 'రికార్డింగ్ అందింది. ఈ స్థానిక డెమోలో లైవ్ ట్రాన్స్‌క్రిప్షన్ కనెక్ట్ కాలేదు.', audioFailed: 'రికార్డింగ్‌ను పరిశీలించలేకపోయాం. సూపర్‌వైజర్‌ను సహాయం అడగండి లేదా మళ్లీ రికార్డ్ చేయండి.', typeInstead: 'టైప్ చేయండి', recordInstead: 'రికార్డ్ చేయండి', matched: 'ముఖ్య అంశాలు సరిపోలాయి', clarification: 'వివరణ అవసరం', unassessable: 'పరిశీలించలేకపోయాం', saved: 'డెమోలో సేవ్ చేయబడింది.' },
+  ne: { demo: 'स्थानीय कृत्रिम डेमो। मिल्दो जवाफ बुझाइको प्रमाण होइन।', label: 'स्थानीय कृत्रिम डेमो', emptyTodo: 'गर्नुपर्ने निर्देशनहरू छैनन्।', emptyDone: 'अहिलेसम्म कुनै सम्पन्न निर्देशन छैन।', loading: 'लोड हुँदै...', unavailable: 'निर्देशन उपलब्ध छैन', outcome: 'रेकर्ड गरिएको नतिजा', assessment: 'यो स्थानीय कृत्रिम जाँच हो। तपाईंको सुपरभाइजरले मूल जवाफ हेर्न सक्नुहुन्छ।', audioPending: 'रेकर्डिङ प्राप्त भयो। AI जाँच पर्खाइमा छ।', audioDemo: 'रेकर्डिङ प्राप्त भयो। यो स्थानीय डेमोमा प्रत्यक्ष ट्रान्स्क्रिप्शन जोडिएको छैन।', audioFailed: 'रेकर्डिङ जाँच्न सकिएन। सुपरभाइजरसँग मद्दत माग्नुहोस् वा फेरि रेकर्ड गर्नुहोस्।', typeInstead: 'लेख्नुहोस्', recordInstead: 'रेकर्ड गर्नुहोस्', matched: 'मुख्य तथ्यहरू मिले', clarification: 'स्पष्टीकरण चाहिन्छ', unassessable: 'जाँच्न सकिएन', saved: 'डेमोमा सुरक्षित भयो।' },
+  fil: { demo: 'Synthetic na lokal na demo. Ang tugmang sagot ay hindi patunay ng pag-unawa.', label: 'Synthetic na lokal na demo', emptyTodo: 'Walang tagubiling gagawin.', emptyDone: 'Wala pang natapos na tagubilin.', loading: 'Naglo-load...', unavailable: 'Hindi available ang tagubilin', outcome: 'Naitalang resulta', assessment: 'Synthetic na lokal na pagsusuri. Maaaring suriin ng supervisor mo ang orihinal na sagot.', audioPending: 'Natanggap ang recording. Nakabinbin ang AI check.', audioDemo: 'Natanggap ang recording. Hindi konektado ang live transcription sa lokal na demo na ito.', audioFailed: 'Hindi masuri ang recording. Humingi ng tulong sa supervisor o mag-record muli.', typeInstead: 'I-type', recordInstead: 'I-record', matched: 'Tumugma ang mahalagang detalye', clarification: 'Kailangan ng paglilinaw', unassessable: 'Hindi masuri', saved: 'Na-save sa demo.' },
+  si: { demo: 'ස්ථානීය කෘත්‍රිම ආදර්ශනය. ගැළපෙන පිළිතුර තේරුම් ගැනීමේ සාක්ෂියක් නොවේ.', label: 'ස්ථානීය කෘත්‍රිම ආදර්ශනය', emptyTodo: 'කළ යුතු උපදෙස් නැත.', emptyDone: 'තවම සම්පූර්ණ කළ උපදෙස් නැත.', loading: 'පූරණය වෙමින්...', unavailable: 'උපදෙස නොමැත', outcome: 'සටහන් කළ ප්‍රතිඵලය', assessment: 'මෙය ස්ථානීය කෘත්‍රිම පරීක්ෂාවකි. ඔබේ අධීක්ෂකට මුල් පිළිතුර බැලිය හැක.', audioPending: 'පටිගත කිරීම ලැබුණි. AI පරීක්ෂාව රඳා පවතී.', audioDemo: 'පටිගත කිරීම ලැබුණි. මෙම ස්ථානීය ආදර්ශනයේ සජීවී පෙළ නිර්මාණය සම්බන්ධ නැත.', audioFailed: 'පටිගත කිරීම පරීක්ෂා කළ නොහැක. අධීක්ෂකගෙන් උදව් ඉල්ලන්න හෝ නැවත පටිගත කරන්න.', typeInstead: 'ටයිප් කරන්න', recordInstead: 'පටිගත කරන්න', matched: 'ප්‍රධාන කරුණු ගැළපුණි', clarification: 'පැහැදිලි කිරීම අවශ්‍යයි', unassessable: 'පරීක්ෂා කළ නොහැක', saved: 'ආදර්ශනයේ සුරැකිණි.' },
+  ru: { demo: 'Локальная синтетическая демонстрация. Совпавший ответ не подтверждает понимание.', label: 'Локальная синтетическая демонстрация', emptyTodo: 'Нет инструкций к выполнению.', emptyDone: 'Выполненных инструкций пока нет.', loading: 'Загрузка...', unavailable: 'Инструкция недоступна', outcome: 'Записанный результат', assessment: 'Это локальная синтетическая проверка. Руководитель может просмотреть исходный ответ.', audioPending: 'Запись получена. ИИ-проверка ожидается.', audioDemo: 'Запись получена. Живая расшифровка в этой локальной демонстрации не подключена.', audioFailed: 'Не удалось проверить запись. Попросите помощи у руководителя или запишите снова.', typeInstead: 'Ввести', recordInstead: 'Записать', matched: 'Ключевые факты совпали', clarification: 'Нужно уточнение', unassessable: 'Не удалось оценить', saved: 'Сохранено в демонстрации.' },
+  'pa-Guru': { demo: 'ਸਥਾਨਕ ਨਕਲੀ ਡੈਮੋ। ਮਿਲਦਾ ਜਵਾਬ ਸਮਝ ਦਾ ਸਬੂਤ ਨਹੀਂ।', label: 'ਸਥਾਨਕ ਨਕਲੀ ਡੈਮੋ', emptyTodo: 'ਕਰਨ ਲਈ ਕੋਈ ਹਦਾਇਤ ਨਹੀਂ।', emptyDone: 'ਹਾਲੇ ਕੋਈ ਪੂਰੀ ਹਦਾਇਤ ਨਹੀਂ।', loading: 'ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...', unavailable: 'ਹਦਾਇਤ ਉਪਲਬਧ ਨਹੀਂ', outcome: 'ਦਰਜ ਨਤੀਜਾ', assessment: 'ਇਹ ਸਥਾਨਕ ਨਕਲੀ ਜਾਂਚ ਹੈ। ਤੁਹਾਡਾ ਸੁਪਰਵਾਈਜ਼ਰ ਅਸਲ ਜਵਾਬ ਵੇਖ ਸਕਦਾ ਹੈ।', audioPending: 'ਰਿਕਾਰਡਿੰਗ ਪ੍ਰਾਪਤ ਹੋਈ। AI ਜਾਂਚ ਬਕਾਇਆ ਹੈ।', audioDemo: 'ਰਿਕਾਰਡਿੰਗ ਪ੍ਰਾਪਤ ਹੋਈ। ਇਸ ਸਥਾਨਕ ਡੈਮੋ ਵਿੱਚ ਲਾਈਵ ਟ੍ਰਾਂਸਕ੍ਰਿਪਸ਼ਨ ਜੁੜੀ ਨਹੀਂ।', audioFailed: 'ਰਿਕਾਰਡਿੰਗ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ। ਸੁਪਰਵਾਈਜ਼ਰ ਤੋਂ ਮਦਦ ਮੰਗੋ ਜਾਂ ਦੁਬਾਰਾ ਰਿਕਾਰਡ ਕਰੋ।', typeInstead: 'ਲਿਖੋ', recordInstead: 'ਰਿਕਾਰਡ ਕਰੋ', matched: 'ਮੁੱਖ ਤੱਥ ਮਿਲਦੇ ਹਨ', clarification: 'ਸਪਸ਼ਟੀਕਰਨ ਚਾਹੀਦਾ ਹੈ', unassessable: 'ਜਾਂਚ ਸੰਭਵ ਨਹੀਂ', saved: 'ਡੈਮੋ ਵਿੱਚ ਸੰਭਾਲਿਆ।' },
+  'pa-Arab': { demo: 'مقامی نقلی ڈیمو۔ میل کھاندا جواب سمجھ دا ثبوت نئیں۔', label: 'مقامی نقلی ڈیمو', emptyTodo: 'کرن لئی کوئی ہدایت نئیں۔', emptyDone: 'ہالے کوئی پوری ہدایت نئیں۔', loading: 'لوڈ ہو ریا اے...', unavailable: 'ہدایت دستیاب نئیں', outcome: 'درج نتیجہ', assessment: 'ایہ مقامی نقلی جانچ اے۔ تہاڈا سپروائزر اصل جواب ویکھ سکدا اے۔', audioPending: 'ریکارڈنگ موصول ہو گئی۔ AI جانچ زیر التوا اے۔', audioDemo: 'ریکارڈنگ موصول ہو گئی۔ ایس مقامی ڈیمو وچ لائیو نقل نویسی جڑی نئیں۔', audioFailed: 'ریکارڈنگ دی جانچ نئیں ہو سکی۔ سپروائزر توں مدد منگو یا دوبارہ ریکارڈ کرو۔', typeInstead: 'لکھو', recordInstead: 'ریکارڈ کرو', matched: 'اہم حقائق میل کھاندے نیں', clarification: 'وضاحت لوڑیندیاے', unassessable: 'جانچ ممکن نئیں', saved: 'ڈیمو وچ محفوظ ہو گیا۔' },
+  id: { demo: 'Demo sintetis lokal. Jawaban yang cocok bukan bukti pemahaman.', label: 'Demo sintetis lokal', emptyTodo: 'Tidak ada instruksi untuk dikerjakan.', emptyDone: 'Belum ada instruksi yang selesai.', loading: 'Memuat...', unavailable: 'Instruksi tidak tersedia', outcome: 'Hasil tercatat', assessment: 'Ini penilaian sintetis lokal. Supervisor Anda dapat meninjau jawaban asli.', audioPending: 'Rekaman diterima. Pemeriksaan AI tertunda.', audioDemo: 'Rekaman diterima. Transkripsi langsung tidak terhubung dalam demo lokal ini.', audioFailed: 'Rekaman tidak dapat diperiksa. Minta bantuan supervisor atau rekam lagi.', typeInstead: 'Ketik', recordInstead: 'Rekam', matched: 'Fakta kunci cocok', clarification: 'Perlu klarifikasi', unassessable: 'Tidak dapat dinilai', saved: 'Tersimpan di demo.' },
 };
 
-function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSessionLost,sessionInvalid,navigationGuard }: { session: Session; view: string; navigate: (path: string) => void; refresh: number; act: (path: string, body?: unknown) => Promise<any>; logout: () => Promise<boolean>; message: string;onSessionLost:()=>void;sessionInvalid:()=>boolean;navigationGuard:React.RefObject<((next:string)=>boolean)|null> }) {
-  const [language,setUiLanguage]=useState<WorkerUiLanguage>(()=>{try{return readWorkerUiLanguage(sessionStorage,session);}catch{return session.language==='ar' || session.language==='ur'?session.language:'en';}});
+const workerLanguageOptionList=workerUiLanguages.map(locale=>({code:locale.code,label:locale.name,dir:locale.direction}));
+type WorkerLanguageText={menu:string;title:string;current:string;pending:string;requested:string;choose:string;reason:string;send:string;sending:string;sent:string;alreadyPending:string;chooseDifferent:string;error:string;session:string;close:string;open:string;loading:string;setupTitle:string;setupBody:string;continue:string;saving:string;selectError:string;reload:string;alreadySelected:string;setupDone:string;cancel:string};
+const workerLanguageText:Record<WorkerUiLanguage,WorkerLanguageText>={
+  en:{menu:'Language',title:'Your language',current:'Current language',pending:'Waiting for supervisor review',requested:'Requested language',choose:'Choose a new language',reason:'Reason (optional)',send:'Send change request',sending:'Sending...',sent:'Your change request was sent to your supervisor.',alreadyPending:'A language change is already waiting for review.',chooseDifferent:'Choose a different language from your current one.',error:'The language change could not be requested. Try again.',session:'Your session changed. Reload before trying again.',close:'Close language settings',open:'Language settings',loading:'Loading your language...',setupTitle:'Choose your language',setupBody:'Your supervisor will send instructions in this language. You can request a change later.',continue:'Continue',saving:'Saving...',selectError:'Your language could not be saved. Reload to continue.',reload:'Reload',alreadySelected:'Your language is already saved. Reload to continue.',setupDone:'Language saved.',cancel:'Cancel'},
+  ar:{menu:'اللغة',title:'لغتك',current:'اللغة الحالية',pending:'بانتظار مراجعة المشرف',requested:'اللغة المطلوبة',choose:'اختر لغة جديدة',reason:'السبب (اختياري)',send:'إرسال طلب التغيير',sending:'جارٍ الإرسال...',sent:'أُرسل طلب التغيير إلى مشرفك.',alreadyPending:'يوجد طلب تغيير لغة بانتظار المراجعة بالفعل.',chooseDifferent:'اختر لغة مختلفة عن لغتك الحالية.',error:'تعذّر طلب تغيير اللغة. حاول مجدداً.',session:'تغيّرت جلستك. أعد التحميل قبل المحاولة مجدداً.',close:'إغلاق إعدادات اللغة',open:'إعدادات اللغة',loading:'جارٍ تحميل لغتك...',setupTitle:'اختر لغتك',setupBody:'سيرسل مشرفك التعليمات بهذه اللغة. يمكنك طلب تغييرها لاحقاً.',continue:'متابعة',saving:'جارٍ الحفظ...',selectError:'تعذّر حفظ اللغة. أعد تحميل الصفحة للمتابعة.',reload:'إعادة التحميل',alreadySelected:'تم حفظ لغتك بالفعل. أعد التحميل للمتابعة.',setupDone:'تم حفظ اللغة.',cancel:'إلغاء'},
+  ur:{menu:'زبان',title:'آپ کی زبان',current:'موجودہ زبان',pending:'سپروائزر کے جائزے کا انتظار',requested:'درخواست کردہ زبان',choose:'نئی زبان منتخب کریں',reason:'وجہ (اختیاری)',send:'تبدیلی کی درخواست بھیجیں',sending:'بھیجا جا رہا ہے...',sent:'تبدیلی کی درخواست آپ کے سپروائزر کو بھیج دی گئی۔',alreadyPending:'زبان کی تبدیلی پہلے ہی جائزے کے انتظار میں ہے۔',chooseDifferent:'اپنی موجودہ زبان سے مختلف زبان منتخب کریں۔',error:'زبان کی تبدیلی کی درخواست نہیں بھیجی جا سکی۔ دوبارہ کوشش کریں۔',session:'آپ کا سیشن بدل گیا۔ دوبارہ کوشش سے پہلے صفحہ لوڈ کریں۔',close:'زبان کی ترتیبات بند کریں',open:'زبان کی ترتیبات',loading:'آپ کی زبان لوڈ ہو رہی ہے...',setupTitle:'اپنی زبان منتخب کریں',setupBody:'آپ کا سپروائزر اسی زبان میں ہدایات بھیجے گا۔ آپ بعد میں تبدیلی کی درخواست کر سکتے ہیں۔',continue:'جاری رکھیں',saving:'محفوظ ہو رہا ہے...',selectError:'زبان محفوظ نہیں ہو سکی۔ جاری رکھنے کے لیے صفحہ دوبارہ لوڈ کریں۔',reload:'دوبارہ لوڈ کریں',alreadySelected:'آپ کی زبان پہلے ہی محفوظ ہے۔ جاری رکھنے کے لیے دوبارہ لوڈ کریں۔',setupDone:'زبان محفوظ ہو گئی۔',cancel:'منسوخ کریں'},
+  hi:{menu:'भाषा',title:'आपकी भाषा',current:'वर्तमान भाषा',pending:'सुपरवाइज़र की समीक्षा की प्रतीक्षा',requested:'अनुरोधित भाषा',choose:'नई भाषा चुनें',reason:'कारण (वैकल्पिक)',send:'बदलाव का अनुरोध भेजें',sending:'भेजा जा रहा है...',sent:'आपका बदलाव अनुरोध सुपरवाइज़र को भेज दिया गया।',alreadyPending:'भाषा बदलने का अनुरोध पहले से समीक्षा की प्रतीक्षा में है।',chooseDifferent:'अपनी वर्तमान भाषा से अलग भाषा चुनें।',error:'भाषा बदलने का अनुरोध नहीं भेजा जा सका। फिर प्रयास करें।',session:'आपका सत्र बदल गया। फिर प्रयास करने से पहले पेज रीलोड करें।',close:'भाषा सेटिंग बंद करें',open:'भाषा सेटिंग',loading:'आपकी भाषा लोड हो रही है...',setupTitle:'अपनी भाषा चुनें',setupBody:'आपका सुपरवाइज़र इस भाषा में निर्देश भेजेगा। आप बाद में बदलाव का अनुरोध कर सकते हैं।',continue:'जारी रखें',saving:'सहेजा जा रहा है...',selectError:'भाषा सहेजी नहीं जा सकी। जारी रखने के लिए पेज रीलोड करें।',reload:'रीलोड करें',alreadySelected:'आपकी भाषा पहले से सहेजी है। जारी रखने के लिए रीलोड करें।',setupDone:'भाषा सहेजी गई।',cancel:'रद्द करें'},
+  bn:{menu:'ভাষা',title:'আপনার ভাষা',current:'বর্তমান ভাষা',pending:'সুপারভাইজারের পর্যালোচনার অপেক্ষায়',requested:'অনুরোধ করা ভাষা',choose:'নতুন ভাষা বেছে নিন',reason:'কারণ (ঐচ্ছিক)',send:'পরিবর্তনের অনুরোধ পাঠান',sending:'পাঠানো হচ্ছে...',sent:'আপনার পরিবর্তনের অনুরোধ সুপারভাইজারের কাছে পাঠানো হয়েছে।',alreadyPending:'ভাষা পরিবর্তনের অনুরোধ ইতিমধ্যে পর্যালোচনার অপেক্ষায় আছে।',chooseDifferent:'আপনার বর্তমান ভাষা থেকে ভিন্ন ভাষা বেছে নিন।',error:'ভাষা পরিবর্তনের অনুরোধ পাঠানো যায়নি। আবার চেষ্টা করুন।',session:'আপনার সেশন বদলেছে। আবার চেষ্টার আগে পেজ রিলোড করুন।',close:'ভাষা সেটিংস বন্ধ করুন',open:'ভাষা সেটিংস',loading:'আপনার ভাষা লোড হচ্ছে...',setupTitle:'আপনার ভাষা বেছে নিন',setupBody:'আপনার সুপারভাইজার এই ভাষায় নির্দেশনা পাঠাবেন। আপনি পরে পরিবর্তনের অনুরোধ করতে পারেন।',continue:'চালিয়ে যান',saving:'সংরক্ষণ হচ্ছে...',selectError:'ভাষা সংরক্ষণ করা যায়নি। চালিয়ে যেতে পেজ রিলোড করুন।',reload:'রিলোড করুন',alreadySelected:'আপনার ভাষা ইতিমধ্যে সংরক্ষিত। চালিয়ে যেতে রিলোড করুন।',setupDone:'ভাষা সংরক্ষিত হয়েছে।',cancel:'বাতিল করুন'},
+  ml:{menu:'ഭാഷ',title:'നിങ്ങളുടെ ഭാഷ',current:'നിലവിലെ ഭാഷ',pending:'സൂപ്പർവൈസറുടെ അവലോകനത്തിനായി കാത്തിരിക്കുന്നു',requested:'അഭ്യർത്ഥിച്ച ഭാഷ',choose:'പുതിയ ഭാഷ തിരഞ്ഞെടുക്കുക',reason:'കാരണം (ഐച്ഛികം)',send:'മാറ്റ അഭ്യർത്ഥന അയക്കുക',sending:'അയക്കുന്നു...',sent:'നിങ്ങളുടെ മാറ്റ അഭ്യർത്ഥന സൂപ്പർവൈസറിന് അയച്ചു.',alreadyPending:'ഭാഷാ മാറ്റ അഭ്യർത്ഥന ഇതിനകം അവലോകനത്തിനായി കാത്തിരിക്കുന്നു.',chooseDifferent:'നിങ്ങളുടെ നിലവിലെ ഭാഷയിൽ നിന്ന് വ്യത്യസ്തമായ ഭാഷ തിരഞ്ഞെടുക്കുക.',error:'ഭാഷാ മാറ്റ അഭ്യർത്ഥന അയക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.',session:'നിങ്ങളുടെ സെഷൻ മാറി. വീണ്ടും ശ്രമിക്കുന്നതിന് മുമ്പ് പേജ് റീലോഡ് ചെയ്യുക.',close:'ഭാഷാ ക്രമീകരണങ്ങൾ അടയ്ക്കുക',open:'ഭാഷാ ക്രമീകരണങ്ങൾ',loading:'നിങ്ങളുടെ ഭാഷ ലോഡ് ചെയ്യുന്നു...',setupTitle:'നിങ്ങളുടെ ഭാഷ തിരഞ്ഞെടുക്കുക',setupBody:'നിങ്ങളുടെ സൂപ്പർവൈസർ ഈ ഭാഷയിൽ നിർദ്ദേശങ്ങൾ അയക്കും. പിന്നീട് മാറ്റം അഭ്യർത്ഥിക്കാം.',continue:'തുടരുക',saving:'സംരക്ഷിക്കുന്നു...',selectError:'ഭാഷ സംരക്ഷിക്കാനായില്ല. തുടരാൻ പേജ് റീലോഡ് ചെയ്യുക.',reload:'റീലോഡ് ചെയ്യുക',alreadySelected:'നിങ്ങളുടെ ഭാഷ ഇതിനകം സംരക്ഷിച്ചു. തുടരാൻ റീലോഡ് ചെയ്യുക.',setupDone:'ഭാഷ സംരക്ഷിച്ചു.',cancel:'റദ്ദാക്കുക'},
+  ta:{menu:'மொழி',title:'உங்கள் மொழி',current:'தற்போதைய மொழி',pending:'மேற்பார்வையாளர் மதிப்பாய்வுக்காக காத்திருக்கிறது',requested:'கோரப்பட்ட மொழி',choose:'புதிய மொழியைத் தேர்ந்தெடுக்கவும்',reason:'காரணம் (விருப்பமானது)',send:'மாற்றக் கோரிக்கையை அனுப்பு',sending:'அனுப்பப்படுகிறது...',sent:'உங்கள் மாற்றக் கோரிக்கை மேற்பார்வையாளருக்கு அனுப்பப்பட்டது.',alreadyPending:'மொழி மாற்றக் கோரிக்கை ஏற்கனவே மதிப்பாய்வுக்காக காத்திருக்கிறது.',chooseDifferent:'உங்கள் தற்போதைய மொழியிலிருந்து வேறு மொழியைத் தேர்ந்தெடுக்கவும்.',error:'மொழி மாற்றக் கோரிக்கையை அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்.',session:'உங்கள் அமர்வு மாறியது. மீண்டும் முயலும் முன் பக்கத்தை மீளேற்றவும்.',close:'மொழி அமைப்புகளை மூடு',open:'மொழி அமைப்புகள்',loading:'உங்கள் மொழி ஏற்றப்படுகிறது...',setupTitle:'உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்',setupBody:'உங்கள் மேற்பார்வையாளர் இந்த மொழியில் அறிவுறுத்தல்களை அனுப்புவார். பின்னர் மாற்றம் கோரலாம்.',continue:'தொடரவும்',saving:'சேமிக்கப்படுகிறது...',selectError:'மொழியைச் சேமிக்க முடியவில்லை. தொடர பக்கத்தை மீளேற்றவும்.',reload:'மீளேற்று',alreadySelected:'உங்கள் மொழி ஏற்கனவே சேமிக்கப்பட்டது. தொடர மீளேற்றவும்.',setupDone:'மொழி சேமிக்கப்பட்டது.',cancel:'ரத்து செய்'},
+  te:{menu:'భాష',title:'మీ భాష',current:'ప్రస్తుత భాష',pending:'సూపర్‌వైజర్ సమీక్ష కోసం వేచి ఉంది',requested:'అభ్యర్థించిన భాష',choose:'కొత్త భాషను ఎంచుకోండి',reason:'కారణం (ఐచ్ఛికం)',send:'మార్పు అభ్యర్థన పంపండి',sending:'పంపుతోంది...',sent:'మీ మార్పు అభ్యర్థన సూపర్‌వైజర్‌కు పంపబడింది.',alreadyPending:'భాష మార్పు అభ్యర్థన ఇప్పటికే సమీక్ష కోసం వేచి ఉంది.',chooseDifferent:'మీ ప్రస్తుత భాషకు భిన్నమైన భాషను ఎంచుకోండి.',error:'భాష మార్పు అభ్యర్థన పంపలేకపోయాం. మళ్లీ ప్రయత్నించండి.',session:'మీ సెషన్ మారింది. మళ్లీ ప్రయత్నించే ముందు పేజీని రీలోడ్ చేయండి.',close:'భాష సెట్టింగ్‌లను మూసివేయండి',open:'భాష సెట్టింగ్‌లు',loading:'మీ భాష లోడ్ అవుతోంది...',setupTitle:'మీ భాషను ఎంచుకోండి',setupBody:'మీ సూపర్‌వైజర్ ఈ భాషలో సూచనలు పంపుతారు. తర్వాత మార్పు అభ్యర్థించవచ్చు.',continue:'కొనసాగించండి',saving:'సేవ్ అవుతోంది...',selectError:'భాషను సేవ్ చేయలేకపోయాం. కొనసాగించడానికి పేజీని రీలోడ్ చేయండి.',reload:'రీలోడ్',alreadySelected:'మీ భాష ఇప్పటికే సేవ్ చేయబడింది. కొనసాగించడానికి రీలోడ్ చేయండి.',setupDone:'భాష సేవ్ చేయబడింది.',cancel:'రద్దు చేయండి'},
+  ne:{menu:'भाषा',title:'तपाईंको भाषा',current:'हालको भाषा',pending:'सुपरभाइजरको समीक्षाको प्रतीक्षामा',requested:'अनुरोध गरिएको भाषा',choose:'नयाँ भाषा छान्नुहोस्',reason:'कारण (वैकल्पिक)',send:'परिवर्तन अनुरोध पठाउनुहोस्',sending:'पठाउँदै...',sent:'तपाईंको परिवर्तन अनुरोध सुपरभाइजरलाई पठाइयो।',alreadyPending:'भाषा परिवर्तन अनुरोध पहिले नै समीक्षाको प्रतीक्षामा छ।',chooseDifferent:'आफ्नो हालको भाषाभन्दा फरक भाषा छान्नुहोस्।',error:'भाषा परिवर्तन अनुरोध पठाउन सकिएन। फेरि प्रयास गर्नुहोस्।',session:'तपाईंको सत्र बदलियो। फेरि प्रयास गर्नुअघि पृष्ठ रिलोड गर्नुहोस्।',close:'भाषा सेटिङ बन्द गर्नुहोस्',open:'भाषा सेटिङ',loading:'तपाईंको भाषा लोड हुँदै...',setupTitle:'आफ्नो भाषा छान्नुहोस्',setupBody:'तपाईंको सुपरभाइजरले यो भाषामा निर्देशन पठाउनुहुनेछ। पछि परिवर्तन अनुरोध गर्न सक्नुहुन्छ।',continue:'जारी राख्नुहोस्',saving:'सुरक्षित हुँदै...',selectError:'भाषा सुरक्षित गर्न सकिएन। जारी राख्न पृष्ठ रिलोड गर्नुहोस्।',reload:'रिलोड गर्नुहोस्',alreadySelected:'तपाईंको भाषा पहिले नै सुरक्षित छ। जारी राख्न रिलोड गर्नुहोस्।',setupDone:'भाषा सुरक्षित भयो।',cancel:'रद्द गर्नुहोस्'},
+  fil:{menu:'Wika',title:'Iyong wika',current:'Kasalukuyang wika',pending:'Naghihintay ng pagsusuri ng supervisor',requested:'Hiniling na wika',choose:'Pumili ng bagong wika',reason:'Dahilan (opsyonal)',send:'Ipadala ang hiling na pagbabago',sending:'Ipinapadala...',sent:'Naipadala sa supervisor mo ang hiling na pagbabago.',alreadyPending:'May hiling nang pagbabago ng wika na naghihintay ng pagsusuri.',chooseDifferent:'Pumili ng wikang iba sa kasalukuyang wika mo.',error:'Hindi naipadala ang hiling na pagbabago ng wika. Subukan muli.',session:'Nagbago ang session mo. I-reload bago subukan muli.',close:'Isara ang mga setting ng wika',open:'Mga setting ng wika',loading:'Naglo-load ng wika mo...',setupTitle:'Pumili ng wika',setupBody:'Ipadadala ng supervisor mo ang mga tagubilin sa wikang ito. Maaari kang humiling ng pagbabago mamaya.',continue:'Magpatuloy',saving:'Nagse-save...',selectError:'Hindi na-save ang wika. I-reload upang magpatuloy.',reload:'I-reload',alreadySelected:'Naka-save na ang wika mo. I-reload upang magpatuloy.',setupDone:'Na-save ang wika.',cancel:'Kanselahin'},
+  si:{menu:'භාෂාව',title:'ඔබේ භාෂාව',current:'වත්මන් භාෂාව',pending:'අධීක්ෂක සමාලෝචනය බලාපොරොත්තුවෙන්',requested:'ඉල්ලා ඇති භාෂාව',choose:'නව භාෂාවක් තෝරන්න',reason:'හේතුව (විකල්ප)',send:'වෙනස්කම් ඉල්ලීම යවන්න',sending:'යවමින්...',sent:'ඔබේ වෙනස්කම් ඉල්ලීම අධීක්ෂකට යවා ඇත.',alreadyPending:'භාෂා වෙනස්කම් ඉල්ලීමක් දැනටමත් සමාලෝචනය බලාපොරොත්තුවෙන් ඇත.',chooseDifferent:'ඔබේ වත්මන් භාෂාවට වෙනස් භාෂාවක් තෝරන්න.',error:'භාෂා වෙනස්කම් ඉල්ලීම යැවිය නොහැක. නැවත උත්සාහ කරන්න.',session:'ඔබේ සැසිය වෙනස් විය. නැවත උත්සාහ කිරීමට පෙර පිටුව නැවුම් කරන්න.',close:'භාෂා සැකසුම් වසන්න',open:'භාෂා සැකසුම්',loading:'ඔබේ භාෂාව පූරණය වෙමින්...',setupTitle:'ඔබේ භාෂාව තෝරන්න',setupBody:'ඔබේ අධීක්ෂක මෙම භාෂාවෙන් උපදෙස් යවනු ඇත. පසුව වෙනසක් ඉල්ලිය හැක.',continue:'ඉදිරියට යන්න',saving:'සුරකිමින්...',selectError:'භාෂාව සුරැකිය නොහැකි විය. ඉදිරියට යාමට පිටුව නැවුම් කරන්න.',reload:'නැවුම් කරන්න',alreadySelected:'ඔබේ භාෂාව දැනටමත් සුරැකී ඇත. ඉදිරියට යාමට නැවුම් කරන්න.',setupDone:'භාෂාව සුරැකිණි.',cancel:'අවලංගු කරන්න'},
+  ru:{menu:'Язык',title:'Ваш язык',current:'Текущий язык',pending:'Ожидает проверки руководителя',requested:'Запрошенный язык',choose:'Выберите новый язык',reason:'Причина (необязательно)',send:'Отправить запрос на изменение',sending:'Отправка...',sent:'Ваш запрос на изменение отправлен руководителю.',alreadyPending:'Запрос на изменение языка уже ожидает проверки.',chooseDifferent:'Выберите язык, отличный от текущего.',error:'Не удалось отправить запрос на изменение языка. Попробуйте снова.',session:'Ваш сеанс изменился. Перезагрузите страницу перед повторной попыткой.',close:'Закрыть настройки языка',open:'Настройки языка',loading:'Загрузка вашего языка...',setupTitle:'Выберите ваш язык',setupBody:'Руководитель будет отправлять инструкции на этом языке. Позже вы сможете запросить изменение.',continue:'Продолжить',saving:'Сохранение...',selectError:'Не удалось сохранить язык. Перезагрузите страницу, чтобы продолжить.',reload:'Перезагрузить',alreadySelected:'Ваш язык уже сохранён. Перезагрузите страницу, чтобы продолжить.',setupDone:'Язык сохранён.',cancel:'Отмена'},
+  'pa-Guru':{menu:'ਭਾਸ਼ਾ',title:'ਤੁਹਾਡੀ ਭਾਸ਼ਾ',current:'ਮੌਜੂਦਾ ਭਾਸ਼ਾ',pending:'ਸੁਪਰਵਾਈਜ਼ਰ ਦੀ ਸਮੀਖਿਆ ਦੀ ਉਡੀਕ',requested:'ਬੇਨਤੀ ਕੀਤੀ ਭਾਸ਼ਾ',choose:'ਨਵੀਂ ਭਾਸ਼ਾ ਚੁਣੋ',reason:'ਕਾਰਨ (ਵਿਕਲਪਿਕ)',send:'ਤਬਦੀਲੀ ਦੀ ਬੇਨਤੀ ਭੇਜੋ',sending:'ਭੇਜਿਆ ਜਾ ਰਿਹਾ ਹੈ...',sent:'ਤੁਹਾਡੀ ਤਬਦੀਲੀ ਦੀ ਬੇਨਤੀ ਸੁਪਰਵਾਈਜ਼ਰ ਨੂੰ ਭੇਜ ਦਿੱਤੀ ਗਈ।',alreadyPending:'ਭਾਸ਼ਾ ਤਬਦੀਲੀ ਦੀ ਬੇਨਤੀ ਪਹਿਲਾਂ ਹੀ ਸਮੀਖਿਆ ਦੀ ਉਡੀਕ ਵਿੱਚ ਹੈ।',chooseDifferent:'ਆਪਣੀ ਮੌਜੂਦਾ ਭਾਸ਼ਾ ਤੋਂ ਵੱਖਰੀ ਭਾਸ਼ਾ ਚੁਣੋ।',error:'ਭਾਸ਼ਾ ਤਬਦੀਲੀ ਦੀ ਬੇਨਤੀ ਨਹੀਂ ਭੇਜੀ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।',session:'ਤੁਹਾਡਾ ਸੈਸ਼ਨ ਬਦਲ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਤੋਂ ਪਹਿਲਾਂ ਪੇਜ ਰੀਲੋਡ ਕਰੋ।',close:'ਭਾਸ਼ਾ ਸੈਟਿੰਗਾਂ ਬੰਦ ਕਰੋ',open:'ਭਾਸ਼ਾ ਸੈਟਿੰਗਾਂ',loading:'ਤੁਹਾਡੀ ਭਾਸ਼ਾ ਲੋਡ ਹੋ ਰਹੀ ਹੈ...',setupTitle:'ਆਪਣੀ ਭਾਸ਼ਾ ਚੁਣੋ',setupBody:'ਤੁਹਾਡਾ ਸੁਪਰਵਾਈਜ਼ਰ ਇਸ ਭਾਸ਼ਾ ਵਿੱਚ ਹਦਾਇਤਾਂ ਭੇਜੇਗਾ। ਤੁਸੀਂ ਬਾਅਦ ਵਿੱਚ ਤਬਦੀਲੀ ਦੀ ਬੇਨਤੀ ਕਰ ਸਕਦੇ ਹੋ।',continue:'ਜਾਰੀ ਰੱਖੋ',saving:'ਸੰਭਾਲਿਆ ਜਾ ਰਿਹਾ ਹੈ...',selectError:'ਭਾਸ਼ਾ ਸੰਭਾਲੀ ਨਹੀਂ ਜਾ ਸਕੀ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਪੇਜ ਰੀਲੋਡ ਕਰੋ।',reload:'ਰੀਲੋਡ ਕਰੋ',alreadySelected:'ਤੁਹਾਡੀ ਭਾਸ਼ਾ ਪਹਿਲਾਂ ਹੀ ਸੰਭਾਲੀ ਹੋਈ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਰੀਲੋਡ ਕਰੋ।',setupDone:'ਭਾਸ਼ਾ ਸੰਭਾਲੀ ਗਈ।',cancel:'ਰੱਦ ਕਰੋ'},
+  'pa-Arab':{menu:'بولی',title:'تہاڈی بولی',current:'موجودہ بولی',pending:'سپروائزر دے جائزے دا انتظار',requested:'درخواست کردہ بولی',choose:'نویں بولی چنو',reason:'وجہ (اختیاری)',send:'تبدیلی دی درخواست بھیجو',sending:'بھیجی جا رہی اے...',sent:'تہاڈی تبدیلی دی درخواست سپروائزر نوں بھیج دتی گئی۔',alreadyPending:'بولی تبدیلی دی درخواست پہلے ای جائزے دے انتظار وچ اے۔',chooseDifferent:'اپنی موجودہ بولی توں وکھری بولی چنو۔',error:'بولی تبدیلی دی درخواست نئیں بھیجی جا سکی۔ دوبارہ کوشش کرو۔',session:'تہاڈا سیشن بدل گیا۔ دوبارہ کوشش توں پہلے صفحہ ری لوڈ کرو۔',close:'بولی دیاں ترتیباں بند کرو',open:'بولی دیاں ترتیباں',loading:'تہاڈی بولی لوڈ ہو رہی اے...',setupTitle:'اپنی بولی چنو',setupBody:'تہاڈا سپروائزر ایس بولی وچ ہدایتاں بھیجے گا۔ تسیں بعد وچ تبدیلی دی درخواست کر سکدے او۔',continue:'جاری رکھو',saving:'محفوظ ہو ریا اے...',selectError:'بولی محفوظ نئیں ہو سکی۔ جاری رکھن لئی صفحہ ری لوڈ کرو۔',reload:'ری لوڈ کرو',alreadySelected:'تہاڈی بولی پہلے ای محفوظ اے۔ جاری رکھن لئی ری لوڈ کرو۔',setupDone:'بولی محفوظ ہو گئی۔',cancel:'منسوخ کرو'},
+  id:{menu:'Bahasa',title:'Bahasa Anda',current:'Bahasa saat ini',pending:'Menunggu tinjauan supervisor',requested:'Bahasa yang diminta',choose:'Pilih bahasa baru',reason:'Alasan (opsional)',send:'Kirim permintaan perubahan',sending:'Mengirim...',sent:'Permintaan perubahan Anda telah dikirim ke supervisor.',alreadyPending:'Permintaan perubahan bahasa sudah menunggu tinjauan.',chooseDifferent:'Pilih bahasa yang berbeda dari bahasa Anda saat ini.',error:'Permintaan perubahan bahasa tidak dapat dikirim. Coba lagi.',session:'Sesi Anda berubah. Muat ulang sebelum mencoba lagi.',close:'Tutup pengaturan bahasa',open:'Pengaturan bahasa',loading:'Memuat bahasa Anda...',setupTitle:'Pilih bahasa Anda',setupBody:'Supervisor Anda akan mengirim instruksi dalam bahasa ini. Anda dapat meminta perubahan nanti.',continue:'Lanjutkan',saving:'Menyimpan...',selectError:'Bahasa tidak dapat disimpan. Muat ulang untuk melanjutkan.',reload:'Muat ulang',alreadySelected:'Bahasa Anda sudah tersimpan. Muat ulang untuk melanjutkan.',setupDone:'Bahasa tersimpan.',cancel:'Batal'},
+};
+type WorkerLanguageState={language:WorkerUiLanguage;selected:boolean;selectedAt:string|null;selectedBy:string|null;pendingRequest:{id:string;currentLanguage:WorkerUiLanguage;requestedLanguage:WorkerUiLanguage;reason:string;requestedAt:string}|null;items:unknown[]};
+
+function WorkerLanguageDialog({session,language,disabled}:{session:Session;language:WorkerUiLanguage;disabled:boolean}) {
+  const dialog=useRef<HTMLDialogElement>(null),requestId=useRef('');
+  const [state,setState]=useState<WorkerLanguageState|null>(null),[choice,setChoice]=useState<WorkerUiLanguage>('en'),[reason,setReason]=useState('');
+  const [loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[sent,setSent]=useState(false);
+  const text=workerLanguageText[language];
+  async function open() {
+    if(disabled)return;
+    requestId.current=crypto.randomUUID();setState(null);setError('');setSent(false);setReason('');setLoading(true);dialog.current?.showModal();
+    try {
+      const data=await api<WorkerLanguageState>('/worker/language',{cache:'no-store',headers:{'x-client-session-context':session.clientContext!}});
+      setState(data);setChoice(workerLanguageOptionList.find(option=>option.code!==data.language)?.code || data.language);
+    } catch(reason) {setError(messageOfLanguageError(language,reason));}
+    finally {setLoading(false);}
+  }
+  async function submit(event:React.FormEvent) {
+    event.preventDefault();
+    if(busy || !state || state.pendingRequest || choice===state.language)return;
+    setBusy(true);setError('');
+    try {
+      const pending=await api<WorkerLanguageState['pendingRequest']>('/worker/language/requests',{method:'POST',cache:'no-store',
+        headers:{'content-type':'application/json','x-client-session-context':session.clientContext!},
+        body:JSON.stringify({requestId:requestId.current,language:choice,reason})});
+      setState({...state,pendingRequest:pending});setSent(true);
+    } catch(cause) {setError(messageOfLanguageError(language,cause));}
+    finally {setBusy(false);}
+  }
+  return <><button type="button" className="icon-button" title={text.open} aria-label={text.open} disabled={disabled} onClick={()=>void open()}><Languages size={20}/></button>
+    <dialog ref={dialog} className="withdraw-dialog worker-language-dialog" aria-labelledby="worker-language-title" onKeyDown={keepDialogFocus} onCancel={(event)=>{if(busy)event.preventDefault();}}>
+      <div className="withdraw-heading"><h2 id="worker-language-title">{text.title}</h2><button autoFocus type="button" className="icon-button" title={text.close} aria-label={text.close} disabled={busy} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
+      {loading ? <p role="status">{text.loading}</p> : !state ? <>{error && <p role="alert" className="record-error">{error}</p>}</> : <>
+        <p className="muted">{text.current}: <strong lang={state.language} dir={workerUiDirection(state.language)}>{workerUiNativeName(state.language)}</strong></p>
+        {state.pendingRequest ? <div className="notice notice-amber"><p>{text.pending}: <bdi lang={state.pendingRequest.requestedLanguage} dir={workerUiDirection(state.pendingRequest.requestedLanguage)}>{workerUiNativeName(state.pendingRequest.requestedLanguage)}</bdi></p>{state.pendingRequest.reason && <p>{text.reason}: <bdi>{state.pendingRequest.reason}</bdi></p>}</div> : sent ? <p className="notice notice-green" role="status">{text.sent}</p> : <form onSubmit={(event)=>void submit(event)}>
+          <fieldset className="worker-language-options"><legend>{text.choose}</legend>{workerLanguageOptionList.filter(option=>option.code!==state.language).map(option=><label key={option.code} className={choice===option.code?'selected':''}><input type="radio" name="new-language" value={option.code} checked={choice===option.code} disabled={busy} onChange={()=>setChoice(option.code)}/><span lang={option.code} dir={option.dir}>{option.label}</span></label>)}</fieldset>
+          <label className="field">{text.reason}<textarea rows={2} maxLength={500} value={reason} disabled={busy} onChange={(event)=>setReason(event.target.value)}/></label>
+          {error && <p role="alert" className="record-error">{error}</p>}
+          <div className="actions"><button type="button" className="button outline" disabled={busy} onClick={()=>dialog.current?.close()}>{text.cancel}</button><button type="submit" className="button primary" disabled={busy || choice===state.language}><Send size={18}/>{busy?text.sending:text.send}</button></div>
+        </form>}
+      </>}
+    </dialog>
+  </>;
+}
+function messageOfLanguageError(language:WorkerUiLanguage,reason:unknown):string {
+  const message=reason instanceof Error?reason.message:'',text=workerLanguageText[language];
+  if(/already selected/i.test(message))return text.alreadySelected;
+  if(/already pending/i.test(message))return text.alreadyPending;
+  if(/Session|session|Sign in/.test(message))return text.session;
+  return text.error;
+}
+
+function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSessionLost,sessionInvalid,navigationGuard,onSessionRefresh }: { session: Session; view: string; navigate: (path: string) => void; refresh: number; act: (path: string, body?: unknown) => Promise<any>; logout: () => Promise<boolean>; message: string;onSessionLost:()=>void;sessionInvalid:()=>boolean;navigationGuard:React.RefObject<((next:string)=>boolean)|null>;onSessionRefresh:()=>Promise<boolean> }) {
+  const [language,setUiLanguage]=useState<WorkerUiLanguage>(()=>{try{return readWorkerUiLanguage(sessionStorage,session);}catch{return workerUiFallbackLanguage(session);}});
   const [languageError,setLanguageError]=useState('');
-  const t = workerText[language] || workerText.en;
-  const a = workerAux[language] || workerAux.en;
-  const statusText = workerStatusText[language] || workerStatusText.en;
-  const pagingText=workerPagingText[language as keyof typeof workerPagingText] || workerPagingText.en;
+  const [setupChoice,setSetupChoice]=useState<WorkerUiLanguage>(()=>language);
+  const [setupBusy,setSetupBusy]=useState(false),[setupError,setSetupError]=useState(''),[setupSaved,setSetupSaved]=useState(false);
+  const setupRequest=useRef(crypto.randomUUID());
+  const t = workerText[language];
+  const a = workerAux[language];
+  const statusText = workerStatusText[language];
+  const pagingText=workerPagingText[language];
   const audioMessage = session.mode.startsWith('synthetic-') ? a.audioDemo : a.audioPending;
   const [tab, setTab] = useState<WorkerInboxTab>('todo');
   const navText=workerNavigationText[language];
+  const notices=workerNotificationText[language];
   const pendingHelpAssignment=useRef<string|null>(null);
   const [page,setPage]=useState(1);
   const [answer, setAnswer] = useState('');
-  const [answerMode, setAnswerMode] = useState<'record' | 'type'>('record');
+  const [answerPresentationId,setAnswerPresentationId]=useState<string|null>(null);
+  const [answerMode, setAnswerMode] = useState<'record' | 'type'>('type');
+  const [reviewingAnswer,setReviewingAnswer]=useState(false);
+  const [acknowledging,setAcknowledging]=useState(false);
   const [audioRefresh, setAudioRefresh] = useState(0);
   const speechPlayers=useRef<{body:HTMLAudioElement|null;question:HTMLAudioElement|null}>({body:null,question:null});
   useEffect(()=>()=>{window.speechSynthesis?.cancel();speechPlayers.current.body?.pause();speechPlayers.current.question?.pause();},[]);
@@ -634,6 +887,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const [conversationUnsent,setConversationUnsent]=useState(false);
   const [helpVoiceUnsent,setHelpVoiceUnsent]=useState(false);
   const [receipt, setReceipt] = useState<any>(null);
+  const checkedReceipts=useRef<Set<string>>(new Set());
   const [requestFailure,setRequestFailure]=useState('');
   type PendingReceipt={kind:'answer'|'help'|'audio';requestId:string;assignmentId:string;status:'unknown'|'received'|'failed'};
   const [pendingReceipts,setPendingReceipts]=useState<PendingReceipt[]>([]);
@@ -684,7 +938,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const noticeAuthority=useRef({sessionInvalid,onSessionLost});noticeAuthority.current={sessionInvalid,onSessionLost};
   const loadRecordingNotice=useMemo(()=>{
     const identity={clientContext:session.clientContext!,expiresAt:session.expiresAt!};
-    return async(selected:WorkerUiLanguage,signal:AbortSignal)=>{
+    return async(selected:RecordingLanguage,signal:AbortSignal)=>{
       try{return await readWorkerRecordingNotice(fetch,identity,selected,signal,()=>!signal.aborted&&!noticeAuthority.current.sessionInvalid());}
       catch(reason){if(!signal.aborted&&!noticeAuthority.current.sessionInvalid()&&reason instanceof WorkerRecordingNoticeError&&reason.code==='session')noticeAuthority.current.onSessionLost();throw reason;}
     };
@@ -695,17 +949,15 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
     try {await work();if(currentView.current==='device')setAudioRefresh(value=>value+1);}
     finally {requestInFlight.current=false;setBusy(false);}
   };
-  useEffect(() => { setReceipt(null); setAnswer(''); setHelpText('');setRequestFailure('');setPendingReceipts([]); window.speechSynthesis?.cancel(); }, [id]);
-  const followupText=language==='ar'?'المتابعة':language==='ur'?'رابطہ':'Follow-up';
-  const answerClosedText=language==='ar'?'انتهى موعد الإجابة. لا يزال بإمكانك طلب المساعدة.':language==='ur'?'جواب کی آخری تاریخ گزر گئی ہے۔ آپ اب بھی مدد مانگ سکتے ہیں۔':'The answer deadline has passed. You can still ask for help.';
-  const emptyFollowup=language==='ar'?'لا توجد محادثات متابعة مفتوحة.':language==='ur'?'ابھی کوئی کھلی گفتگو نہیں۔':'No open follow-up conversations.';
+  useEffect(() => { setReceipt(null); checkedReceipts.current.clear(); setAnswer(''); setHelpText('');setRequestFailure('');setPendingReceipts([]);setReviewingAnswer(false);setAcknowledging(false);setAnswerPresentationId(null); window.speechSynthesis?.cancel(); }, [id]);
   const inbox=useApi<WorkerBriefingPage>(workerInboxPath(view,tab,page),refresh+audioRefresh,session.clientContext);
   useEffect(() => {
-    if(id || view==='device') return;
+    if(id || view==='device' || view==='notifications') return;
     const timer=window.setInterval(() => setAudioRefresh((value) => value+1),60000);
     return () => window.clearInterval(timer);
   },[id,view]);
   const detail = useApi<any>(id ? `/worker/briefings/${id}` : null, refresh + audioRefresh,session.clientContext);
+  useEffect(()=>{setAnswerPresentationId(null);},[id,detail.data?.publicationId,detail.data?.version]);
   useEffect(()=>{
     if(!pendingHelpAssignment.current)return;
     if(id!==pendingHelpAssignment.current){pendingHelpAssignment.current=null;return;}
@@ -718,7 +970,8 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const retainedDetail=retainWorkerDetail(id,detail.data?.id,hasUnsent,detail.errorStatus);
   const refreshText=workerRefreshText[language] || workerRefreshText.en;
   useEffect(()=>{if([inbox.error,detail.error].some(error=>['Session context changed','Sign in required'].includes(error)) || [inbox.errorStatus,detail.errorStatus].some(status=>status!==null && [401,403,409].includes(status)))onSessionLost();},[inbox.error,detail.error,inbox.errorStatus,detail.errorStatus]);
-  const speak = (text: string) => { if (!('speechSynthesis' in window)) return; speechPlayers.current.body?.pause();speechPlayers.current.question?.pause();speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.lang = detail.data?.language || language; speechSynthesis.speak(utterance); };
+  const contentLanguage:RecordingLanguage=detail.data?.language==='ar'||detail.data?.language==='ur'?detail.data.language as RecordingLanguage:'en';
+  const speak = (text: string) => { if (!('speechSynthesis' in window)) return; speechPlayers.current.body?.pause();speechPlayers.current.question?.pause();speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.lang = contentLanguage; speechSynthesis.speak(utterance); };
   const goBack = () => askLeave('back',()=>{window.speechSynthesis?.cancel();setReceipt(null);approvedRoute.current='inbox';navigate('inbox');});
   const requestIdFor=(kind:'answer'|'help',assignmentId:string,text:string)=>workerRequestId(sessionStorage,session,assignmentId,kind,text,Date.now,kind==='answer'?detail.data?.repeatRequest?.id:undefined);
   const requestError=(error:unknown)=>setRequestFailure(workerRequestText[language][error instanceof WorkerRequestError?error.code:'storage']);
@@ -746,12 +999,13 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
     setBusy(true);setRequestFailure('');
     try {
       const submissionId = await requestIdFor('answer', id, answer);
+      const presentationId=answerPresentationId;
       trackReceipt('answer',id,submissionId);
-      const result = await act(`/worker/briefings/${id}/answers`, { text: answer, submissionId });
-      if (result && currentAssignment.current === id) { clearTrackedReceipt('answer');setReceipt({ ...result, assignmentId: id,requestKind:'typed',publicationVersion:receiptScope.version,contentLanguage:receiptScope.language }); setAnswer(''); }
+      const result = await act(`/worker/briefings/${id}/answers`, { text: answer, submissionId, ...(presentationId?{presentationId}:{}) });
+      if (result && currentAssignment.current === id) { clearTrackedReceipt('answer');setReceipt({ ...result, assignmentId: id,requestKind:'typed',publicationVersion:receiptScope.version,contentLanguage:receiptScope.language }); setAnswer('');setReviewingAnswer(false); }
     } catch(error){requestError(error);} finally { requestInFlight.current = false; setBusy(false); }
   };
-  const submitAudio = async (bytes: Uint8Array, submissionId: string) => {
+  const submitAudio = async (bytes: Uint8Array, submissionId: string, presentationId: string | null) => {
     if(sessionInvalid())throw new Error('Session context changed');
     if(detailUnavailable||inputAvailability.answerBlocked)throw new Error(refreshText.failed);
     if (!id || requestInFlight.current) throw new Error('A request is already in progress');
@@ -765,7 +1019,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
         if(response.status===401 || (response.status===409 && response.headers.get('content-type')?.includes('application/json') && (await response.clone().json()).error==='Session context changed'))onSessionLost();
         return response;
       },session,receiptScope,bytes,submissionId,
-        ()=>!sessionInvalid() && currentAssignment.current===id);
+        ()=>!sessionInvalid() && currentAssignment.current===id,presentationId);
       clearTrackedReceipt('audio');
       if (currentAssignment.current === id) setReceipt({ ...result, audio: true, assignmentId: id,requestKind:'audio',publicationVersion:receiptScope.version,contentLanguage:receiptScope.language });
       setAudioRefresh((value) => value + 1);
@@ -774,14 +1028,14 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
       throw error;
     } finally { requestInFlight.current = false; setBusy(false); }
   };
-  const saveAudioPreview=async(bytes:Uint8Array,submissionId:string,capturedAt:string)=>{
+  const saveAudioPreview=async(bytes:Uint8Array,submissionId:string,capturedAt:string,presentationId:string|null)=>{
     if(!id || requestInFlight.current || detailUnavailable || inputAvailability.answerBlocked || sessionInvalid() || !audioConsentRef.current)throw Error('Saving unavailable');
     requestInFlight.current=true;setBusy(true);
     try {
       const {saveAudioDraft,browserAudioDraftFor}=await import('./worker-audio-draft');
       const scope={assignmentId:id,publicationId:detail.data.publicationId,version:detail.data.version,language:detail.data.language};
       await saveAudioDraft(await browserAudioDraftFor(scope),session,scope,
-        {bytes,submissionId,capturedAt},audioConsentRef.current,()=>!sessionInvalid() && currentAssignment.current===id && audioConsentRef.current);
+        {bytes,submissionId,capturedAt,presentationId},audioConsentRef.current,()=>!sessionInvalid() && currentAssignment.current===id && audioConsentRef.current);
       setAudioDraftRefresh(value=>value+1);
     }finally {requestInFlight.current=false;setBusy(false);}
   };
@@ -796,87 +1050,145 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
       if (result && currentAssignment.current === id) { clearTrackedReceipt('help');setHelpText(''); setAudioRefresh((value) => value + 1); }
     } catch(error){requestError(error);} finally { requestInFlight.current = false; setBusy(false); }
   };
+  const acknowledge = async () => {
+    if(!id || requestInFlight.current || detailUnavailable || !responseState?.canRespond || sessionInvalid())return;
+    requestInFlight.current=true;setAcknowledging(true);setRequestFailure('');
+    try {
+      const result=await act(`/worker/briefings/${id}/acknowledge`,{requestId:crypto.randomUUID()});
+      if(result && currentAssignment.current===id)setAudioRefresh(value=>value+1);
+    } catch(error){requestError(error);} finally {requestInFlight.current=false;setAcknowledging(false);}
+  };
   const endSession=async()=>{
     if(requestInFlight.current)return;
     requestInFlight.current=true;setBusy(true);approvedRoute.current='overview';
     try {if(!await logout())approvedRoute.current=null;}
     finally {requestInFlight.current=false;setBusy(false);}
   };
-  const visible=inbox.data?.items || [];
-  const pages=Math.max(1,Math.ceil((inbox.data?.total || 0)/5));
-  // Do not unmount an unsent recording as the wall clock crosses a deadline. The server rechecks acceptance on upload.
-  const responseState = useMemo(() => detail.data ? workerResponseState(detail.data) : null, [detail.data]);
-  return (
-    <div className="worker-shell worker-navigation-shell" lang={language} dir={language === 'en' ? 'ltr' : 'rtl'}>
+  const saveFirstLanguage=async()=>{
+    if(setupBusy)return;setSetupBusy(true);setSetupError('');
+    try {
+      await api('/worker/language/selection',{method:'POST',cache:'no-store',
+        headers:{'content-type':'application/json','x-client-session-context':session.clientContext!},
+        body:JSON.stringify({requestId:setupRequest.current,language:setupChoice})});
+      try{saveWorkerUiLanguage(sessionStorage,session,setupChoice);}catch{}
+      setUiLanguage(setupChoice);setSetupSaved(true);
+      if(!await onSessionRefresh())setSetupError(workerLanguageText[setupChoice].selectError);
+    } catch(reason) {setSetupError(messageOfLanguageError(language,reason));setupRequest.current=crypto.randomUUID();}
+    finally {setSetupBusy(false);}
+  };
+  if(session.languageSelectionRequired) {
+    const setupText=workerLanguageText[language];
+    return <div className="worker-shell worker-navigation-shell" lang={language} dir={workerUiDirection(language)}>
+      <a className="skip-link" href="#worker-main" onClick={event=>{event.preventDefault();document.getElementById('worker-main')?.focus();}}>{t.skip}</a>
       <header className="worker-header">
         <div className="worker-brand"><Brand/><small className="worker-site-label"><bdi>{session.organization}</bdi> · <bdi>{session.site}</bdi></small></div>
         <div className="worker-identity">
           <span className="avatar">{session.name?.replace(/\D/g, '') || 'W'}</span>
           <span><strong><bdi>{session.name}</bdi></strong><small>{language.toUpperCase()}</small></span>
-          <button className="icon-button" title={language==='ar'?'هذا الجهاز':language==='ur'?'یہ آلہ':'This device'} aria-label={language==='ar'?'هذا الجهاز':language==='ur'?'یہ آلہ':'This device'} disabled={busy} onClick={()=>navigate('device')}><Smartphone size={20}/></button>
+          <button className="icon-button" title={leaveText.end} aria-label={leaveText.end} disabled={setupBusy} onClick={()=>askLeave('logout',()=>void endSession())}><LogOut size={20}/></button>
+        </div>
+      </header>
+      <main className="worker-content" id="worker-main" tabIndex={-1}>
+        <section className="worker-card worker-language-gate">
+          <h1>{setupText.setupTitle}</h1>
+          <p>{setupText.setupBody}</p>
+          {setupSaved ? <><p className="notice notice-green" role="status">{setupError || setupText.setupDone}</p><button className="button primary full" onClick={()=>location.reload()}>{setupText.reload}</button></> : <>
+            <div className="worker-language-options" role="radiogroup" aria-label={setupText.setupTitle}>{workerLanguageOptionList.map(option=><label key={option.code} className={setupChoice===option.code?'selected':''}><input type="radio" name="worker-language" value={option.code} checked={setupChoice===option.code} disabled={setupBusy} onChange={()=>{setSetupChoice(option.code);setUiLanguage(option.code);}}/><span lang={option.code} dir={option.dir}>{option.label}</span></label>)}</div>
+            {setupError && <p role="alert" className="notice notice-amber">{setupError}</p>}
+            <button className="button primary full" disabled={setupBusy} onClick={()=>void saveFirstLanguage()}>{setupBusy?setupText.saving:setupText.continue}</button>
+          </>}
+        </section>
+        <div className="page-foot">{a.label}</div>
+      </main>
+    </div>;
+  }
+  const visible=inbox.data?.items || [];
+  const pages=Math.max(1,Math.ceil((inbox.data?.total || 0)/5));
+  // Do not unmount an unsent recording as the wall clock crosses a deadline. The server rechecks acceptance on upload.
+  const responseState = useMemo(() => detail.data ? workerResponseState(detail.data) : null, [detail.data]);
+  const responseMode=detail.data?.responseMode==='acknowledge'?'acknowledge':'question';
+  const deliveryMode=detail.data?.deliveryMode==='text'||detail.data?.deliveryMode==='voice'?detail.data.deliveryMode as 'text'|'voice':'both';
+  return (
+    <div className="worker-shell worker-navigation-shell" lang={language} dir={workerUiDirection(language)}>
+      <a className="skip-link" href="#worker-main" onClick={event=>{event.preventDefault();document.getElementById('worker-main')?.focus();}}>{t.skip}</a>
+      <header className="worker-header">
+        <div className="worker-brand"><Brand/><small className="worker-site-label"><bdi>{session.organization}</bdi> · <bdi>{session.site}</bdi></small></div>
+        <div className="worker-identity">
+          <span className="avatar">{session.name?.replace(/\D/g, '') || 'W'}</span>
+          <span><strong><bdi>{session.name}</bdi></strong><small>{language.toUpperCase()}</small></span>
+          <button className="icon-button" title={notices.title} aria-label={notices.title} disabled={busy} onClick={()=>navigate('notifications')}><Bell size={20}/></button>
+          <button className="icon-button" title={t.thisDevice} aria-label={t.thisDevice} disabled={busy} onClick={()=>navigate('device')}><Smartphone size={20}/></button>
+          <WorkerLanguageDialog session={session} language={language} disabled={busy}/>
           <button className="icon-button" title={leaveText.end} aria-label={leaveText.end} disabled={busy} onClick={()=>askLeave('logout',()=>void endSession())}><LogOut size={20} /></button>
         </div>
       </header>
-      <main className="worker-content">
+      <main className="worker-content" id="worker-main" tabIndex={-1}>
         {requestFailure && <p ref={requestFailureRef} tabIndex={-1} className="notice notice-amber" role="alert">{requestFailure}</p>}
         {pendingReceipts.filter(value=>value.assignmentId===id).map(value=><div className="notice notice-amber worker-receipt-check" key={value.kind}>
           <strong>{checkText[value.kind]}</strong><p role="status">{checkText[value.status]}</p>
           <button className="button outline" disabled={busy} onClick={()=>void checkReceipt(value)}><RefreshCw size={18}/>{checkText.check}</button>
         </div>)}
-        {view==='device' ? <WorkerDeviceView language={language} session={session} disabled={busy} current={()=>!sessionInvalid() && validWorkerSession(session) && currentView.current==='device'} onOperation={outboxOperation} onSessionLost={onSessionLost} onBack={()=>navigate('inbox')} languageError={languageError} onLanguageChange={next=>{if(busy || sessionInvalid())return;try{saveWorkerUiLanguage(sessionStorage,session,next);window.speechSynthesis?.cancel();setUiLanguage(next);setLanguageError('');}catch{setLanguageError(workerUiLanguageText[language].failed);}}}/> : !id ? (
+        {view==='device' ? <WorkerDeviceView language={language} session={session} disabled={busy} current={()=>!sessionInvalid() && validWorkerSession(session) && currentView.current==='device'} onOperation={outboxOperation} onSessionLost={onSessionLost} onBack={()=>navigate('inbox')} languageError={languageError} onEndSession={()=>askLeave('logout',()=>void endSession())} onEndSessionAndClear={()=>void endSession()} onLanguageChange={next=>{if(busy || sessionInvalid())return;try{saveWorkerUiLanguage(sessionStorage,session,next);window.speechSynthesis?.cancel();setUiLanguage(next);setLanguageError('');}catch{setLanguageError(workerUiLanguageText[language].failed);}}}/> : view==='notifications' ? <WorkerNotifications session={session} language={language} navigate={navigate} refresh={refresh+audioRefresh} current={()=>!sessionInvalid() && validWorkerSession(session)} onSessionLost={onSessionLost} timezone={session.timezone}/> : !id ? (
           <>
             {view==='help'?<WorkerHelpHub language={language} items={visible} loading={inbox.loading} failed={!!inbox.error} disabled={busy} onOpen={assignmentId=>{pendingHelpAssignment.current=assignmentId;navigate('worker/'+assignmentId);}} onFollowup={()=>{setTab('followup');setPage(1);navigate('inbox');}}/>:<>
             <h1>{t.mine}</h1>
             <div className="segmented worker-inbox-tabs">
               <button className={tab === 'todo' ? 'selected' : ''} aria-pressed={tab==='todo'} onClick={() => {setTab('todo');setPage(1);}}>{t.todo} {inbox.data && `(${inbox.data.counts.todo})`}</button>
               <button className={tab === 'completed' ? 'selected' : ''} aria-pressed={tab==='completed'} onClick={() => {setTab('completed');setPage(1);}}>{statusText.sent}</button>
-              <button className={tab === 'followup' ? 'selected' : ''} aria-pressed={tab==='followup'} onClick={() => {setTab('followup');setPage(1);}}>{followupText} {inbox.data && `(${inbox.data.counts.followup})`}</button>
-              <button className={tab === 'history' ? 'selected' : ''} aria-pressed={tab==='history'} onClick={() => {setTab('history');setPage(1);}}>{workerVersionText[language] || workerVersionText.en}</button>
             </div>
+            <details className="worker-inbox-more" open={tab==='followup'||tab==='history'}>
+              <summary>{t.more}</summary>
+              <div className="segmented">
+                <button className={tab === 'followup' ? 'selected' : ''} aria-pressed={tab==='followup'} onClick={() => {setTab('followup');setPage(1);}}>{t.followupShort} {inbox.data && `(${inbox.data.counts.followup})`}</button>
+                <button className={tab === 'history' ? 'selected' : ''} aria-pressed={tab==='history'} onClick={() => {setTab('history');setPage(1);}}>{workerVersionText[language] || workerVersionText.en}</button>
+              </div>
+            </details>
             {inbox.loading ? <p role="status">{a.loading}</p> : inbox.error ? <p className="notice notice-amber" role="alert">{navText.listFailed}</p> : visible.length ? visible.map((item) => (
               <section className="worker-card" key={item.id}>
                 <div className="worker-card-head">
                   <div className="metric-icon"><FileText size={28} /></div>
                   <div><h2 lang={item.language} dir={item.language==='en'?'ltr':'rtl'}>{item.title}</h2><p>{t.version} v{item.version} · {item.language.toUpperCase()}</p></div>
-                  {language==='en'?<ChevronRight size={23} aria-hidden="true"/>:<ChevronLeft size={23} aria-hidden="true"/>}
+                  {workerUiDirection(language)==='rtl'?<ChevronLeft size={23} aria-hidden="true"/>:<ChevronRight size={23} aria-hidden="true"/>}
                 </div>
-                {item.dueAt && <p className="worker-deadline"><Clock3 size={18}/><span>{language==='ar'?'الموعد النهائي':language==='ur'?'آخری وقت':'Due'}: <time dateTime={item.dueAt}>{new Date(item.dueAt).toLocaleString(language,{timeZone:session.timezone,dateStyle:'medium',timeStyle:'short'})}</time> · {session.timezone}</span></p>}
-                {item.repeatRequest && <Notice tone="amber">{language==='ar'?'طلب المشرف إجابة جديدة':language==='ur'?'سپروائزر نے نیا جواب مانگا ہے':'Your supervisor requested another answer'} · <time dateTime={item.repeatRequest.dueAt}>{new Date(item.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></Notice>}
+                {item.dueAt && <p className="worker-deadline"><Clock3 size={18}/><span>{t.due}: <time dateTime={item.dueAt}>{new Date(item.dueAt).toLocaleString(language,{timeZone:session.timezone,dateStyle:'medium',timeStyle:'short'})}</time> · {session.timezone}</span></p>}
+                {item.repeatRequest && <Notice tone="amber">{t.repeat} · <time dateTime={item.repeatRequest.dueAt}>{new Date(item.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></Notice>}
                 {item.outcome && <Status value={a[item.outcome as 'matched' | 'clarification' | 'unassessable'] || item.outcome} />}
-                {item.reminderAt && <Notice tone="amber">{language==='ar'?'تذكير: لم يُستلم ردك بعد.':language==='ur'?'یاد دہانی: آپ کا جواب ابھی موصول نہیں ہوا۔':'Reminder: your answer has not been received yet.'}</Notice>}
+                {item.acknowledgedAt && !item.outcome && <Status value={statusText.acknowledged} />}
+                {item.reminderAt && <Notice tone="amber">{t.reminder}</Notice>}
                 {!item.outcome && item.audioStatus && <Notice tone="blue">{item.audioStatus === 'failed' ? a.audioFailed : audioMessage}</Notice>}
                 {!item.outcome && !item.audioStatus && workerResponseState(item, now).pending && <Notice tone="blue">{statusText.pending}</Notice>}
-                {workerResponseState(item, now).closed && <Notice>{workerResponseState(item,now).canHelp?answerClosedText:statusText.closed}</Notice>}
-                <button className="button primary full" onClick={() => navigate('worker/' + item.id)}><Play size={19} /> {workerResponseState(item, now).received || workerResponseState(item, now).closed ? t.open : t.listen}</button>
+                {workerResponseState(item, now).closed && <Notice>{workerResponseState(item,now).canHelp?t.deadlinePassed:statusText.closed}</Notice>}
+                <button className="button primary full" onClick={() => navigate('worker/' + item.id)}>{item.responseMode==='acknowledge'&&!workerResponseState(item, now).received&&!workerResponseState(item, now).closed ? <CheckCircle2 size={19}/> : <Play size={19}/>} {workerResponseState(item, now).received || workerResponseState(item, now).closed ? t.open : item.responseMode==='acknowledge' ? t.ack : t.listen}</button>
               </section>
-            )) : <p className="empty-state">{tab === 'todo' ? a.emptyTodo : tab==='history' ? pagingText.emptyHistory : tab==='followup'?emptyFollowup:statusText.emptySent}</p>}
-            <button type="button" className="worker-inbox-help" onClick={()=>{setPage(1);navigate('help');}}><HelpCircle size={28} aria-hidden="true"/><span><strong>{navText.needHelp}</strong><small>{navText.contact}</small></span>{language==='en'?<ChevronRight size={22} aria-hidden="true"/>:<ChevronLeft size={22} aria-hidden="true"/>}</button>
+            )) : <p className="empty-state">{tab === 'todo' ? a.emptyTodo : tab==='history' ? pagingText.emptyHistory : tab==='followup'?t.emptyFollowup:statusText.emptySent}</p>}
+            <button type="button" className="worker-inbox-help" onClick={()=>{setPage(1);navigate('help');}}><HelpCircle size={28} aria-hidden="true"/><span><strong>{navText.needHelp}</strong><small>{navText.contact}</small></span>{workerUiDirection(language)==='rtl'?<ChevronLeft size={22} aria-hidden="true"/>:<ChevronRight size={22} aria-hidden="true"/>}</button>
             </>}
             <div className="worker-inbox-pagination"><span role="status">{!inbox.loading && !inbox.error && inbox.data && `${page} / ${pages} · ${inbox.data.total}`}</span><div className="actions">
-              <button className="icon-button" aria-label={pagingText.previous} title={pagingText.previous} disabled={inbox.loading || !!inbox.error || page<=1} onClick={() => setPage((value) => value-1)}>{language==='en' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}</button>
-              <button className="icon-button" aria-label={pagingText.next} title={pagingText.next} disabled={inbox.loading || !!inbox.error || page>=pages || page>=5000} onClick={() => setPage((value) => Math.min(value+1,5000))}>{language==='en' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}</button>
+              <button className="icon-button" aria-label={pagingText.previous} title={pagingText.previous} disabled={inbox.loading || !!inbox.error || page<=1} onClick={() => setPage((value) => value-1)}>{workerUiDirection(language)==='rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}</button>
+              <button className="icon-button" aria-label={pagingText.next} title={pagingText.next} disabled={inbox.loading || !!inbox.error || page>=pages || page>=5000} onClick={() => setPage((value) => Math.min(value+1,5000))}>{workerUiDirection(language)==='rtl' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}</button>
               <button className="icon-button" aria-label={pagingText.refresh} title={pagingText.refresh} disabled={inbox.loading} onClick={() => setAudioRefresh((value) => value+1)}><RefreshCw size={20} /></button>
               {!inbox.error && page>pages && <button className="button outline" onClick={() => setPage(1)}>{pagingText.first}</button>}
             </div></div>
             <Notice tone="blue">{a.demo}</Notice>
           </>
-        ) : detail.loading && !(hasUnsent && detail.data?.id===id) ? <p role="status">{a.loading}</p> : (detail.error && !retainedDetail) || !detail.data || detail.data.id!==id ? <><p className="notice notice-amber" role="alert">{navText.detailFailed}</p><button className="icon-button" aria-label={refreshText.refresh} title={refreshText.refresh} disabled={busy || detail.loading} onClick={()=>setAudioRefresh(value=>value+1)}><RefreshCw size={20}/></button></> : (
+        ) : detail.loading && !(detail.data?.id===id && (hasUnsent || receipt?.assignmentId===id)) ? <p role="status">{a.loading}</p> : (detail.error && !retainedDetail) || !detail.data || detail.data.id!==id ? <><p className="notice notice-amber" role="alert">{navText.detailFailed}</p><button className="icon-button" aria-label={refreshText.refresh} title={refreshText.refresh} disabled={busy || detail.loading} onClick={()=>setAudioRefresh(value=>value+1)}><RefreshCw size={20}/></button></> : (
           <>
-            <button className="back-link" disabled={busy} onClick={goBack}>{language==='en'?<ArrowLeft size={19} aria-hidden="true"/>:<ArrowRight size={19} aria-hidden="true"/>}{t.back}</button>
+            <button className="back-link" disabled={busy} onClick={goBack}>{workerUiDirection(language)==='rtl'?<ArrowRight size={19} aria-hidden="true"/>:<ArrowLeft size={19} aria-hidden="true"/>}{t.back}</button>
             <button className="icon-button" aria-label={refreshText.refresh} title={refreshText.refresh} disabled={busy || detail.loading} onClick={()=>setAudioRefresh(value=>value+1)}><RefreshCw size={20}/></button>
             {detail.loading && <p role="status">{a.loading}</p>}
             {detail.error && <p role="alert">{refreshText.failed}</p>}
             {receipt?.assignmentId!==id&&<><h1 lang={detail.data.language} dir={detail.data.language === 'en' ? 'ltr' : 'rtl'}>{detail.data.contentExpired?detail.data.title:detail.data.content.title}</h1>
             <p className="worker-subtitle">{t.version} v{detail.data.version}</p></>}
             {receipt?.assignmentId === id ? (
-              <WorkerSubmissionReceipt key={receipt.requestId} session={session} selection={{assignmentId:id,version:receipt.publicationVersion,language:receipt.contentLanguage,requestId:receipt.requestId,kind:receipt.requestKind}} acknowledgedContext={receipt.clientContext} language={language} timezone={session.timezone} disabled={busy||detailUnavailable} canHelp={!!responseState?.canHelp} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost} onBack={goBack} onHelp={()=>{pendingHelpAssignment.current=id;setReceipt(null);}}/>
+              <WorkerSubmissionReceipt key={receipt.requestId} session={session} selection={{assignmentId:id,version:receipt.publicationVersion,language:receipt.contentLanguage,requestId:receipt.requestId,kind:receipt.requestKind}} acknowledgedContext={receipt.clientContext} language={language} timezone={session.timezone} disabled={busy||detailUnavailable} canHelp={!!responseState?.canHelp} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost} onBack={goBack} onHelp={()=>{pendingHelpAssignment.current=id;setReceipt(null);}} onChecked={()=>{const requestId=receipt.requestId;if(!requestId||checkedReceipts.current.has(requestId))return;checkedReceipts.current.add(requestId);setAudioRefresh(value=>value+1);}}/>
             ) : detail.data.contentExpired ? (
-              <Notice tone="blue">{language==='ar'?'انتهت مدة الاحتفاظ بمحتوى التعليمات. يظل سجل إجاباتك أدناه.':language==='ur'?'بریفنگ کے مواد کی مدت ختم ہو گئی ہے۔ آپ کے جوابات کی تاریخ نیچے موجود ہے۔':'Briefing content expired. Your response history remains below.'}</Notice>
+              <Notice tone="blue">{t.expired}</Notice>
             ) : (
               <>
-                {responseState?.closed && <Notice>{responseState.canHelp?answerClosedText:statusText.closed}</Notice>}
+                {responseState?.closed && <Notice>{responseState.canHelp?t.deadlinePassed:statusText.closed}</Notice>}
                 <section className="worker-card">
-                  <h2>{t.listen}</h2>
+                  <h2>{deliveryMode==='text'?t.readInstruction:t.listen}</h2>
+                  {deliveryMode==='text' ? <p className="briefing-text" lang={detail.data.language} dir={detail.data.language === 'en' ? 'ltr' : 'rtl'}>{detail.data.content.text}</p> : <>
                   {detail.data.speechUrls?.body ? <WorkerAudioPlayer key={`${id}:body:${detail.data.publicationId}:${detail.data.version}`} src={detail.data.speechUrls.body} label={t.play} language={language} onPlayer={element=>{speechPlayers.current.body=element;}} onPlay={()=>{window.speechSynthesis?.cancel();speechPlayers.current.question?.pause();}}/> : <button className="audio-button" disabled={detail.data.content.speech!=='device-synthesis-demo'} onClick={() => speak(detail.data.content.text)}>
                     <span className="play-round"><Volume2 size={25} /></span><span>{t.play}</span>
                     <span className="waveform" aria-hidden="true">▁▃▅▂▇▄▆▂▅▃▁</span>
@@ -884,12 +1196,22 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   <details className="worker-text-disclosure" key={`${id}:text:${detail.data.publicationId}:${detail.data.version}`}><summary><FileText size={18} aria-hidden="true"/> {t.text}<ChevronDown size={18} aria-hidden="true"/></summary>
                     <p className="briefing-text" lang={detail.data.language} dir={detail.data.language === 'en' ? 'ltr' : 'rtl'}>{detail.data.content.text}</p>
                   </details>
+                  </>}
+                  <WorkerPresentationView key={`presentation:${id}:${detail.data.publicationId}:${detail.data.version}`} assignmentId={id} version={detail.data.version} sourceKind="instruction" originalLanguage={detail.data.language} approvedLanguage={session.language || ''} uiLanguage={language} session={session} disabled={busy||detailUnavailable} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} onActive={setAnswerPresentationId}/>
                 </section>
                 <section className="worker-card question-card">
+                  {responseMode==='acknowledge' ? <>
+                    <div className="question-label"><CheckCircle2 size={24} />{t.receipt}</div>
+                    <h2>{t.ackTitle}</h2>
+                    <p className="muted">{t.ackBody}</p>
+                    {responseState?.closed && <Notice>{responseState.canHelp?t.deadlinePassed:statusText.closed}</Notice>}
+                    {detail.data.acknowledgedAt ? <><Status value={statusText.acknowledged}/><p className="muted"><time dateTime={detail.data.acknowledgedAt}>{new Date(detail.data.acknowledgedAt).toLocaleString(language,{timeZone:session.timezone,dateStyle:'medium',timeStyle:'short'})}</time></p></> : !responseState?.closed && responseState?.canRespond ? <button className="button primary full" disabled={busy || acknowledging || detailUnavailable} onClick={()=>void acknowledge()}>{acknowledging?t.saving:<><CheckCircle2 size={20}/>{t.ackAction}</>}</button> : null}
+                    <button className="button outline full" onClick={() => document.getElementById('worker-help')?.scrollIntoView({ behavior: 'smooth' })}><MessageCircle size={20} /> {t.help}</button>
+                  </> : <>
                   <div className="question-label"><HelpCircle size={24} />{t.question}</div>
                   <h2 lang={detail.data.language} dir={detail.data.language === 'en' ? 'ltr' : 'rtl'}>{detail.data.content.question}</h2>
-                  {detail.data.repeatRequest && <Notice tone="amber">{language==='ar'?'طلب المشرف إجابة جديدة. إجابتك السابقة محفوظة.':language==='ur'?'سپروائزر نے نیا جواب مانگا ہے۔ آپ کا پچھلا جواب محفوظ ہے۔':'Your supervisor requested another answer. Your earlier answer is preserved.'} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></Notice>}
-                  {detail.data.speechUrls?.question ? <WorkerAudioPlayer key={`${id}:question:${detail.data.publicationId}:${detail.data.version}`} src={detail.data.speechUrls.question} label={t.playQuestion} language={language} onPlayer={element=>{speechPlayers.current.question=element;}} onPlay={()=>{window.speechSynthesis?.cancel();speechPlayers.current.body?.pause();}}/> : <button className="audio-button compact" disabled={detail.data.content.speech!=='device-synthesis-demo'} onClick={() => speak(detail.data.content.question)}><Play size={20} />{t.playQuestion}</button>}
+                  {detail.data.repeatRequest && <Notice tone="amber">{t.repeatSaved} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></Notice>}
+                  {deliveryMode!=='text' && (detail.data.speechUrls?.question ? <WorkerAudioPlayer key={`${id}:question:${detail.data.publicationId}:${detail.data.version}`} src={detail.data.speechUrls.question} label={t.playQuestion} language={language} onPlayer={element=>{speechPlayers.current.question=element;}} onPlay={()=>{window.speechSynthesis?.cancel();speechPlayers.current.body?.pause();}}/> : <button className="audio-button compact" disabled={detail.data.content.speech!=='device-synthesis-demo'} onClick={() => speak(detail.data.content.question)}><Play size={20} />{t.playQuestion}</button>)}
                   {!detail.data.repeatRequest && detail.data.audioStatus && detail.data.audioStatus !== 'failed' ? (
                     <><Notice tone="blue">{audioMessage}</Notice><audio controls preload="none" src={'/api/recordings/' + detail.data.recordingId + '/audio'} /></>
                   ) : !detail.data.repeatRequest && detail.data.outcome ? (
@@ -900,25 +1222,33 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                     <>
                       {detail.data.audioStatus === 'failed' && <Notice>{a.audioFailed}</Notice>}
                       <div className="segmented answer-mode">
-                        <button disabled={busy} className={answerMode === 'record' ? 'selected' : ''} onClick={() => setAnswerMode('record')}>{a.recordInstead}</button>
                         <button disabled={busy} className={answerMode === 'type' ? 'selected' : ''} onClick={() => askLeave('type',()=>setAnswerMode('type'))}>{a.typeInstead}</button>
+                        <button disabled={busy} className={answerMode === 'record' ? 'selected' : ''} onClick={() => setAnswerMode('record')}>{a.recordInstead}</button>
                       </div>
-                      {answerMode === 'record' ? <WorkerRecorderView key={id} language={language} noticeLanguage={language} loadSiteNotice={loadRecordingNotice} synthetic={session.mode.startsWith('synthetic-')} disabled={busy || detailUnavailable || inputAvailability.answerBlocked} saveAllowed={privateDevice && audioConsent} onSave={saveAudioPreview} onSend={submitAudio} onUnsavedChange={setAudioUnsent} /> : (
+                      {answerMode === 'record' ? <WorkerRecorderView key={id} language={language} noticeLanguage={contentLanguage} loadSiteNotice={loadRecordingNotice} synthetic={session.mode.startsWith('synthetic-')} disabled={busy || detailUnavailable || inputAvailability.answerBlocked} saveAllowed={privateDevice && audioConsent} onSave={(bytes,submissionId,capturedAt)=>saveAudioPreview(bytes,submissionId,capturedAt,answerPresentationId)} onSend={(bytes,submissionId)=>submitAudio(bytes,submissionId,answerPresentationId)} onUnsavedChange={setAudioUnsent} /> : reviewingAnswer ? (
+                        <div className="worker-answer-review">
+                          <h3>{t.reviewTitle}</h3>
+                          <p className="briefing-text" dir="auto">{answer}</p>
+                          <p className="muted">{t.reviewBody}</p>
+                          <div className="actions"><button type="button" className="button outline" disabled={busy} onClick={()=>setReviewingAnswer(false)}>{t.edit}</button><button type="button" className="button primary" onClick={submit} disabled={!answer.trim() || busy || detailUnavailable || inputAvailability.answerBlocked}><Send size={20}/>{t.send}</button></div>
+                        </div>
+                      ) : (
                         <>
                           <label className="field">{t.answer}<textarea rows={4} value={answer} disabled={busy || inputAvailability.answerBlocked} onChange={(event) => setAnswer(event.target.value)} placeholder={t.reply} maxLength={2000} /></label>
-                          <button className="button primary full" onClick={submit} disabled={!answer.trim() || busy || detailUnavailable || inputAvailability.answerBlocked}><Send size={20} /> {t.send}</button>
+                          <button className="button primary full" onClick={()=>setReviewingAnswer(true)} disabled={!answer.trim() || busy || detailUnavailable || inputAvailability.answerBlocked}>{workerUiDirection(language)==='rtl'?<ChevronLeft size={20} />:<ChevronRight size={20} />}{t.reviewAnswer}</button>
                         </>
                       )}
                     </>
                   )}
                   {responseState?.pending && <button className="icon-button" aria-label={statusText.check} title={statusText.check} disabled={busy} onClick={() => setAudioRefresh((value) => value + 1)}><RefreshCw size={20} /></button>}
                   <button className="button outline full" onClick={() => document.getElementById('worker-help')?.scrollIntoView({ behavior: 'smooth' })}><MessageCircle size={20} /> {t.help}</button>
+                  </>}
                 </section>
                 <section className="worker-card" id="worker-help">
                   <h2 tabIndex={-1}>{t.helpTitle}</h2>
                   {responseState?.canHelp && <><label className="field">{t.helpPrompt}<textarea rows={3} value={helpText} disabled={busy || helpVoiceUnsent || inputAvailability.helpBlocked} onChange={(event) => setHelpText(event.target.value)} maxLength={500} /></label>
                   <button className="button outline full" disabled={helpText.trim().length < 3 || helpVoiceUnsent || inputAvailability.helpBlocked || busy || detailUnavailable} onClick={help}><MessageCircle size={18} />{t.help}</button>
-                  {detail.data.canVoiceHelp && <CaseVoiceRecorder key={`help-voice:${id}`} scope={{kind:'help',id}} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} current={()=>!sessionInvalid()&&currentAssignment.current===id} language={language} noticeLanguage={language} disabled={busy || detailUnavailable || inputAvailability.helpBlocked || !!helpText.trim()} onDirtyChange={setHelpVoiceUnsent} onSessionLost={onSessionLost} onReceived={()=>setAudioRefresh(value=>value+1)}/>}</>}
+                  {detail.data.canVoiceHelp && <CaseVoiceRecorder key={`help-voice:${id}`} scope={{kind:'help',id}} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} current={()=>!sessionInvalid()&&currentAssignment.current===id} language={language} noticeLanguage={contentLanguage} disabled={busy || detailUnavailable || inputAvailability.helpBlocked || !!helpText.trim()} onDirtyChange={setHelpVoiceUnsent} onSessionLost={onSessionLost} onReceived={()=>setAudioRefresh(value=>value+1)}/>}</>}
                 </section>
               </>
             )}
@@ -926,7 +1256,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
             <WorkerAudioDraftView key={`audio:${id}:${detail.data.publicationId}:${detail.data.version}`} session={session} interfaceLanguage={language} scope={{assignmentId:id,publicationId:detail.data.publicationId,version:detail.data.version,language:detail.data.language}}
               refresh={audioDraftRefresh} consent={audioConsent} onConsent={changeAudioConsent} disabled={busy || detailUnavailable} blocked={audioUnsent || !!answer.trim() || !!helpText.trim()}
               current={()=>!sessionInvalid() && validWorkerSession(session) && currentAssignment.current===id && !detailUnavailable}
-              onSend={submitAudio} onCheck={async requestId=>{trackReceipt('audio',id,requestId);await checkReceipt({kind:'audio',assignmentId:id,requestId,status:'unknown'});}}/>
+              onSend={(bytes,submissionId,presentationId)=>submitAudio(bytes,submissionId,presentationId??null)} onCheck={async requestId=>{trackReceipt('audio',id,requestId);await checkReceipt({kind:'audio',assignmentId:id,requestId,status:'unknown'});}}/>
             <WorkerTextDraftView key={`${id}:${detail.data.publicationId}:${detail.data.version}`} session={session} interfaceLanguage={language} scope={{assignmentId:id,publicationId:detail.data.publicationId,version:detail.data.version}}
               draft={{answer,help:helpText,receipts:pendingReceipts.filter(value=>value.assignmentId===id)}} disabled={busy || detailUnavailable} restoreBlocked={audioUnsent}
               current={()=>!sessionInvalid() && validWorkerSession(session) && currentAssignment.current===id && !detailUnavailable}
@@ -939,7 +1269,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
         <div className="page-foot">{a.label}</div>
       </main>
       <nav className="worker-bottom-nav" aria-label={navText.navigation}><div>
-        <button type="button" aria-current={view!=='device' && view!=='help'?'page':undefined} disabled={busy} onClick={()=>navigate('inbox')}><FileText size={23} aria-hidden="true"/><span>{navText.briefings}</span></button>
+        <button type="button" aria-current={view!=='device' && view!=='help' && view!=='notifications'?'page':undefined} disabled={busy} onClick={()=>navigate('inbox')}><FileText size={23} aria-hidden="true"/><span>{navText.briefings}</span></button>
         <button type="button" aria-current={view==='help'?'page':undefined} disabled={busy} onClick={()=>{setPage(1);navigate('help');}}><HelpCircle size={23} aria-hidden="true"/><span>{navText.help}</span></button>
         <button type="button" aria-current={view==='device'?'page':undefined} disabled={busy} onClick={()=>navigate('device')}><Smartphone size={23} aria-hidden="true"/><span>{navText.device}</span></button>
       </div></nav>

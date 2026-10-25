@@ -35,6 +35,19 @@ export async function processOneDeletionRedaction(pool,{schema='public'}={}){
       status='failed',lease_token=NULL,lease_until=NULL,error_code='worker_deleted'
       WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)`,[row.worker_id]);
     await client.query("UPDATE clarifications SET reason='[Deleted]',notes='' WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)",[row.worker_id]);
+    await client.query("UPDATE worker_language_requests SET reason='[Deleted]' WHERE worker_id=$1 AND reason<>'[Deleted]'",[row.worker_id]);
+    await client.query(`UPDATE presentation_artifacts SET title=CASE WHEN title IS NULL THEN NULL ELSE '[Deleted]' END,
+      text='[Deleted]',question=CASE WHEN question IS NULL THEN NULL ELSE '[Deleted]' END,updated_at=clock_timestamp()
+      WHERE worker_id=$1 AND status='ready' AND text<>'[Deleted]'`,[row.worker_id]);
+    await client.query(`UPDATE presentation_artifacts SET status='failed',title=NULL,text=NULL,question=NULL,provider=NULL,live=NULL,
+      error_code='Worker deletion pending',lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp()
+      WHERE worker_id=$1 AND status='pending'`,[row.worker_id]);
+    await client.query(`UPDATE answer_presentation_bindings SET presented_question='[Deleted]'
+      WHERE presentation_id IN (SELECT id FROM presentation_artifacts WHERE worker_id=$1) AND presented_question<>'[Deleted]'`,[row.worker_id]);
+    await client.query(`UPDATE recordings SET presented_question='[Deleted]'
+      WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1) AND presented_question IS NOT NULL AND presented_question<>'[Deleted]'`,[row.worker_id]);
+    await client.query(`UPDATE instruction_deliveries SET content_json='{"title":"[Deleted]","text":"[Deleted]"}'::jsonb,
+      updated_at=clock_timestamp() WHERE worker_id=$1 AND content_json IS NOT NULL AND content_json->>'title'<>'[Deleted]'`,[row.worker_id]);
     await client.query('INSERT INTO worker_deletion_redactions VALUES($1,$2,$3,$4,clock_timestamp())',[row.id,row.org_id,row.site_id,row.worker_id]);
     await domainAudit(client,{...row,principal_type:'system',principal_id:'deletion-worker'},'worker.content.redacted',row.worker_id);
     return true;

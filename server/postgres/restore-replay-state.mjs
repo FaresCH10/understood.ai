@@ -8,11 +8,11 @@ export const restoreStateHash=state=>createHash('sha256').update(JSON.stringify(
 const digest=value=>typeof value==='string' && /^[a-f0-9]{64}$/.test(value);
 const auditTables=['audit','operational_audit_receipts'];
 const allowed={
-  deletions:['staff','workers','worker_deletion_requests','worker_grants','sessions','recordings','assessment_jobs'],
+  deletions:['staff','workers','worker_deletion_requests','worker_grants','worker_credentials','worker_setup_tokens','sessions','recordings','assessment_jobs'],
   policies:['staff',...['retention','text_retention','case_retention','generated_retention','activity_retention','briefing_retention'].flatMap(name=>[`${name}_policies`,`${name}_requests`])],
   activity:['restore_activity_redactions','activity_identity_purges'],
   briefings:['restore_briefing_redactions','briefing_content_purges','briefing_content_origins','briefings','publications','draft_reviews','briefing_review_requests','briefing_regeneration_requests','generated_bundles','briefing_copies','source_audio_requests'],
-  restrictions:['restore_access_restrictions','staff','staff_access_requests','staff_access_revisions','workers','worker_grants','sessions','site_access_requests','site_lifecycle_requests','site_access_controls','site_lifecycle','staff_accounts'],
+  restrictions:['restore_access_restrictions','staff','staff_access_requests','staff_access_revisions','workers','worker_grants','worker_credentials','worker_setup_tokens','sessions','site_access_requests','site_lifecycle_requests','site_access_controls','site_lifecycle','staff_accounts'],
   retirements:['restore_privacy_retirements','text_retention_purges','case_content_purges','generated_audio_retirements','generated_bundles','recording_purges','source_audio_purges','recordings','assessment_jobs','attempts','report_exports','clarifications','help_requests','case_messages','case_reviews','case_followups','case_followup_audio','case_voice'],
 };
 

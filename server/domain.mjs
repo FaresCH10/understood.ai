@@ -10,6 +10,10 @@ import {assertGlossaryCurrent} from './glossary-input.mjs';
 import {scheduleHash} from './schedule-input.mjs';
 import {queuePublicationReminders} from './reminders.mjs';
 import {routeNewCase} from './case-routing.mjs';
+import {instructionModes} from './instruction-schema.mjs';
+import {checkedPresentationBinding,recordPresentationBinding} from './presentations.mjs';
+import {requireWritableEntitlement} from './entitlements.mjs';
+import {recordWorkerEvent,staffAuditOnce} from './notification-events.mjs';
 
 export const CANONICAL_SOURCE = 'Put finished items on the blue shelf. Put unfinished items on the yellow shelf. Leave the walkway clear.';
 export const QUESTION = 'Where will you put finished and unfinished items?';
@@ -98,10 +102,13 @@ export function metricsFromResponses(rows) {
   const currentOutcome = (row) => isCurrentRecording(row) ? null : row.outcome;
   const matches = rows.filter((row) => currentOutcome(row) === 'matched').length;
   const clarifications = rows.filter((row) => ['clarification', 'unassessable'].includes(currentOutcome(row))).length;
-  const responses = rows.filter((row) => row.outcome || row.attempt_at || row.audio_status).length;
-  const unassessed = responses - matches - clarifications;
-  return { assigned, responses, matches, clarifications, unassessed, pending: assigned - responses,
+  const acknowledged = rows.filter((row) => !isCurrentRecording(row) && row.acknowledged_at && !row.outcome && !row.audio_status).length;
+  const responses = rows.filter((row) => row.outcome || row.attempt_at || row.audio_status || row.acknowledged_at).length;
+  const unassessed = responses - matches - clarifications - acknowledged;
+  const result = { assigned, responses, matches, clarifications, unassessed, pending: assigned - responses,
     completion: assigned ? Math.round(responses / assigned * 100) : 0 };
+  if (acknowledged) result.acknowledged = acknowledged;
+  return result;
 }
 
 export function checkedPublication(db,session,briefing,request) {
@@ -110,18 +117,24 @@ export function checkedPublication(db,session,briefing,request) {
   if (!Number.isSafeInteger(request.nextVersion)) throw new Error('Invalid publication version');
   if (briefing.next_version!==request.nextVersion) throw new Error('Draft version changed');
   if (request.dueAt!==null && request.dueAt<=NOW()) throw new Error('Deadline must be in the future');
-  const recipient=db.prepare('SELECT id,language FROM workers WHERE id=? AND org_id=? AND site_id=? AND active=1');
+  const recipient=db.prepare(`SELECT id,language,language_selection_required FROM workers
+    WHERE id=? AND org_id=? AND site_id=? AND active=1`);
   const workers=request.workerIds.map((id) => recipient.get(id,session.org_id,session.site_id));
   if (workers.some((worker) => !worker)) throw new Error('Recipient unavailable');
-  const snapshot=readySnapshot({...briefing,prepared_json:briefing.prepared_json ? JSON.parse(briefing.prepared_json) : null},workers,'synthetic');
+  if (workers.some((worker) => worker.language_selection_required)) throw new Error('Recipient language not selected');
+  const snapshot=readySnapshot({...briefing,prepared_json:briefing.prepared_json ? JSON.parse(briefing.prepared_json) : null},workers,'synthetic',
+    instructionModes(db,briefing.id,session.org_id,session.site_id));
   assertGlossaryCurrent(snapshot,readGlossarySnapshot(db,session.org_id,session.site_id));
   return {workers,snapshot};
 }
 
-export function publish(db, session, briefingId,input,{scheduleId,verifySchedule}={}) {
+export function publish(db, session, briefingId,input,options={}) {
+  return transaction(db, () => publishInTransaction(db,session,briefingId,input,options));
+}
+
+export function publishInTransaction(db,session,briefingId,input,{scheduleId,verifySchedule}={}) {
   const request=publicationInput(input);
-  return transaction(db, () => {
-    briefingAuthority(db,session);
+  briefingAuthority(db,session);
     const briefing = db.prepare('SELECT * FROM briefings WHERE id=? AND org_id=? AND site_id=?').get(briefingId, session.org_id, session.site_id);
     if (!briefing) throw new Error('Briefing unavailable');
     const scheduled=scheduleId ? db.prepare('SELECT * FROM publication_schedules WHERE id=? AND briefing_id=? AND org_id=? AND site_id=?')
@@ -138,6 +151,7 @@ export function publish(db, session, briefingId,input,{scheduleId,verifySchedule
       if (old.request_json!==JSON.stringify(request)) throw new Error('Publication request conflict');
       return {id:old.id,version:old.version,assigned:old.assigned,duplicate:true};
     }
+    requireWritableEntitlement(db,session.org_id);
     const {workers,snapshot:prepared}=checkedPublication(db,session,briefing,request);
     if(scheduled && (scheduled.snapshot_hash!==scheduleHash(prepared) || scheduled.recipients_json!==JSON.stringify(workers))) throw Error('Scheduled recipient language changed');
     const id = randomUUID();
@@ -145,7 +159,12 @@ export function publish(db, session, briefingId,input,{scheduleId,verifySchedule
     db.prepare("UPDATE publications SET state='superseded' WHERE briefing_id=? AND org_id=? AND state='published'").run(briefing.id, session.org_id);
     db.prepare('INSERT INTO publications VALUES (?,?,?,?,?,?,?,?)').run(id, session.org_id, session.site_id, briefing.id, briefing.next_version, JSON.stringify(prepared), now, 'published');
     const insert = db.prepare('INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,due_at,created_at,language) VALUES (?,?,?,?,?,?,?,?)');
-    for (const worker of workers) insert.run(randomUUID(), session.org_id, session.site_id, id, worker.id, request.dueAt, now, worker.language);
+    for (const worker of workers) {
+      const assignmentId=randomUUID();
+      insert.run(assignmentId, session.org_id, session.site_id, id, worker.id, request.dueAt, now, worker.language);
+      recordWorkerEvent(db,{orgId:session.org_id,siteId:session.site_id,workerId:worker.id,kind:'instruction.available',
+        objectType:'assignment',objectId:assignmentId,dedupeKey:`instruction.available:${assignmentId}`,now});
+    }
     captureReportAudience(db,id);
     queuePublicationReminders(db,session,id,request);
     db.prepare('INSERT INTO publication_requests VALUES(?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,briefing.id,id,JSON.stringify(request));
@@ -153,7 +172,6 @@ export function publish(db, session, briefingId,input,{scheduleId,verifySchedule
     briefingAudit(db,session,'briefing.published',id);
     if(scheduled) db.prepare("UPDATE publication_schedules SET state='published',publication_id=?,finished_at=?,attempts=attempts+1,retry_at=NULL WHERE id=? AND state='queued'").run(id,now,scheduled.id);
     return { id, version: briefing.next_version, assigned: workers.length,duplicate:false };
-  });
 }
 
 export function withdrawPublication(db,session,briefingId,input) {
@@ -179,7 +197,18 @@ export function withdrawPublication(db,session,briefingId,input) {
   });
 }
 
-export function submitAnswer(db, session, assignmentId, submissionId, answerText) {
+export function assessKeywordAnswer(answer,rubric) {
+  const raw=answer.normalize('NFKC').toLowerCase().trim();
+  if(!raw) return {outcome:'unassessable',reasons:['empty_answer']};
+  if(/ignore|mark (it )?correct|rubric|system prompt/.test(raw)) return {outcome:'unassessable',reasons:['instruction_like_answer']};
+  const groups=Array.isArray(rubric?.keywordGroups) ? rubric.keywordGroups : [];
+  const covered=groups.filter((group)=>group.some((word)=>raw.includes(word))).length;
+  return covered>=Math.min(2,groups.length) && groups.length
+    ? {outcome:'matched',reasons:['asked_facts_present']}
+    : {outcome:'clarification',reasons:['missing_asked_fact']};
+}
+
+export function submitAnswer(db, session, assignmentId, submissionId, answerText, presentationId = null) {
   if (session.principal_type !== 'worker') throw new Error('Forbidden');
   if (typeof submissionId !== 'string' || !submissionId || submissionId.length > 100) throw new Error('Invalid submission ID');
   if (typeof answerText !== 'string' || answerText.length > 2000) throw new Error('Invalid answer');
@@ -195,26 +224,33 @@ export function submitAnswer(db, session, assignmentId, submissionId, answerText
       if (old.answer_text !== answerText.trim()) throw new Error('Submission ID conflict');
       return { id: old.id, outcome: old.outcome, duplicate: true };
     }
+    requireWritableEntitlement(db,session.org_id);
     if (submissionId.length < 8) throw new Error('Invalid submission ID');
     if (assignment.state !== 'published') throw new Error('Assignment unavailable');
     if (assignment.due_at && assignment.due_at<=NOW()) throw new Error('Assignment deadline passed');
     if (db.prepare('SELECT 1 FROM recordings WHERE assignment_id=? AND submission_id=?').get(assignmentId, submissionId))
       throw new Error('Submission ID conflict');
     const snapshot = JSON.parse(assignment.snapshot_json);
+    if(snapshot.responseMode==='acknowledge') throw new Error('This instruction only requires confirmation');
+    const presentation=checkedPresentationBinding(db,session,assignmentId,presentationId);
     const rubric = snapshot.rubric?.askedFacts;
     const result = snapshot.provenance?.adapter === 'synthetic-local-v1'
       && Array.isArray(rubric) && rubric.join('|') === 'finished -> blue shelf|unfinished -> yellow shelf'
       ? assessAnswer(answerText)
-      : { outcome: 'unassessable', reasons: ['unsupported_rubric'] };
+      : snapshot.provenance?.adapter === 'synthetic-instruction-v1' && snapshot.rubric?.mode === 'keywords'
+        ? assessKeywordAnswer(answerText,snapshot.rubric)
+        : { outcome: 'unassessable', reasons: ['unsupported_rubric'] };
     const id = randomUUID();
     const now = NOW();
     db.prepare('INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at) VALUES (?,?,?,?,?)')
       .run(session.org_id, assignmentId, submissionId, 'typed', now);
     db.prepare('INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?)').run(id, session.org_id, assignmentId, submissionId, answerText.trim(), result.outcome, JSON.stringify(result.reasons), now);
+    recordPresentationBinding(db,id,presentation,now);
     if (result.outcome !== 'matched') {
       const caseId=randomUUID();
       db.prepare('INSERT INTO clarifications VALUES (?,?,?,?,?,?,?,?,?)').run(caseId, session.org_id, assignmentId, id, result.reasons[0], null, 'open', '', now);
       routeNewCase(db,session.org_id,session.site_id,caseId);
+      staffAuditOnce(db,{orgId:session.org_id,siteId:session.site_id,action:'answer.needs_attention',objectId:caseId,now});
     }
     db.prepare('INSERT INTO audit VALUES (?,?,?,?,?,?,?,?)').run(randomUUID(), session.org_id, session.site_id, 'worker', session.principal_id, 'answer.received', id, now);
     return { id, outcome: result.outcome, duplicate: false };

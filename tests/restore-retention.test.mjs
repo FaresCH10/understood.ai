@@ -289,7 +289,7 @@ async function accountedCleanup(f,key,{families=true}={}){
   await writeBackupCompletion(directory,baseline,key);await writeBackupCompletion(ledgerDirectory,ledger,key);
   const stateFile=join(f.root,'accounted-quarantine.enc');
   await encryptBackupBytes(Buffer.from(JSON.stringify(state)),stateFile,key,`understood:restore:${baseline.id}:quarantine-state`);
-  const args={pool:f.pool,storage:f.storage,directory,ledgerDirectory,stateFile,stateKind:'quarantine',scratchDirectory:join(f.root,'accounted-result'),key,
+  const args={pool:f.pool,storage:f.storage,directory,ledgerDirectory,stateFile,stateKind:'quarantine',scratchDirectory:join(f.root,'accounted-result'),key,maxMilliseconds:300000,
     connection:{connectionString:'postgresql://operator:private@127.0.0.1/restored'},isolatedTarget:true,writersStopped:true};
   return {args,baseline,ledger,state};
 }
@@ -297,7 +297,7 @@ async function accountedCleanup(f,key,{families=true}={}){
 test('accounted production cleanup chains each commit and all six removals, preserves evidence and verifies successor on resume',async()=>{
   const f=await fixture(),key=backupKey('e4'.repeat(32));try{
     const {args,baseline,state}=await accountedCleanup(f,key),publications=(await f.db.query('SELECT * FROM publications')).rows;
-    const result=await sweepPostgresRestore(args);assert.equal(result.elapsedPoliciesReconciled,true);
+    const result=await sweepPostgresRestore(args);assert.equal(result.elapsedPoliciesReconciled,true,JSON.stringify({stop:result.stop,failedStages:result.failedStages,pendingCount:result.pendingCount,work:result.work}));
     assert.equal(result.cleanupState.removedObjects.length,6);assert.equal(result.activationAllowed,false);
     assert.deepEqual((await f.db.query('SELECT * FROM publications')).rows,publications);
     assert.equal((await f.db.query('SELECT outcome FROM attempts')).rows[0].outcome,'matched');

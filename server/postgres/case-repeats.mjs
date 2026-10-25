@@ -1,5 +1,7 @@
 import {domainTransaction,requirePrincipal,domainAudit} from './domain.mjs';
 import {requireSiteOperational} from './site-lifecycle.mjs';
+import {requireWritableEntitlement} from './entitlements.mjs';
+import {recordWorkerEvent} from './notification-events.mjs';
 
 const uuid=value=>typeof value==='string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(value);
 const iso=value=>value instanceof Date?value.toISOString():value;
@@ -21,7 +23,7 @@ async function repeatCase(client,session,caseId,write=false) {
   const worker=(await client.query('SELECT active FROM workers WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[identity.worker_id,session.org_id,session.site_id])).rows[0];
   const assignment=(await client.query('SELECT id,publication_id FROM assignments WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',[identity.id,session.org_id,session.site_id])).rows[0];
   const row=(await client.query('SELECT id,status FROM clarifications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',[caseId,session.org_id,session.site_id])).rows[0];
-  return {...row,assignment_id:assignment.id,publication_id:assignment.publication_id,active:worker?.active};
+  return {...row,worker_id:identity.worker_id,assignment_id:assignment.id,publication_id:assignment.publication_id,active:worker?.active};
 }
 export function listCaseRepeats(pool,session,caseId,{schema='public'}={}) {
   return domainTransaction(pool,schema,async client=>{
@@ -49,6 +51,7 @@ export async function requestCaseRepeat(pool,session,caseId,input,{schema='publi
       if(old.case_id!==caseId || old.org_id!==session.org_id || old.site_id!==session.site_id || old.actor_id!==session.principal_id || old.actor_role!==session.role
         || iso(old.due_at)!==input.dueAt)throw Error('Repeat request conflict');return repeatRow(old);
     }
+    await requireWritableEntitlement(client,session.org_id);
     const publication=(await client.query('SELECT state,publication_content_available(id) AS content_available FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[thread.publication_id,session.org_id,session.site_id])).rows[0];
     if(thread.status!=='open' || !thread.active || publication?.state!=='published' || !publication.content_available)throw Error('Repeat request unavailable');
     if(!(await client.query("SELECT $1::timestamptz>clock_timestamp() AND $1::timestamptz<=clock_timestamp()+interval '30 days' AS valid",[input.dueAt])).rows[0].valid)throw Error('Invalid repeat deadline');
@@ -58,8 +61,10 @@ export async function requestCaseRepeat(pool,session,caseId,input,{schema='publi
     if((await client.query("SELECT 1 FROM case_repeats WHERE assignment_id=$1 AND status='pending'",[thread.assignment_id])).rows.length)throw Error('Repeat already requested');
     const row=(await client.query(`INSERT INTO case_repeats(id,org_id,site_id,case_id,assignment_id,publication_id,actor_id,actor_role,due_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[input.requestId,session.org_id,session.site_id,caseId,thread.assignment_id,thread.publication_id,session.principal_id,session.role,input.dueAt])).rows[0];
-    await domainAudit(client,session,'clarification.repeat_requested',row.id);return repeatRow(row);
-  });
+    await domainAudit(client,session,'clarification.repeat_requested',row.id);
+    await recordWorkerEvent(client,{orgId:session.org_id,siteId:session.site_id,workerId:thread.worker_id,
+      kind:'repeat.available',objectType:'case_repeat',objectId:row.id,dedupeKey:`repeat.available:${row.id}`});
+    return repeatRow(row);  });
 }
 
 // Caller holds the worker and assignment locks through receipt acceptance.

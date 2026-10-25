@@ -16,8 +16,16 @@ const candidate=`SELECT d.*,p.code_hash FROM worker_deletion_requests d JOIN wor
   AND NOT EXISTS(SELECT 1 FROM recordings rec JOIN assignments a ON a.id=rec.assignment_id WHERE a.worker_id=d.worker_id
     AND (rec.status<>'failed' OR rec.transcript IS NOT NULL OR rec.lease_token IS NOT NULL OR rec.lease_until IS NOT NULL OR rec.retry_at IS NOT NULL
       OR NOT EXISTS(SELECT 1 FROM recording_purges pur WHERE pur.recording_id=rec.id AND pur.status='complete')))
+  AND NOT EXISTS(SELECT 1 FROM recordings rec JOIN assignments a ON a.id=rec.assignment_id WHERE a.worker_id=d.worker_id
+    AND rec.presented_question IS NOT NULL AND rec.presented_question<>'[Deleted]')
   AND NOT EXISTS(SELECT 1 FROM attempts t JOIN assignments a ON a.id=t.assignment_id WHERE a.worker_id=d.worker_id
     AND (t.answer_text<>'[Deleted]' OR t.reasons_json<>'{"reasons":[],"evidence":[]}'))
+  AND NOT EXISTS(SELECT 1 FROM presentation_artifacts p WHERE p.worker_id=d.worker_id
+    AND ((p.status='ready' AND p.text<>'[Deleted]') OR p.status='pending'))
+  AND NOT EXISTS(SELECT 1 FROM answer_presentation_bindings b JOIN presentation_artifacts p ON p.id=b.presentation_id
+    WHERE p.worker_id=d.worker_id AND b.presented_question<>'[Deleted]')
+  AND NOT EXISTS(SELECT 1 FROM instruction_deliveries del WHERE del.worker_id=d.worker_id AND del.content_json IS NOT NULL
+    AND json_extract(del.content_json,'$.title')<>'[Deleted]')
   AND NOT EXISTS(SELECT 1 FROM help_requests h JOIN assignments a ON a.id=h.assignment_id WHERE a.worker_id=d.worker_id AND h.text<>'[Deleted]')
   AND NOT EXISTS(SELECT 1 FROM case_messages m JOIN assignments a ON a.id=m.assignment_id WHERE a.worker_id=d.worker_id AND m.text<>'[Deleted]')
   AND NOT EXISTS(SELECT 1 FROM clarifications c JOIN assignments a ON a.id=c.assignment_id WHERE a.worker_id=d.worker_id AND (c.reason<>'[Deleted]' OR c.notes<>''))

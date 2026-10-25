@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {clearWorkerLocalData,localCleanupText} from '../src/worker-local-data.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 test('local cleanup attempts tab, audio and briefing stores independently and reports failures',async()=>{
   const removed=[];let audio=0,briefings=0;const cache=async()=>{briefings++;};
@@ -15,5 +16,5 @@ test('local cleanup attempts tab, audio and briefing stores independently and re
   assert.equal(briefings,4);
   assert.equal(await clearWorkerLocalData('old-context',storage,async()=>{audio++;},async()=>{throw Error();}),false);
   assert.equal(audio,4);
-  for(const language of ['en','ar','ur'])for(const value of Object.values(localCleanupText[language]))assert.ok(value.trim());
+  assertWorkerDictionary(localCleanupText,'localCleanupText');
 });

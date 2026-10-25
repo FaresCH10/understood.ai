@@ -51,6 +51,12 @@ export async function requestWorkerDeletion(pool,session,workerId,input,{schema=
     await client.query('UPDATE workers SET active=false WHERE id=$1',[workerId]);
     await client.query('INSERT INTO worker_deletion_requests VALUES($1,$2,$3,$4,$5,$6,$7,clock_timestamp())',[input.requestId,session.org_id,session.site_id,workerId,session.principal_id,fingerprint,input.reason]);
     await client.query('UPDATE worker_grants SET revoked_at=clock_timestamp() WHERE worker_id=$1 AND revoked_at IS NULL',[workerId]);
+    await client.query('UPDATE worker_setup_tokens SET revoked_at=clock_timestamp() WHERE worker_id=$1 AND revoked_at IS NULL',[workerId]);
+    await client.query(`UPDATE push_subscriptions SET revoked_at=clock_timestamp(),revoke_reason='worker_deleted',updated_at=clock_timestamp()
+      WHERE principal_type='worker' AND principal_id=$1 AND revoked_at IS NULL`,[workerId]);
+    await client.query(`UPDATE push_deliveries SET state='cancelled',last_error='worker_deleted',updated_at=clock_timestamp()
+      WHERE state IN ('queued','sending') AND subscription_id IN (SELECT id FROM push_subscriptions
+        WHERE principal_type='worker' AND principal_id=$1)`,[workerId]);
     await client.query("UPDATE sessions SET revoked_at=clock_timestamp() WHERE principal_type='worker' AND principal_id=$1 AND revoked_at IS NULL",[workerId]);
     await client.query(`UPDATE recordings SET status='failed',transcript=NULL,lease_token=NULL,lease_until=NULL,retry_at=NULL,error='Worker deletion pending'
       WHERE status<>'storing' AND assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)`,[workerId]);

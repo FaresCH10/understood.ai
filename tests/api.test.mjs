@@ -8,6 +8,7 @@ import { createAppServer } from '../server/index.mjs';
 import { processOne } from '../server/worker.mjs';
 import { publish } from '../server/domain.mjs';
 import { briefingFilters } from '../server/briefing-input.mjs';
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import {checkedWorkerReceipt} from '../src/worker-request.ts';
 
 test('SQLite publication HTTP requires the confirmed version and returns stale-version conflict without writes',async()=>{
@@ -70,9 +71,11 @@ test('SQLite language readiness is scoped and separates stored content from unte
     assert.equal((await request('/language-readiness',worker)).status,403);
     const foreignResult=await request('/language-readiness',foreign);assert.equal(foreignResult.status,200);assert.equal((await foreignResult.json()).publication,null);
     const result=await (await request('/language-readiness',maya)).json();
-    assert.equal(result.realDataAllowed,false);assert.equal(result.languages.length,3);
+    assert.equal(result.realDataAllowed,false);assert.deepEqual(result.languages.map(language=>language.code),WORKER_LANGUAGE_CODES);
+    assert.ok(result.languages.every(language=>language.ui.state==='ready'));
     assert.ok(result.languages.some(language=>language.code==='ar' && language.content.state==='ready'));
-    assert.ok(result.languages.every(language=>language.translation.state==='not_tested'));
+    assert.ok(result.languages.filter(language=>['en','ar','ur'].includes(language.code)).every(language=>language.translation.state==='not_tested'));
+    assert.ok(result.languages.filter(language=>!['en','ar','ur'].includes(language.code)).every(language=>language.translation.state==='unavailable'));
     assert.equal((await request('/language-readiness/test',maya,{unexpected:true})).status,400);
     const tested=await (await request('/language-readiness/test',maya,{})).json();
     assert.equal(tested.tests.speech.state,'not_tested');assert.match(tested.provider.evidence,/Synthetic-only/);

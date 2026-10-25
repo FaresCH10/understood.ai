@@ -9,3 +9,13 @@ data/
 !.env.example
 !.env.*.example
 *.log
+artifacts/
+
+.vercel-token.local
+.vercel/
+.vercel-probe/
+
+.vercel
+.env*
+!.env.example
+!.env.*.example

@@ -1,5 +1,6 @@
 import {ensureCaseMessageSchema} from './case-messages.mjs';
 import {ensureRetentionSchema} from './retention.mjs';
+import {sqlLanguageList} from './languages.mjs';
 
 export function ensureStaffCaseRecordingSchema(db){
   ensureCaseMessageSchema(db);ensureRetentionSchema(db);
@@ -7,7 +8,7 @@ export function ensureStaffCaseRecordingSchema(db){
   db.exec(`CREATE TABLE IF NOT EXISTS case_voice (
     id TEXT PRIMARY KEY,request_id TEXT NOT NULL UNIQUE,org_id TEXT NOT NULL REFERENCES organizations(id),site_id TEXT NOT NULL REFERENCES sites(id),
     assignment_id TEXT NOT NULL REFERENCES assignments(id),worker_id TEXT NOT NULL REFERENCES workers(id),kind TEXT NOT NULL CHECK(kind IN ('help','reply','in_person')),
-    requested_case_id TEXT NOT NULL,case_id TEXT REFERENCES clarifications(id),language TEXT NOT NULL CHECK(language IN ('en','ar','ur')),
+    requested_case_id TEXT NOT NULL,case_id TEXT REFERENCES clarifications(id),language TEXT NOT NULL CHECK(language IN (${sqlLanguageList()})),
     sha256 TEXT NOT NULL CHECK(length(sha256)=64),bytes INTEGER NOT NULL CHECK(bytes BETWEEN 8044 AND 2880044),
     duration_seconds REAL NOT NULL CHECK(duration_seconds BETWEEN 0.25 AND 90),status TEXT NOT NULL CHECK(status IN ('storing','received','failed')),
     created_at TEXT NOT NULL,received_at TEXT,lease_token TEXT,lease_until TEXT,

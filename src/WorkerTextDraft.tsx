@@ -4,9 +4,11 @@ import {canRestoreTextDraft,removeTextDraft,restoreTextDraft,saveTextDraft,textD
 import type {PageSession} from './session-state';
 import {usePrivateDevice} from './usePrivateDevice';
 import {sharedDeviceText} from './worker-device-policy';
+import {workerUiFallbackLanguage,type WorkerUiLanguage} from './worker-ui-language';
 
-export function WorkerTextDraft({session,interfaceLanguage,scope,draft,disabled,restoreBlocked,current,onRestore}:{session:PageSession;interfaceLanguage?:'en'|'ar'|'ur';scope:DraftScope;draft:TextDraft;disabled:boolean;restoreBlocked:boolean;current:()=>boolean;onRestore:(value:TextDraft)=>void}){
-  const t=textDraftCopy[(interfaceLanguage || session.language) as keyof typeof textDraftCopy] || textDraftCopy.en;
+export function WorkerTextDraft({session,interfaceLanguage,scope,draft,disabled,restoreBlocked,current,onRestore}:{session:PageSession;interfaceLanguage?:WorkerUiLanguage;scope:DraftScope;draft:TextDraft;disabled:boolean;restoreBlocked:boolean;current:()=>boolean;onRestore:(value:TextDraft)=>void}){
+  const language=interfaceLanguage??workerUiFallbackLanguage(session);
+  const t=textDraftCopy[language];
   const [consent,setConsent]=useState(false),[status,setStatus]=useState<keyof typeof t>('empty');
   const privateDevice=usePrivateDevice(session.clientContext!);
   useEffect(()=>{
@@ -27,7 +29,7 @@ export function WorkerTextDraft({session,interfaceLanguage,scope,draft,disabled,
   };
   return <section className="worker-text-draft" aria-label={t.title}>
     <h2>{t.title}</h2><p>{t.limits}</p>
-    {!privateDevice && <p>{sharedDeviceText[interfaceLanguage || (session.language==='ar' || session.language==='ur'?session.language:'en')].blocked}</p>}
+    {!privateDevice && <p>{sharedDeviceText[language].blocked}</p>}
     <label className="checkbox-label"><input type="checkbox" checked={consent} disabled={disabled || !privateDevice} onChange={event=>setConsent(event.target.checked)}/>{t.consent}</label>
     <p role="status">{t[status]}</p>
     {status==='restored' && <div className="worker-restored-text">{draft.answer && <p>{draft.answer}</p>}{draft.help && <p>{draft.help}</p>}</div>}

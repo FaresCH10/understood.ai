@@ -2,6 +2,7 @@ import {domainTransaction} from './domain.mjs';
 import {scheduleAuthority} from './schedules.mjs';
 import {scheduleHash} from '../schedule-input.mjs';
 import {dispatchAllowed,dispatchPredicate} from './operations-gates.mjs';
+import {recordWorkerEvent} from './notification-events.mjs';
 
 export async function queuePublicationReminders(client,session,publicationId,request) {
   if(!request.reminderMinutes)return;
@@ -10,7 +11,8 @@ export async function queuePublicationReminders(client,session,publicationId,req
     SELECT a.id,a.org_id,a.site_id,a.publication_id,a.worker_id,$4,$5,
       greatest(p.published_at,a.due_at-($6::int*interval '1 minute')),'queued'
     FROM assignments a JOIN publications p ON p.id=a.publication_id
-    WHERE a.publication_id=$1 AND a.org_id=$2 AND a.site_id=$3`,
+    WHERE a.publication_id=$1 AND a.org_id=$2 AND a.site_id=$3
+    ON CONFLICT(assignment_id) DO NOTHING`,
     [publicationId,session.org_id,session.site_id,session.principal_id,JSON.stringify(authority),request.reminderMinutes]);
 }
 export async function processOneReminder(pool,{schema='public'}={}) {
@@ -32,6 +34,8 @@ export async function processOneReminder(pool,{schema='public'}={}) {
       AND NOT EXISTS(SELECT 1 FROM submission_receipts sr WHERE sr.assignment_id=a.id AND sr.org_id=a.org_id)
       FOR SHARE OF p,w`,[row.assignment_id])).rows.length>0;
     await client.query("UPDATE assignment_reminders SET state=$1,finished_at=clock_timestamp() WHERE assignment_id=$2 AND state='queued'",[eligible?'visible':'skipped',row.assignment_id]);
+    if(eligible)await recordWorkerEvent(client,{orgId:row.org_id,siteId:row.site_id,workerId:row.worker_id,kind:'deadline.reminder',
+      objectType:'assignment',objectId:row.assignment_id,dedupeKey:`deadline.reminder:${row.assignment_id}`});
     return true;
   });
 }

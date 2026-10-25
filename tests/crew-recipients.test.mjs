@@ -16,7 +16,7 @@ import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 const owner={principal_type:'staff',principal_id:'owner',role:'owner',org_id:'a',site_id:'a'},origin='http://127.0.0.1:3020';
 async function fixture(postgres) {
   const db=postgres?new PGlite():openDatabase(':memory:'),schema='understood_test_crew_recipients';let fail=false;
-  const client={async query(sql,values){if(fail && sql.startsWith('SELECT w.id,w.code,w.language'))throw Error('Private database sentinel');return values?.length?db.query(sql,values):(await db.exec(sql)).at(-1) || {rows:[]};},release(){}};
+  const client={async query(sql,values){if(fail && sql.startsWith('SELECT w.id,w.code,w.name,w.language'))throw Error('Private database sentinel');return values?.length?db.query(sql,values):(await db.exec(sql)).at(-1) || {rows:[]};},release(){}};
   const pool={async connect(){return client;}};
   const exec=async(sql,values=[])=>{if(!postgres)return {rows:db.prepare(sql).all(...values)};let n=0;return db.query(sql.replaceAll('?',()=>`$${++n}`),values);};
   if(postgres){await db.exec(`CREATE SCHEMA ${schema};SET search_path TO ${schema},pg_catalog`);await runMigrations(pool,{schema});}else {seed(db);ensurePeopleSchema(db);}
@@ -38,7 +38,7 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} crew 
     await member(f,'inactive',{active:false});await member(f,'offsite',{crew:'other-site',site:'c'});await member(f,'outside',{crew:'foreign',org:'b',site:'b'});
     const before=(await f.exec('SELECT count(*) AS n FROM audit')).rows[0].n,preview=await f.list(owner,'crew');
     assert.equal(preview.items.length,125);assert.equal(preview.items[0].id,'000');assert.equal(preview.items.at(-1).id,'124');
-    assert.deepEqual(preview.crew,{id:'crew',name:'Crew'});assert.deepEqual(Object.keys(preview.items[0]),['id','code','language','crew_name']);
+    assert.deepEqual(preview.crew,{id:'crew',name:'Crew'});assert.deepEqual(Object.keys(preview.items[0]),['id','code','name','language','crew_name']);
     assert.equal((await f.exec('SELECT count(*) AS n FROM audit')).rows[0].n,before);
     assert.deepEqual((await f.list(owner,'empty')).items,[]);
     for(const s of [{...owner,principal_type:'worker'},{...owner,role:'administrator'},{...owner,principal_id:'reader',role:'auditor'},{...owner,site_id:'c'},{...owner,org_id:'b'},{...owner,token_hash:'f'.repeat(64)}])await assert.rejects(async()=>f.list(s,'crew'),/Forbidden|Sign in required/);

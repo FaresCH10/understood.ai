@@ -32,7 +32,7 @@ async function fixture({duringFetch,transportFailure=false,shortDeadline=false,s
     if(serialConnections){const previous=tail;tail=new Promise(done=>{release=done;});await previous;}
     return {async query(sql,args){
     queries.push(sql);if(sql==='SELECT pg_export_snapshot() AS id')return {rows:[{id:'embedded-not-native'}]};
-    if(shortDeadline && sql.startsWith('INSERT INTO provider_verifications'))sql=sql.replace("interval '90 seconds'","interval '400 milliseconds'");
+    if(shortDeadline && sql.startsWith('INSERT INTO provider_verifications'))sql=sql.replace("interval '90 seconds'","interval '4 seconds'");
     if(freshnessWindow!==null)sql=sql.replace("interval '30 seconds'",`interval '${freshnessWindow} milliseconds'`);
     if(heartbeatFailure && sql.startsWith('INSERT INTO worker_health') && args?.[1]!=='stopped' && ++heartbeatWrites>1)throw Error('Synthetic private heartbeat connection failure');
     if(heartbeatHold && sql.startsWith('INSERT INTO worker_health') && args?.[1]!=='stopped' && ++heartbeatWrites>1 && args[1]==='idle'){
@@ -182,7 +182,7 @@ for(const started of [false,true])test(`expired lost claim with ${started?'start
       return (await f.db.query('SELECT operation_id FROM provider_verification_jobs WHERE request_id=$1',[input.requestId])).rows[0];
     });
     if(started)await f.as('worker',()=>providerRequestJournal(f.pool,{id:row.operation_id,orgId:null,maxRequests:1,verificationToken:token},f.options).beforeRequest());
-    await new Promise(resolve=>setTimeout(resolve,450));assert.equal(await f.as('worker',()=>rehearsalTasks(f.pool,{},f.options).providerVerification()),true);assert.equal(f.calls(),0);
+    await new Promise(resolve=>setTimeout(resolve,4100));assert.equal(await f.as('worker',()=>rehearsalTasks(f.pool,{},f.options).providerVerification()),true);assert.equal(f.calls(),0);
     const receipt=await f.receipt(input);assert.equal(receipt.result.state,'uncertain');assert.equal(receipt.result.diagnosticCode,'test_interrupted');
     assert.equal(await f.work(),false);assert.equal((await f.enqueue(input)).duplicate,true);assert.equal(f.calls(),0);
     await f.as('worker',()=>assert.rejects(domainTransaction(f.pool,schema,client=>currentVerificationAuthority(client,input.requestId)),/authority changed/));
@@ -205,7 +205,7 @@ test('operator SQL cannot bypass global test quota or create a preverified appro
     await f.policy(1);
     await f.as('operator',async()=>{
       await assert.rejects(f.db.query(`INSERT INTO provider_operations(id,org_id,kind,reference_id,claim_token,model,data_class,reserved_requests,quota_day)
-        VALUES($1,NULL,'connection-test',$2,NULL,$3,'synthetic',2,CURRENT_DATE)`,[randomUUID(),randomUUID(),f.descriptor.metadata.models.text]),/quota reached/);
+        VALUES($1,NULL,'connection-test',$2,NULL,$3,'synthetic',2,(clock_timestamp() AT TIME ZONE 'UTC')::date)`,[randomUUID(),randomUUID(),f.descriptor.metadata.models.text]),/quota reached/);
     });
     const input=command();await f.enqueue(input);
     await f.as('operator',async()=>{

@@ -1,6 +1,7 @@
 import { randomUUID,createHash } from 'node:crypto';
 import {preparationRequestInput,preparationRequestId,preparationReference,preparationRequestReceipt} from '../preparation-request-input.mjs';
 import { syntheticPrepare } from '../domain.mjs';
+import { syntheticInstructionPrepare } from '../instruction-prep.mjs';
 import { domainTransaction,domainAudit,requirePrincipal,readySnapshot,requireActiveBriefing } from './domain.mjs';
 import { draftInput,expectedRevision,copyDraftInput,checkDraftCopyReplay,archiveBriefingInput } from '../briefing-input.mjs';
 import {checkedSyntheticReview} from '../briefing-input.mjs';
@@ -115,9 +116,9 @@ export async function copyDraft(pool,session,id,input,{schema='public'}={}) {
 
 export async function queuePreparation(pool,session,briefingId,revision,{schema='public'}={}) {
   expectedRevision(revision);
-  return domainTransaction(pool,schema,client=>queuePreparationTransaction(client,session,briefingId,revision));
+  return domainTransaction(pool,schema,client=>queuePreparationInTransaction(client,session,briefingId,revision));
 }
-async function queuePreparationTransaction(client,session,briefingId,revision) {
+export async function queuePreparationInTransaction(client,session,briefingId,revision) {
     await requirePrincipal(client,session,'staff');
     const briefing=(await client.query('SELECT revision,state FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',[briefingId,session.org_id,session.site_id])).rows[0];
     if (!briefing) throw new Error('Briefing unavailable');
@@ -169,7 +170,7 @@ export function requestPreparation(pool,session,id,value,{schema='public'}={}) {
     const context=await preparationContext(client,session,id);
     if(context.revision!==input.revision || (context.job?.id ?? null)!==input.jobId || (context.job?.generation ?? 0)!==input.generation
       || !['draft','failed'].includes(context.state) || context.job && context.job.status!=='failed')throw Error('Preparation request state changed');
-    const result=await queuePreparationTransaction(client,session,id,input.revision);
+    const result=await queuePreparationInTransaction(client,session,id,input.revision);
     const row=(await client.query('INSERT INTO preparation_requests(request_id,org_id,site_id,briefing_id,revision,job_id,generation,request_json,requested_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',[requestId,session.org_id,session.site_id,id,input.revision,result.id,input.generation,JSON.stringify(body),session.principal_id])).rows[0];
     return {...preparationRequestReceipt(row).result,duplicate:false};
   });
@@ -190,8 +191,10 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
   if (!job) return false;
   try {
     if (job.attempts>3) throw new Error('Preparation interrupted too many times');
-    const briefing=await domainTransaction(pool,schema,async (client) => (await client.query(`SELECT source,state,revision FROM briefings
-      WHERE id=$1 AND org_id=$2 AND site_id=$3`,[job.briefing_id,job.org_id,job.site_id])).rows[0]);
+    const briefing=await domainTransaction(pool,schema,async (client) => (await client.query(`SELECT b.source,b.title,b.state,b.revision,
+      s.request_id AS instruction_request_id,s.response_mode,s.delivery_mode FROM briefings b
+      LEFT JOIN instruction_sends s ON s.briefing_id=b.id AND s.org_id=b.org_id AND s.site_id=b.site_id
+      WHERE b.id=$1 AND b.org_id=$2 AND b.site_id=$3`,[job.briefing_id,job.org_id,job.site_id])).rows[0]);
     if (!briefing || briefing.state!=='processing' || briefing.revision!==job.revision) throw new Error('Obsolete draft revision');
     const review=await domainTransaction(pool,schema,async client=>(await client.query('SELECT content_json FROM draft_reviews WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',[job.briefing_id,job.org_id,job.site_id])).rows[0]?.content_json);
     if(review && review.revision!==job.revision) throw new Error('Obsolete draft review');
@@ -199,6 +202,8 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     const intent=await domainTransaction(pool,schema,client=>loadTargetRegeneration(client,job));
     const targets=intent ? intent.evidence.manifest.dependencies.languages : await domainTransaction(pool,schema,client=>readGenerationLanguages(client,job.org_id,job.site_id,languages,job.briefing_id));
     if(intent && !targets.every(language=>languages.includes(language)))throw Error('Regeneration language configuration changed');
+    const instruction=briefing?.instruction_request_id ? {response_mode:briefing.response_mode,delivery_mode:briefing.delivery_mode} : null;
+    if(instruction && adapter)throw Error('Instruction sends require the synthetic instruction processor');
     if(adapter) {
       const input={source:briefing.source,revision:job.revision,languages:targets,review:review ?? null,glossary};
       if(typeof adapter.permitsPreparation==='function' && !adapter.permitsPreparation(input))throw Error('Preparation input is not an allowlisted synthetic fixture');
@@ -237,9 +242,13 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       return true;
     }
     if(intent) throw Error('Generated target regeneration requires its configured adapter');
-    const prepared=checkedSyntheticGlossary(checkedSyntheticReview(await prepare(briefing.source),review),glossary);
+    const base=instruction
+      ? syntheticInstructionPrepare({source:briefing.source,title:briefing.title},instruction)
+      : checkedSyntheticReview(await prepare(briefing.source),review);
+    const prepared=checkedSyntheticGlossary(base,glossary);
     prepared.languages=Object.fromEntries(targets.map(language=>[language,prepared.languages[language]]));
-    readySnapshot({...briefing,state:'ready',prepared_json:prepared},targets.map((language) => ({language})),integrationMode);
+    readySnapshot({...briefing,state:'ready',prepared_json:prepared},targets.map((language) => ({language})),integrationMode,
+      instruction ? {responseMode:instruction.response_mode,deliveryMode:instruction.delivery_mode} : undefined);
     await domainTransaction(pool,schema,async (client) => {
       if(!await dispatchAllowed(client,job.org_id,{provider:true}))return;
       await checkPreparationAuthority(client,job);

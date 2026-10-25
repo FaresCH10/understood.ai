@@ -74,7 +74,7 @@ test('notification input rejects unknown scope, arbitrary IDs and unbounded pagi
   assert.deepEqual(Object.keys(notificationKinds).sort(),[
     'briefing.prepared','briefing.published','briefing.withdrawn','help.requested',
     'clarification.assigned','clarification.routed','clarification.escalated','clarification.resolved','clarification.message',
-    'export.ready','export.failed',
+    'worker.language_requested','answer.needs_attention','instruction.send_incomplete','assignment.overdue','export.ready','export.failed',
   ].sort());
 });
 
@@ -123,8 +123,10 @@ test('SQLite notification HTTP reauthorizes, requires local origin, keeps reads 
   try {
     db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run('http-notice','cedar','beirut','system','pipeline','export.ready','private',new Date(Date.now()-1000).toISOString());
     const staff=await login('maya'),worker=await login('worker-29'),other=await login('harbor-owner');
-    assert.equal((await request(null,'/notifications')).status,401);assert.equal((await request(worker,'/notifications')).status,403);
-    assert.equal((await request(worker,'/notifications/http-notice/read',{})).status,403);assert.equal((await request(other,'/notifications/http-notice/read',{})).status,404);
+    assert.equal((await request(null,'/notifications')).status,401);
+    assert.deepEqual(await (await request(worker,'/notifications')).json().then(body=>({total:body.total,items:body.items})),{total:0,items:[]});
+    assert.equal((await request(worker,'/notifications/http-notice/read',{})).status,404);
+    assert.equal((await request(other,'/notifications/http-notice/read',{})).status,404);
     assert.equal((await request(staff,'/notifications?org_id=harbor')).status,400);
     assert.equal((await request(staff,'/notifications/http-notice/read',{staffId:'reader'})).status,400);
     assert.equal((await fetch(`${base}/notifications/http-notice/read`,{method:'POST',headers:{cookie:staff,origin:'https://foreign.invalid','content-type':'application/json'},body:'{}'})).status,403);
@@ -133,7 +135,8 @@ test('SQLite notification HTTP reauthorizes, requires local origin, keeps reads 
     assert.deepEqual(await (await request(staff,'/notifications/http-notice/read',{})).json(),receipt);
     assert.deepEqual(await (await request(staff,'/notifications/http-notice/receipt')).json(),{found:true,item:receipt});
     assert.deepEqual(await (await request(other,'/notifications/http-notice/receipt')).json(),{found:false});
-    assert.equal((await request(worker,'/notifications/http-notice/receipt')).status,403);assert.equal((await request(staff,'/notifications/http-notice/receipt?scope=foreign')).status,400);
+    assert.deepEqual(await (await request(worker,'/notifications/http-notice/receipt')).json(),{found:false});
+    assert.equal((await request(staff,'/notifications/http-notice/receipt?scope=foreign')).status,400);
     assert.equal((await (await request(staff,'/notifications?status=unread')).json()).total,0);
     db.prepare("UPDATE staff SET active=0 WHERE id='maya'").run();assert.equal((await request(staff,'/notifications')).status,401);
   }finally {await new Promise(resolve=>server.close(resolve));db.close();}

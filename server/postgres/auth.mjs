@@ -6,6 +6,7 @@ import { tokenHash, normalizeEmail, credentialInput, passwordRecord, passwordMat
 import {consumeAuthBudget} from './auth-budget.mjs';
 import {requireTenantActive,lockOperationsGate} from './operations-gates.mjs';
 import {requireWorkerSiteAccess} from './site-access.mjs';
+import {revokeSessionPushSubscriptions} from './notification-events.mjs';
 
 const invalidCredentials = () => new Error('Invalid credentials');
 const validToken = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{43}$/.test(value);
@@ -40,13 +41,14 @@ async function audit(client, principal, action, objectId) {
     VALUES ($1,$2,$3,$4,$5,$6,$7)`,[randomUUID(),principal.org_id,principal.site_id,principal.principal_type,principal.principal_id,action,objectId]);
 }
 
-export async function insertSession(client, principal, type, grantId = null, maxSeconds = 8*3600) {
+export async function insertSession(client, principal, type, grantId = null, maxSeconds = 8*3600, credentialRevision = null) {
   await requireTenantActive(client,principal.org_id);
   if(type==='worker')await requireWorkerSiteAccess(client,principal.org_id,principal.site_id);
+  if(credentialRevision!==null && (!Number.isSafeInteger(credentialRevision)||credentialRevision<1)) throw new Error('Invalid credential revision');
   const token = randomBytes(32).toString('base64url');
-  const row = (await client.query(`INSERT INTO sessions(token_hash,org_id,site_id,principal_type,principal_id,expires_at,grant_id,access_mode)
-    VALUES ($1,$2,$3,$4,$5,clock_timestamp()+$6*interval '1 second',$7,'credential') RETURNING expires_at`,
-  [tokenHash(token),principal.org_id,principal.site_id,type,principal.id,maxSeconds,grantId])).rows[0];
+  const row = (await client.query(`INSERT INTO sessions(token_hash,org_id,site_id,principal_type,principal_id,expires_at,grant_id,access_mode,credential_revision)
+    VALUES ($1,$2,$3,$4,$5,clock_timestamp()+$6*interval '1 second',$7,'credential',$8) RETURNING expires_at`,
+  [tokenHash(token),principal.org_id,principal.site_id,type,principal.id,maxSeconds,grantId,credentialRevision])).rows[0];
   return { token,expiresAt:row.expires_at.toISOString(),maxSeconds };
 }
 
@@ -112,17 +114,22 @@ export async function requireSession(pool, req, { schema='public',cookieName='un
   const token = cookieToken(req,cookieName);
   if (!validToken(token)) throw new Error('Sign in required');
   return inSchema(pool,schema,async (client) => {
-    const row = (await client.query(`SELECT se.token_hash,se.org_id,se.site_id,se.principal_type,se.principal_id,se.expires_at,se.grant_id,se.access_mode,
-      COALESCE(s.name,w.code) AS name,s.role,w.language,a.id AS account_id
+    const row = (await client.query(`SELECT se.token_hash,se.org_id,se.site_id,se.principal_type,se.principal_id,se.expires_at,se.grant_id,se.access_mode,se.credential_revision,
+      COALESCE(s.name,w.name,w.code) AS name,s.role,w.language,w.language_selection_required,w.language_selected_at,w.language_selected_by,a.id AS account_id,cred.email
       FROM sessions se
       LEFT JOIN staff s ON se.principal_type='staff' AND s.id=se.principal_id AND s.org_id=se.org_id AND s.site_id=se.site_id
       LEFT JOIN workers w ON se.principal_type='worker' AND w.id=se.principal_id AND w.org_id=se.org_id AND w.site_id=se.site_id
       LEFT JOIN staff_account_memberships m ON m.staff_id=s.id LEFT JOIN staff_accounts a ON a.id=m.account_id
+      LEFT JOIN staff_credentials cred ON cred.staff_id=a.credential_staff_id
       WHERE se.token_hash=$1 AND se.access_mode='credential' AND se.revoked_at IS NULL AND se.expires_at>clock_timestamp()
       AND ((se.principal_type='staff' AND s.active=true AND a.active=true AND EXISTS (SELECT 1 FROM staff_credentials c WHERE c.staff_id=a.credential_staff_id))
-        OR (se.principal_type='worker' AND w.active=true AND EXISTS (SELECT 1 FROM worker_grants g WHERE g.id=se.grant_id
-          AND g.worker_id=w.id AND g.org_id=se.org_id AND g.site_id=se.site_id AND g.redeemed_at IS NOT NULL
-          AND g.revoked_at IS NULL AND g.expires_at>clock_timestamp())))`,[tokenHash(token)])).rows[0];
+        OR (se.principal_type='worker' AND w.active=true AND (
+          (se.grant_id IS NOT NULL AND EXISTS (SELECT 1 FROM worker_grants g WHERE g.id=se.grant_id
+            AND g.worker_id=w.id AND g.org_id=se.org_id AND g.site_id=se.site_id AND g.redeemed_at IS NOT NULL
+            AND g.revoked_at IS NULL AND g.expires_at>clock_timestamp()))
+          OR (se.grant_id IS NULL AND se.credential_revision IS NOT NULL AND EXISTS (SELECT 1 FROM worker_credentials c
+            WHERE c.worker_id=w.id AND c.org_id=se.org_id AND c.site_id=se.site_id AND c.state='active'
+            AND c.credential_revision=se.credential_revision)))))`,[tokenHash(token)])).rows[0];
     if (!row) throw new Error('Sign in required');
     await requireTenantActive(client,row.org_id);
     if(row.principal_type==='worker')await requireWorkerSiteAccess(client,row.org_id,row.site_id);
@@ -134,8 +141,12 @@ export async function revokeSession(pool, req, { schema='public',cookieName='und
   const token = cookieToken(req,cookieName);
   if (!validToken(token)) return;
   return inSchema(pool,schema,async (client) => {
-    const rows = (await client.query(`UPDATE sessions SET revoked_at=clock_timestamp() WHERE token_hash=$1 AND revoked_at IS NULL
-      RETURNING org_id,site_id,principal_type,principal_id`,[tokenHash(token)])).rows;
+    const sessionHash=tokenHash(token);
+    // Subscriptions must be revoked while their session is still live: the scope guard rejects updates afterwards.
+    const rows = (await client.query(`SELECT org_id,site_id,principal_type,principal_id FROM sessions
+      WHERE token_hash=$1 AND revoked_at IS NULL FOR UPDATE`,[sessionHash])).rows;
+    await revokeSessionPushSubscriptions(client,sessionHash);
+    await client.query('UPDATE sessions SET revoked_at=clock_timestamp() WHERE token_hash=$1 AND revoked_at IS NULL',[sessionHash]);
     if (rows[0]) await audit(client,rows[0],'session.revoked',rows[0].principal_id);
   });
 }

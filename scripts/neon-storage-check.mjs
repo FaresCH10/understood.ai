@@ -38,10 +38,14 @@ export function importNeonStorageSettings(root) {
     if (prior[name] && prior[name] !== value) throw Error('Private storage settings differ; files were not changed');
     updated[name] = value;
     const quote = value.includes('"') ? "'" : '"';
-    text = text.replace(new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=.*$`, 'm'), () => `${name}=${quote}${value}${quote}`);
+    text = text.replace(new RegExp(`^([ \\t]*(?:export[ \\t]+)?${name}[ \\t]*=)[^\\r\\n]*(\\r?\\n|$)`, 'm'),
+      (_, prefix, ending) => `${prefix}${quote}${value}${quote}${ending}`);
   }
   neonStorageTestConfig(updated);
-  if (JSON.stringify(parseEnv(text)) !== JSON.stringify({...parseEnv(originalTarget), ...updated})) throw Error('Private storage import verification failed');
+  const after = parseEnv(text), expected = {...parseEnv(originalTarget), ...updated};
+  const keys = Object.keys(after).sort();
+  if (keys.join('\n') !== Object.keys(expected).sort().join('\n')
+    || keys.some(key => after[key] !== expected[key])) throw Error('Private storage import verification failed');
   const temporary = resolve(root, `.env.neon-storage-test.${randomUUID()}.tmp`);
   try {
     writeFileSync(temporary, text, {flag: 'wx', mode: 0o600});

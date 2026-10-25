@@ -4,11 +4,16 @@ import {rehearsalConfig} from '../server/postgres/runtime.mjs';
 import {provisionOperator} from '../server/postgres/operators.mjs';
 import {hostedSyntheticConfig} from '../server/postgres/hosted-config.mjs';
 import {bootstrapWorkspace} from '../server/postgres/workspace-bootstrap.mjs';
+import {fileURLToPath} from 'node:url';
 
+export function operatorMaintenanceConfig(env=process.env,action) {
+  const service=action==='--provision-operator'?'operator':'api';
+  return env.UNDERSTOOD_TIER==='staging'?hostedSyntheticConfig(env,{service}):rehearsalConfig();
+}
 async function main() {
   const action=process.argv[2];
   if(process.argv.length!==3 || !['--provision-operator','--bootstrap-workspace'].includes(action))throw Error('Explicit maintenance action is required');
-  const config=process.env.UNDERSTOOD_TIER==='staging'?hostedSyntheticConfig():rehearsalConfig();
+  const config=operatorMaintenanceConfig(process.env,action);
   if(action==='--provision-operator' && !config.operatorAccess)throw Error('Operator access is disabled');
   const chunks=[];let size=0,input,pool;
   try{
@@ -27,4 +32,6 @@ async function main() {
     for(const chunk of chunks)chunk.fill(0);if(pool)await pool.end();
   }
 }
-main().catch(()=>{console.error('Synthetic maintenance failed. Credential and connection details are not logged.');process.exitCode=1;});
+if(process.argv[1] && fileURLToPath(import.meta.url)===process.argv[1])main().catch(()=>{
+  console.error('Synthetic maintenance failed. Credential and connection details are not logged.');process.exitCode=1;
+});

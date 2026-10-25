@@ -1,0 +1,6 @@
+{
+	admin off
+}
+
+import /etc/caddy/sites/customer.caddy
+import /etc/caddy/sites/operator.caddy

@@ -5,6 +5,7 @@ import {routeNewCase} from './case-routing.mjs';
 import {currentAssessmentClaim,assessmentInput} from './assessment-claim.mjs';
 import {assessmentInputHash} from '../ai/assessment-config.mjs';
 import {reserveProviderOperation,providerRequestJournal} from './provider-budget.mjs';
+import {staffAuditOnce} from './notification-events.mjs';
 
 export function validatedAssessment(value,answer,askedFacts) {
   if (!['matched','clarification','unassessable'].includes(value?.outcome) || !Array.isArray(value.reasons)
@@ -86,6 +87,7 @@ export async function processOneAssessment(pool,adapter,{schema='public'}={}) {
           const caseId=randomUUID();await client.query(`INSERT INTO clarifications(id,org_id,site_id,assignment_id,attempt_id,reason,status)
           VALUES ($1,$2,$3,$4,$5,$6,'open')`,[caseId,job.org_id,job.site_id,job.assignment_id,job.attempt_id,result.reasons[0]]);
           await routeNewCase(client,job.org_id,job.site_id,caseId);
+          await staffAuditOnce(client,{orgId:job.org_id,siteId:job.site_id,action:'answer.needs_attention',objectId:caseId});
         }
         await domainAudit(client,{...job,principal_type:'system',principal_id:'assessment-worker'},'answer.checked',job.attempt_id);
       }

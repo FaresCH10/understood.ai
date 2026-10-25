@@ -3,8 +3,9 @@ import { NOW, transaction } from './db.mjs';
 import { tokenHash as hash, normalizeEmail, credentialInput, passwordRecordSync, passwordMatchesSync } from './auth-crypto.mjs';
 import { requirePeopleStaff,inputKeys } from './people.mjs';
 import {accountIdentity} from './account-schema.mjs';
-import {consumeAuthBudget} from './auth-budget.mjs';
+import {consumeAuthBudget,recordAuthFailure} from './auth-budget.mjs';
 import {requireWorkerSiteAccess} from './site-access.mjs';
+import {revokePushForSession} from './notification-events.mjs';
 
 const isLoopback = (address) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address);
 const invalidCredentials = () => new Error('Invalid credentials');
@@ -33,6 +34,16 @@ export function requireLocalRequest(req) {
 
 export function verifyMutationOrigin(req, config) {
   const origin = req.headers.origin;
+  if (config.remoteDemo) {
+    const host = req.headers.host, forwardedProto = req.headers['x-forwarded-proto'];
+    const proto = config.localDemo ? (forwardedProto ?? 'http') : forwardedProto;
+    if (!host || !/^[a-z0-9.-]+(?::\d{1,5})?$/.test(host) || !['http','https'].includes(proto)
+      || (!config.localDemo && proto !== 'https') || !origin || origin !== `${proto}://${host}`)
+      throw new Error('Forbidden origin');
+    if (config.localDemo ? !/^(?:localhost|127\.0\.0\.1)(?::\d{1,5})?$/.test(host) : !config.demoHosts?.has(host))
+      throw new Error('Forbidden origin');
+    return;
+  }
   if (config.accessMode === 'credential' && origin !== config.publicOrigin) throw new Error('Forbidden origin');
   if (origin && origin !== config.publicOrigin) throw new Error('Forbidden origin');
 }
@@ -56,14 +67,28 @@ export function clearSessionCookie(options={}) {
   return sessionCookie('',0,options);
 }
 
-export function createSession(db, principal, principalType, accessMode, grantId = null, maxSeconds = 8 * 3600) {
+export function createSession(db, principal, principalType, accessMode, grantId = null, maxSeconds = 8 * 3600, credentialRevision = null) {
   if(principalType==='worker')requireWorkerSiteAccess(db,principal.org_id,principal.site_id);
+  if(credentialRevision!==null && (!Number.isSafeInteger(credentialRevision) || credentialRevision<1)) throw new Error('Invalid credential revision');
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + maxSeconds * 1000).toISOString();
   db.prepare(`INSERT INTO sessions
-    (token_hash,org_id,site_id,principal_type,principal_id,expires_at,revoked_at,grant_id,access_mode)
-    VALUES (?,?,?,?,?,?,?,?,?)`).run(hash(token), principal.org_id, principal.site_id, principalType, principal.id, expiresAt, null, grantId, accessMode);
+    (token_hash,org_id,site_id,principal_type,principal_id,expires_at,revoked_at,grant_id,access_mode,credential_revision)
+    VALUES (?,?,?,?,?,?,?,?,?,?)`).run(hash(token), principal.org_id, principal.site_id, principalType, principal.id, expiresAt, null, grantId, accessMode, credentialRevision);
   return { token, expiresAt, maxSeconds };
+}
+
+export function workerCredentialSessionValid(db, session) {
+  if (!session || session.principal_type !== 'worker' || session.access_mode !== 'credential') return true;
+  if (session.grant_id) {
+    return !!db.prepare(`SELECT 1 FROM worker_grants WHERE id=? AND worker_id=? AND org_id=? AND site_id=?
+      AND redeemed_at IS NOT NULL AND revoked_at IS NULL AND expires_at>?`).get(session.grant_id, session.principal_id, session.org_id, session.site_id, NOW());
+  }
+  if (!Number.isSafeInteger(session.credential_revision) || session.credential_revision < 1) return false;
+  return !!db.prepare(`SELECT 1 FROM worker_credentials c JOIN workers w ON w.id=c.worker_id
+    AND w.org_id=c.org_id AND w.site_id=c.site_id
+    WHERE c.worker_id=? AND c.org_id=? AND c.site_id=? AND c.state='active' AND c.credential_revision=? AND w.active=1`)
+    .get(session.principal_id, session.org_id, session.site_id, session.credential_revision);
 }
 
 export function requireSession(db, req, config) {
@@ -80,18 +105,18 @@ export function requireSession(db, req, config) {
   const account=session.principal_type==='staff' && config.accessMode==='credential' ? accountIdentity(db,session.principal_id) : null;
   if (config.accessMode === 'credential' && session.principal_type === 'staff' &&
       (!account?.account_active || !db.prepare('SELECT 1 FROM staff_credentials WHERE staff_id=?').get(account.credential_staff_id))) throw new Error('Sign in required');
-  if (config.accessMode === 'credential' && session.principal_type === 'worker') {
-    if (!session.grant_id || !db.prepare(`SELECT 1 FROM worker_grants WHERE id=? AND worker_id=? AND org_id=? AND site_id=?
-      AND redeemed_at IS NOT NULL AND revoked_at IS NULL AND expires_at>?`).get(session.grant_id, session.principal_id, session.org_id, session.site_id, NOW())) {
-      throw new Error('Sign in required');
-    }
-  }
+  if (config.accessMode === 'credential' && session.principal_type === 'worker' &&
+      !workerCredentialSessionValid(db, session)) throw new Error('Sign in required');
   return { ...session, ...principal,...(account ? {account_id:account.account_id} : {}), principal_id: session.principal_id, principal_type: session.principal_type };
 }
 
 export function revokeSession(db, req) {
   const token = cookieToken(req);
-  if (token) db.prepare('UPDATE sessions SET revoked_at=? WHERE token_hash=?').run(NOW(), hash(token));
+  if (token) {
+    const token_hash=hash(token);
+    db.prepare('UPDATE sessions SET revoked_at=? WHERE token_hash=?').run(NOW(), token_hash);
+    revokePushForSession(db,token_hash);
+  }
 }
 
 export function provisionStaffCredential(db, staffId, email, password) {
@@ -113,14 +138,6 @@ export function provisionStaffCredential(db, staffId, email, password) {
 
 function attemptKey(type, value) { return hash(`${type}:${value}`); }
 
-function failedAttempt(db, key) {
-  const row = db.prepare('SELECT count,window_started_at FROM auth_attempts WHERE key_hash=?').get(key);
-  if (!row || Date.now() - Date.parse(row.window_started_at) >= 15 * 60_000) {
-    db.prepare('INSERT INTO auth_attempts VALUES (?,?,?) ON CONFLICT(key_hash) DO UPDATE SET count=excluded.count,window_started_at=excluded.window_started_at')
-      .run(key, 1, NOW());
-  } else db.prepare('UPDATE auth_attempts SET count=count+1 WHERE key_hash=?').run(key);
-}
-
 export function authenticateStaff(db, email, password, remoteAddress = '') {
   const normalized = normalizeEmail(email);
   if(typeof remoteAddress!=='string' || remoteAddress.length>128) throw invalidCredentials();
@@ -135,8 +152,8 @@ export function authenticateStaff(db, email, password, remoteAddress = '') {
     : null;
   const matches = passwordMatchesSync(password,row);
   if (!row || !row.active || !matches) {
-    failedAttempt(db, emailKey);
-    failedAttempt(db, ipKey);
+    recordAuthFailure(db, emailKey);
+    recordAuthFailure(db, ipKey);
     throw invalidCredentials();
   }
   db.prepare('DELETE FROM auth_attempts WHERE key_hash=?').run(emailKey);

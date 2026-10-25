@@ -4,6 +4,8 @@ import { NOW, transaction } from './db.mjs';
 import { ensurePeopleSchema, validateWorkerInput } from './people.mjs';
 import { csvCell } from './reports.mjs';
 import {ensureDeletionSchema} from './deletions.mjs';
+import {requireWritableEntitlement} from './entitlements.mjs';
+import {requireWorkerCapacity} from './worker-capacity.mjs';
 
 const deletionImportExpiry=`EXISTS(SELECT 1 FROM worker_deletion_requests d JOIN workers w ON w.id=d.worker_id
   WHERE d.org_id=i.org_id AND (instr(i.filename,w.code)>0 OR EXISTS(
@@ -195,8 +197,10 @@ export function confirmWorkerImport(db, session, id) {
     const row = scopedRow(db, session, id);
     if (row.status === 'imported') return { id, status: 'imported', imported: row.imported_count, duplicate: true };
     if (row.status === 'expired') throw new Error('Import expired');
+    requireWritableEntitlement(db, session.org_id);
     const rows = revalidate(db, session, JSON.parse(row.rows_json));
     if (JSON.parse(row.errors_json).length || !rows.length || rows.some((entry) => !entry.valid)) throw new Error('Fix CSV errors before importing');
+    requireWorkerCapacity(db, session.org_id, rows.length);
     const insertWorker = db.prepare('INSERT INTO workers(id,org_id,site_id,code,language,active) VALUES (?,?,?,?,?,1)');
     for (const entry of rows) {
       const workerId = randomUUID();

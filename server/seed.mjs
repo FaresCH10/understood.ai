@@ -12,13 +12,14 @@ export function seed(db) {
     db.prepare('INSERT INTO sites VALUES (?,?,?,?)').run('harbor-yard', 'harbor', 'Harbor yard', 'UTC');
     db.prepare('INSERT INTO staff VALUES (?,?,?,?,?,?)').run('maya', 'cedar', 'beirut', 'Maya Haddad', 'owner', 1);
     db.prepare('INSERT INTO staff VALUES (?,?,?,?,?,?)').run('harbor-owner', 'harbor', 'harbor-yard', 'Harbor Owner', 'owner', 1);
-    const addWorker = db.prepare('INSERT INTO workers VALUES (?,?,?,?,?,?)');
+    const addWorker = db.prepare('INSERT INTO workers (id,org_id,site_id,code,name,language,active) VALUES (?,?,?,?,?,?,?)');
+    const workerNames = ['Rana Khoury', 'Omar Nassar', 'Lina Haddad', 'Yusuf Karim', 'Mariam Saleh', 'Tariq Aziz'];
     for (let n = 1; n <= 30; n++) {
       const code = `Worker ${String(n).padStart(3, '0')}`;
       const language = n <= 12 ? 'en' : n <= 22 ? 'ar' : 'ur';
-      addWorker.run(`worker-${n}`, 'cedar', 'beirut', code, language, 1);
+      addWorker.run(`worker-${n}`, 'cedar', 'beirut', code, workerNames[(n - 1) % workerNames.length], language, 1);
     }
-    addWorker.run('harbor-worker', 'harbor', 'harbor-yard', 'Worker 014', 'en', 1);
+    addWorker.run('harbor-worker', 'harbor', 'harbor-yard', 'Worker 014', 'Harbor Worker', 'en', 1);
     const prepared = syntheticPrepare(CANONICAL_SOURCE);
     const now = NOW();
     db.prepare('INSERT INTO briefings VALUES (?,?,?,?,?,?,?,?,?,?,?)').run('shelf', 'cedar', 'beirut', prepared.title, CANONICAL_SOURCE, 1, 4, 'draft', null, now, now);

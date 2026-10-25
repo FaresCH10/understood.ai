@@ -1,4 +1,5 @@
-const languages=['en','ar','ur'];
+import {CONTENT_LANGUAGE_CODES} from './languages.mjs';
+const languages=[...CONTENT_LANGUAGE_CODES];
 export function glossaryRequestId(value) {
   if(typeof value!=='string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) throw new Error('Invalid glossary request');
   return value;

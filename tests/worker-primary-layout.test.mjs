@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {conversationRecorderText} from '../src/recording-notice.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 test('private voice failure copy describes messages without promising an available writer or answer outcome',()=>{
-  for(const language of ['en','ar','ur']){
-    const copy=conversationRecorderText[language];assert.deepEqual(Object.keys(copy).sort(),['error','failed','format','permission']);
-    for(const value of Object.values(copy)){assert.ok(value.trim().length>20);assert.doesNotMatch(value,/\banswer\b|إجابت|جواب/i);if(language!=='en')assert.match(value,/[\u0600-\u06ff]/);}
-  }
+  assertWorkerDictionary(conversationRecorderText,'conversationRecorderText');
+  assert.deepEqual(Object.keys(conversationRecorderText.en).sort(),['error','failed','format','permission']);
+  for(const copy of Object.values(conversationRecorderText))for(const value of Object.values(copy)){assert.ok(value.trim().length>20);assert.doesNotMatch(value,/\banswer\b|إجابت|جواب/i);}
   assert.match(conversationRecorderText.en.permission,/when available/);assert.match(conversationRecorderText.en.failed,/when available/);assert.match(conversationRecorderText.en.error,/unconfirmed/);
 });
 

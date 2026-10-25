@@ -52,7 +52,7 @@ async function currentSource(client,referenceId,claimToken,orgId,inputHash) {
 
 export async function reserveProviderOperation(client,{orgId,kind,referenceId,model,dataClass,maxRequests,claimToken=null,inputHash=null,provenance=null,preparationContext=null}) {
   if(dataClass!=='synthetic' || !['source-transcription','connection-test','stage-test','case-followup','recording-transcription','recording-assessment','preparation','typed-assessment'].includes(kind) || typeof referenceId!=='string' || !/^[A-Za-z0-9_-]{1,100}$/.test(referenceId)
-    || typeof model!=='string' || !/^[a-z0-9][a-z0-9.-]{2,80}$/.test(model) || !Number.isInteger(maxRequests) || maxRequests<1 || maxRequests>64
+    || typeof model!=='string' || !/^[a-z0-9][a-z0-9.:/-]{2,79}$/.test(model) || !Number.isInteger(maxRequests) || maxRequests<1 || maxRequests>64
     || (['connection-test','stage-test'].includes(kind)?orgId!==null || claimToken!==null:typeof orgId!=='string' || !/^[A-Za-z0-9_-]{1,100}$/.test(orgId) || typeof claimToken!=='string' || !/^[a-f0-9-]{36}$/i.test(claimToken)))throw Error('Invalid provider reservation');
   if(kind!=='preparation' && preparationContext!==null)throw Error('Invalid provider input evidence');
   if(['typed-assessment','source-transcription','recording-transcription','recording-assessment','preparation'].includes(kind)) {

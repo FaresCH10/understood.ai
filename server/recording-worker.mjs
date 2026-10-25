@@ -3,6 +3,8 @@ import { NOW, transaction } from './db.mjs';
 import { audioStore } from './private-storage.mjs';
 import { DEFAULT_AUDIO_ROOT, ensureRecordingSchema } from './recordings.mjs';
 import {routeNewCase} from './case-routing.mjs';
+import {recordPresentationBinding} from './presentations.mjs';
+import {staffAuditOnce} from './notification-events.mjs';
 
 const MAX_ATTEMPTS = 3;
 
@@ -46,7 +48,7 @@ export async function processOneRecording(db, adapter, root = DEFAULT_AUDIO_ROOT
         .run(transcript.trim(), claimed.id, claimed.leaseToken, NOW());
       if (!saved.changes) return true;
     }
-    const question = snapshot.languages?.[assignment.language]?.question || snapshot.question;
+    const question = claimed.presented_question || snapshot.languages?.[assignment.language]?.question || snapshot.question;
     const assessment = await adapter.assess(transcript, question, askedFacts);
     if (!['matched', 'clarification', 'unassessable'].includes(assessment?.outcome)
       || !Array.isArray(assessment.reasons) || !assessment.reasons.every((reason) => typeof reason === 'string' && reason.length <= 300)) {
@@ -67,11 +69,17 @@ export async function processOneRecording(db, adapter, root = DEFAULT_AUDIO_ROOT
         db.prepare('INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?)').run(attemptId, claimed.org_id,
           claimed.assignment_id, claimed.submission_id, transcript.trim(), assessment.outcome,
           JSON.stringify({ reasons: assessment.reasons, evidence: assessment.evidence || [], recordingId: claimed.id }), claimed.received_at || claimed.created_at);
+        if(claimed.presentation_id && claimed.presentation_language && claimed.presented_question){
+          recordPresentationBinding(db,attemptId,{id:claimed.presentation_id,org_id:claimed.org_id,site_id:claimed.site_id,
+            assignment_id:claimed.assignment_id,target_language:claimed.presentation_language,
+            question:claimed.presented_question},now);
+        }
         if (assessment.outcome !== 'matched') {
           const caseId=randomUUID();db.prepare('INSERT INTO clarifications VALUES (?,?,?,?,?,?,?,?,?)')
           .run(caseId, claimed.org_id, claimed.assignment_id, attemptId,
             assessment.reasons[0] || 'AI check needs clarification', null, 'open', '', now);
           routeNewCase(db,claimed.org_id,claimed.site_id,caseId);
+          staffAuditOnce(db,{orgId:claimed.org_id,siteId:claimed.site_id,action:'answer.needs_attention',objectId:caseId,now});
         }
         db.prepare('INSERT INTO audit VALUES (?,?,?,?,?,?,?,?)').run(randomUUID(), claimed.org_id,
           claimed.site_id, 'system', 'ai-worker', 'answer.checked', attemptId, now);

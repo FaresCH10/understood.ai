@@ -55,8 +55,28 @@ test('physical content expiry removes all eight owned copies, preserves version/
     });
     await f.db.query("INSERT INTO briefing_copies(request_id,org_id,site_id,source_briefing_id,source_revision,copy_briefing_id,title,requested_by) VALUES($1,'org','site','active',1,'old','PRIVATE copied title','owner')",[copyId]);
     await f.db.query("INSERT INTO source_audio_requests(request_id,org_id,site_id,requested_by,request_hash,title,id,sha256,bytes,duration_seconds,original_id,original_sha256,original_bytes,original_type,authority_json,status,created_at,received_at,briefing_id) VALUES('source','org','site','owner',$1,'PRIVATE audio title','audio',$1,32044,1,'original',$1,100,'audio/wav','{}','transcribed',clock_timestamp()-interval '10 days',clock_timestamp()-interval '10 days','old')",['a'.repeat(64)]);
+    await f.db.query(`INSERT INTO instruction_sends(request_id,org_id,site_id,briefing_id,publication_request_id,audience_json,
+      response_mode,delivery_mode,state,publication_id,audience_count,delivered,undelivered,undelivered_json,request_json,
+      requested_by,created_at,updated_at) VALUES('send-old','org','site','old','pub-request',
+      '{"type":"all","workers":[{"id":"worker","language":"en"}]}','question','text','published','pub',1,1,0,'[]',
+      '{"title":"PRIVATE send title","source":"PRIVATE send source","responseMode":"question","deliveryMode":"text","sourceHash":"${'f'.repeat(64)}"}',
+      'owner',clock_timestamp()-interval '10 days',clock_timestamp()-interval '10 days')`);
+    await f.db.query(`INSERT INTO instruction_deliveries(request_id,org_id,site_id,worker_id,language,state,reason,attempts,
+      assignment_id,content_json,content_hash,updated_at) VALUES('send-old','org','site','worker','en','available',NULL,0,
+      'assignment','{"title":"PRIVATE late title","text":"PRIVATE late text"}',$1,clock_timestamp()-interval '10 days')`,['e'.repeat(64)]);
     const evidence=(await f.db.query("SELECT to_jsonb(p)-'snapshot_json' AS publication FROM publications p WHERE id='pub'")).rows[0];
     await f.db.exec("INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at) SELECT org_id,assignment_id,submission_id,'typed',received_at FROM attempts WHERE id='attempt'");
+    await f.db.exec(`INSERT INTO presentation_artifacts(id,org_id,site_id,worker_id,assignment_id,publication_id,publication_version,
+      source_kind,source_id,original_language,target_language,source_hash,status,title,text,question,provider,live,created_at,updated_at,ready_at)
+      VALUES('instruction-ready','org','site','worker','assignment','pub',1,'instruction','','en','ur','${'b'.repeat(64)}','ready',
+        'PRIVATE translated title','PRIVATE translated text','PRIVATE translated question','synthetic-test',false,clock_timestamp(),clock_timestamp(),clock_timestamp()),
+      ('instruction-pending','org','site','worker','assignment','pub',1,'instruction','','en','ar','${'c'.repeat(64)}','pending',
+        NULL,NULL,NULL,NULL,NULL,clock_timestamp(),clock_timestamp(),NULL);
+      INSERT INTO answer_presentation_bindings(attempt_id,org_id,site_id,assignment_id,presentation_id,presentation_language,presented_question,created_at)
+        VALUES('attempt','org','site','assignment','instruction-ready','ur','PRIVATE translated question',clock_timestamp());
+      INSERT INTO recordings(id,org_id,site_id,assignment_id,submission_id,sha256,duration_seconds,bytes,status,transcript,created_at,received_at,presentation_id,presentation_language,presented_question)
+        VALUES('recording','org','site','assignment','recording-submission','${'d'.repeat(64)}',1,100,'transcribed','Worker transcript',
+          clock_timestamp()-interval '10 days',clock_timestamp()-interval '10 days','instruction-ready','ur','PRIVATE translated question');`);
     const attempt=(await f.db.query("SELECT * FROM attempts WHERE id='attempt'")).rows[0];
     await saveBriefingRetention(f.pool,owner,change(),f.options);
     assert.equal(await rehearsalTasks(f.pool,null,f.options).briefingContentRetention(),true);assert.equal(await processOneBriefingContentPurge(f.pool,f.options),false);
@@ -75,6 +95,31 @@ test('physical content expiry removes all eight owned copies, preserves version/
       const column=table==='briefings'?'id':table==='briefing_copies'?'copy_briefing_id':'briefing_id';
       assert.doesNotMatch(JSON.stringify((await f.db.query(`SELECT * FROM ${table} WHERE ${column}='old'`)).rows),/PRIVATE/);
     }
+    const send=(await f.db.query("SELECT request_json,response_mode,delivery_mode,audience_json,audience_count,delivered,undelivered FROM instruction_sends WHERE request_id='send-old'")).rows[0];
+    assert.equal(send.request_json.title,'[Expired]');assert.equal(send.request_json.source,'[Expired]');
+    assert.equal(send.request_json.responseMode,'question');assert.equal(send.request_json.sourceHash,'f'.repeat(64));
+    assert.equal(send.response_mode,'question');assert.equal(send.delivery_mode,'text');assert.equal(send.audience_count,1);assert.equal(send.delivered,1);
+    assert.equal((await f.db.query("SELECT content_json FROM instruction_deliveries WHERE request_id='send-old'")).rows[0].content_json,null);
+    const delivery=(await f.db.query("SELECT state,assignment_id,content_hash FROM instruction_deliveries WHERE request_id='send-old'")).rows[0];
+    assert.deepEqual(delivery,{state:'available',assignment_id:'assignment',content_hash:'e'.repeat(64)});
+    for(const sql of [`UPDATE instruction_sends SET request_json=request_json||'{"title":"PRIVATE restored"}' WHERE request_id='send-old'`,
+      `UPDATE instruction_deliveries SET content_json='{"title":"PRIVATE restored","text":"PRIVATE restored"}' WHERE request_id='send-old'`])
+      await assert.rejects(f.db.exec(sql),/immutable/,sql);
+    assert.doesNotMatch(JSON.stringify((await f.db.query("SELECT request_json FROM instruction_sends WHERE request_id='send-old'")).rows),/PRIVATE/);
+    const presentations=(await f.db.query("SELECT id,status,title,text,question,provider,live,source_hash,error_code FROM presentation_artifacts ORDER BY id")).rows;
+    assert.deepEqual(presentations.find(row=>row.id==='instruction-ready'),
+      {id:'instruction-ready',status:'ready',title:'[Expired]',text:'[Expired]',question:'[Expired]',provider:'synthetic-test',
+        live:false,source_hash:'b'.repeat(64),error_code:null});
+    const pendingPresentation=presentations.find(row=>row.id==='instruction-pending');
+    assert.equal(pendingPresentation.status,'failed');assert.equal(pendingPresentation.text,null);assert.equal(pendingPresentation.title,null);
+    assert.equal(pendingPresentation.provider,null);assert.equal(pendingPresentation.error_code,'Briefing content retention expired');
+    assert.equal((await f.db.query("SELECT presented_question FROM answer_presentation_bindings WHERE attempt_id='attempt'")).rows[0].presented_question,'[Expired]');
+    const retainedRecording=(await f.db.query("SELECT presented_question,sha256,transcript FROM recordings WHERE id='recording'")).rows[0];
+    assert.deepEqual(retainedRecording,{presented_question:'[Expired]',sha256:'d'.repeat(64),transcript:'Worker transcript'});
+    for(const sql of ["UPDATE presentation_artifacts SET text='Restored' WHERE id='instruction-ready'",
+      "UPDATE presentation_artifacts SET status='pending' WHERE id='instruction-ready'",
+      "UPDATE answer_presentation_bindings SET presented_question='Restored' WHERE attempt_id='attempt'",
+      "UPDATE recordings SET presented_question='Restored' WHERE id='recording'"])await assert.rejects(f.db.exec(sql),/immutable/,sql);
     assert.deepEqual((await f.db.query("SELECT to_jsonb(p)-'snapshot_json' AS publication FROM publications p WHERE id='pub'")).rows[0],evidence);
     assert.deepEqual((await f.db.query("SELECT * FROM attempts WHERE id='attempt'")).rows[0],attempt);
     const read=await getBriefing(f.pool,owner,'old',f.options);assert.equal(read.contentExpired,true);assert.equal(read.review,null);assert.deepEqual(read.publications[0].snapshot.facts,[]);

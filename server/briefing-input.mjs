@@ -60,21 +60,34 @@ export function publicationReceiptReference(briefingId,kind,requestId) {
   if(!id(briefingId) || !['publish','schedule'].includes(kind) || !uuid(requestId)) throw Error('Invalid publication receipt request');
 }
 
-export function readySnapshot(briefing,workers,integrationMode) {
+export function readySnapshot(briefing,workers,integrationMode,modes={}) {
+  const responseMode=modes?.responseMode ?? 'question',deliveryMode=modes?.deliveryMode ?? 'both';
+  if(!['question','acknowledge'].includes(responseMode) || !['text','voice','both'].includes(deliveryMode))
+    throw new Error('Briefing response mode is unavailable');
   const value=briefing.prepared_json;
+  const questionMode=responseMode==='question';
   if (briefing.state!=='ready' || !value || value.source!==briefing.source || !nonempty(value.title,120)
-    || !nonempty(value.question,500) || !Array.isArray(value.facts) || !value.facts.length || value.facts.length>12
-    || !value.facts.every((fact) => nonempty(fact,500)) || !Array.isArray(value.rubric?.askedFacts)
-    || !value.rubric.askedFacts.length || value.rubric.askedFacts.length>6 || !value.rubric.askedFacts.every((fact) => nonempty(fact,500))) throw new Error('Briefing is not technically ready');
+    || (questionMode && (!nonempty(value.question,500) || !Array.isArray(value.facts) || !value.facts.length || value.facts.length>12
+      || !value.facts.every((fact) => nonempty(fact,500)) || !Array.isArray(value.rubric?.askedFacts)
+      || !value.rubric.askedFacts.length || value.rubric.askedFacts.length>6 || !value.rubric.askedFacts.every((fact) => nonempty(fact,500)))))
+    throw new Error('Briefing is not technically ready');
   // A device-speech demo marker is not a verified live private audio artifact.
-  if (integrationMode!=='synthetic' || value.provenance?.adapter!=='synthetic-local-v1' || value.provenance.live!==false) throw new Error('Live publication artifact verification is unavailable');
+  if (integrationMode!=='synthetic' || !['synthetic-local-v1','synthetic-instruction-v1'].includes(value.provenance?.adapter) || value.provenance.live!==false)
+    throw new Error('Live publication artifact verification is unavailable');
+  if(value.provenance.adapter==='synthetic-instruction-v1' && questionMode) {
+    const groups=value.rubric?.keywordGroups;
+    if(value.rubric.mode!=='keywords' || !Array.isArray(groups) || !groups.length || groups.length>6
+      || groups.some((group)=>!Array.isArray(group) || !group.length || group.length>3 || !group.every((word)=>nonempty(word,60))))
+      throw new Error('Briefing is not technically ready');
+  }
   if (workers.some((worker) => {
     const language=value.languages?.[worker.language];
     return !language || !nonempty(language.title,120) || !nonempty(language.text,5000)
-      || !nonempty(language.question,500) || language.speech!=='device-synthesis-demo';
+      || (questionMode && !nonempty(language.question,500))
+      || (deliveryMode!=='text' && language.speech!=='device-synthesis-demo');
   })) throw new Error('Recipient language is unavailable');
   if (Buffer.byteLength(JSON.stringify(value))>100000) throw new Error('Prepared content exceeds limit');
-  return value;
+  return {...value,responseMode,deliveryMode};
 }
 
 export function expectedRevision(value) {

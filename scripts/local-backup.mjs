@@ -155,6 +155,8 @@ export async function restoreLocal({ source, destination }) {
       const now = new Date().toISOString();
       restored.prepare('UPDATE sessions SET revoked_at=? WHERE revoked_at IS NULL').run(now);
       restored.prepare('UPDATE worker_grants SET revoked_at=? WHERE revoked_at IS NULL').run(now);
+      if(hasTable(restored,'worker_setup_tokens')) restored.prepare('UPDATE worker_setup_tokens SET revoked_at=? WHERE revoked_at IS NULL').run(now);
+      if(hasTable(restored,'worker_credentials')) restored.prepare('DELETE FROM worker_credentials').run();
       if(hasTable(restored,'staff_recovery_tokens')) restored.prepare('UPDATE staff_recovery_tokens SET revoked_at=? WHERE revoked_at IS NULL AND used_at IS NULL').run(now);
       if(hasTable(restored,'staff_recovery_mail')) restored.prepare("UPDATE staff_recovery_mail SET state='expired',payload=NULL,lease_token=NULL,lease_until=NULL WHERE state IN ('queued','processing')").run();
       if(hasTable(restored,'staff_invitations')) restored.prepare("UPDATE staff_invitations SET state='expired',email_payload=NULL WHERE state='pending'").run();
@@ -162,6 +164,12 @@ export async function restoreLocal({ source, destination }) {
       if(hasTable(restored,'staff_invitation_mail')) {
         restored.prepare("UPDATE staff_invitation_mail SET state='expired',payload=NULL,lease_token=NULL,lease_until=NULL WHERE state IN ('queued','processing')").run();
         restored.prepare('UPDATE staff_invitation_mail SET payload=NULL WHERE payload IS NOT NULL').run();
+      }
+      if(hasTable(restored,'organization_registrations')) restored.prepare("UPDATE organization_registrations SET state='expired',payload=NULL WHERE state='pending'").run();
+      if(hasTable(restored,'registration_tokens')) restored.prepare('UPDATE registration_tokens SET revoked_at=? WHERE revoked_at IS NULL AND used_at IS NULL').run(now);
+      if(hasTable(restored,'registration_mail')) {
+        restored.prepare("UPDATE registration_mail SET state='expired',payload=NULL,lease_token=NULL,lease_until=NULL WHERE state IN ('queued','processing')").run();
+        restored.prepare('UPDATE registration_mail SET payload=NULL WHERE payload IS NOT NULL').run();
       }
       restored.prepare("UPDATE jobs SET status='queued',lease_until=NULL WHERE status='processing'").run();
       if (hasTable(restored, 'recordings')) {

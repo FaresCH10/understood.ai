@@ -20,7 +20,7 @@ function fixture() {
   db.prepare('INSERT INTO sites VALUES (?,?,?,?)').run('harbor-yard', 'harbor', 'Harbor yard', 'UTC');
   db.prepare('INSERT INTO staff VALUES (?,?,?,?,?,?)').run('maya', 'cedar', 'beirut', 'Maya Haddad', 'owner', 1);
   db.prepare('INSERT INTO staff VALUES (?,?,?,?,?,?)').run('harbor-owner', 'harbor', 'harbor-yard', 'Harbor Owner', 'owner', 1);
-  const insertWorker = db.prepare('INSERT INTO workers VALUES (?,?,?,?,?,?)');
+  const insertWorker = db.prepare('INSERT INTO workers (id,org_id,site_id,code,language,active) VALUES (?,?,?,?,?,?)');
   for (let n = 1; n <= 30; n++) insertWorker.run(
     `worker-${n}`, 'cedar', 'beirut', `Worker ${String(n).padStart(3, '0')}`, n <= 12 ? 'en' : n <= 22 ? 'ar' : 'ur', 1,
   );
@@ -116,7 +116,7 @@ test('worker creation and editing validate input and deny cross-tenant and cross
     assert.equal(worker.org_id, 'cedar');
     assert.equal(worker.site_id, 'beirut');
     assert.equal(worker.language, 'ur');
-    assert.throws(() => createWorker(db, maya, { code: 'Worker 031', language: 'ur' }), /UNIQUE constraint/);
+    assert.throws(() => createWorker(db, maya, { code: 'Worker 031', language: 'ur' }), /Worker ID already in use/);
     assert.throws(() => updateWorker(db, harbor, worker.id, { language: 'ar' }), /Worker unavailable/);
     assert.throws(() => updateWorker(db, maya, worker.id, { site_id: 'harbor-yard' }), /Invalid/);
     db.prepare('INSERT INTO sites VALUES (?,?,?,?)').run('tripoli', 'cedar', 'Tripoli', 'Asia/Beirut');

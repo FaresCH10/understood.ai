@@ -1,6 +1,846 @@
 # Understood build status
 
-## Current Reports Checkpoint
+## Production Hardening Baseline
+
+25 October 2026: production hardening and controlled-release verification started. The
+release control surface is [docs/PRODUCTION_RELEASE_GATES.md](docs/PRODUCTION_RELEASE_GATES.md);
+it records the exact candidate fingerprint, gates G0-G18, service decisions, evidence
+boundaries and the current **NO-GO** decision. Functional reconciliation is in
+[docs/FUNCTIONAL_ACCEPTANCE_MATRIX.md](docs/FUNCTIONAL_ACCEPTANCE_MATRIX.md). No deployment,
+real worker data, real email/push, paid provider call, production database or external
+account was used. Phase 7 below remains the last complete local implementation checkpoint.
+
+## Production Hardening And Admission Verification Checkpoint
+
+25 October 2026: production hardening added a separate, fail-closed production admission
+review while the hosted staging path remains synthetic-only and the production tier remains
+hard-blocked. No production listener, real data, external email/push, paid provider call,
+hosted database or deployment was used.
+
+- `server/postgres/production-admission.mjs` validates a production-only
+  `production`/`live`/`credential`/`real` configuration: exact HTTPS origins, exact trusted
+  proxies, certificate-verified PostgreSQL with a production schema/role profile, private
+  storage, verified mail, webpush VAPID, explicit provider stages, disabled fallback and a
+  candidate-bound `understood-production-approval-v1` manifest with G0-G18 evidence and
+  seven approvals. `scripts/production-admission-check.mjs` reports blocker codes and exits
+  1 without opening a listener, database connection or provider call.
+- `LIVE_PROVIDER_ADAPTERS` is deliberately empty; synthetic, mock, fixture, local and
+  free-tier names are rejected. API/worker admission cannot pass even with a complete
+  fabricated manifest, and no production startup wiring exists. `server/auth.mjs` still
+  rejects production and `hostedSyntheticConfig` still admits only explicit synthetic
+  staging. `tests/production-admission.test.mjs` passes 6/6, including demo identities,
+  synthetic evaluators, mocked speech, fixture mailboxes, wildcard proxies, unapproved
+  free-tier dispatch and operator secret separation.
+- A disposable local native PostgreSQL 16.15 cluster (loopback, temporary data directory,
+  read-only existing runtime, no Docker restart or saved environment touched) passed:
+  fresh-schema migration 1/1, concurrency 2/2, encrypted native `pg_dump`/`pg_restore` with
+  isolated readback and quarantine 1/1, and local certificate verification with wrong-CA
+  rejection (`DEPTH_ZERO_SELF_SIGNED_CERT`). Evidence:
+  `artifacts/native-pg16-2026-10-25/`. This is not production-major/Neon, public-CA or
+  native runtime-role evidence.
+- The standard full suite was not clean: 1,489 tests / 1,484 passed / 0 failed / 4 skipped
+  / 1 cancelled (3,423,492.6709 ms). The cancelled test
+  `tests/restore-retention.test.mjs:297` hit the unchanged 300,000 ms per-test timeout under
+  suite concurrency (301,299.4742 ms) with no failed assertion; the file passes 16/16 in
+  isolation (348,809.8558 ms; affected test 78,180.1132 ms). Logs:
+  `artifacts/production-admission-2026-10-25/`. The four skips are the native tests, which
+  were executed separately. No clean-suite claim is made.
+- `npm run typecheck` and `npm run build` exit 0 on this tree, with the pre-existing
+  large-chunk and ineffective-dynamic-import warnings.
+
+Decision remains **NO-GO**. External gates remain: production-major/Neon PostgreSQL with
+native roles and proxy/TLS, approved real-data providers/privacy, verified email domain,
+real push and physical-device acceptance, independent security and accessibility/AT review,
+approved compute/DNS/public TLS, capacity/load, deployed monitoring/incident drill, off-site
+backup/key custody/DR, frozen candidate and final written authorization. Details:
+`docs/PRODUCTION_RELEASE_GATES.md`, `docs/FUNCTIONAL_ACCEPTANCE_MATRIX.md`.
+
+Docs updated: `docs/PRODUCTION_RELEASE_GATES.md` (G0, G3-G6 and G13 status plus suite
+evidence), `docs/FUNCTIONAL_ACCEPTANCE_MATRIX.md` (X1-X3 and evidence identity),
+`docs/READINESS.md` (current checkpoint).
+
+## Phase 7 Integration And Release Verification Checkpoint
+
+25 October 2026: Phase 7 checked schema/permission parity, notification lifecycle around
+import, deletion and restore quarantine, ran the complete repository suite against the final
+source, and rechecked the built staff/worker interfaces at phone and desktop widths. No
+deployment, external push, real worker data, paid provider call, production database, saved
+demo database or pre-existing server was used. Production readiness is still not established.
+
+Notification lifecycle and privacy:
+
+- Worker deletion revokes push subscriptions (`worker_deleted`), cancels queued/sending push
+  deliveries and revokes worker sessions on both SQLite and PostgreSQL. The SQLite cleanup was
+  added for parity; both deletion tests pass. A deleted worker's registered device or queued
+  alert therefore cannot survive the deletion request.
+- Restore quarantine revokes push subscriptions (`restore_quarantine`) and cancels
+  queued/sending deliveries inside the audited quarantine operation while retaining
+  publication, relational and audit evidence. The quarantine test asserts this and passes.
+- Synthetic SQLite-to-PostgreSQL cutover preserves notification events and read receipts as
+  immutable in-app history, but recognizes push subscriptions and deliveries only to omit
+  them. A migrated copy cannot revive a device binding or dispatch a queued local push. The
+  new retention test passes.
+- Delivery fanout rechecks recipient session validity and active principal state at send time
+  in both repositories; an unavailable recipient becomes `expired`/`recipient_unavailable`
+  and the subscription is revoked instead of delivering. This is source inspection, not
+  external-device evidence.
+- Runtime permission profiles include the notification/read/subscription/delivery tables, and
+  the operator policy intentionally grants no access. Migration 108 is additive; no
+  destructive down migration is provided, so rolling back application code leaves the tables
+  and immutable evidence in place.
+
+Verification and fixes:
+
+- Final `npm test` on the integration-complete source: 1,483 tests, 1,479 passed, 0 failed,
+  4 skipped, 2,737,801.731 ms (45m 37.8s). Evidence:
+  `artifacts/phase7/full-suite-2026-10-25-summary.log` (final 80-line summary excerpt; the run
+  was not tee'd to a full log). The four skips are one native latest-schema migration test,
+  two native concurrency tests and the native backup/restore test. No
+  `UNDERSTOOD_PG_TEST_URL` or running PostgreSQL target was available; a disposable Docker
+  PostgreSQL start was attempted but the container never left `Created`, so no native
+  concurrency, role or TLS claim is made. PGlite remains non-native evidence only.
+- `npm run typecheck` exits 0 and `npm run build` exits 0 with the pre-existing large-chunk and
+  ineffective-dynamic-import warnings. The new source and test changes are included in the
+  suite; the documentation updates affect no runtime.
+- Built-browser checks used disposable fixtures with synthetic data only (worker port 3225,
+  staff port 3212) served from built assets. Worker Arabic RTL at an exact CDP 320px viewport
+  had `innerWidth=320`, `scrollWidth=320`, no horizontal overflow and 7 to-do items. Worker
+  English and staff English were checked at 1440px. The Arabic worker detail opened after a
+  keyboard Enter on "استمع وأجب". Staff notifications showed 26 unread at both 1440px and
+  320px. Focus outlines measured 3px solid, Enter activation worked and reduced-motion
+  emulation was applied. Evidence: `artifacts/phase7/worker-ar-320.png`,
+  `worker-en-1440.png`, `worker-ar-detail-320.png`, `staff-notifications-1440.png` and
+  `staff-notifications-320-fixed.png`.
+- The staff site switcher clipped the organization to "C..." at 320px. It now hides the
+  organization/separator below 480px and wraps the site name on two lines while keeping both
+  names in the accessible label; the post-fix 320px capture shows "Beirut site" with zero
+  document overflow. The 1440px staff capture predates this <=480px-only change, and the
+  desktop breakpoint is unaffected.
+
+Known limits:
+
+- Native PostgreSQL concurrency/TLS/role and native backup/restore tests remain unexecuted
+  (4 skips). Hosted concurrency, monitoring and a production backup rehearsal remain open.
+- No real web push was sent and no physical-device notification, notification click or
+  endpoint refusal/reassignment was observed. The synthetic adapter and service-worker shell
+  show service wiring, not visible device acceptance.
+- Worker 15-locale dictionaries and staff EN/AR/UR controls were exercised in earlier
+  checkpoints; this phase browser-drove worker Arabic/English and staff English. Staff Arabic
+  was not re-driven, and no physical-device/AT, real microphone/audio or hardware pass is
+  claimed.
+- Production tier remains fail-closed. Real worker data, invitations, email, paid AI,
+  external push, production data and deployment were not used. Provider/privacy/security
+  review, physical-device acceptance and deployment authorization remain external gates.
+
+Docs updated: `docs/NOTIFICATIONS.md` (Phase 7 lifecycle), `docs/POSTGRES_CUTOVER.md`
+(notification events preserved, push bindings/deliveries omitted), `docs/POSTGRES_BACKUP.md`
+(quarantine cancels push) and `docs/READINESS.md` (historical counts labelled, current
+pointer).
+
+Next task: run the native PostgreSQL concurrency/TLS suite and real push/device acceptance in
+an authorized environment, then an independent accessibility/security pass. Keep production
+fail-closed and do not deploy until those gates and explicit deployment approval are complete.
+
+## Phase 6 Notifications And Web Push Checkpoint
+
+25 October 2026: Phase 6 added a durable, server-backed notification spine and optional web
+push without changing the record of delivery already shown elsewhere. PostgreSQL migration
+`108_notification_events.sql` and the matching SQLite guards create immutable
+`notification_events` and `notification_event_reads` rows. Events are unique per
+organization/site/audience/recipient/dedupe key, scoped by trigger to a real site and to a
+same-site worker or owner/supervisor, and read receipts can only be inserted once for the
+event owner. Worker event kinds are `instruction.available`, `clarification.followup`,
+`repeat.available`, `language.decided` and `deadline.reminder`; supervisor push kinds cover
+help requests, clarification assignment/routing/escalation/messages, worker language
+requests, answers needing attention, incomplete instruction sends and overdue assignments.
+Events and push subscriptions are never physically deleted by the product; revocation is
+recorded in place.
+
+Workers now have a `#notifications` inbox in all 15 worker UI locales. It pages 10 items at a
+time, has All/Unread filters with a server unread count, marks read through a POST receipt,
+opens an assignment or the Help destination, and keeps the in-app record usable when push is
+disabled, synthetic or denied. The header bell appears without an invented badge, and the
+notifications view does not run the ordinary polling loop. Lock-screen copy is generic in
+every worker language and never carries names, answer text, rubric content, audio links or
+worker identifiers. The push service worker shows a generic fallback for malformed payloads,
+always opens `/#notifications` with no bearer token in the URL, and lets the normal session
+check decide whether the person must sign in again.
+
+Push is optional and environment-separated. The server supports `disabled`, `synthetic` and
+`webpush` adapters; synthetic mode requires the synthetic data class and is visibly labelled
+as delivering no external alerts. VAPID private material stays server-side. Public keys only
+reach the browser. A subscription is bound to organization, site, principal, session and
+endpoint hash; endpoints must be HTTPS on an allowlisted push service with no credentials or
+fragment; each principal may keep 10 active subscriptions. Reusing an endpoint under another
+principal revokes the prior binding, signing out revokes that session's registrations, and a
+disabled or deleted principal stops receiving attempts. Delivery attempts use a queued
+outbox with bounded retry/backoff (five attempts), explicit `accepted`, `uncertain`, `failed`,
+`cancelled` and `expired` states, stale-send recovery, endpoint expiry cleanup, recipient
+access rechecks before fanout, and no claim that acceptance equals sight. Real external
+delivery was not exercised.
+
+Verification: the focused notification/push/public-shell/primary-layout set passed 48/48 in
+about 28.3 seconds across eight files. The run exposed a timestamp-tie flake in the
+`notification-events` test: two events recorded in the same millisecond were ordered by random
+UUID after `created_at`, not by insertion order. The test now records them 30 seconds apart, so
+the checked order is deterministic; the production query's `created_at DESC,id DESC` ordering
+is unchanged and stable for a fixed dataset. `npm run typecheck` passes and `npm run build`
+passes with the pre-existing chunk-size and ineffective-dynamic-import warnings.
+
+Browser evidence used a disposable SQLite database on separate API/web ports 3290/3291 with
+the synthetic push adapter; the saved demo database and pre-existing servers were untouched.
+Worker 014 rendered 13 events over two pages in Arabic RTL, English and Urdu LTR/RTL with
+localized labels and dates, persisted a mark-read receipt, removed the item from Unread,
+navigated Open to `#inbox`, and showed the empty-unread state in English and Urdu. No repeated
+notification GETs appeared while the view stayed open. Supervisor Maya's page loaded with zero
+site notifications, the synthetic adapter notice, the blocked-browser-permission notice and
+the in-app fallback text. A synthetic-only fake subscription inserted for that signed-in
+session appeared as "Device registration 1"; Remove removed it and the database row recorded
+`revoke_reason='user_revoked'`. On a local production preview (port 3292), `/sw.js` was served,
+the service worker activated at scope `/`, the shell cache was created, the page became
+controlled and the push listener was present; the registration and cache were removed after
+the check. The worker header wrap breakpoint was widened from 480px to 640px after the new
+bell overlapped the brand at about 510px; the corrected Arabic header was rechecked.
+
+Known limits at this checkpoint: no external push was delivered, and the browser used a
+synthetic adapter where the enable button is intentionally unavailable. The staff enable
+button itself was therefore not browser-driven; its subscription validation and HTTP flows
+are covered by tests. The full empty-all notification state was not visually verified because
+read receipts are immutable; the verified empty-unread state uses the same render branch. The
+notifications-specific load-failure view was not browser-verified because stopping the
+disposable API triggered the global session lock before that view could render. Service-worker
+push notification display, notification click and real endpoint refusal/reassignment by a
+push service were not driven in a browser. This checkpoint is not a release or
+production-readiness certificate.
+
+Next task: Phase 7 release verification.
+
+## Phase 5d Verified Owner Registration And First-Run Checkpoint
+
+24 October 2026: verified owner registration is now the only public path that creates an
+organization, and the 14x24h / 25-worker trial starts only when email control is verified.
+`POST /api/registration` collects owner name, work email, password, company name, operating
+country, required terms and privacy acknowledgement and an optional business phone; it never asks
+for a card, provider keys, worker uploads or site hierarchy, and offers no public role choice. The
+public response is the same generic acceptance for unknown, existing-staff and duplicate emails,
+and duplicate or concurrent requests create no second workspace and no mail. Registration records
+store only an email hash plus an AES-256-GCM sealed envelope for the encrypted owner PII and
+password hash; raw verification secrets are never stored. PostgreSQL migration
+`106_owner_registration.sql` and the idempotent SQLite schema add `organization_registrations`,
+`registration_mail` and `registration_tokens` with immutability triggers for registration identity,
+payload and verified rows, delivery attempts capped at three, and tokens that are one-use, hashed,
+24-hour-lived and revoked when a resend rotates them. Registrations expire after seven days, each
+request may resend at most five times, per-email and per-IP budgets bound resend abuse, and the
+shared outbox capacity is enforced before a registration commits. Verification succeeds only for a
+pending, unexpired registration with a matching unused token; completion writes the email hash,
+organization, first site (company name, UTC pending onboarding), owner staff row and credentials,
+organization settings, entitlement, entitlement transition and audit in one transaction, then
+marks the token used. A replay or lost-response retry returns the same outcome without creating a
+second organization, sending a session or moving the trial.
+
+The entitlement inserted at verification is exactly 14*24 hours from server time with a company-wide
+active-worker limit of 25 and no payment state. Refreshing, resending, changing email, re-opening a
+completed registration or starting a fresh registration after expiry never restarts or extends that
+clock. The worker cap counts active and setup-pending identities across every site; the 26th add is
+rejected atomically without partially importing a batch. There is no fixed instruction count.
+
+PostgreSQL migration `107_first_run_onboarding.sql` adds `staff_interface_language` and
+`first_run_completed_at` to `site_settings` and backfills existing sites as already configured.
+After verification, the owner lands in a short first-run flow that asks for the first site name, a
+confirmed timezone and the default staff interface language, then shows Add your team, Create your
+first instruction and Go to Today. Completing it updates the existing site and site settings with a
+revision and audit entry; duplicate submissions return the same saved values, a forged site is
+rejected, and legacy sites without a settings row are reported complete and cannot be modified
+through this endpoint.
+
+Self-review during browser verification fixed three presentation defects: the registration form
+claimed email delivery was unavailable even when it was configured (replaced with a truthful
+one-use-link note), the incomplete first-run form displayed "Setup is already complete" in
+contradiction with itself (removed from the incomplete state), and saving first-run navigated away
+before the designed ready panel could appear (now stays and shows the ready panel immediately).
+
+Verification: focused Phase 5d/entitlement/first-run suite (`registration`,
+`postgres-registration`, `entitlement`, `entitlement-activation`, `first-run`) passed 32/32 in about
+49.6 seconds before the three UI copy fixes; `first-run` alone passed 4/4. After those fixes,
+`npm run typecheck` and `npm run build` pass. Browser evidence used a disposable SQLite database,
+separate API/web ports 3244/3245 and a synthetic capture mailer: registration accepted with a
+generic response, the captured one-use link verified to "Email verified" without signing the owner
+in, sign-in redirected to first-run, Arabic setup saved site name/timezone/language with
+`site_settings.revision=1` and an `onboarding.first_run_completed` audit, and the ready panel
+appeared with all three next actions, with Add your team navigating to `#people/new`. The
+disposable database showed the entitlement start and end exactly 336 hours apart, a worker limit of
+25, plan `trial`, and an `organization.registered` audit. No deployment, real invitation/email/push,
+paid provider call or real worker data was used; the saved demo database and pre-existing servers
+were untouched.
+
+The full suite was rerun after the Phase 5d changes: 1457 tests, 1451 passed, 2 failed and 4 skipped.
+Both failures were test-side time dependence, not product regressions, and both were fixed. The
+provider-verification quota test inserted its synthetic operation with session-local `CURRENT_DATE`,
+which the deliberately strict reservation guard rejects when it differs from the UTC quota day; the
+test now uses the same UTC day as the guard. The SQLite report-publication paging test seeded a
+publication dated "now", which entered its fixed 2026-10-25 Asia/Beirut window once the run crossed
+local midnight; the assertion now constrains the search term as well as the civil-date range. Both
+files pass 32/32 after the fixes. Integrating Phase 5d also required importer support for the three
+entitlement tables and the two new `site_settings` columns (with pre-onboarding defaults), legacy
+backup compatibility and updated writable-table counts (application 133, worker 104). Those affected
+suites pass. The corrected full-suite pass count is therefore 1453 of 1457 with the same 4 skipped;
+the full suite has not been rerun a second time since these two test-only fixes.
+
+Next task: Phase 6 notifications and shared-device work, then Phase 7 release verification.
+
+## Phase 5a-5c Entitlement, Trial Limits And Activation Checkpoint
+
+24 October 2026: organizations now have a server-enforced entitlement separate from payment
+collection. PostgreSQL migration `105_organization_entitlements.sql` and the idempotent SQLite
+schema create `organization_entitlements`, immutable `organization_entitlement_transitions` and
+`organization_activation_requests`, with triggers enforcing revision increments, transition scope,
+one pending request per organization and closed-request immutability. A missing entitlement row is
+reported honestly as legacy/unmanaged and remains writable; `trial`, `active` and `read_only` use
+server time, and a trial past its exact `ends_at` is effectively read-only even before an operator
+writes the state. Read-only blocks new instruction sends, answers/recordings, acknowledgments,
+repeats, conversation/help writes, manual or scheduled publish release, worker creation/import or
+reactivation and new billable presentation generation. Reads, login/logout, credential recovery,
+security revocation, privacy/retention, settlement/reconciliation, exact duplicate replays and
+activation requests remain available. The 25-active-worker trial cap applies company-wide across
+sites, not per site, and reads the entitlement limit rather than the illustrative briefing counts.
+
+Company owners and administrators see plan state, access state, days remaining, end date,
+active-worker usage against the limit, terms reference and revision on Plan & usage. They can submit
+a durable, scoped activation request with an optional note; the request is recorded for platform
+operations, never changes access or payment by itself, and survives reload while a saved intent is
+recovered only after an exact acknowledgement and receipt match. Only an authorized platform
+operator can write the revision-bound entitlement command, record plan/terms/reason, accept the
+pending request (auto-accepting the latest pending request for any non-read-only state) or decline
+it; both SQLite and PostgreSQL store immutable audit/transition evidence and replay-safe receipts.
+The operator console now has an Entitlements tab with strict local validation of the same command
+shapes. No prices, invoices or payment state are invented, and no activation occurred outside the
+disposable synthetic test stack.
+
+Self-review fixed a real client-contract defect found during browser verification: a pending
+activation request keeps the entitlement revision captured when it was submitted, so a later
+operator revision advance made `checkedEntitlement` reject the whole Plan & usage payload. The
+validator now accepts an older capture revision (rejecting only a revision newer than the current
+one) and a regression test covers the stale-pending case.
+
+Verification: focused Phase 5 suite 16/16 passed in 25.4 seconds (`entitlement`,
+`entitlement-activation`, `activation-request-recovery`, `usage-state`), covering exact expiry,
+unmanaged legacy access, worker-capacity rejection, read-only write surfaces with duplicate receipt
+replay, both backends' operator commands and activation requests, HTTP session-context binding and
+the new client regression. `npm run typecheck` and `npm run build` pass. Browser evidence on a
+disposable SQLite stack (separate ports 3099/5180, synthetic data only): an owner request recorded
+`POST /api/entitlement/requests` 201, fetched its receipt 200 and cleared the saved intent; the
+pending request survived reload; after setting the trial end in the past, the page showed
+"Trial Ended · Read-Only", 0 days and the read-only notice; `POST /api/instructions/send` returned
+403 `Workspace is read-only` while a new activation request reached 409
+`Activation request already pending` (not the read-only gate); after declining that request in the
+disposable database, the read-only page rendered "Request activation" and a submitted request was
+recorded and displayed. The operator console's Entitlements tab is PostgreSQL-only and was not
+browser-driven in this checkpoint; its command/HTTP flow is covered by the PostgreSQL tests above.
+The full suite has not been rerun since these changes and will be required before any release claim.
+No deployment, real invitation/email/push, paid provider call or real worker data was used.
+
+Next task: Phase 5d verified owner registration and the 14x24h/25-worker trial, then Phase 6
+notifications/shared-device work and Phase 7 release verification.
+
+## Phase 4 Automatic Send And Mode-Aware Reporting Checkpoint
+
+24 October 2026: automatic Send now runs as one durable, immutable-captured operation instead
+of a browser-driven publish chain. `instruction_sends`, `instruction_deliveries` and
+`instruction_retries` force a `preparing` delivery row per captured recipient at request time
+and keep the request JSON, audience, language, response mode, delivery mode and crew provenance
+immutable. Preparation, authority, worker state, language, deletion, deadline and content
+readiness are rechecked on both SQLite and PostgreSQL before anything is released; a publication
+is created once per request and late delivery adds assignments to that same publication/version.
+A recipient is released only when that recipient's selected artifacts are ready: acknowledge mode
+uses confirmation-only assignment content, voice mode requires usable audio, text mode requires
+text, and both mode requires both. Common-source failure blocks the whole Send; a target-language
+failure makes only that language undelivered. Delivery states are `preparing`, `available`,
+`blocked`, `failed` and `withdrawn`; persisted counts report truthfully (for example
+"Sent to 18 of 25; 7 not delivered") and retry only reopens eligible unfinished recipients with an
+immutable retry receipt. Background completion and reconciliation finish the request without a
+browser-held chain, rechecking the deadline and recipient state at release time.
+
+Reports and CSV exports are now mode-aware through the shared `reportActivity`/`selectReport`
+builders. They distinguish captured audience, preparing/not delivered, available/delivered,
+answered, acknowledged, matched, follow-up needed, pending check and human-resolved outcomes, and
+show their denominators. Unreleased recipients are never counted as failing to respond; missing
+historical mode fields are marked as legacy/unknown rather than invented. The export accepts the
+original 6/8-cell rows, the Phase 4 8-cell mode-aware rows and an optional 9th follow-up-status
+cell, so earlier artifacts still parse. Self-review fixed a case-repeat interaction with the
+assignment deadline, corrected generated-audio DTO exposure so only generated speech URLs are
+returned, and made the retention upgrade statement tolerate pre-migration schemas. PostgreSQL
+migrations through `104_instruction_content_retention.sql` are applied by the migration runner;
+migration 105 was not started in this checkpoint.
+
+Verification: the full suite ran 1,415 tests with 1,408 passing and 4 environment-gated skips; the only three
+failures were outdated hardcoded migration counts (102 instead of 104) in
+`language-registry.test.mjs`, `neon-rehearsal.test.mjs` and `operator-permissions.test.mjs`. After
+correcting those expectations, the three affected files passed 22/22 (exit 0, ~79 seconds).
+Targeted Phase 4 PostgreSQL/SQLite delivery, retry and report tests passed before that run, and
+`npm run typecheck` passed. All data was synthetic, no live AI/provider was called, no deployment
+was changed and no real worker data was used.
+
+Open items: newly released late recipients do not yet receive an in-app notification or web push
+(Phase 6); instruction Send does not yet enforce entitlement/quota gating (Phase 5); browser
+export evidence predates the optional 9th export column; reports still show the original
+publication language and do not expose a later presentation language under a clear label;
+native-speaker review remains pending. This checkpoint is not a production-readiness certificate.
+
+Next task: Phase 5a entitlement core and read-only gates, followed by the 25-worker trial cap,
+usage/operator activation surfaces and verified owner registration.
+
+## Phase 3d Historical Translated Presentation Checkpoint
+
+24 October 2026: added an additive translated-presentation layer without changing the
+original record. PostgreSQL migrations `100_presentation_artifacts.sql`,
+`101_presentation_retention.sql` and `102_recording_presentation_guard.sql`, plus the
+idempotent SQLite schema in `server/presentation-schema.mjs`, create
+`presentation_artifacts` and `answer_presentation_bindings`. Each artifact is keyed by
+assignment, source kind (`instruction` or `answer`), source ID and target language and
+stores the original language, publication ID/version, source hash, provider/live flags,
+status and translated content. Typed answers bind the presentation and presented
+question at acceptance; recordings gained optional `presentation_id`,
+`presentation_language` and `presented_question` columns. Assignments, attempts,
+publications, publication snapshots and recording bytes are never rewritten by
+presentation reads or generation, and the tables do not participate in assignment,
+answer or delivery denominators.
+
+`GET /api/worker/briefings/:assignmentId/presentations` reads cached artifacts only and
+never generates. `POST` on the same path accepts the exact request shape
+(`requestId`, `sourceKind`, optional `sourceId`), replays the same request and creates
+at most one artifact per assignment/source/target. Instruction presentations can be
+served directly from an existing approved language snapshot in the publication
+(`publication-snapshot-v1`, `live=false`); translation remains capability-bound to
+English, Arabic and Urdu. A UI-only target returns
+`unavailable/language_capability_unavailable`, a missing translator returns
+`unavailable/translation_not_enabled`, a paused tenant returns
+`deferred/generation_paused`, a provider failure stays `failed`, the same language
+returns `not_required`, and expired briefing content returns
+`unavailable/content_expired`. Pending work holds a bounded lease. Because the target
+is always the worker's currently approved language, changing that language creates a
+new artifact for the new target while earlier artifacts and bindings remain intact;
+binding an old artifact after the preference changes is rejected. The worker UI shows
+the translated view for instruction and answer history in all 15 UI locales, labels it
+as a translated view whose original remains the record, and never presents generated
+text or audio as the worker's original recording; original audio playback stays
+attached to the original recording.
+
+Deletion and retention now cover the derived copies. Worker deletion redacts ready
+presentation content and presented questions, fails pending artifacts and requires
+those tombstones before completion. Answer-text retention redacts ready answer
+presentations, and briefing-content retention redacts instruction and answer
+presentations, bindings and recording provenance. While hardening the recording
+provenance guard, self-review found a SQL three-valued-logic hole: the original guard
+used `OLD.presented_question NOT IN ('[Deleted]','[Expired]')`, which evaluates to NULL
+when the old value is NULL, so an update from NULL to arbitrary text was accepted.
+Migration 102 and the SQLite trigger now require an existing non-null, non-sentinel
+value before permitting the one-way tombstone. The PostgreSQL retention code also
+guards its presentation statements when upgrading from a pre-100 schema so the
+old-schema expiry-origin test still proves erased sources are not reconstructed.
+
+Verification: the complete suite passed 1,394 of 1,398 tests with 0 failures and 4
+environment-gated skips (native `pg_dump`/`pg_restore`, and three real-PostgreSQL
+concurrency/migration tests) in 32 minutes 15 seconds. The presentation contract
+tests passed 3/3 across SQLite and PostgreSQL, the client presentation contract and
+copy tests passed 11/11, the migration/upgrade batch passed 11/11, and the Neon
+rehearsal plus operator-permission batch passed 18/18. `npm run typecheck` passed, and
+the production build passed with only the known chunk-size and
+`INEFFECTIVE_DYNAMIC_IMPORT` warnings.
+
+Open items: read-only entitlement gating for cached presentation reads is not built;
+reports and exports still show the original publication language and do not yet expose
+a later approved presentation language under a clear label; audio-only answers have no
+translated text view because the answer source requires accepted typed text, though
+the original recording remains available; privacy-ledger format v8 restore
+reconciliation does not yet include presentation artifacts, bindings or recording
+provenance even though backups inventory all tables and runtime redaction covers them;
+native-speaker review of the UI translations is still pending; and the translated
+panel was validated by component/server tests rather than a browser walkthrough
+because the browser viewport was unavailable. All data was synthetic, no provider was
+called, nothing was deployed, and no real worker data or paid service was involved.
+This checkpoint is not a production-readiness certificate.
+
+Next task: begin Phase 4 automatic Send by auditing the existing publication,
+assignment and recipient-release path, then adding a durable captured Send operation
+with safe per-recipient release and truthful partial-delivery status. No paid provider,
+real invitation or public deployment is part of that work.
+
+## Phase 3c Worker UI Localization And Honest Readiness Checkpoint
+
+24 October 2026: the worker experience is presented in all 15 selectable locale codes
+covering the 14 required worker languages, with Punjabi split into Gurmukhi
+(`pa-Guru`) and Shahmukhi (`pa-Arab`). Navigation, paging, access entry, first-use
+setup and recovery, inbox, assignment detail, listen/read, typed and recorded drafts,
+offline copy, device controls, help and history, sent answers, receipt, conversation,
+language settings, shared-device cleanup and recording notices now resolve their copy
+from locale dictionaries keyed by `WorkerUiLanguage`; a missing locale or key fails
+typecheck and the dictionary tests. Direction comes from the shared registry (RTL:
+Arabic, Urdu and Shahmukhi Punjabi; LTR: the other twelve locales). Instruction,
+question and answer content keeps its own `lang`/`dir`, so a Hindi LTR shell can show
+Arabic RTL content without inheriting the shell direction.
+
+The interface language is stored only for the exact unexpired worker session context.
+It grants no session authority, survives a reload but not a session change, and
+shared-device cleanup removes it. First use requires the supervisor-set language;
+later changes stay pending requests until staff approval. Viewing a page never
+rewrites the stored worker language or the original assignment language.
+
+`GET /api/language-readiness` now reports all 15 locales instead of three. Every row
+reports worker UI as `ready` with explicit evidence that native-speaker review is
+still pending. Stored content remains `ready` or `missing` based on the latest scoped
+publication. Translation is `not_tested` only for English, Arabic and Urdu under the
+synthetic environment/declared adapter and `unavailable` for the other twelve;
+speech is `not_tested` only for English and Arabic and `unavailable` everywhere else,
+including Urdu, which the configured adapter does not support. Generation defaults
+remain restricted to content-capable languages, `realDataAllowed` stays `false`, and
+no UI-only locale gains a translation or speech claim. Publication still fails closed
+when a recipient language has no content support; no translated instruction is
+invented, and truthful partial delivery remains open.
+
+Verification: the strict production build (`tsc --noEmit` plus Vite) passed after the
+readiness copy update with only the known chunk-size and INEFFECTIVE_DYNAMIC_IMPORT
+warnings. The full suite was split into three sorted batches: batch 1 passed 448/448;
+batch 2 reported 510 pass, 4 native PostgreSQL skips, 0 assertion failures and one
+300-second timeout under parallel load; batch 3 passed 419/419. The timed-out test
+(`tests/postgres-backup.test.mjs`, isolated physical embedded restore) passed 8/8 in
+43.1 seconds when rerun alone, confirming resource contention rather than a product
+failure. Across the three batches that is 1,382 tests, 0 assertion failures and 4
+environment skips, or 1,378 passing and 4 skipped after the isolated rerun.
+
+Browser verification used a freshly seeded disposable synthetic SQLite database, a
+disposable API on 3040 and the production bundle served on 3042; the saved demo
+database was not modified. Worker 029 (`pa-Arab`) rendered a Shahmukhi RTL shell
+(`dir=rtl`, `lang=pa-Arab`) around Urdu (`lang=ur`) content; Worker 014 (`hi`)
+rendered a Hindi LTR shell (`dir=ltr`, `lang=hi`) around Arabic (`lang=ar`) content
+on the assignment detail, with the original English answer untouched. Evidence:
+`artifacts/phase3c-locale-browser-2026-10-24/worker-pa-arab-inbox-2026-10-24.png`,
+`worker-hi-inbox-2026-10-24.png` and `worker-hi-assignment-2026-10-24.png`. The
+fixture servers were stopped and the scratch database and scripts deleted.
+
+Native-speaker review of the twelve new UI translations is still pending. Historical
+translated presentation, partial delivery with a truthful undelivered count,
+automatic Send, trial/entitlement/read-only behavior, web push and shared-device
+handoff, and release verification remain open. All data was synthetic; nothing was
+deployed, and no real worker data, paid provider call, invitation or push message was
+involved. This checkpoint is not a production-readiness certificate.
+
+## Phase 3c Worker Locale Registry And Storage Checkpoint
+
+23 October 2026: added the shared locale and capability foundation for the 14 required
+worker languages. `server/languages.mjs` (with TypeScript declarations consumed by both
+the server and the React client) is now the single registry for 15 selectable locales:
+English, Arabic, Hindi, Urdu, Bengali, Malayalam, Tamil, Telugu, Nepali, Filipino,
+Sinhala, Russian, Punjabi Gurmukhi, Punjabi Shahmukhi and Indonesian. Bare `pa` is
+rejected; the two Punjabi scripts are explicit locales with their own direction
+(Gurmukhi LTR, Shahmukhi RTL), and Arabic, Urdu and Shahmukhi are the RTL set.
+Capabilities are declared per stage rather than implied by dropdown membership: UI text
+is implemented for all 15; translation, instruction/question content and assessment
+remain en/ar/ur; transcription and speech remain en/ar; staff source input remains
+en/ar. Provider adapters and verification descriptors still declare exactly those
+content/speech limits, so no new-language audio or translation is claimed.
+
+Storage now accepts every registered locale. SQLite adds any missing Phase 3a identity
+columns before transactionally rebuilding `workers`, `assignments` and
+`worker_language_requests` with the expanded CHECK lists, preserves rows and foreign
+keys, runs `PRAGMA foreign_key_check` and recreates the indexes and guards on startup.
+PostgreSQL migration `099_worker_language_locales.sql` replaces the twelve pure language
+CHECK constraints; content-generation JSON checks intentionally stay limited to
+content-capable languages. The worker directory filter and direct staff correction,
+worker session validation, crew DTOs, response filters, report breakdowns and language
+labels are registry-backed. The Team worker form and directory filter now list all 15
+locales with self-names. `settings-input.mjs` still rejects generating a language without
+translation content, so a worker who selects a UI-only locale cannot yet receive an
+instruction: publication fails closed with `Recipient language is unavailable` until
+provider content exists and the planned partial-delivery flow can report undelivered
+workers truthfully. That is an open requirement, not a completed capability.
+
+Verification: `tests/language-registry.test.mjs` 4/4 pass (registry invariants and
+capability honesty; in-place SQLite upgrade preserving names, a pending request,
+foreign keys, triggers and indexes while accepting `pa-Guru`/`pa-Arab` and rejecting
+bare `pa`; a legacy worker table without Phase 3a columns; PGlite applying all 99
+migrations and storing all 15 locales). Focused regression batches passed 60/60
+(directory, settings, reports, responses, assignment languages, embedded PostgreSQL,
+Neon rehearsal, operator permissions and upgrade guards), 40/40 (worker directory and
+language HTTP, imports, worker UI/session locale) and 71/71 (reports, worker
+credentials, draft languages, language artifacts, audit/expiry upgrades and
+verification authority). `npm run build` passes with only the known chunk-size and
+INEFFECTIVE_DYNAMIC_IMPORT warnings. All data was synthetic; nothing was deployed, and
+no real worker data, provider call, invitation or push message was involved. Worker
+interface translation for the 12 new locales, first-use locale selection UI, historical
+translated presentation and partial delivery remain open. This checkpoint is not a
+production-readiness certificate.
+
+## Phase 3b Worker ID And Password Checkpoint
+
+23 October 2026: implemented the worker credential identity with synthetic data only.
+Workers sign in with company ID, worker ID and password; first use is a staff-issued
+one-time setup code (43-character base64url, SHA-256 at rest, 5-1440 minute expiry).
+Worker IDs are trimmed, NFKC-normalized and uppercased, and a credential's login must
+match its worker's code. Passwords use scrypt (N=16384, r=8, p=1), 8-128 characters,
+no edge whitespace and cannot equal the login or company ID. Issuing a setup code or
+resetting a password revokes all prior worker sessions, setup codes and access links
+and increments `credential_revision`; new sessions bind to that revision, so a reset
+invalidates a live session immediately. Disabled workers and paused or archived sites
+fail closed. Failed password and setup attempts share the existing hashed 15-minute
+global/per-account/per-IP budget, with a worker-specific limit of eight. Staff owners
+and supervisors see sign-in status in Team, issue or reset a code with a confirmation
+and expiry choice, and can copy a one-time handout; the worker entry now offers Worker
+ID and password, first-time setup and access-link modes, clears stale failures when the
+method changes and warns when signing in will end an active staff session. Handout copy
+failure falls back to a selectable sign-in sheet.
+
+SQLite (`server/worker-credentials.mjs`) and PostgreSQL
+(`server/postgres/worker-credentials.mjs`, migration
+`098_worker_password_credentials.sql`) implement the same contract. PostgreSQL session,
+import, runtime-permission, backup, restore-replay and retention surfaces account for
+the two new tables and the revision-bound session identity. Focused verification:
+SQLite `tests/worker-credentials.test.mjs` 6/6 pass; PostgreSQL
+`tests/postgres-worker-credentials.test.mjs` 5/5 pass; PostgreSQL auth 6/6, import
+11/11, embedded migration 1/1, runtime 4/4, backup 8/8, restore retention 16/16 and
+activity retention 5/5 pass after the migration-list update. `npm run build` (strict
+TypeScript and Vite) passes with only the known chunk-size and
+INEFFECTIVE_DYNAMIC_IMPORT warnings.
+
+Browser verification used a disposable PGlite fixture at `127.0.0.1:3245` and the
+production build. Staff issued a setup code; a worker completed first-time setup using
+mixed-case `WorkEr 001` and reached the inbox at credential revision 2; a wrong password
+was rejected; staff reset the password and the live worker session was revoked at once
+(`sessions=0`, state `setup`, revision 3); the old password failed and a second setup
+activated revision 4; the existing one-time access-link flow still signed in. Evidence:
+`artifacts/worker-credentials-staff-panel-full-2026-10-23.png`,
+`artifacts/worker-credentials-issued-dialog-2026-10-23.png`,
+`artifacts/worker-credential-entry-login-full-2026-10-23.png`,
+`artifacts/worker-credential-login-failed-2026-10-23.png` and
+`artifacts/worker-credential-inbox-2026-10-23.png`. The local demo runs in access mode
+`demo`, so its Team view hides credential controls by design; browser credential
+evidence came from the credential-mode PostgreSQL fixture, while SQLite credential mode
+is covered by its focused tests, not a separate browser run.
+
+Full-suite verification, 23 October 2026:
+`node --test --test-timeout=300000 tests/*.test.mjs` exited 0 with 1376 tests,
+1372 pass, 0 fail, 4 skipped, 0 cancelled and 0 todo in 1,719,631 ms
+(`artifacts/full-suite-2026-10-23-clean2.log`). The four skips are the known
+external gates: native `pg_dump`/`pg_restore` without explicitly isolated
+source/empty-target databases, and three real-PostgreSQL admission,
+concurrency and migration tests without an authorized test server. The strict
+TypeScript check and Vite build pass with only the known chunk-size and
+INEFFECTIVE_DYNAMIC_IMPORT warnings. This run covers the Phase 3a/3b contract
+updates (98 migrations, 13 hidden worker tables, 125 writable application
+tables, the 14-key crew DTO validator, the duplicate worker-ID message and the
+scheduler failure-injection prefix) plus load-tolerant deadlines for the Neon
+interruption, provider-verification and restore-retention tests. The 14 worker
+locales, automatic capture/orchestration,
+trial entitlements, scoped push, physical-device/AT testing, real provider and database
+integration, TLS/hosting and release gates remain open. Nothing was deployed here; no
+real worker data, invitations, push messages, paid providers or production changes were
+involved. This checkpoint is not a production-readiness certificate.
+
+## Phase 3a Worker Identity And Language Checkpoint
+
+23 October 2026: implemented the third phase's worker identity and persisted-language
+foundation with synthetic data only. Workers now have an optional display name, and a
+worker created without a language chooses it on first sign-in instead of inheriting a
+browser preference. The server persists the language, selection time and source
+(`worker`, `staff` or `migration`); a database trigger refuses to reopen selection.
+Language changes use a scoped request ledger: a worker request stays pending until a
+supervisor approves or rejects it with an expected-language check, a note and an
+immutable decision, and a direct supervisor correction supersedes a pending request.
+Unselected workers are excluded from instruction audiences so a send cannot silently
+assign a language nobody chose. The page-session context now includes language and
+selection state, so stale worker POSTs and staff directory reads are fenced when either
+changes. Team exposes the name field, a choose-later option, a Not Selected badge, the
+pending request and a decision panel; the worker shell exposes the first-use gate and a
+localized change-request dialog. Legacy synthetic rows remain explicitly marked as
+selected, and existing history is preserved. SQLite and PostgreSQL implement the same
+domain contract (PostgreSQL migration `097_worker_language_identity.sql`);
+the default runtime remains SQLite and the PostgreSQL path is exercised only in
+isolated embedded tests.
+
+Verification: focused worker-language suites rerun 9/9 pass (SQLite identity/search,
+first-use persistence, request transitions, audience exclusion and context fencing;
+PostgreSQL identity, immutable decisions and HTTP routes); the PostgreSQL domain suite
+previously passed 45/45; `npm run typecheck` passes. The in-app browser at 634x473
+verified the lifecycle against synthetic fixtures: a new worker `W-3101` named
+"Synthetic Worker 31" was added with choose-later and appeared as Not Selected; its
+first sign-in rendered the language gate, choosing Arabic persisted `language='ar'`
+with `language_selected_by='worker'` and opened the inbox; the worker then requested
+Urdu with a reason; owner Maya saw the pending change in Team, approved it with a note,
+and the directory updated to Urdu, "Set by supervisor", with the request panel empty.
+The approved synthetic request `d15d9961-3644-41df-bb56-d6b21e088c50` (ar → ur) is
+retained in the local synthetic database. The temporary local test session was revoked,
+existing worker-14 stayed unchanged, and the trigger prevented a forced reset to
+first-use. No real worker data, provider call, invitation, push message or deployment
+was involved.
+
+A clean full-suite rerun after the Phase 2 and 3a changes is still required before
+claiming a current total; the earlier focused PostgreSQL domain evidence does not
+replace it. Phase 3b worker ID/password identity is now recorded in the checkpoint
+above; the 14 worker locales, automatic capture/orchestration, trial entitlements,
+scoped push and physical-device/AT testing remain open. This checkpoint is not a
+production-readiness certificate.
+
+## Phase 2 Simplification Checkpoint
+
+23 October 2026: implemented the second phase of the complete implementation prompt with
+synthetic data only. Supervisor navigation is now Today, Instructions and Team with
+Reports and Settings secondary. The instruction composer is one page: record, type or
+upload an English/Arabic source, choose recipients, leave **Include a question** on by
+default, choose Text only, Voice only or Both (Both by default), and Send. Send options
+are frozen per instruction in `instruction_sends`; snapshots carry `responseMode` and
+`deliveryMode`, and a question-off instruction requires an explicit, immutable
+acknowledgment instead of an assessed answer. Ready language versions are delivered to
+their own workers and the send record reports delivered and undelivered counts
+truthfully instead of claiming a complete send.
+
+The worker experience now has To do and Done tabs, a guided Listen/read, Answer, Review
+and send page with typed answers as the default, localized acknowledgment labels and
+receipts, and review-before-send. Supervisor Responses exposes an Acknowledged filter
+and a receipt view (time and published key facts, no fabricated question or
+submissions). The acknowledgment-only notice states plainly that neither a matching
+answer nor an acknowledgment certifies understanding or safe work.
+
+Browser evidence used the in-app browser at 634x473 against synthetic fixtures: Maya
+sent a canonical text acknowledgment instruction to all 30 workers (Delivered 30 of 30),
+worker-029 acknowledged in Urdu with a localized receipt and Done state, and the
+supervisor saw the acknowledgment filter and receipt. A typed question flow was also
+run through the review step. Focused tests passed 10/10, `npm run typecheck` passed and
+`npm run build` passed (6.2 s) with only the known chunk-size and
+INEFFECTIVE_DYNAMIC_IMPORT warnings.
+
+The first full-suite run after these changes exposed three backup/import failures,
+because the synthetic SQLite-to-PostgreSQL import rejected the two new tables as an
+unsupported schema. Fixed by adding migration
+`096_instruction_modes_and_acknowledgments.sql` with guarded PostgreSQL tables, real
+acknowledgment reads in the PostgreSQL response detail and list models, import
+validation and row copying for both tables, and the matching runtime permission policy
+(application writable tables 122, worker 96). The same run exposed a scheduled
+publication defect: the schedule verifier compared raw prepared content with a snapshot
+hash that now includes instruction modes. Content verification now accepts the raw
+prepared hash or the mode-normalized hash in both SQLite and PostgreSQL. Affected suites
+pass: runtime permissions 24/24, PostgreSQL/import/instruction/authorization 59/59,
+publication schedules and pipeline rehearsal 15/15. A clean full-suite rerun is still
+required before claiming a current total. PostgreSQL still writes instruction sends and
+acknowledgments only through the SQLite path; the PostgreSQL tables and read/import
+models exist for parity, while worker password identity, server-persisted language,
+14-locale resources and automatic capture remain the next phase. Nothing was deployed;
+no real invitations, push messages, paid providers or worker data were used.
+
+## Final Accessibility And Clean-Suite Checkpoint
+
+22 October 2026: the final browser accessibility sweep covered 38 public, staff and
+worker screen states in the in-app browser (about 634x473, synthetic demo data). It
+found zero structural issues, zero unnamed controls, zero duplicate ids, zero heading
+skips, zero landmark problems and zero contrast failures after fixes. Localized staff
+and worker skip links are first in tab order, appear at the top when focused, and move
+focus to the main landmark; the public skip link already existed. Muted metadata and
+page-footer text were darkened from failing colors, amber status text moved from 3.2-4.2:1
+to about 5.1:1, and select, worker-switch, checkbox-label and overview title-button
+targets were raised to at least 24px. Controls still below 24px are wrapped by 48px
+labels, are radios inside full-row labels, or are a visually hidden file input with a
+visible label. Public header/footer text links remain 16-18px high but meet the WCAG
+2.5.8 spacing exception (at least 26px between centers). This is a heuristic DOM/CSS
+audit, not a WCAG certificate; screen-reader, keyboard-only end-to-end, 200% zoom/320px
+reflow, forced-colors and physical-device sessions remain open.
+Evidence: `artifacts/a11y-2026-10-22/results.json`.
+
+`npm run build` passes after the final CSS changes (2.4 s) with only the known
+chunk-size and INEFFECTIVE_DYNAMIC_IMPORT warnings. The focused UI source suite passes
+19/19. The clean full single-process run reports 1,350 tests: 1,346 pass, 0 fail and 4
+native skips (`artifacts/full-suite-2026-10-22-run2.log`); this supersedes the earlier
+checkpoint's one load-sensitive restore-retention failure, which passed in isolation and
+was not reproduced. Production readiness is unchanged: synthetic-only, not deployed,
+with public DNS/ACME, hosted Neon connectivity, monitoring, real-data provider/privacy
+approval, production backup rehearsal, independent security review, physical-device/AT
+testing and deployment authorization still open.
+
+## Runtime Packaging Verification Checkpoint
+
+22 October 2026: the packaged runtime was exercised locally with synthetic data only.
+The Docker image built successfully and runs as uid 1000 `node` with no environment
+files inside it. The API container rejected missing or altered proxy headers, direct
+access from an untrusted network and HTTP forwarded-protocol spoofing, and served the
+self-only CSP, HSTS, nosniff, revalidated HTML and immutable hashed-asset contract.
+Caddy 2.10 validated both deployment configurations; a local TLS run with Caddy's
+internal CA confirmed HTTPS, a 308 HTTP-to-HTTPS redirect, and overwrite of spoofed
+multi-address `X-Forwarded-For` and `X-Forwarded-Proto: http`. The native
+`pg_dump`/`pg_restore` round-trip gate passed against a disposable PostgreSQL 18.6 TLS
+cluster (1/1, 17.9 s), including private-object readback, quarantine and immutability;
+the scratch databases were removed afterwards. `npm audit --omit=dev` reports zero
+vulnerabilities and a repository secret scan found no credential material outside the
+gitignored environment files. Public ACME issuance/renewal, deployed Neon connectivity,
+hosted concurrency and the independent release gates remain unverified. This is not a
+production-readiness certificate. Evidence:
+`artifacts/runtime-verification-2026-10-22.json`.
+
+## Reference UI Parity And Provider Verification Checkpoint
+
+22 October 2026: the 47-reference screenshot audit is complete and the remaining UI
+deltas were implemented and checked in a real browser against the disposable PGlite
+demo. Organization settings now show the signed-in owner name/role/email, workspace
+status, support contact and explanatory note; site settings show the timezone, EN/AR/UR
+language tags, primary/deputy contacts and revision. Staff access requests 50 invitation
+rows through a page-size-aware validator and keeps failed email delivery inside the
+dialog with an inline error. Glossary detail shows the locked-revision notice
+("Saved revisions are locked and cannot be edited..."), verified by creating a synthetic
+term and viewing v1. The operator Providers & quotas screen was verified against the
+fresh dist through the disposable operator fixture: credentials missing, all seven
+pipeline stages disabled, fixed synthetic tests blocked by server configuration, quota
+save disabled pending confirmation, zero reserved operations and actual cost
+"Not reconciled"; no fabricated spend or readiness. `npm audit --omit=dev` reports zero
+vulnerabilities, and a dist/src scan found no key material. `npm run build` passes in
+about 12 s with only chunk-size/INEFFECTIVE_DYNAMIC_IMPORT warnings. The full
+single-process suite (230 files) reports 1,350 tests: 1,345 pass, 1 fail and 4 native
+skips. The failure was `accounted production cleanup chains each commit and all six
+removals...` in tests/restore-retention.test.mjs; the same test passed on an isolated
+rerun (1/1, 73 s) and was consistent with the sweep's 120 s bound under a loaded host,
+not a reproduced functional defect. This is a load-sensitive suite flake, not a
+production-readiness certificate. Production readiness is unchanged: synthetic-only
+and not deployed; public ACME/DNS, hosted Neon integration, a deployed
+backup/retention drill, real-provider data and physical-device/assistive-technology
+audits remain unverified. The runtime checkpoint above supersedes the earlier
+"image not built / Caddy not started" status.
+Evidence: artifacts/final-verification-2026-10-22.json.
+
+## Hybrid Voice Rehearsal Checkpoint
+
+22 October 2026: the full synthetic voice business workflow was exercised through the
+real browser UI against an isolated local PGlite workspace. A supervisor voice upload was
+transcribed by Gemini, prepared with MiniMax M3.1 Flash (free) text plus Gemini speech,
+and published as v1 to one worker. The worker redeemed a one-time access link, recorded a
+synthetic WAV through the browser recorder, and the answer was transcribed by Gemini and
+assessed by MiniMax against the frozen rubric: matched all three key facts with exact
+evidence. No real worker data, public endpoint, deployment or production approval was
+involved. `npm run build` passes; focused OpenRouter/preparation/recording/hosted/deploy
+tests pass; `tests/generated-audio.test.mjs` passes 31/31 in isolation (one 300s timeout
+under parallel shard load, not a failure). Hosted provider dispatch remains fail-closed by
+`hosted-config.mjs`, so the hosted staging package stays a non-AI synthetic shell until a
+separate security review approves provider execution. Demo entry point:
+`scripts/ui-demo-server.mjs`; credentials and evidence stay under gitignored `artifacts/`.
+
+## Deployment Package Checkpoint
+
+21 October 2026: a local-only synthetic staging deployment package is ready for host
+configuration, but nothing is deployed or published. It adds a multi-stage Dockerfile,
+Compose API/worker plus optional separate operator profile, Caddy TLS/header overwrite,
+an offline deploy preflight and docs/DEPLOY_RUNBOOK.md. The Docker build stage now
+copies `server/`; without it the TypeScript build fails on server imports. Four-shard
+suite:1,343 tests/1,339 pass/zero fail/four skips; the three real-PostgreSQL skips
+were then run against a disposable local PostgreSQL16 container and passed (3/3),
+leaving only the native pg_dump/restore backup test skipped. Clean build,
+production-only dependency check, exact Docker build context and both compose
+profiles pass. A
+throwaway PostgreSQL18.4 cluster:95 migrations applied, all three current ACL profiles
+configured, and each hosted check passed over certificate-checked TLS; API health/
+static/proxy rejection, worker health publication and separate operator-origin denial
+passed.
+Preflight (with the populated local loopback contract) reports
+ready:true/deployed:false/productionReady:false with zero network requests. Docker image build, Caddy TLS issuance, DNS, Neon integration, backups and
+live AI remain unverified because registry blob downloads stalled. This is deployment
+preparation, not production readiness. Evidence:
+artifacts/deploy-validation-2026-10-21.json. Earlier checks below are historical. No
+cloud account, host, billing, real data or public endpoint was used.
+
+## Previous Reports Checkpoint
 
 21 October 2026: EN/AR/UR Reports/publication history/export recovery and scoped
 shell are implemented.30 built locale-width checks, keyboard held-read focus,

@@ -5,10 +5,10 @@ import {readWorkerReceiptSnapshot,workerReceiptText,workerReceiptUnknownText,typ
 import {playbackTime} from './worker-playback';
 import {workerSubmissionState,WorkerSubmissionsError} from './worker-submissions';
 import {validWorkerSession,type PageSession} from './session-state';
-import type {WorkerUiLanguage} from './worker-ui-language';
+import {type WorkerUiLanguage,workerUiDirection} from './worker-ui-language';
 
-type Props={session:PageSession;selection:ReceiptSelection;acknowledgedContext:string;language:WorkerUiLanguage;timezone?:string;disabled:boolean;canHelp:boolean;current:()=>boolean;onSessionLost:()=>void;onBack:()=>void;onHelp:()=>void};
-export function WorkerSubmissionReceipt({session,selection,acknowledgedContext,language,timezone,disabled,canHelp,current,onSessionLost,onBack,onHelp}:Props){
+type Props={session:PageSession;selection:ReceiptSelection;acknowledgedContext:string;language:WorkerUiLanguage;timezone?:string;disabled:boolean;canHelp:boolean;current:()=>boolean;onSessionLost:()=>void;onBack:()=>void;onHelp:()=>void;onChecked?:()=>void};
+export function WorkerSubmissionReceipt({session,selection,acknowledgedContext,language,timezone,disabled,canHelp,current,onSessionLost,onBack,onHelp,onChecked}:Props){
   const t=workerReceiptText[language],key=JSON.stringify([session.clientContext,session.expiresAt,selection.assignmentId,selection.version,selection.language,selection.requestId,selection.kind]);
   const selected=useRef(key);selected.current=key;
   const [retry,setRetry]=useState(0),[read,setRead]=useState<{key:string;data:WorkerReceiptSnapshot|null;failed:boolean;loading:boolean}>({key:'',data:null,failed:false,loading:true});
@@ -33,8 +33,15 @@ export function WorkerSubmissionReceipt({session,selection,acknowledgedContext,l
     const timer=window.setTimeout(refresh,10000);document.addEventListener('visibilitychange',refresh);
     return()=>{window.clearTimeout(timer);document.removeEventListener('visibilitychange',refresh);};
   },[data,key]);
-  if(!acknowledged)return null;
   const state=data?workerSubmissionState(data.receipt):null;
+  const notified=useRef<string|null>(null),notify=useRef(onChecked);notify.current=onChecked;
+  useEffect(()=>{
+    if(!state||state==='pending'||state==='paused')return;
+    const marker=`${key}:${state}`;
+    if(notified.current===marker)return;
+    notified.current=marker;notify.current?.();
+  },[key,state]);
+  if(!acknowledged)return null;
   return <section className="worker-receipt" aria-labelledby="worker-receipt-title">
     <div className="receipt-mark" aria-hidden="true"><Check size={44}/></div>
     <h1 id="worker-receipt-title" className="receipt-title">{t.title}</h1><p className="receipt-copy">{t.followup}</p>
@@ -53,6 +60,6 @@ export function WorkerSubmissionReceipt({session,selection,acknowledgedContext,l
     </section>}
     {session.mode?.startsWith('synthetic-')&&<p className="muted">{t.synthetic}</p>}
     <p className="muted">{t.limits}</p>
-    <div className="worker-receipt-actions"><button type="button" className="button primary full" disabled={disabled} onClick={onBack}>{language==='en'?<ArrowLeft size={20} aria-hidden="true"/>:<ArrowRight size={20} aria-hidden="true"/>}{t.back}</button><button type="button" className="button outline full" disabled={disabled||!canHelp} onClick={onHelp}><MessageCircle size={20} aria-hidden="true"/>{t.help}</button></div>
+    <div className="worker-receipt-actions"><button type="button" className="button primary full" disabled={disabled} onClick={onBack}>{workerUiDirection(language)==='rtl'?<ArrowRight size={20} aria-hidden="true"/>:<ArrowLeft size={20} aria-hidden="true"/>}{t.back}</button><button type="button" className="button outline full" disabled={disabled||!canHelp} onClick={onHelp}><MessageCircle size={20} aria-hidden="true"/>{t.help}</button></div>
   </section>;
 }

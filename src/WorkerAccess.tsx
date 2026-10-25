@@ -5,10 +5,11 @@ import { workerAccessLink } from './worker-access';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {completeStaffRequest} from './staff-request';
 import {checkedWorkerGrant,checkedWorkerGrantPage,checkedGrantRevocation,copyWorkerGrant,type WorkerGrant as Grant,type WorkerGrantPage as GrantPage,type IssuedWorkerGrant} from './worker-access-state';
+import { WorkerCredentials } from './WorkerCredentials';
 
 const statusText={available:'Not yet used',redeemed:'Used to sign in',expired:'Expired',revoked:'Revoked'};
 
-export function WorkerAccess({workerId,code,active,credentialAccess,authority}:{workerId:string;code:string;active:boolean;credentialAccess:boolean;authority:StaffRequestAuthority}) {
+export function WorkerAccess({workerId,code,active,credentialAccess,canManage,authority}:{workerId:string;code:string;active:boolean;credentialAccess:boolean;canManage:boolean;authority:StaffRequestAuthority}) {
   const {request,current}=useStaffRequest(authority);
   const complete=<T,>(value:unknown,validate:(value:unknown)=>T|Promise<T>,done:(value:T)=>void)=>completeStaffRequest(value,validate,done,current,authority.canMutate);
   const dialog=useRef<HTMLDialogElement>(null),inFlight=useRef(false);
@@ -51,7 +52,7 @@ export function WorkerAccess({workerId,code,active,credentialAccess,authority}:{
     finally {inFlight.current=false;if(current())setBusy(false);}
   }
   const pages=Math.max(1,Math.ceil((data?.total || 0)/5));
-  return <section className="panel worker-access-panel"><h2>Worker access</h2>
+  return <><section className="panel worker-access-panel"><h2>Worker access</h2>
     {credentialAccess ? <button className="button outline full" onClick={() => {setOpen(true);setPage(1);dialog.current?.showModal();}}><Link size={18}/>Manage access links</button> : <p>Private access links are unavailable in profile-demo mode.</p>}
     <dialog ref={dialog} className="withdraw-dialog" aria-labelledby={`access-title-${workerId}`} onKeyDown={keepDialogFocus} onCancel={(event) => {if(inFlight.current) event.preventDefault();}} onClose={closeState}>
       <div className="withdraw-heading"><h2 id={`access-title-${workerId}`}>{code} · Access links</h2><button autoFocus className="icon-button" title="Close access links" aria-label="Close access links" disabled={busy} onClick={() => dialog.current?.close()}><X size={20}/></button></div>
@@ -61,5 +62,7 @@ export function WorkerAccess({workerId,code,active,credentialAccess,authority}:{
       <div className="actions"><button className="button outline" disabled={busy || loading} onClick={() => {setAction(null);setConfirmed(false);setRevision((n) => n+1);}}><RefreshCw size={18}/>Refresh status</button><button className="button primary" disabled={busy || loading || needsStatus || !data || !active || !data.workerActive} onClick={() => {setAction('issue');setConfirmed(false);clearLink();setMessage('');}}><Link size={18}/>Issue new link</button></div>
       {action && <form onSubmit={(event) => void save(event)}><p className="crew-impact">{action==='issue' ? `Issue a new link for ${code}? Existing links and active worker sessions will be revoked. Assignments and responses remain unchanged.` : 'Revoke this link and every session opened with it? Existing assignments and responses remain unchanged.'}</p>{action==='issue' && <label className="field">Link validity<select value={minutes} disabled={busy} onChange={(event) => {setMinutes(Number(event.target.value));setConfirmed(false);}}><option value={30}>30 minutes</option><option value={240}>4 hours</option><option value={1440}>24 hours</option></select></label>}<label className="recipient-row publish-confirm"><input type="checkbox" checked={confirmed} disabled={busy} onChange={(event) => setConfirmed(event.target.checked)}/><span>{action==='issue' ? `Issue private access for ${code} and replace existing access` : 'Revoke this link and its sessions'}</span></label><div className="actions"><button type="button" className="button outline" disabled={busy} onClick={() => {setAction(null);setConfirmed(false);dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();}}>Cancel</button><button type="submit" className={`button ${action==='issue' ? 'primary' : 'danger'}`} disabled={busy || !confirmed}><Check size={18}/>{busy ? 'Saving...' : action==='issue' ? 'Confirm issue' : 'Confirm revocation'}</button></div></form>}
     </dialog>
-  </section>;
+  </section>
+  {credentialAccess && canManage && <WorkerCredentials key={`credentials:${workerId}`} workerId={workerId} workerCode={code} active={active} enabled={credentialAccess} authority={authority}/>}
+  </>;
 }

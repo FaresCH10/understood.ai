@@ -5,6 +5,7 @@ import {routeNewCase} from './case-routing.mjs';
 import {caseDeadlineOverride} from './case-reviews.mjs';
 import {clarificationActionCommand,clarificationActionId,clarificationCaseId,clarificationActionReceiptRow,exactClarificationAction} from '../clarification-action-input.mjs';
 import {requireSiteOperational} from './site-lifecycle.mjs';
+import {requireWritableEntitlement} from './entitlements.mjs';
 
 const roles=['owner','supervisor','auditor'];
 const iso=(value) => value instanceof Date ? value.toISOString() : value;
@@ -33,6 +34,7 @@ export async function requestHelp(pool,session,assignmentId,input,{schema='publi
       if (old.org_id!==session.org_id || old.site_id!==session.site_id || old.assignment_id!==assignmentId || old.text!==text) throw new Error('Help request conflict');
       return {id:input.requestId,status:old.status,duplicate:true};
     }
+    await requireWritableEntitlement(client,session.org_id);
     // Help is independent of an answer and may be requested after a deadline, but not on withdrawn content.
     const publication=(await client.query('SELECT state,publication_content_available(id) AS content_available FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[assignment.publication_id,session.org_id,session.site_id])).rows[0];
     if (publication?.state!=='published' || !publication.content_available) throw new Error('Assignment unavailable');

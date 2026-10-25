@@ -2,6 +2,7 @@ import { ensureRecordingSchema, isCurrentRecording, responseColumns } from "./re
 import {NOW,transaction} from './db.mjs';
 import {ensureReportAudienceSchema,reportScope,selectReport} from './report-scope.mjs';
 import {reportPublicationFilters} from './report-input.mjs';
+import {WORKER_LANGUAGE_CODES} from './languages.mjs';
 export {reportPublicationFilters} from './report-input.mjs';
 
 export function publicationDateBounds({from,through}) {
@@ -47,6 +48,25 @@ export function csvCell(value) {
   return `"${safe.replaceAll('"', '""')}"`;
 }
 
+const present=(db,name)=>!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
+const json=(value,fallback)=>{if(value&&typeof value==='object')return value;try{return JSON.parse(value);}catch{return fallback;}};
+
+export function publicationModes(snapshot) {
+  const value=json(snapshot,{});
+  return {
+    responseMode:value?.responseMode==='acknowledge'?'acknowledge':value?.responseMode==='question'?'question':'legacy',
+    deliveryMode:['text','voice','both'].includes(value?.deliveryMode)?value.deliveryMode:'legacy',
+  };
+}
+
+export function reportDelivery(send,states=[]) {
+  if(!send)return null;
+  const counts={preparing:0,available:0,blocked:0,failed:0,withdrawn:0};
+  for(const row of states)if(Object.hasOwn(counts,row.state))counts[row.state]+=Number(row.count ?? row.n ?? 1);
+  return {requestId:send.request_id,state:send.state,captured:Number(send.audience_count),delivered:Number(send.delivered),
+    undelivered:Number(send.undelivered),undeliveredReasons:json(send.undelivered_json,[]),states:counts};
+}
+
 export function reportActivity(db,session,publication,input={}) {
   const filters=reportScope(input);
   ensureReportAudienceSchema(db);
@@ -62,31 +82,48 @@ export function reportActivity(db,session,publication,input={}) {
   const timezone=db.prepare('SELECT timezone FROM sites WHERE id=? AND org_id=?').get(session.site_id,session.org_id)?.timezone;
   if(!timezone)throw Error('Forbidden');
   const audience=db.prepare('SELECT * FROM publication_report_audience WHERE publication_id=? AND org_id=? AND site_id=?').all(publication.id,session.org_id,session.site_id);
-  return selectReport(rows,publication.version,filters,timezone,audience);
+  const send=present(db,'instruction_sends')
+    ? db.prepare(`SELECT request_id,state,audience_count,delivered,undelivered,undelivered_json FROM instruction_sends
+      WHERE publication_id=? AND org_id=? AND site_id=?`).get(publication.id,session.org_id,session.site_id)
+    : null;
+  const states=send && present(db,'instruction_deliveries')
+    ? db.prepare('SELECT state,COUNT(*) AS count FROM instruction_deliveries WHERE request_id=? GROUP BY state').all(send.request_id)
+    : [];
+  const resolvedAssignmentIds=present(db,'clarifications')
+    ? db.prepare(`SELECT DISTINCT c.assignment_id FROM clarifications c JOIN assignments a
+      ON a.id=c.assignment_id AND a.org_id=c.org_id WHERE a.org_id=? AND a.site_id=? AND a.publication_id=? AND c.status='resolved'`)
+      .all(session.org_id,session.site_id,publication.id).map((row)=>row.assignment_id)
+    : [];
+  return selectReport(rows,publication.version,filters,timezone,audience,
+    {...publicationModes(publication.snapshot_json),delivery:reportDelivery(send,states),resolvedAssignmentIds});
 }
 
 export function activityRows(db,session,publication) {
   return reportActivity(db,session,publication).rows;
 }
 
-export function activityRow(row, version) {
+export function activityRow(row, version, modes={}) {
   const currentAudio = isCurrentRecording(row);
-  const receivedAt = currentAudio ? row.audio_at : row.attempt_at;
-  return [row.code, row.language, currentAudio ? row.audio_status : row.outcome ? 'assessed' : row.attempt_at ? 'assessment_pending' : 'awaiting_response',
-    currentAudio || (row.attempt_at && !row.outcome) ? 'unassessed' : row.outcome || '', receivedAt instanceof Date ? receivedAt.toISOString() : receivedAt || '', version];
+  const acknowledgedAt = currentAudio ? null : row.acknowledged_at;
+  const receivedAt = currentAudio ? row.audio_at : row.attempt_at || acknowledgedAt;
+  const status = currentAudio ? row.audio_status : row.outcome ? 'assessed' : acknowledgedAt ? 'acknowledged' : row.attempt_at ? 'assessment_pending' : 'awaiting_response';
+  const cells=[row.code, row.language, status,
+    currentAudio || (row.attempt_at && !row.outcome) ? 'unassessed' : row.outcome || '', receivedAt instanceof Date ? receivedAt.toISOString() : receivedAt || '', version,
+    modes.responseMode || 'legacy', modes.deliveryMode || 'legacy'];
+  if(modes.showResolved)cells.push(modes.resolved?'resolved':'');
+  return cells;
+}
+
+const activityHeaders=["worker_id","language","response_status","assessment","received_at","briefing_version"];
+export function activityColumns(rows) {
+  const width=rows.length?rows[0].length:6;
+  if(![6,8,9].includes(width) || rows.some((row)=>!Array.isArray(row) || row.length!==width))throw new Error('Invalid activity rows');
+  if(width===9)return [...activityHeaders,"response_mode","delivery_mode","follow_up_status"];
+  return width===8?[...activityHeaders,"response_mode","delivery_mode"]:activityHeaders;
 }
 
 export function activityCsv(rows) {
-  const lines = [
-    [
-      "worker_id",
-      "language",
-      "response_status",
-      "assessment",
-      "received_at",
-      "briefing_version",
-    ],
-  ];
+  const lines = [activityColumns(rows)];
   lines.push(...rows);
   return (
     "\uFEFF" +
@@ -100,7 +137,7 @@ export function briefingActivityCsv(db, session, publication) {
 }
 
 export function languageBreakdown(rows) {
-  return ['en', 'ar', 'ur'].map((language) => {
+  return WORKER_LANGUAGE_CODES.map((language) => {
     const group = rows.filter((row) => row[1] === language);
     const assigned = group.length;
     const received = group.filter((row) => row[2] !== 'awaiting_response').length;

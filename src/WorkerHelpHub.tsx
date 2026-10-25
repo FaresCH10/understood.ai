@@ -1,10 +1,10 @@
 import {ChevronLeft,ChevronRight,MessageCircle,TriangleAlert} from 'lucide-react';
-import type {WorkerUiLanguage} from './worker-ui-language';
+import {type WorkerUiLanguage,workerUiDirection} from './worker-ui-language';
 import {workerNavigationText} from './worker-navigation';
 
 type HelpAssignment={id:string;title:string;language:string;version:number};
 export function WorkerHelpHub({language,items,loading,failed,disabled,onOpen,onFollowup}:{language:WorkerUiLanguage;items:HelpAssignment[];loading:boolean;failed:boolean;disabled:boolean;onOpen:(id:string)=>void;onFollowup:()=>void}){
-  const t=workerNavigationText[language],Forward=language==='en'?ChevronRight:ChevronLeft;
+  const t=workerNavigationText[language],Forward=workerUiDirection(language)==='rtl'?ChevronLeft:ChevronRight;
   return <section className="worker-help-hub" aria-labelledby="worker-help-hub-title">
     <h1 id="worker-help-hub-title">{t.helpTitle}</h1>
     <p className="notice notice-amber worker-help-contact"><TriangleAlert size={22} aria-hidden="true"/>{t.urgent}</p>

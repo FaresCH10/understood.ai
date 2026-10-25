@@ -35,7 +35,7 @@ export async function sendAuthMail(config,id,message,fetchImpl=fetch) {
   if(!config.available) throw new Error('Email delivery unavailable');
   if(typeof id!=='string' || !/^[a-f0-9-]{36}$/i.test(id) || !message || typeof message.email!=='string'
     || message.email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(message.email)
-    || !['Reset your Understood password','Your Understood password was changed','Your Understood invitation','New Understood pilot request'].includes(message.subject)
+    || !['Reset your Understood password','Your Understood password was changed','Your Understood invitation','New Understood pilot request','Verify your Understood account'].includes(message.subject)
     || typeof message.text!=='string' || message.text.length>3000) throw new Error('Invalid private email');
   try {
     const response=await fetchImpl('https://api.resend.com/emails',{method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),

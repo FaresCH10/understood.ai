@@ -22,8 +22,10 @@ export async function processOneDeletionPseudonym(pool,{schema='public'}={}){
     const pseudonym=`Deleted ${randomUUID()}`;
     await client.query('INSERT INTO worker_deletion_pseudonyms VALUES($1,$2,$3,$4,$5,$6,clock_timestamp())',
       [row.id,row.org_id,row.site_id,row.worker_id,createHash('sha256').update(row.code).digest('hex'),pseudonym]);
-    await client.query('UPDATE workers SET code=$1 WHERE id=$2',[pseudonym,row.worker_id]);
+    await client.query('UPDATE workers SET code=$1,name=NULL WHERE id=$2',[pseudonym,row.worker_id]);
     await client.query('DELETE FROM crew_memberships WHERE worker_id=$1',[row.worker_id]);
+    await client.query('DELETE FROM worker_credentials WHERE worker_id=$1',[row.worker_id]);
+    await client.query('DELETE FROM worker_setup_tokens WHERE worker_id=$1',[row.worker_id]);
     await domainAudit(client,{...row,principal_type:'system',principal_id:'deletion-worker'},'worker.identity.pseudonymized',row.worker_id);
     return true;
   });

@@ -1,7 +1,8 @@
 import {domainTransaction,requirePrincipal,domainAudit,checkedPublication,publicationPreflight,publish} from './domain.mjs';
-import {scheduleInput,schedulePage,scheduleCancel,scheduleHash,scheduleReceipt,scheduleFailure} from '../schedule-input.mjs';
+import {scheduleInput,schedulePage,scheduleCancel,scheduleHash,scheduledContentHash,scheduleReceipt,scheduleFailure} from '../schedule-input.mjs';
 import {publicationInput} from '../briefing-input.mjs';
 import {dispatchAllowed,dispatchPredicate} from './operations-gates.mjs';
+import {requireWritableEntitlement} from './entitlements.mjs';
 
 async function authority(client,session) {
   await requirePrincipal(client,session,'staff');
@@ -35,6 +36,7 @@ export async function createSchedule(pool,session,briefingId,input,{schema='publ
       if(old.org_id!==session.org_id || old.site_id!==session.site_id || old.briefing_id!==briefingId || scheduleHash(old.request_json)!==scheduleHash(request))throw Error('Schedule request conflict');
       return {...scheduleReceipt(old),duplicate:true};
     }
+    await requireWritableEntitlement(client,session.org_id);
     if(!(await client.query('SELECT $1::timestamptz>clock_timestamp() AS valid',[request.publishAt])).rows[0].valid)throw Error('Scheduled publication must be in the future');
     if(briefing.next_version!==request.nextVersion)throw Error('Draft revision changed');
     if((await client.query("SELECT 1 FROM publication_schedules WHERE briefing_id=$1 AND state='queued'",[briefingId])).rows.length)throw Error('A publication schedule is already pending');
@@ -74,7 +76,10 @@ export async function cancelSchedule(pool,session,briefingId,id,input,{schema='p
 }
 export async function processOneSchedule(pool,{schema='public',integrationMode,storage}={}) {
   const row=await domainTransaction(pool,schema,async client=>(await client.query(`SELECT * FROM publication_schedules WHERE state='queued' AND publish_at<=clock_timestamp() AND (retry_at IS NULL OR retry_at<=clock_timestamp())
-    AND ${dispatchPredicate('publication_schedules')} ORDER BY publish_at,id LIMIT 1`)).rows[0]);
+    AND ${dispatchPredicate('publication_schedules')}
+    AND NOT EXISTS(SELECT 1 FROM organization_entitlements e WHERE e.org_id=publication_schedules.org_id
+      AND (e.state='read_only' OR (e.ends_at IS NOT NULL AND e.ends_at<=clock_timestamp())))
+    ORDER BY publish_at,id LIMIT 1`)).rows[0]);
   if(!row)return false;
   const request=row.request_json,session={org_id:row.org_id,site_id:row.site_id,principal_type:'staff',principal_id:row.requested_by,role:row.authority_json.role};
   try {
@@ -83,10 +88,10 @@ export async function processOneSchedule(pool,{schema='public',integrationMode,s
         if(!await dispatchAllowed(client,row.org_id))throw Error('Operational dispatch paused');
         if(scheduleHash(await authority(client,session))!==scheduleHash(current.authority_json))throw Error('Scheduled authority changed');
         if(briefing.next_version!==request.nextVersion || briefing.revision!==request.revision)throw Error('Draft revision changed');
-        if(scheduleHash(briefing.prepared_json)!==current.snapshot_hash)throw Error('Scheduled content changed');
+        if(scheduleHash(briefing.prepared_json)!==current.snapshot_hash && scheduledContentHash(briefing.prepared_json)!==current.snapshot_hash)throw Error('Scheduled content changed');
       }});
   }catch(error) {
-    if(['Operational dispatch paused','Workspace access paused'].includes(error.message))return true;
+    if(['Operational dispatch paused','Workspace access paused','Workspace is read-only'].includes(error.message))return true;
     const reason=scheduleFailure(error),terminal=!!reason || row.attempts>=2;
     await domainTransaction(pool,schema,async client=>{
       if(!await dispatchAllowed(client,row.org_id))return;

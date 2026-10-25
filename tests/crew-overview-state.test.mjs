@@ -12,6 +12,8 @@ const overview={items:[crew],total:1,page:1,pageSize:5,site:{id:'beirut',name:'�
 
 test('team view accepts actual bounded evidence and keeps missing legacy snapshot distinct from zero',()=>{
   assert.deepEqual(readCrewOverview(overview,expected),overview);
+  const acknowledged={...metrics,matches:0,unassessed:0,acknowledged:1},ackCrew={...crew,metrics:acknowledged},ackOverview={...overview,metrics:acknowledged,items:[ackCrew]};
+  assert.doesNotThrow(()=>readCrewOverview(ackOverview,expected));
   assert.doesNotThrow(()=>readCrewOverview({...overview,crewSnapshotAvailable:false,items:[{...crew,metrics:null}]},expected));
   assert.doesNotThrow(()=>readCrewOverview({...overview,publication:null,metrics:null,crewSnapshotAvailable:false,items:[{...crew,metrics:null}]},expected));
   assert.doesNotThrow(()=>readCrewOverview({...overview,items:[],page:2}, {...expected,page:2}));
@@ -22,6 +24,7 @@ test('team overview rejects forged scope, denominator, snapshot, paging, contact
     {...overview,items:[crew,crew],total:2},{...overview,items:[{...crew,id:'../bad'}]},{...overview,items:[{...crew,metrics:{...metrics,pending:0}}]},
     {...overview,items:[{...crew,id:'one'},{...crew,id:'two'}],total:2},{...overview,crewSnapshotAvailable:false},
     {...overview,publication:null},{...overview,metrics:{...metrics,completion:80}},{...overview,metrics:{...metrics,assigned:6000}},
+    {...overview,metrics:{...metrics,acknowledged:1}},{...overview,metrics:{...metrics,matches:0,unassessed:0,acknowledged:2}},
     {...overview,site:{...overview.site,id:'other-site'}},{...overview,site:{...overview.site,timezone:'Not/AZone'}},
     {...overview,contacts:{...overview.contacts,primary:{name:'Bad',role:'administrator'}}},
     {...overview,contacts:{...overview.contacts,primary:{...overview.contacts.primary,email:'private@example.test'}}},
@@ -32,12 +35,18 @@ test('team overview rejects forged scope, denominator, snapshot, paging, contact
 });
 
 test('selected current members must match the exact crew and site, with no extra private data',()=>{
-  const worker={id:'worker',org_id:'cedar',site_id:'beirut',code:'عامل QA-1',language:'ar',active:true,crew_id:'crew',crew_name:'فريق QA'};
+  const worker={id:'worker',org_id:'cedar',site_id:'beirut',code:'عامل QA-1',name:'Rana',language:'ar',language_selection_required:false,language_selected:true,
+    language_selected_at:null,language_selected_by:null,active:true,crew_id:'crew',crew_name:'فريق QA',pending_language_request:null};
   const page={items:[worker],total:1,page:1,pageSize:5},selection={...expected,crewId:'crew'};
   assert.deepEqual(readCrewMembers(page,selection),page);
   for(const value of [{...page,items:[{...worker,crew_id:'other'}]}, {...page,items:[{...worker,site_id:'other'}]},
     {...page,items:[{...worker,active:false}]},{...page,items:[{...worker,grant:'PRIVATE'}]},
+    {...page,items:[{...worker,language:'xx'}]},{...page,items:[{...worker,language_selected:false}]},
+    {...page,items:[{...worker,name:'\n'}]},{...page,items:[{...worker,pending_language_request:{id:'r',currentLanguage:'ar',requestedLanguage:'ar',reason:'',requestedAt:at}}]},
+    {...page,items:[{...worker,pending_language_request:{id:'r',currentLanguage:'ar',requestedLanguage:'ur',reason:'',requestedAt:at,private:'x'}}]},
     {...page,items:[worker,worker],total:2},{...page,total:0}])assert.throws(()=>readCrewMembers(value,selection),/cannot be verified/);
+  const request={id:'r',currentLanguage:'ar',requestedLanguage:'ur',reason:'Need Urdu',requestedAt:at};
+  assert.doesNotThrow(()=>readCrewMembers({...page,items:[{...worker,pending_language_request:request}]},selection));
 });
 
 test('crew mutation validation cannot report a different crew, actor scope or malformed outcome as confirmed',()=>{

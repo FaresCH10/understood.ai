@@ -49,7 +49,7 @@ export async function requestExport(pool,session,body,{schema='public'}={}) {
       if(JSON.stringify(reportScope(oldFilters))!==JSON.stringify(filters))throw Error('Export request ID conflict');
       return {...publicExport(await expireRow(client,old)),duplicate:true};
     }
-    const publication=(await client.query('SELECT id,version FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[body.publicationId,session.org_id,session.site_id])).rows[0];
+    const publication=(await client.query('SELECT id,version,snapshot_json FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[body.publicationId,session.org_id,session.site_id])).rows[0];
     if (!publication) throw new Error('Publication unavailable');
     await client.query(`SELECT w.id FROM workers w WHERE EXISTS(SELECT 1 FROM assignments a
       WHERE a.worker_id=w.id AND a.publication_id=$1) ORDER BY w.id FOR SHARE`,[publication.id]);

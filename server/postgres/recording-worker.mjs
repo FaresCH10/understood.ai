@@ -5,9 +5,11 @@ import { validatedAssessment } from './assessment-worker.mjs';
 import {routeNewCase} from './case-routing.mjs';
 import {dispatchAllowed,dispatchPredicate} from './operations-gates.mjs';
 import {currentRecordingClaim} from './recording-claim.mjs';
+import {recordPresentationBinding} from './presentations.mjs';
 import {reserveProviderOperation,providerRequestJournal} from './provider-budget.mjs';
 import {recordingTranscriptionInputHash} from '../ai/audio-provenance.mjs';
 import {assessmentInputHash} from '../ai/assessment-config.mjs';
+import {staffAuditOnce} from './notification-events.mjs';
 
 export async function processOneRecording(pool,adapter,storage,{schema='public'}={}) {
   if (typeof adapter?.transcribe!=='function' || typeof adapter.assess!=='function' || typeof storage?.read!=='function') throw new Error('Recording processor unavailable');
@@ -53,7 +55,7 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
       return true;
     }
     const snapshot = input.snapshot_json, facts = snapshot.rubric?.askedFacts;
-    const question = snapshot.languages?.[input.language]?.question || snapshot.question;
+    const question = job.presented_question || snapshot.languages?.[input.language]?.question || snapshot.question;
     const frozenInput={question,askedFacts:facts,language:input.language,publicationId:input.publication_id,version:input.version};
     if (typeof question!=='string' || !question.trim() || question.length>500 || !Array.isArray(facts)
       || !facts.length || facts.length>6 || !facts.every((fact) => typeof fact==='string' && fact.trim() && fact.length<=500)) throw new Error('Published rubric unavailable');
@@ -96,12 +98,16 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
         const attemptId=randomUUID();
         await client.query(`INSERT INTO attempts(id,org_id,site_id,assignment_id,submission_id,answer_text,outcome,reasons_json,evidence_json,received_at)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[attemptId,job.org_id,job.site_id,job.assignment_id,job.submission_id,transcript,result.outcome,JSON.stringify(result.reasons),JSON.stringify(result.evidence),job.received_at]);
+        await recordPresentationBinding(client,attemptId,job.presentation_id && job.presentation_language && job.presented_question
+          ? {id:job.presentation_id,org_id:job.org_id,site_id:job.site_id,assignment_id:job.assignment_id,
+            target_language:job.presentation_language,question:job.presented_question} : null);
         const repeat=(await client.query(`SELECT case_id FROM case_repeats WHERE assignment_id=$1 AND submission_id=$2
           AND org_id=$3 AND site_id=$4 AND status='submitted'`,[job.assignment_id,job.submission_id,job.org_id,job.site_id])).rows[0];
         if (result.outcome!=='matched' && !repeat) {
           const caseId=randomUUID();await client.query(`INSERT INTO clarifications(id,org_id,site_id,assignment_id,attempt_id,reason,status)
           VALUES ($1,$2,$3,$4,$5,$6,'open')`,[caseId,job.org_id,job.site_id,job.assignment_id,attemptId,result.reasons[0]]);
           await routeNewCase(client,job.org_id,job.site_id,caseId);
+          await staffAuditOnce(client,{orgId:job.org_id,siteId:job.site_id,action:'answer.needs_attention',objectId:caseId});
         }
         await domainAudit(client,{...job,principal_type:'system',principal_id:'recording-worker'},'answer.checked',attemptId);
       }

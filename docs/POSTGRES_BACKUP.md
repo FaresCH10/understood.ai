@@ -118,9 +118,9 @@ relations. Exact relational hashes, sequences, definitions, object inventory and
 current migrations are verified before the restored database is changed.
 
 Then one audit-atomic quarantine operation disables credential accounts and
-platform operators, revokes customer/operator sessions,
-worker grants, reset and invitation links; expires queued private mail and pilot
-inquiries; cancels pending invitations; suspends all tenants; pauses jobs/providers;
+platform operators, revokes customer/operator sessions, push subscriptions, worker grants,
+reset and invitation links; cancels queued/sending push deliveries; expires queued private
+mail and pilot inquiries; cancels pending invitations; suspends all tenants; pauses jobs/providers;
 disables provider policies; and marks interrupted provider requests/verifications
 uncertain instead of fabricating completion. Existing publications, assignments,
 receipts, accepted provider evidence and deletion/retention journals stay intact.

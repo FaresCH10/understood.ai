@@ -1,6 +1,7 @@
 const uuid=value=>typeof value==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export function settingsRequestId(value){if(!uuid(value))throw Error('Invalid settings request');return value;}
 import {staffFilters,staffReference} from './staff-input.mjs';
+import {CONTENT_LANGUAGE_CODES} from './languages.mjs';
 export function siteContactFilters(input={}) {
   const filters=staffFilters(input);
   if(Object.keys(input).some(key=>!['search','page','pageSize'].includes(key)))throw Error('Invalid settings request');
@@ -8,8 +9,9 @@ export function siteContactFilters(input={}) {
 }
 export const siteContactDto=row=>row?{id:row.id,name:row.name,role:row.role,available:!!row.active && ['owner','supervisor'].includes(row.role)}:null;
 export function generationLanguages(value) {
-  if(!Array.isArray(value) || !value.length || value.length>3 || !value.includes('en') || !value.every(code=>['en','ar','ur'].includes(code)) || new Set(value).size!==value.length)throw Error('Invalid generation languages');
-  return ['en',...['ar','ur'].filter(code=>value.includes(code))];
+  if(!Array.isArray(value) || !value.length || value.length>CONTENT_LANGUAGE_CODES.length || !value.includes('en')
+    || !value.every(code=>CONTENT_LANGUAGE_CODES.includes(code)) || new Set(value).size!==value.length)throw Error('Invalid generation languages');
+  return ['en',...CONTENT_LANGUAGE_CODES.filter(code=>code!=='en' && value.includes(code))];
 }
 export function settingsInput(kind,input) {
   const fields=kind==='organization' ? ['name','supportEmail'] : kind==='site' ? ['name','timezone','generationLanguages','primaryContactId','deputyContactId'] : [];

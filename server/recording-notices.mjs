@@ -3,6 +3,7 @@ import {NOW,transaction} from './db.mjs';
 import {recordingNoticeInput,noticeRequestId,sameNoticeRequest,noticeView} from './recording-notice-input.mjs';
 import {staffRecoveryScope} from './staff-input.mjs';
 import {requireWorkerSiteAccess} from './site-access.mjs';
+import {workerCredentialSessionValid} from './auth.mjs';
 
 export function ensureRecordingNoticeSchema(db){
   db.exec(`CREATE TABLE IF NOT EXISTS recording_notices (
@@ -34,9 +35,7 @@ function authority(db,session,write=false){
   if(session.token_hash!==undefined && !db.prepare(`SELECT 1 FROM sessions WHERE token_hash=? AND org_id=? AND site_id=?
     AND principal_type=? AND principal_id=? AND revoked_at IS NULL AND expires_at>?`)
     .get(session.token_hash,session.org_id,session.site_id,session.principal_type,session.principal_id,NOW()))throw Error('Sign in required');
-  if(session.principal_type==='worker' && session.access_mode==='credential' && !db.prepare(`SELECT 1 FROM worker_grants
-    WHERE id=? AND worker_id=? AND org_id=? AND site_id=? AND redeemed_at IS NOT NULL AND revoked_at IS NULL AND expires_at>?`)
-    .get(session.grant_id,session.principal_id,session.org_id,session.site_id,NOW()))throw Error('Sign in required');
+  if(session.principal_type==='worker' && session.access_mode==='credential' && !workerCredentialSessionValid(db, session))throw Error('Sign in required');
   return {...session,...(session.principal_type==='worker'?{language:row.language}:{})};
 }
 const current=(db,session)=>db.prepare('SELECT * FROM recording_notices WHERE org_id=? AND site_id=?').get(session.org_id,session.site_id);

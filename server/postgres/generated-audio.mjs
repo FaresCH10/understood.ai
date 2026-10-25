@@ -4,6 +4,7 @@ import {readGlossarySnapshot} from './glossary.mjs';
 import {bundleHash,checkedPreparedBundle,preparedAudioReferences,reviewContent} from '../ai/prepared-bundle.mjs';
 import {inspectWav} from '../audio.mjs';
 import {appendPreparationStage,systemStage} from './preparation-progress.mjs';
+import {isWorkerLanguage} from '../languages.mjs';
 import {dispatchAllowed} from './operations-gates.mjs';
 import {checkPreparationAuthority} from './preparation-authority.mjs';
 import {linkPreparationOperations,preparationBundleOperations} from './preparation-evidence.mjs';
@@ -188,7 +189,7 @@ export async function staffArtifactUrls(client,session,briefingId,version,snapsh
 
 export async function getStaffArtifactSpeech(pool,session,briefingId,versionType,version,language,kind,storage,{schema='public'}={}) {
   const identity=value=>typeof value==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
-  if(!identity(briefingId) || !['draft','publication'].includes(versionType) || !['en','ar','ur'].includes(language) || !['body','question'].includes(kind)
+  if(!identity(briefingId) || !['draft','publication'].includes(versionType) || !isWorkerLanguage(language) || !['body','question'].includes(kind)
     || (versionType==='draft' ? !/^[1-9][0-9]{0,14}$/.test(version) || !Number.isSafeInteger(Number(version)) : !identity(version))) throw Error('Artifact audio unavailable');
   const load=()=>domainTransaction(pool,schema,async client=>{
     await requirePrincipal(client,session,'staff');

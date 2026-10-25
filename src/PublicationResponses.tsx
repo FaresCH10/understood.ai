@@ -8,10 +8,10 @@ type Publication={id:string;version:number;state:string};
 type Row={assignmentId:string;worker:string;language:string;status:string;receivedAt:string|null};
 type Page={publication:Publication;items:Row[];total:number;page:number;pageSize:number};
 type Receipt={sequence:string;kind:string;receivedAt:string;isLatest:boolean;answerText:string|null;outcome:string|null;reasons:string[];recordingId:string|null;audioStatus:string|null;evidence:{factIndex:number;quote:string}[]};
-type Detail={publication:Publication;assignment:{id:string;worker:string;language:string;dueAt:string|null};question:string;workerQuestion:string|null;facts:string[];receipts:Receipt[];total:number;page:number;pageSize:number;cases:{id:string;status:string;reason:string}[]};
+type Detail={publication:Publication;assignment:{id:string;worker:string;language:string;dueAt:string|null};question:string|null;workerQuestion:string|null;facts:string[];receipts:Receipt[];total:number;page:number;pageSize:number;cases:{id:string;status:string;reason:string}[];responseMode?:string;deliveryMode?:string;acknowledgedAt?:string|null};
 type WorkerAssignment=Row & {publicationId:string;title:string;version:number;state:string;dueAt:string|null};
 type WorkerAssignmentPage={worker:{id:string;code:string;active:boolean};items:WorkerAssignment[];total:number;page:number;pageSize:number};
-const labels:Record<string,string>={awaiting_response:'Awaiting response',assessment_pending:'Assessment pending',matched:'Matches key facts',clarification:'Needs clarification',unassessable:'Could not assess',failed_audio:'Audio check failed'};
+const labels:Record<string,string>={awaiting_response:'Awaiting response',acknowledged:'Acknowledged',assessment_pending:'Assessment pending',matched:'Matches key facts',clarification:'Needs clarification',unassessable:'Could not assess',failed_audio:'Audio check failed'};
 const languageNames:Record<string,string>={en:'English',ar:'Arabic',ur:'Urdu'};
 const date=(value:string|null) => value ? new Date(value).toLocaleString() : 'Not received';
 
@@ -66,7 +66,7 @@ export function PublicationResponses({briefingId,publication,onSelect,context,re
         <Paging page={page} total={data.total} size={20} onChange={setPage} label="recipients" />
       </>}
     </section>{assignmentId && <ResponseDetail authority={authority} key={`${publicationId}:${assignmentId}`} publicationId={publicationId} assignmentId={assignmentId} refresh={refresh+tick} onClose={() => {recipientButtons.current[assignmentId]?.focus();setAssignmentId(null);}} navigate={navigate} canPlayAudio={canPlayAudio} />}</div>
-    <div className="notice notice-blue">A matching answer records the requested key facts. It does not certify understanding or safe work.</div>
+    <div className="notice notice-blue">A matching answer records the requested key facts; an acknowledgment records only that the instruction was opened. Neither certifies understanding or safe work.</div>
   </>;
 }
 
@@ -94,9 +94,9 @@ export function ResponseDetail({publicationId,assignmentId,refresh,onClose,navig
     {loading ? <p role="status">Loading submission history...</p> : error ? <p role="alert">{error}</p> : data && <>
       <p>v{data.publication.version} · {data.publication.state} · {languageNames[data.assignment.language]}</p>
       {data.assignment.dueAt && <p>Due {date(data.assignment.dueAt)}</p>}
-      <h3>Question</h3><p>{data.question}</p>{data.workerQuestion && data.workerQuestion!==data.question && <p lang={data.assignment.language} dir={data.assignment.language==='en' ? 'ltr' : 'rtl'}>{data.workerQuestion}</p>}
+      {data.responseMode==='acknowledge' ? <><h3>Receipt</h3>{data.acknowledgedAt ? <><Assessment value="acknowledged" /><p>{date(data.acknowledgedAt)}</p></> : <p>Awaiting acknowledgment.</p>}</> : <><h3>Question</h3><p>{data.question}</p>{data.workerQuestion && data.workerQuestion!==data.question && <p lang={data.assignment.language} dir={data.assignment.language==='en' ? 'ltr' : 'rtl'}>{data.workerQuestion}</p>}</>}
       <h3>Published key facts</h3><ul>{data.facts.map((fact,index) => <li key={index}>{fact}</li>)}</ul>
-      <h3>Accepted submissions</h3>{!data.receipts.length && <p>No accepted response yet.</p>}
+      {data.responseMode!=='acknowledge' && <><h3>Accepted submissions</h3>{!data.receipts.length && <p>No accepted response yet.</p>}
       {data.receipts.map((receipt) => <article className="case-attempt" key={receipt.sequence}>
         <div className="response-receipt-heading"><strong>{receipt.kind==='audio' ? 'Audio answer' : 'Typed answer'}{receipt.isLatest ? ' · Latest' : ''}</strong><small>{date(receipt.receivedAt)}</small></div>
         <Assessment value={receipt.outcome || (receipt.audioStatus==='failed' ? 'failed_audio' : 'assessment_pending')} />
@@ -105,7 +105,7 @@ export function ResponseDetail({publicationId,assignmentId,refresh,onClose,navig
         {receipt.reasons.length>0 && <ul>{receipt.reasons.map((reason,index) => <li key={index}>{reason.replaceAll('_',' ')}</li>)}</ul>}
         {receipt.evidence.map((item,index) => <blockquote key={index}>Fact {item.factIndex+1}: {item.quote}</blockquote>)}
       </article>)}
-      <Paging page={page} total={data.total} size={10} onChange={setPage} label="submissions" />
+      <Paging page={page} total={data.total} size={10} onChange={setPage} label="submissions" /></>}
       {data.cases.length>0 && <><h3>Clarification records</h3><div className="row-list">{data.cases.map((item) => <button className="item-row" key={item.id} onClick={() => navigate(`clarifications/${item.id}`)}><span className="item-main"><strong>{item.reason}</strong><small>{item.status}</small></span><ChevronRight size={18} /></button>)}</div></>}
     </>}
   </section>;

@@ -211,8 +211,9 @@ export function processOneExport(db) {
 }
 
 export function exportCsv(rows) {
-  if (!Array.isArray(rows) || rows.length > 5000 || rows.some((entry) => !Array.isArray(entry) || entry.length !== 6
-    || entry.some((cell) => !['string', 'number'].includes(typeof cell)))) throw new Error('Invalid snapshot');
+  if (!Array.isArray(rows) || rows.length > 5000 || rows.some((entry) => !Array.isArray(entry) || ![6,8,9].includes(entry.length)
+    || entry.some((cell) => !['string', 'number'].includes(typeof cell)))
+    || (rows.length>0 && rows.some((entry) => entry.length!==rows[0].length))) throw new Error('Invalid snapshot');
   const csv=activityCsv(rows);
   if (Buffer.byteLength(csv)>MAX_BYTES) throw new Error('Export limit exceeded');
   return csv;

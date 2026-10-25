@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {sendWorkerRecording,WorkerAudioRetryError,workerAudioRetryText} from '../src/worker-audio-retry.ts';
 import {createRecordingSubmission} from '../src/audio.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2099-01-01T00:00:00.000Z'};
 const scope={assignmentId:'assignment-one',publicationId:'publication-one',version:3,language:'en'};
@@ -32,6 +33,19 @@ test('new audio performs session, receipt and exact assignment reads before a bo
   for(const {options} of requests){assert.equal(options.cache,'no-store');assert.equal(options.credentials,'include');assert.equal(options.headers['x-client-session-context'],session.clientContext);assert.ok(options.signal instanceof AbortSignal);}
   assert.equal(requests[3].options.headers['x-submission-id'],id);
   assert.deepEqual(new Uint8Array(await requests[3].options.body.arrayBuffer()),bytes);
+});
+
+test('a bound translated-question id is carried only as a validated upload header',async()=>{
+  const presentationId=crypto.randomUUID(),{send,requests}=fixture();
+  assert.equal((await sendWorkerRecording(send,session,scope,bytes,id,()=>true,presentationId)).id,receipt.id);
+  assert.equal(requests[3].options.headers['x-presentation-id'],presentationId);
+  const plain=fixture();await sendWorkerRecording(plain.send,session,scope,bytes,id);
+  assert.equal('x-presentation-id' in plain.requests[3].options.headers,false);
+  for(const bad of ['',`presentation-${id}`,'bad',crypto.randomUUID().toUpperCase(),1]){
+    const rejected=fixture();
+    await assert.rejects(sendWorkerRecording(rejected.send,session,scope,bytes,id,()=>true,bad),fail('input'));
+    assert.equal(rejected.requests.length,0);
+  }
 });
 
 test('a changed interface preference does not replace or block the frozen assignment language',async()=>{
@@ -114,6 +128,7 @@ test('invalid recording identities and payload bounds are rejected before any re
   const {send,requests}=fixture();
   for(const args of [[scope,new Uint8Array(0),id],[scope,new Uint8Array(2880046),id],[scope,new Uint8Array(8045),id],[scope,bytes,'bad'],[{...scope,version:0},bytes,id],[{...scope,assignmentId:''},bytes,id],[{...scope,publicationId:''},bytes,id],[{...scope,language:'xyz'},bytes,id]])await assert.rejects(sendWorkerRecording(send,session,...args),fail('input'));
   assert.equal(requests.length,0);
-  for(const language of ['en','ar','ur'])assert.deepEqual(Object.keys(workerAudioRetryText[language]).sort(),['conflict','input','receipt','session','unavailable']);
+  assertWorkerDictionary(workerAudioRetryText,'workerAudioRetryText');
+  assert.deepEqual(Object.keys(workerAudioRetryText.en).sort(),['conflict','input','receipt','session','unavailable']);
   for(const copy of Object.values(workerAudioRetryText))for(const value of Object.values(copy))assert.ok(value.trim().length>20);
 });

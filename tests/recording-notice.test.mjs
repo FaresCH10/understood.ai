@@ -1,23 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {recordingNotice} from '../src/recording-notice.ts';
+import {WORKER_LOCALES} from '../server/languages.mjs';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
-test('recording notice localizes every privacy statement and distinguishes synthetic from configured AI',()=>{
-  const notices=['en','ar','ur'].map(language=>{
-    const synthetic=recordingNotice(language,true),configured=recordingNotice(language,false);
+test('recording notice localizes every privacy statement for every worker UI language and distinguishes synthetic from configured AI',()=>{
+  const dictionary=Object.fromEntries(WORKER_LOCALES.map(({code})=>[code,recordingNotice(code,true)]));
+  assertWorkerDictionary(dictionary,'recordingNotice');
+  for(const {code} of WORKER_LOCALES){
+    const synthetic=dictionary[code],configured=recordingNotice(code,false);
     assert.deepEqual(Object.keys(synthetic),['title','local','access','processing','retention']);
-    for(const value of Object.values(synthetic))assert.ok(typeof value==='string' && value.trim().length>0);
     for(const field of ['title','local','access','retention'])assert.equal(synthetic[field],configured[field]);
     assert.notEqual(synthetic.processing,configured.processing);
     assert.doesNotMatch(Object.values(synthetic).join(' '),/\b(?:30|90) days\b|GDPR compliant|legally consented/);
-    return synthetic;
-  });
-  assert.equal(new Set(notices.map(value=>value.local)).size,3);
-  assert.match(notices[0].local,/Leaving or reloading can lose an unsaved preview/);
-  assert.match(notices[0].local,/unless you explicitly save a copy/);
-  assert.match(notices[0].local,/Saving does not send it; sending requires a separate action/);
-  assert.match(notices[0].processing,/not sent to a live AI provider/);
-  assert.match(notices[0].retention,/does not erase old backups/);
-  assert.match(notices[1].local,/[\u0600-\u06ff]/);
-  assert.match(notices[2].local,/[\u0600-\u06ff]/);
+  }
+  assert.equal(new Set(Object.values(dictionary).map(value=>value.local)).size,WORKER_LOCALES.length);
+  const english=dictionary.en;
+  assert.match(english.local,/Leaving or reloading can lose an unsaved preview/);
+  assert.match(english.local,/unless you explicitly save a copy/);
+  assert.match(english.local,/Saving does not send it; sending requires a separate action/);
+  assert.match(english.processing,/not sent to a live AI provider/);
+  assert.match(english.retention,/does not erase old backups/);
 });

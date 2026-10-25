@@ -5,6 +5,7 @@ import {OPERATOR_COOKIE,HOSTED_OPERATOR_COOKIE,authenticateOperator,requireOpera
 import {operationsOverview,operationsTenants,operationsAudit,saveOperatorControl,operatorReceipt,operationsJobs,retryOperationsJob} from './operations.mjs';
 import {readProviderControls,saveProviderPolicy,runProviderVerification} from './provider-controls.mjs';
 import {operationsTenantAccess} from './operator-tenant-access.mjs';
+import {operationsEntitlements,saveOperatorEntitlement,saveActivationDecision} from './entitlement-operations.mjs';
 
 export async function handleOperationsRoute(pool,req,res,url,{enabled=false,schema='public',providerVerification,workerVerification=false,pipeline,secure=false,clientAddress=req.socket.remoteAddress}={}) {
   const path=url.pathname;
@@ -62,6 +63,20 @@ export async function handleOperationsRoute(pool,req,res,url,{enabled=false,sche
     if(path==='/api/ops/jobs/retry' && req.method==='POST') {
       if(url.search)throw Error('Invalid operator command');
       const body=await readJson(req,4096),result=await retryOperationsJob(pool,actor,body,options);
+      send(res,200,{requestId:body.requestId,clientContext:operatorSession(actor).clientContext,...result});return true;
+    }
+    if(path==='/api/ops/entitlements' && req.method==='GET') {
+      if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid operator filters');
+      send(res,200,await operationsEntitlements(pool,actor,Object.fromEntries(url.searchParams),options));return true;
+    }
+    if(path==='/api/ops/entitlements' && req.method==='POST') {
+      if(url.search)throw Error('Invalid operator command');
+      const body=await readJson(req,4096),result=await saveOperatorEntitlement(pool,actor,body,options);
+      send(res,200,{requestId:body.requestId,clientContext:operatorSession(actor).clientContext,...result});return true;
+    }
+    if(path==='/api/ops/entitlements/decision' && req.method==='POST') {
+      if(url.search)throw Error('Invalid operator command');
+      const body=await readJson(req,4096),result=await saveActivationDecision(pool,actor,body,options);
       send(res,200,{requestId:body.requestId,clientContext:operatorSession(actor).clientContext,...result});return true;
     }
     if(path==='/api/ops/audit' && req.method==='GET') {

@@ -8,6 +8,10 @@ export const notificationKinds = Object.freeze({
   'clarification.escalated': {label:'Overdue clarification escalated',destination:'clarifications'},
   'clarification.resolved': {label:'Human follow-up recorded',destination:'clarifications'},
   'clarification.message': {label:'Clarification conversation updated',destination:'clarifications'},
+  'worker.language_requested': {label:'Worker requested a language change',destination:'people'},
+  'answer.needs_attention': {label:'Answer needs review or clarification',destination:'clarifications'},
+  'instruction.send_incomplete': {label:'Instruction delivery was incomplete',destination:'briefings'},
+  'assignment.overdue': {label:'Instruction assignment is overdue',destination:'briefings'},
   'export.ready': {label:'Report export ready',destination:'reports'},
   'export.failed': {label:'Report export failed',destination:'reports'},
 });

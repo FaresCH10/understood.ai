@@ -1,5 +1,10 @@
 # Feature register
 
+Production hardening 25 October 2026: this register is a historical feature checkpoint, not a
+current readiness percentage. Current release control is `docs/PRODUCTION_RELEASE_GATES.md`
+and requirement reconciliation is `docs/FUNCTIONAL_ACCEPTANCE_MATRIX.md`. All percentages and
+test counts below are historical. Production readiness is not established.
+
 Current Reports delta: [REPORT_LOCALIZATION.md](REPORT_LOCALIZATION.md). EN/AR/UR
 filters/history/status/recovery and scoped shell, persistent keyboard paging
 focus, truthful read failure, identical CSV bytes and exact original-command

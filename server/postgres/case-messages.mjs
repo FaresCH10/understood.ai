@@ -2,6 +2,8 @@ import {domainTransaction,requirePrincipal,domainAudit} from './domain.mjs';
 import {requireSiteOperational} from './site-lifecycle.mjs';
 import {caseMessageId,caseMessageInput,caseMessageFilters,caseMessageReceipt,caseMessageRow} from '../case-message-input.mjs';
 import {responseRead} from './responses.mjs';
+import {requireWritableEntitlement} from './entitlements.mjs';
+import {recordWorkerEvent} from './notification-events.mjs';
 
 export async function scopedCase(client,session,id,write=false) {
   caseMessageId(id);const type=session?.principal_type;
@@ -52,11 +54,19 @@ export function sendCaseMessage(pool,session,caseId,input,{schema='public'}={}) 
       if(exact.request_hash!==message.hash)throw Error('Conversation request conflict');return caseMessageReceipt(exact);
     }
     if((await client.query('SELECT 1 FROM case_followups WHERE id=$1',[message.id])).rows.length)throw Error('Conversation request conflict');
+    await requireWritableEntitlement(client,session.org_id);
     if(thread.status!=='open' || !thread.active || thread.publication_state!=='published' || !thread.content_available)throw Error('Conversation is closed');
     if(session.principal_type==='staff' && thread.language!=='en')throw Error('Follow-up translation unavailable');
     const row=(await client.query(`INSERT INTO case_messages(id,org_id,site_id,case_id,assignment_id,actor_type,actor_id,language,text,request_hash,created_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,clock_timestamp()) RETURNING *`,
       [message.id,session.org_id,session.site_id,caseId,thread.assignment_id,session.principal_type,session.principal_id,thread.language,message.text,message.hash])).rows[0];
-    await domainAudit(client,session,'clarification.message',message.id);return caseMessageReceipt(row);
+    await domainAudit(client,session,'clarification.message',message.id);
+    if(session.principal_type==='staff') {
+      const worker=(await client.query('SELECT worker_id FROM assignments WHERE id=$1 AND org_id=$2 AND site_id=$3',
+        [thread.assignment_id,session.org_id,session.site_id])).rows[0];
+      if(worker) await recordWorkerEvent(client,{orgId:session.org_id,siteId:session.site_id,workerId:worker.worker_id,
+        kind:'clarification.followup',objectType:'case_message',objectId:message.id,dedupeKey:`clarification.followup:${message.id}`});
+    }
+    return caseMessageReceipt(row);
   });
 }

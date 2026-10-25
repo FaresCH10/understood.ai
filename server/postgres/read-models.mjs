@@ -1,5 +1,5 @@
 import { domainTransaction,requirePrincipal } from './domain.mjs';
-import { responseColumns,isCurrentRecording } from '../recordings.mjs';
+import { postgresResponseColumns as responseColumns,isCurrentRecording } from '../recordings.mjs';
 import { metricsFromResponses } from '../domain.mjs';
 import { publicationResponses } from './reports.mjs';
 import { briefingFilters } from '../briefing-input.mjs';
@@ -23,9 +23,11 @@ const iso=(value) => value instanceof Date ? value.toISOString() : value;
 export async function sessionContext(pool,session,{schema='public'}={}) {
   return domainTransaction(pool,schema,async (client) => {
     await requirePrincipal(client,session,session.principal_type,[...readRoles,'administrator']);
-    const context=(await client.query(`SELECT o.name AS organization,st.name AS site,st.timezone FROM organizations o
-      JOIN sites st ON st.org_id=o.id WHERE o.id=$1 AND st.id=$2`,[session.org_id,session.site_id])).rows[0];
-    return {...context,siteState:(await siteLifecycleState(client,session.org_id,session.site_id)).state,role:session.principal_type,staffRole:session.principal_type==='staff' ? session.role : null,staffScope:staffSiteScope(session),staffRecoveryScope:staffRecoveryScope(session),billingRecoveryScope:billingRecoveryScope(session),templateRecoveryScope:templateRecoveryScope(session),name:session.name,language:session.language || 'en',workerId:session.principal_type==='worker' ? session.principal_id : null};
+    const {staff_interface_language,first_run_completed_at,has_site_settings,...context}=(await client.query(`SELECT o.name AS organization,st.name AS site,st.timezone,
+      ss.staff_interface_language,ss.first_run_completed_at,(ss.site_id IS NOT NULL) AS has_site_settings FROM organizations o
+      JOIN sites st ON st.org_id=o.id LEFT JOIN site_settings ss ON ss.site_id=st.id AND ss.org_id=st.org_id
+      WHERE o.id=$1 AND st.id=$2`,[session.org_id,session.site_id])).rows[0];
+    return {...context,siteState:(await siteLifecycleState(client,session.org_id,session.site_id)).state,role:session.principal_type,staffRole:session.principal_type==='staff' ? session.role : null,email:session.principal_type==='staff' ? session.email ?? null : null,staffInterfaceLanguage:session.principal_type==='staff' ? staff_interface_language ?? 'en' : null,firstRunRequired:session.principal_type==='staff' && session.role==='owner' && has_site_settings===true && first_run_completed_at===null,staffScope:staffSiteScope(session),staffRecoveryScope:staffRecoveryScope(session),billingRecoveryScope:billingRecoveryScope(session),templateRecoveryScope:templateRecoveryScope(session),name:session.name || session.code,language:session.language || 'en',languageSelectionRequired:session.principal_type==='worker' ? !!session.language_selection_required : false,languageSelectedAt:session.principal_type==='worker' ? session.language_selected_at ?? null : null,languageSelectedBy:session.principal_type==='worker' ? session.language_selected_by ?? null : null,workerId:session.principal_type==='worker' ? session.principal_id : null};
   });
 }
 
@@ -36,8 +38,8 @@ export async function listBriefings(pool,session,filters={}, {schema='public'}={
   return domainTransaction(pool,schema,async (client) => {
     await requirePrincipal(client,session,'staff',readRoles);
     const row=(await client.query(`WITH scoped AS (
-      SELECT b.id,b.title,b.state,b.revision,b.next_version,b.updated_at,p.version AS published_version,p.state AS publication_state,a.occurred_at AS archived_at,s.state AS schedule_state,s.publish_at AS scheduled_for
-      FROM briefings b LEFT JOIN LATERAL (SELECT version,state FROM publications
+      SELECT b.id,b.title,b.state,b.revision,b.next_version,b.updated_at,p.version AS published_version,p.state AS publication_state,p.id AS latest_publication_id,p.snapshot_json->'languages' AS languages,a.occurred_at AS archived_at,s.state AS schedule_state,s.publish_at AS scheduled_for
+      FROM briefings b LEFT JOIN LATERAL (SELECT id,version,state,snapshot_json FROM publications
         WHERE briefing_id=b.id AND org_id=b.org_id AND site_id=b.site_id ORDER BY version DESC LIMIT 1) p ON true
       LEFT JOIN briefing_archives a ON a.briefing_id=b.id AND a.org_id=b.org_id AND a.site_id=b.site_id
       LEFT JOIN LATERAL (SELECT state,publish_at FROM publication_schedules WHERE briefing_id=b.id AND org_id=b.org_id
@@ -50,7 +52,18 @@ export async function listBriefings(pool,session,filters={}, {schema='public'}={
       SELECT (SELECT COUNT(*)::int FROM filtered) AS total,
         (SELECT COALESCE(jsonb_agg(result ORDER BY ${aggregateOrder}),'[]') FROM (SELECT * FROM filtered ORDER BY ${order} LIMIT $6 OFFSET $7) result) AS items`,
       [session.org_id,session.site_id,search,status,publicationStatus,pageSize,(page-1)*pageSize,archiveStatus,scheduleStatus])).rows[0];
-    return {...row,page,pageSize};
+    const items=[];
+    for(const item of row.items){
+      const {latest_publication_id,languages,...rest}=item;
+      items.push({...rest,languages:Object.keys(languages || {}),metrics:latest_publication_id?metricsFromResponses(await publicationResponses(client,session,latest_publication_id)):null});
+    }
+    const counts=(await client.query(`SELECT COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE b.state='processing')::int AS processing,COUNT(*) FILTER (WHERE b.state='ready')::int AS ready,
+      COUNT(*) FILTER (WHERE EXISTS(SELECT 1 FROM briefing_archives a WHERE a.briefing_id=b.id AND a.org_id=b.org_id AND a.site_id=b.site_id))::int AS archived,
+      COUNT(*) FILTER (WHERE EXISTS(SELECT 1 FROM publications p WHERE p.briefing_id=b.id AND p.org_id=b.org_id AND p.site_id=b.site_id
+        AND p.version=(SELECT MAX(latest.version) FROM publications latest WHERE latest.briefing_id=b.id AND latest.org_id=b.org_id AND latest.site_id=b.site_id) AND p.state='published'))::int AS published
+      FROM briefings b WHERE b.org_id=$1 AND b.site_id=$2`,[session.org_id,session.site_id])).rows[0];
+    return {...row,items,page,pageSize,counts};
   });
 }
 
@@ -132,16 +145,25 @@ export async function getProcessing(pool,session,id,{schema='public'}={}) {
 }
 
 function workerContent(row,detail=false) {
-  const currentAudio=isCurrentRecording(row), lang=row.languages?.[row.language],expired=row.content_expired===true;
+  const currentAudio=isCurrentRecording(row), lang=row.delivery_content_json || row.languages?.[row.language],expired=row.content_expired===true;
   if (!lang && !expired) throw new Error('Assignment language unavailable');
+  const responseMode=row.response_mode||'question',deliveryMode=row.delivery_mode||'both',acknowledgedAt=iso(row.acknowledged_at);
+  const generatedSpeech=!expired && deliveryMode!=='text' && !!lang?.speech && typeof lang.speech==='object'
+    && !!lang.speech.body && !!lang.speech.question;
+  const deviceSpeech=!expired && deliveryMode!=='text' && lang?.speech==='device-synthesis-demo';
+  const speechOffered=deviceSpeech;
   // Explicit DTO: do not spread publication JSON or return internal reasons/rubric/notes/storage references.
   return {id:row.id,publicationId:row.publication_id,version:row.version,state:row.state,title:expired?'[Expired]':lang.title,language:row.language,
     ...(expired?{contentExpired:true}:{}),
-    dueAt:iso(row.due_at),...(row.repeat_request?{repeatRequest:row.repeat_request}:{}),outcome:currentAudio ? null : row.outcome,assessmentStatus:currentAudio || (row.attempt_at && !row.outcome) ? 'pending' : row.outcome ? 'complete' : null,
+    dueAt:iso(row.due_at),...(row.repeat_request?{repeatRequest:row.repeat_request}:{}),responseMode,deliveryMode,
+    outcome:responseMode==='acknowledge' ? null : currentAudio ? null : row.outcome,
+    assessmentStatus:responseMode==='acknowledge' ? acknowledgedAt ? 'complete' : null
+      : currentAudio || (row.attempt_at && !row.outcome) ? 'pending' : row.outcome ? 'complete' : null,
+    ...(acknowledgedAt?{acknowledgedAt}:{}),
     audioStatus:currentAudio ? row.audio_status : null,...(detail ? {recordingId:currentAudio ? row.recording_id : null,
-      content:expired?null:{title:lang.title,text:lang.text,question:lang.question,speech:lang.speech==='device-synthesis-demo' ? lang.speech : null},
-      ...(!expired && row.speech_active===true && lang.speech?.body && lang.speech?.question ? {speechUrls:{body:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/body`,question:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/question`}} : {}),
-      speechAvailable:!expired && lang.speech==='device-synthesis-demo' ? 'speechSynthesis' : null} : {})};
+      content:expired?null:{title:lang.title,text:lang.text,...(responseMode==='question'?{question:lang.question}:{}),speech:speechOffered ? lang.speech : null},
+      ...(!expired && row.speech_active===true && generatedSpeech && lang.speech?.body && lang.speech?.question ? {speechUrls:{body:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/body`,question:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/question`}} : {}),
+      speechAvailable:speechOffered ? 'speechSynthesis' : null} : {})};
 }
 
 export async function workerBriefings(pool,session,{schema='public',history=false}={},input={}) {
@@ -151,7 +173,7 @@ export async function workerBriefings(pool,session,{schema='public',history=fals
     const now=(await client.query('SELECT clock_timestamp() AS now')).rows[0].now.toISOString();
     const scope=`FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
       WHERE a.org_id=$1 AND a.site_id=$2 AND a.worker_id=$3`;
-    const accepted='EXISTS(SELECT 1 FROM submission_receipts sr WHERE sr.assignment_id=a.id AND sr.org_id=a.org_id)';
+    const accepted='(EXISTS(SELECT 1 FROM submission_receipts sr WHERE sr.assignment_id=a.id AND sr.org_id=a.org_id) OR EXISTS(SELECT 1 FROM acknowledgments ak WHERE ak.assignment_id=a.id AND ak.org_id=a.org_id))';
     const available="p.state='published' AND publication_content_available(p.id)";
     const followup=`(${available}) AND (${workerFollowupPredicate} OR ${pendingRepeatPredicate})`;
     const todo=`${available} AND (${pendingRepeatPredicate} OR ((a.due_at IS NULL OR a.due_at>$4::timestamptz) AND NOT ${accepted}))`;
@@ -159,7 +181,11 @@ export async function workerBriefings(pool,session,{schema='public',history=fals
       COUNT(*) FILTER(WHERE ${accepted})::int AS sent,COUNT(*) FILTER(WHERE ${followup})::int AS followup,
       COUNT(*) FILTER(WHERE ${todo})::int AS todo ${scope}`,
       [session.org_id,session.site_id,session.principal_id,now])).rows[0];
-    const rows=(await client.query(`SELECT a.id,a.due_at,p.id AS publication_id,p.version,p.state,p.snapshot_json->'languages' AS languages,a.language,NOT publication_content_available(p.id) AS content_expired,${pendingRepeatColumns},
+    const rows=(await client.query(`SELECT a.id,a.due_at,p.id AS publication_id,p.version,p.state,p.snapshot_json->'languages' AS languages,a.language,NOT publication_content_available(p.id) AS content_expired,
+      p.snapshot_json->>'responseMode' AS response_mode,p.snapshot_json->>'deliveryMode' AS delivery_mode,
+      (SELECT d.content_json FROM instruction_deliveries d WHERE d.assignment_id=a.id AND d.org_id=a.org_id
+        AND d.site_id=a.site_id AND d.worker_id=a.worker_id AND d.state='available') AS delivery_content_json,
+      ${pendingRepeatColumns},
       CASE WHEN ${available} AND a.due_at>$6::timestamptz AND NOT ${accepted} THEN
         (SELECT r.finished_at FROM assignment_reminders r WHERE r.assignment_id=a.id AND r.org_id=a.org_id AND r.site_id=a.site_id AND r.worker_id=a.worker_id AND r.state='visible') END AS reminder_at,
       ${responseColumns} ${scope}
@@ -175,10 +201,14 @@ export async function workerBriefing(pool,session,assignmentId,{schema='public'}
   return domainTransaction(pool,schema,async (client) => {
     await requirePrincipal(client,session,'worker');
     const row=(await client.query(`SELECT a.id,a.due_at,p.id AS publication_id,p.version,p.state,p.snapshot_json->'languages' AS languages,a.language,NOT publication_content_available(p.id) AS content_expired,
+      p.snapshot_json->>'responseMode' AS response_mode,p.snapshot_json->>'deliveryMode' AS delivery_mode,
+      d.content_json AS delivery_content_json,
       (gb.state='attached') AS speech_active,${pendingRepeatColumns},${responseColumns}
       FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
       JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
       LEFT JOIN generated_bundles gb ON gb.id::text=p.snapshot_json->'artifactBundle'->>'id' AND gb.org_id=p.org_id AND gb.site_id=p.site_id
+      LEFT JOIN instruction_deliveries d ON d.assignment_id=a.id AND d.org_id=a.org_id AND d.site_id=a.site_id
+        AND d.worker_id=a.worker_id AND d.state='available'
       WHERE a.id=$1 AND a.org_id=$2 AND a.site_id=$3 AND a.worker_id=$4`,[assignmentId,session.org_id,session.site_id,session.principal_id])).rows[0];
     if (!row) throw new Error('Assignment unavailable');
     return workerContent(row,true);

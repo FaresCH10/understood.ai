@@ -29,7 +29,7 @@ export function clarificationDetailView(row,context){
 export function clarificationHttpError(error){
   const message=error?.message;
   if(message==='Sign in required')return {status:401,error:message};
-  if(['Forbidden','Forbidden origin','Forbidden transport','Workspace access paused','Worker access paused','Site archived'].includes(message))return {status:403,error:message};
+  if(['Forbidden','Forbidden origin','Forbidden transport','Workspace access paused','Worker access paused','Site archived','Workspace is read-only'].includes(message))return {status:403,error:message};
   if(['Clarification unavailable','Clarification owner unavailable','Clarification action receipt unavailable','Clarification creation receipt unavailable','Clarification subject unavailable'].includes(message))return {status:404,error:message};
   if(['Session context changed','Resolution conflict','Clarification action conflict','Clarification creation conflict','Clarification selected answer changed','Clarification selected answer unavailable','Clarification answer already has a case'].includes(message))return {status:409,error:message};
   if(message==='Request too large')return {status:413,error:message};

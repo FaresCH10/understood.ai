@@ -35,7 +35,7 @@ export async function bootstrapWorkspace(pool,input,config) {
     await client.query('INSERT INTO sites(id,org_id,name,timezone) VALUES($1,$2,$3,$4)',[siteId,orgId,value.siteName,value.timezone]);
     await client.query("INSERT INTO staff(id,org_id,site_id,name,role) VALUES($1,$2,$3,$4,'owner')",[ownerId,orgId,siteId,value.ownerName]);
     await client.query('INSERT INTO organization_settings(org_id,revision,support_email) VALUES($1,0,$2)',[orgId,value.supportEmail]);
-    await client.query('INSERT INTO site_settings(site_id,org_id,revision,generation_languages_json,primary_contact_id) VALUES($1,$2,0,$3,$4)',[siteId,orgId,JSON.stringify(value.generationLanguages),ownerId]);
+    await client.query('INSERT INTO site_settings(site_id,org_id,revision,generation_languages_json,primary_contact_id,first_run_completed_at) VALUES($1,$2,0,$3,$4,clock_timestamp())',[siteId,orgId,JSON.stringify(value.generationLanguages),ownerId]);
     await client.query('INSERT INTO staff_credentials(staff_id,email,password_salt,password_hash) VALUES($1,$2,$3,$4)',[ownerId,value.ownerEmail,record.salt,record.derived]);
     await client.query('INSERT INTO workspace_bootstraps(request_id,request_hash,org_id,site_id,owner_id) VALUES($1,$2,$3,$4,$5)',[value.requestId,hash,orgId,siteId,ownerId]);
     await domainAudit(client,{org_id:orgId,site_id:siteId,principal_type:'system',principal_id:'workspace-maintenance'},'workspace.created',orgId);

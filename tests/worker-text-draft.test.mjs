@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {canRestoreTextDraft,TextDraftError,textDraftCopy,textDraftStatus,saveTextDraft,restoreTextDraft,removeTextDraft} from '../src/worker-text-draft.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 const time=Date.parse('2026-10-07T12:00:00.000Z');
 const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2026-10-07T20:00:00.000Z'};
 const scope={assignmentId:'one',publicationId:'published-one',version:3};
@@ -65,11 +66,8 @@ test('storage denial, discarded writes and unsuccessful removal never claim a sa
   store.removeItem=()=>{throw Error();};assert.throws(()=>removeTextDraft(store),error('storage'));
 });
 
-test('all tab snapshot controls and limitations have complete EN AR UR copy',()=>{
-  for(const language of ['en','ar','ur']){
-    assert.deepEqual(Object.keys(textDraftCopy[language]),Object.keys(textDraftCopy.en));
-    for(const text of Object.values(textDraftCopy[language])){assert.ok(text.trim());if(language!=='en')assert.match(text,/[\u0600-\u06ff]/);}
-  }
+test('all tab snapshot controls and limitations have complete copy for every worker UI language',()=>{
+  assertWorkerDictionary(textDraftCopy,'textDraftCopy');
 });
 test('restore cannot replace newer text, request tracking or an unsent recording',()=>{
   const empty={answer:'',help:'',receipts:[]};assert.equal(canRestoreTextDraft(empty,false),true);

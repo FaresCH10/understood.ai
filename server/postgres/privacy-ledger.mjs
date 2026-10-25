@@ -512,6 +512,8 @@ export async function replayPrivacyDeletions(pool,baseline,ledger,options={}){
       await client.query(`INSERT INTO worker_deletion_requests(id,org_id,site_id,worker_id,actor_id,fingerprint,reason,created_at)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,[request.id,request.org_id,request.site_id,request.worker_id,request.actor_id,request.fingerprint,request.reason,request.created_at]);
       await client.query('UPDATE worker_grants SET revoked_at=clock_timestamp() WHERE worker_id=$1 AND revoked_at IS NULL',[request.worker_id]);
+      await client.query('UPDATE worker_setup_tokens SET revoked_at=clock_timestamp() WHERE worker_id=$1 AND revoked_at IS NULL',[request.worker_id]);
+      await client.query('DELETE FROM worker_credentials WHERE worker_id=$1',[request.worker_id]);
       await client.query("UPDATE sessions SET revoked_at=clock_timestamp() WHERE principal_type='worker' AND principal_id=$1 AND revoked_at IS NULL",[request.worker_id]);
       await client.query(`UPDATE recordings SET status='failed',transcript=NULL,lease_token=NULL,lease_until=NULL,retry_at=NULL,error='Worker deletion pending'
         WHERE status<>'storing' AND assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)`,[request.worker_id]);
@@ -668,6 +670,7 @@ export async function replayPrivacyRestrictions(pool,baseline,ledger,options={})
     for(const target of current.workers)if(target.active && indexed.workers.get(keyFor('workers',target)).active===false){
       await client.query('UPDATE workers SET active=false WHERE id=$1',[target.id]);
       await client.query('UPDATE worker_grants SET revoked_at=clock_timestamp() WHERE worker_id=$1 AND revoked_at IS NULL',[target.id]);
+      await client.query('UPDATE worker_setup_tokens SET revoked_at=clock_timestamp() WHERE worker_id=$1 AND revoked_at IS NULL',[target.id]);
       await client.query("UPDATE sessions SET revoked_at=clock_timestamp() WHERE principal_type='worker' AND principal_id=$1 AND revoked_at IS NULL",[target.id]);disabledWorkers++;
     }
     for(const [name,restricted] of [['site_access_controls','paused'],['site_lifecycle','archived']])for(const source of ledger.tables[name])if(sites.get(source.site_id)===source.org_id){

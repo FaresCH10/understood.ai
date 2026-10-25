@@ -1,16 +1,20 @@
 import {generationLanguages} from './settings-input.mjs';
+import {WORKER_LOCALES,languageCapability} from './languages.mjs';
 import {pipelineStatus} from './ai/pipeline-status.mjs';
 import {STAGE_TESTS,stageVerificationPipeline} from './ai/provider-stage-verification.mjs';
-const LANGUAGE_DEFINITIONS = Object.freeze([
-  { code: 'en', name: 'English', direction: 'ltr', source: true },
-  { code: 'ar', name: 'Arabic', direction: 'rtl', source: false },
-  { code: 'ur', name: 'Urdu', direction: 'rtl', source: false },
-]);
+const LANGUAGE_DEFINITIONS = Object.freeze(WORKER_LOCALES.map(locale=>Object.freeze({
+  code: locale.code, name: locale.englishName, nativeName: locale.name, direction: locale.direction, source: locale.code === 'en',
+})));
 
 const copy = Object.freeze({
   synthetic: 'Synthetic-only environment. Full-pipeline evaluation and real-data permission are not verified.',
   missing: 'No published version contains a complete stored language artifact.',
   present: 'A published version contains title, text and question fields for this language.',
+  ui: 'Worker UI labels, direction and text fallback are localized in every selectable locale; native-speaker review is still pending.',
+  translationUnsupported: 'Configured translation coverage is English, Arabic and Urdu only; this worker UI locale has no content translation support.',
+  translationUndeclared: 'The configured translation adapter does not declare this language.',
+  speechUnsupported: 'Configured speech coverage is English and Arabic only; this worker UI locale has no speech support.',
+  speechUndeclared: 'The configured speech adapter does not declare this language.',
 });
 
 function contentState(snapshot, code) {
@@ -32,13 +36,18 @@ export function languageReadinessModel({ mode = 'synthetic-demo', publication = 
       ? { state: 'not_tested', evidence: copy.synthetic }
       : { state: 'unavailable', evidence: 'Provider configuration is not verified in this environment.' };
     const translationStage=pipeline.stages.find(stage=>stage.id==='translation'),speechStage=pipeline.stages.find(stage=>stage.id==='speech');
-    let translation=translationStage.configuration==='configured'
-      ? {state:'not_tested',evidence:'Synthetic translation adapter is configured; language accuracy and live translation have not been verified.'}:provider;
-    let speech = speechStage.configuration==='configured'
-      ? {state:speechStage.declaredLanguages.includes(definition.code)?'not_tested':'unavailable',evidence:speechStage.declaredLanguages.includes(definition.code)?'Synthetic speech adapter is configured; live speech has not been verified.':'This configured adapter does not support Urdu speech.'}
-      : definition.code === 'ur' && synthetic
-      ? { state: 'not_tested', evidence: 'No verified Urdu speech provider is configured.' }
-      : provider;
+    let translation=!languageCapability(definition.code,'translation')
+      ? {state:'unavailable',evidence:copy.translationUnsupported}
+      : translationStage.configuration!=='configured' ? provider
+      : translationStage.declaredLanguages.includes(definition.code)
+      ? {state:'not_tested',evidence:'Synthetic translation adapter is configured; language accuracy and live translation have not been verified.'}
+      : {state:'unavailable',evidence:copy.translationUndeclared};
+    let speech=!languageCapability(definition.code,'speech')
+      ? {state:'unavailable',evidence:copy.speechUnsupported}
+      : speechStage.configuration!=='configured' ? provider
+      : speechStage.declaredLanguages.includes(definition.code)
+      ? {state:'not_tested',evidence:'Synthetic speech adapter is configured; live speech has not been verified.'}
+      : {state:'unavailable',evidence:copy.speechUndeclared};
     const check=(stage,current)=>{
       const test=stageTests.find(test=>test.stage===stage && test.language===definition.code);
       const configured=stage==='translation'?translationStage:speechStage;
@@ -48,7 +57,7 @@ export function languageReadinessModel({ mode = 'synthetic-demo', publication = 
         evidence:stage==='translation'?'Fixed synthetic translation and automated comparison only; language accuracy is not certified.':'Fixed synthetic WAV format and nonempty audio only; speech accuracy and quality are not certified.'};
     };
     translation=check('translation',translation);speech=check('speech',speech);
-    return { ...definition,generationDefault:defaults.includes(definition.code), ui: { state: 'ready', evidence: 'Worker UI includes direction, labels and text fallback.' }, content, translation, speech };
+    return { ...definition,generationDefault:defaults.includes(definition.code), ui: { state: 'ready', evidence: copy.ui }, content, translation, speech };
   });
   return {
     generatedAt: testedAt || new Date().toISOString(),

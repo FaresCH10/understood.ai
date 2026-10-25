@@ -1,14 +1,24 @@
 import { withTransaction } from './db.mjs';
 import { schemaName } from './migrate.mjs';
-import {reportPublicationFilters,publicationDateBounds,reportPublicationPage } from '../reports.mjs';
+import {reportPublicationFilters,publicationDateBounds,reportPublicationPage,publicationModes,reportDelivery } from '../reports.mjs';
 import {domainTransaction,requirePrincipal} from './domain.mjs';
-import { responseColumns } from '../recordings.mjs';
+import { postgresResponseColumns as responseColumns } from '../recordings.mjs';
 import {reportScope,selectReport} from '../report-scope.mjs';
 
 export async function reportActivity(client,session,publication,filters,timezone) {
   const responses=await publicationResponses(client,session,publication.id);
   const audience=(await client.query('SELECT * FROM publication_report_audience WHERE publication_id=$1 AND org_id=$2 AND site_id=$3',[publication.id,session.org_id,session.site_id])).rows;
-  return selectReport(responses,publication.version,filters,timezone,audience);
+  const send=(await client.query(`SELECT request_id,state,audience_count,delivered,undelivered,undelivered_json
+    FROM instruction_sends WHERE org_id=$1 AND site_id=$2 AND publication_id=$3 ORDER BY created_at DESC,request_id LIMIT 1`,
+  [session.org_id,session.site_id,publication.id])).rows[0];
+  const states=send?(await client.query(`SELECT state,count(*)::int AS count FROM instruction_deliveries
+    WHERE request_id=$1 AND org_id=$2 AND site_id=$3 GROUP BY state`,[send.request_id,session.org_id,session.site_id])).rows:[];
+  const resolvedAssignmentIds=(await client.query(`SELECT DISTINCT c.assignment_id FROM clarifications c JOIN assignments a
+    ON a.id=c.assignment_id AND a.org_id=c.org_id AND a.site_id=c.site_id
+    WHERE a.org_id=$1 AND a.site_id=$2 AND a.publication_id=$3 AND c.status='resolved'`,
+  [session.org_id,session.site_id,publication.id])).rows.map((row)=>row.assignment_id);
+  return selectReport(responses,publication.version,filters,timezone,audience,
+    {...publicationModes(publication.snapshot_json),delivery:reportDelivery(send,states),resolvedAssignmentIds});
 }
 
 export async function publicationResponses(client,session,publicationId) {
@@ -48,7 +58,7 @@ export async function readPublicationReport(pool, session, { publicationId, sche
     if (!principal) throw new Error('Forbidden');
     const availablePublications = (await client.query(`SELECT id,version,state,snapshot_json->>'title' AS title
       FROM publications WHERE org_id=$1 AND site_id=$2 ORDER BY published_at DESC,id LIMIT 100`, [session.org_id, session.site_id])).rows;
-    const publication = (await client.query(`SELECT id,version,snapshot_json->>'title' AS title,published_at
+    const publication = (await client.query(`SELECT id,version,snapshot_json,snapshot_json->>'title' AS title,published_at
       FROM publications WHERE org_id=$1 AND site_id=$2 AND ${publicationId ? 'id=$3' : "state='published'"}
       ORDER BY published_at DESC,id LIMIT 1`, [session.org_id, session.site_id, ...(publicationId ? [publicationId] : [])])).rows[0];
     if (publicationId && !publication) throw new Error('Publication unavailable');

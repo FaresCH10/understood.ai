@@ -142,15 +142,27 @@ export async function quarantineRestoredDatabase(pool,{schema='public',backupId,
       if(JSON.stringify(before.database)!==JSON.stringify(expected.database) || JSON.stringify(before.objects)!==JSON.stringify(expected.objects))
         throw Error('Quarantine baseline does not match the restored database');
     }
+    const pushTables=(await client.query("SELECT to_regclass('push_subscriptions') AS subscriptions,to_regclass('push_deliveries') AS deliveries")).rows[0];
+    if(pushTables.subscriptions){
+      await client.query(`UPDATE push_subscriptions SET revoked_at=clock_timestamp(),revoke_reason='restore_quarantine',updated_at=clock_timestamp()
+        WHERE revoked_at IS NULL`);
+      if(pushTables.deliveries)await client.query(`UPDATE push_deliveries SET state='cancelled',last_error='restore_quarantine',updated_at=clock_timestamp()
+        WHERE state IN ('queued','sending')`);
+    }
     await client.query('UPDATE sessions SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL');
     await client.query('UPDATE worker_grants SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL');
+    await client.query('UPDATE worker_setup_tokens SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL');
+    await client.query('DELETE FROM worker_credentials');
     await client.query('UPDATE operator_sessions SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL');
     await client.query('UPDATE staff_accounts SET active=false WHERE active=true');
     await client.query('UPDATE platform_operators SET active=false,revision=revision+1 WHERE active=true');
     await client.query('UPDATE staff_recovery_tokens SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL AND used_at IS NULL');
     await client.query('UPDATE staff_invitation_tokens SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL AND used_at IS NULL');
+    await client.query('UPDATE registration_tokens SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL AND used_at IS NULL');
     await client.query("UPDATE staff_recovery_mail SET state='expired',payload=NULL,lease_token=NULL,lease_until=NULL WHERE state IN ('queued','processing')");
     await client.query("UPDATE staff_invitation_mail SET state='expired',payload=NULL,lease_token=NULL,lease_until=NULL WHERE state IN ('queued','processing')");
+    await client.query("UPDATE registration_mail SET state='expired',payload=NULL,lease_token=NULL,lease_until=NULL WHERE state IN ('queued','processing')");
+    await client.query("UPDATE organization_registrations SET state='expired',payload=NULL WHERE state='pending'");
     await client.query("UPDATE pilot_inquiries SET state='expired',content_json=NULL,destination=NULL,lease_token=NULL,lease_until=NULL WHERE state IN ('saved','queued','processing')");
     await client.query("UPDATE staff_invitations SET state='cancelled',revision=revision+1,email_payload=NULL WHERE state='pending'");
     await client.query(`INSERT INTO system_controls(id,revision,jobs_paused,provider_paused) VALUES('global',1,true,true)
@@ -170,9 +182,10 @@ export async function quarantineRestoredDatabase(pool,{schema='public',backupId,
     if(before){
       await client.query('SET CONSTRAINTS ALL IMMEDIATE');
       const database=await databaseInventory(client,schema),objects=await privateObjectInventory(client);
-      const changed=new Set(['sessions','worker_grants','operator_sessions','staff_accounts','platform_operators','staff_recovery_tokens',
-        'staff_invitation_tokens','staff_recovery_mail','staff_invitation_mail','pilot_inquiries','staff_invitations','system_controls','tenant_controls',
-        'provider_policies','provider_requests','provider_verifications','worker_health','report_exports','worker_imports','audit','operational_audit_receipts']);
+      const changed=new Set(['sessions','worker_grants','worker_setup_tokens','worker_credentials','operator_sessions','staff_accounts','platform_operators','staff_recovery_tokens',
+        'staff_invitation_tokens','staff_recovery_mail','staff_invitation_mail','registration_tokens','registration_mail','organization_registrations','pilot_inquiries','staff_invitations','system_controls','tenant_controls',
+        'provider_policies','provider_requests','provider_verifications','worker_health','report_exports','worker_imports','audit','operational_audit_receipts',
+        'push_subscriptions','push_deliveries']);
       if(database.definitionsSha256!==before.database.definitionsSha256 || JSON.stringify(database.sequences)!==JSON.stringify(before.database.sequences)
         || JSON.stringify(database.tables.filter(row=>!changed.has(row.name)))!==JSON.stringify(before.database.tables.filter(row=>!changed.has(row.name)))
         || JSON.stringify(objects)!==JSON.stringify(before.objects))throw Error('Quarantine changed unrelated restored evidence');

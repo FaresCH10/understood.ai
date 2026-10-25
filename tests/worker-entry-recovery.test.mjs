@@ -12,6 +12,7 @@ import {tokenHash} from '../server/auth-crypto.mjs';
 import {readWorkerRedemption} from '../server/worker-redemption.mjs';
 import {readWorkerRedemption as pgRead} from '../server/postgres/worker-redemption.mjs';
 import {workerEntryKey,workerEntryRecoveryText,prepareWorkerEntry,savePendingWorkerEntry,readPendingWorkerEntry,clearPendingWorkerEntry,recoverWorkerEntry} from '../src/worker-entry-recovery.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 const origin='http://127.0.0.1:3020',password='Synthetic recovery test password only',owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 async function fixture(postgres){
@@ -110,11 +111,6 @@ test('client recovery never opens unrelated, missing, expired or changed session
   await assert.rejects(recoverWorkerEntry(pending,async()=>({...session,expiresAt:new Date(0).toISOString()})),/could not be checked/);
 });
 
-test('worker access recovery has complete EN AR UR copy for failures, storage and explicit new-link recovery',()=>{
-  const keys=Object.keys(workerEntryRecoveryText.en).sort();
-  for(const language of ['en','ar','ur']){
-    assert.deepEqual(Object.keys(workerEntryRecoveryText[language]).sort(),keys);
-    for(const value of Object.values(workerEntryRecoveryText[language]))assert.ok(value.trim());
-    if(language!=='en')for(const key of keys)assert.notEqual(workerEntryRecoveryText[language][key],workerEntryRecoveryText.en[key]);
-  }
+test('worker access recovery has complete copy for every worker UI language',()=>{
+  assertWorkerDictionary(workerEntryRecoveryText,'workerEntryRecoveryText');
 });

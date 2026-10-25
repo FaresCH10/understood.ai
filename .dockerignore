@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+dist
+data
+artifacts
+tests
+evaluation
+references
+docs
+*.md
+.env
+.env.*
+*.log
+images.rar
+deploy/.local

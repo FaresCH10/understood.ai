@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { inspectWav } from '../audio.mjs';
 import { domainTransaction,domainAudit,requirePrincipal } from './domain.mjs';
 import {acceptingRepeat,consumeRepeat} from './case-repeats.mjs';
+import {checkedPresentationBinding} from './presentations.mjs';
+import {requireWritableEntitlement} from './entitlements.mjs';
 
 const uuid = (value) => typeof value==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const receipt = (row,duplicate) => ({id:row.id,status:row.status,receivedAt:row.received_at?.toISOString() || null,duplicate});
@@ -15,21 +17,25 @@ async function lockedAssignment(client,session,assignmentId) {
 }
 
 async function acceptingAssignment(client,session,assignment) {
-  const row = (await client.query(`SELECT state,publication_content_available(id) AS content_available FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE`,
-    [assignment.publication_id,session.org_id,session.site_id])).rows[0];
+  await requireWritableEntitlement(client,session.org_id);
+  const row = (await client.query(`SELECT state,snapshot_json->>'responseMode' AS response_mode,publication_content_available(id) AS content_available
+    FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE`,
+  [assignment.publication_id,session.org_id,session.site_id])).rows[0];
   if (row?.state!=='published' || !row.content_available) throw new Error('Assignment unavailable');
+  if (row.response_mode==='acknowledge') throw new Error('This instruction only requires confirmation');
   return acceptingRepeat(client,session,assignment);
 }
 
-export async function receiveRecording(pool,session,assignmentId,submissionId,bytes,storage,{schema='public'}={}) {
+export async function receiveRecording(pool,session,assignmentId,submissionId,bytes,storage,{schema='public',presentationId=null}={}) {
   if (typeof assignmentId!=='string' || !assignmentId || assignmentId.length>100 || !uuid(submissionId)) throw new Error('Invalid submission ID');
   if (typeof storage?.save!=='function' || typeof storage.remove!=='function') throw new Error('Private storage unavailable');
   const info = inspectWav(bytes);
   const staged = await domainTransaction(pool,schema,async (client) => {
     const assignment = await lockedAssignment(client,session,assignmentId);
-    const old = (await client.query(`SELECT id,status,received_at,sha256,bytes FROM recordings
+    const old = (await client.query(`SELECT id,status,received_at,sha256,bytes,presentation_id FROM recordings
       WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 AND submission_id=$4`,[assignmentId,session.org_id,session.site_id,submissionId])).rows[0];
     if (old) {
+      if (presentationId!==null && (typeof presentationId!=='string' || presentationId!==old.presentation_id)) throw new Error('Submission ID conflict');
       if (old.sha256!==info.sha256 || old.bytes!==info.bytes) throw new Error('Submission ID conflict');
       if (old.received_at) return {duplicate:receipt(old,true)};
       if (old.status==='storing') throw new Error('Recording storage still in progress');
@@ -37,10 +43,14 @@ export async function receiveRecording(pool,session,assignmentId,submissionId,by
     }
     await acceptingAssignment(client,session,assignment);
     if ((await client.query('SELECT 1 FROM attempts WHERE assignment_id=$1 AND submission_id=$2',[assignmentId,submissionId])).rows.length) throw new Error('Submission ID conflict');
-    const row = {...info,id:randomUUID(),org_id:session.org_id,site_id:session.site_id,assignment_id:assignmentId,submission_id:submissionId,token:randomUUID()};
-    await client.query(`INSERT INTO recordings(id,org_id,site_id,assignment_id,submission_id,sha256,duration_seconds,bytes,status,lease_token,lease_until)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'storing',$9,clock_timestamp()+interval '90 seconds')`,
-    [row.id,row.org_id,row.site_id,row.assignment_id,row.submission_id,row.sha256,row.durationSeconds,row.bytes,row.token]);
+    const presentation=await checkedPresentationBinding(client,session,assignmentId,presentationId);
+    const row = {...info,id:randomUUID(),org_id:session.org_id,site_id:session.site_id,assignment_id:assignmentId,submission_id:submissionId,token:randomUUID(),
+      presentation_id:presentation?.id ?? null,presentation_language:presentation?.target_language ?? null,presented_question:presentation?.question ?? null};
+    await client.query(`INSERT INTO recordings(id,org_id,site_id,assignment_id,submission_id,sha256,duration_seconds,bytes,status,lease_token,lease_until,
+      presentation_id,presentation_language,presented_question)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'storing',$9,clock_timestamp()+interval '90 seconds',$10,$11,$12)`,
+    [row.id,row.org_id,row.site_id,row.assignment_id,row.submission_id,row.sha256,row.durationSeconds,row.bytes,row.token,
+      row.presentation_id,row.presentation_language,row.presented_question]);
     return row;
   });
   if (staged.duplicate) return staged.duplicate;
@@ -60,7 +70,14 @@ export async function receiveRecording(pool,session,assignmentId,submissionId,by
       await domainAudit(client,session,'answer.received',staged.id);
       return receipt(row,false);
     });
-  } catch {
+  } catch (error) {
+    if (error?.message==='Workspace is read-only') {
+      let removed=false;
+      try {await storage.remove(staged); removed=true;} catch { /* Keep the staged reference for later private-object cleanup. */ }
+      if (removed) await domainTransaction(pool,schema,async (client) => client.query(`UPDATE recordings SET status='failed',
+        error='Workspace is read-only',lease_until=NULL,lease_token=NULL WHERE id=$1 AND status='storing' AND received_at IS NULL`,[staged.id]));
+      throw error;
+    }
     // A lost COMMIT acknowledgement may already have accepted the recording. Confirm before deleting its object.
     const current = await domainTransaction(pool,schema,async (client) => {
       const row = (await client.query('SELECT id,status,received_at FROM recordings WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',

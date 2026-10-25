@@ -73,7 +73,7 @@ test('hosted service commands select an exact fixed profile without application 
 
 test('actual operator column role authenticates and runs metadata, control and all three retries without content grants',async()=>{
   const f=await fixture();try {
-    const configured=await f.configure();await f.runtime();assert.equal((await verifyMigrations(f.pool,{schema})).migrations,95);
+    const configured=await f.configure();await f.runtime();assert.equal((await verifyMigrations(f.pool,{schema})).migrations,108);
     assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema,profile:'operator'}),configured);
     await assert.rejects(verifyRuntimePermissions(f.pool,{schema,profile:'application'}),/privileges/);
     const login=await f.login(),actor=login.session;

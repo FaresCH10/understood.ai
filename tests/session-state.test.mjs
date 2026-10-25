@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {clientSessionContext,verifyClientSession} from '../server/session-context.mjs';
 import {validWorkerSession,sameWorkerSession,workerSessionText,sessionLoadText} from '../src/session-state.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 const serverSession={token_hash:'a'.repeat(64),org_id:'org',site_id:'site',principal_type:'worker',principal_id:'worker',access_mode:'demo',language:'en',expires_at:'2027-01-01T00:00:00.000Z'};
 test('page context is non-credential, stable and changes on cookie, identity, site or language rotation',()=>{
@@ -30,8 +31,5 @@ test('worker verification fails closed for expiry, changed identity, malformed r
   for(const change of [{authenticated:false},{role:'staff'},{workerId:'other'},{workerId:' '},{language:'ar'},{language:'xyz'},{mode:'other'},{mode:undefined},{mode:42},{clientContext:'b'.repeat(64)},{expiresAt:'bad'},{expiresAt:'2027-01-01'},{expiresAt:new Date(now).toISOString()}])
     assert.equal(sameWorkerSession(session,{...session,...change},now),false);
   for(const value of [null,[],{},'not a session'])assert.equal(sameWorkerSession(session,value,now),false);
-  for(const labels of [workerSessionText,sessionLoadText]){
-    for(const language of ['en','ar','ur'])for(const text of Object.values(labels[language]))assert.ok(text.trim());
-    for(const language of ['ar','ur'])for(const text of Object.values(labels[language]))assert.match(text,/[\u0600-\u06ff]/);
-  }
+  for(const [name,labels] of [['workerSessionText',workerSessionText],['sessionLoadText',sessionLoadText]])assertWorkerDictionary(labels,name);
 });

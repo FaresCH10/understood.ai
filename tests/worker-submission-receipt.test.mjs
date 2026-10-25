@@ -16,6 +16,7 @@ import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {issueWorkerGrant,redeemWorkerGrant} from '../server/postgres/auth.mjs';
 import {receiveRecording as receivePgRecording} from '../server/postgres/recordings.mjs';
 import {syntheticPrepare,CANONICAL_SOURCE} from '../server/domain.mjs';
+import {assertWorkerDictionary,assertWorkerStrings} from './helpers/worker-locales.mjs';
 
 const context='a'.repeat(64),requestId='741c20ac-955a-4eee-aa09-94d915578cf9';
 const selection={assignmentId:'assignment-30',version:3,language:'ur',requestId,kind:'typed'};
@@ -46,8 +47,7 @@ test('exact receipt GET captures identity and immutable selection through transp
   await assert.rejects(read(()=>assert.fail('Must not fetch'),()=>false),error=>error.code==='session');
 });
 test('all immediate receipt states, safety limits and direct Help are localized without fabricating check success',async()=>{
-  const keys=Object.keys(workerReceiptText.en).sort();
-  for(const language of ['en','ar','ur']){assert.deepEqual(Object.keys(workerReceiptText[language]).sort(),keys);for(const value of [...Object.values(workerReceiptText[language]),workerReceiptUnknownText[language]]){assert.ok(value.trim());if(language!=='en')assert.match(value,/[\u0600-\u06ff]/);}}
+  assertWorkerDictionary(workerReceiptText,'workerReceiptText');assertWorkerStrings(workerReceiptUnknownText,'workerReceiptUnknownText');
   const main=await readFile(new URL('../src/main.tsx',import.meta.url),'utf8');
   assert.match(main,/requestKind:'typed',publicationVersion:receiptScope.version,contentLanguage:receiptScope.language/);
   assert.match(main,/requestKind:'audio',publicationVersion:receiptScope.version,contentLanguage:receiptScope.language/);

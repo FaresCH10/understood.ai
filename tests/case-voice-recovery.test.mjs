@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readVoicePending,retainVoice,checkedVoiceReceipt,clearVoicePending} from '../src/case-voice-recovery.ts';
 import {conversationRecordingNotice} from '../src/recording-notice.ts';
+import {WORKER_LOCALES} from '../server/languages.mjs';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 test('voice recovery keeps only context-bound metadata and requires the exact recording and receipt',async()=>{
   const values=new Map(),storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
@@ -20,7 +22,9 @@ test('voice recovery keeps only context-bound metadata and requires the exact re
 });
 
 test('conversation recording notices disclose private storage and explicitly exclude AI processing',()=>{
-  for(const language of ['en','ar','ur']){const notice=conversationRecordingNotice(language);assert.equal(Object.keys(notice).length,5);for(const text of Object.values(notice))assert.ok(text.trim());}
+  const notices=Object.fromEntries(WORKER_LOCALES.map(({code})=>[code,conversationRecordingNotice(code)]));
+  assertWorkerDictionary(notices,'conversationRecordingNotice');
+  for(const notice of Object.values(notices))assert.equal(Object.keys(notice).length,5);
   assert.match(conversationRecordingNotice('en').processing,/not submitted as answers or sent to an AI provider/);
   assert.doesNotMatch(conversationRecordingNotice('en').local,/save a copy/);
 });

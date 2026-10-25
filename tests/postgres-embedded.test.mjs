@@ -42,6 +42,19 @@ test('embedded PostgreSQL executes migration and protects tenant, site, receipt 
       '083_restore_cleanup_transitions.sql',
       '084_export_retry_receipts.sql', '085_preparation_request_receipts.sql', '086_processing_retry_receipts.sql', '087_neon_storage_health.sql', '088_operator_column_boundary.sql', '089_provider_verification_authorities.sql', '090_provider_verification_jobs.sql', '091_provider_verification_workers.sql', '092_worker_identity_locks.sql', '093_clarification_action_receipts.sql',
       '094_staff_clarification_creations.sql', '095_staff_inperson_recordings.sql',
+      '096_instruction_modes_and_acknowledgments.sql',
+      '097_worker_language_identity.sql',
+      '098_worker_password_credentials.sql',
+      '099_worker_language_locales.sql',
+      '100_presentation_artifacts.sql',
+      '101_presentation_retention.sql',
+      '102_recording_presentation_guard.sql',
+      '103_instruction_deliveries.sql',
+      '104_instruction_content_retention.sql',
+      '105_organization_entitlements.sql',
+      '106_owner_registration.sql',
+      '107_first_run_onboarding.sql',
+      '108_notification_events.sql',
     ]);
     assert.deepEqual(await runMigrations(pool), []);
     await db.query("INSERT INTO organizations(id,name) VALUES ('org-a','A'),('org-b','B')");

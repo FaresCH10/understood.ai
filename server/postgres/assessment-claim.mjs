@@ -1,4 +1,5 @@
 import {dispatchAllowed} from './operations-gates.mjs';
+import {isWorkerLanguage} from '../languages.mjs';
 
 export function assessmentInput(row) {
   const snapshot=row?.snapshot_json,askedFacts=snapshot?.rubric?.askedFacts;
@@ -6,7 +7,7 @@ export function assessmentInput(row) {
   if(typeof row?.answer_text!=='string' || !row.answer_text.trim() || row.answer_text.length>2000
     || typeof question!=='string' || !question.trim() || question.length>500 || !Array.isArray(askedFacts)
     || !askedFacts.length || askedFacts.length>6 || !askedFacts.every(fact=>typeof fact==='string' && fact.trim() && fact.length<=500)
-    || !['en','ar','ur'].includes(row.language) || typeof row.publication_id!=='string'
+    || !isWorkerLanguage(row.language) || typeof row.publication_id!=='string'
     || !Number.isInteger(row.version) || row.version<1)throw Error('Published assessment input unavailable');
   return {answer:row.answer_text,question,askedFacts,language:row.language,publicationId:row.publication_id,version:row.version};
 }

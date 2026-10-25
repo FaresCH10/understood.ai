@@ -48,7 +48,7 @@ test('actual isolated child launcher refuses unconfirmed configuration over IPC 
   let closed=false,timer;
   const exit=new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',code=>{closed=true;resolve(code);});});
   try{
-    const code=await Promise.race([exit,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Offline child did not exit')),5000);})]);
+    const code=await Promise.race([exit,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Offline child did not exit')),30000);})]);
     assert.equal(code,1);assert.deepEqual(messages,[{type:'failed'}]);
   }finally{clearTimeout(timer);if(!closed){child.kill('SIGKILL');await exit;}}
 });

@@ -16,6 +16,7 @@ import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {createDraft,queuePreparation} from '../server/preparation.mjs';
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import {processOne} from '../server/worker.mjs';
 import {createDraft as pgDraft,queuePreparation as pgQueue,processOnePreparation as pgProcess} from '../server/postgres/preparation.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
@@ -159,7 +160,7 @@ for(const pg of [false,true]) test(`${pg ? 'PostgreSQL' : 'SQLite'} workspace ed
       assert.equal((await call('/settings/site',cookie,selection)).status,200);
       assert.equal((await (await call('/settings',cookie)).json()).site.deputyContact.id,'rami');
       const readiness=await call('/language-readiness',cookie);assert.equal(readiness.status,200);assert.match(readiness.headers.get('cache-control'),/no-store/);
-      const model=await readiness.json();assert.deepEqual(model.languages.map(item=>[item.code,item.generationDefault]),[['en',true],['ar',false],['ur',false]]);assert.equal(model.provider.connection.state,'not_tested');assert.equal(model.realDataAllowed,false);
+      const model=await readiness.json();assert.deepEqual(model.languages.map(item=>[item.code,item.generationDefault]),WORKER_LANGUAGE_CODES.map(code=>[code,code==='en']));assert.ok(model.languages.every(item=>item.ui.state==='ready'));assert.equal(model.provider.connection.state,'not_tested');assert.equal(model.realDataAllowed,false);
     } finally {await new Promise(resolve=>server.close(resolve));}
     await f.raw(pg ? "UPDATE staff SET active=false WHERE id='maya'" : "UPDATE staff SET active=0 WHERE id='maya'");await assert.rejects(async()=>f.get(owner),/Forbidden/);
   } finally {await f.close();}

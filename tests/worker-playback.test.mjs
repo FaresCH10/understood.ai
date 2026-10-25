@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {playbackSeconds,playbackTime,playbackSeek,workerPlaybackRates,workerPlaybackText} from '../src/worker-playback.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 test('playback duration and time never expose invalid or negative media metadata',()=>{
   for(const value of [NaN,Infinity,-Infinity,-1]){assert.equal(playbackSeconds(value),0);assert.equal(playbackTime(value),'0:00');}
@@ -15,10 +16,6 @@ test('seeking uses actual finite media ranges rather than assuming all duration 
   assert.equal(playbackSeek(0,72,[{start:-1,end:10},{start:10,end:1},{start:NaN,end:20}]),null);
 });
 test('playback controls, errors and accessible labels cover every enabled worker UI language',()=>{
-  const keys=Object.keys(workerPlaybackText.en).sort();
-  for(const language of ['en','ar','ur']){
-    assert.deepEqual(Object.keys(workerPlaybackText[language]).sort(),keys);
-    for(const label of Object.values(workerPlaybackText[language])){assert.ok(label.trim());if(language!=='en')assert.match(label,/[\u0600-\u06ff]/);}
-  }
+  assertWorkerDictionary(workerPlaybackText,'workerPlaybackText');
   assert.deepEqual(workerPlaybackRates,[0.75,1,1.25,1.5,2]);
 });

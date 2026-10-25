@@ -91,7 +91,7 @@ test('SQLite worker inbox pages all assigned versions with exact scoped todo/sen
     const before=db.prepare('SELECT * FROM submission_receipts ORDER BY sequence').all(),audit=db.prepare('SELECT COUNT(*) n FROM audit').get().n;
     let result=workerBriefings(db,worker,{page:7,pageSize:20},true);
     assert.equal(result.total,126);assert.equal(result.items.length,6);assert.deepEqual(result.counts,{todo:3,sent:2,history:126,followup:0});
-    assert.equal(result.items.at(-1).id,'inbox-assignment-000');assert.equal(result.items[0].language,'ur');assert.ok(!/rubric|source|facts|question|reasons|notes|answer_text|snapshot|sequence|storage/.test(JSON.stringify(result)));
+    assert.equal(result.items.at(-1).id,'inbox-assignment-000');assert.equal(result.items[0].language,'ur');assert.ok(!/"(rubric|source|facts|question|reasons|notes|answer_text|snapshot|sequence|storage)"\s*:/.test(JSON.stringify(result)));assert.match(result.items[0].responseMode,/^(question|acknowledgment)$/);
     result=workerBriefings(db,worker,{view:'todo',pageSize:1});assert.equal(result.total,3);assert.equal(result.items.length,1);
     assert.ok(!['inbox-assignment-122','inbox-assignment-124','assignment-30'].includes(result.items[0].id));
     result=workerBriefings(db,worker,{view:'sent'});assert.equal(result.total,2);assert.equal(result.items[0].state,'withdrawn');assert.equal(result.items[1].audioStatus,'received');

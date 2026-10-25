@@ -1,5 +1,57 @@
 # Readiness
 
+Update 25 October 2026 (latest production-hardening checkpoint): the production admission
+review is implemented and negative-tested 6/6, and a disposable native PostgreSQL 16.15
+cluster passed fresh migration 1/1, concurrency 2/2, encrypted native backup/restore 1/1
+and local TLS certificate/wrong-CA checks. The standard full suite was **not clean**:
+1,489 tests / 1,484 passed / 0 failed / 4 skipped / 1 cancelled; the cancelled
+`restore-retention` cleanup test hit the 300,000 ms suite timeout under parallel load and
+passes 16/16 in isolation. `npm run typecheck` and `npm run build` pass. Production remains
+hard-blocked: production-major/Neon PostgreSQL and native roles, approved real-data
+providers/privacy, verified email, real push/device acceptance, independent security and
+accessibility/AT review, hosting/TLS/proxy, capacity, monitoring, off-site backup/DR, a
+frozen candidate and written deployment authorization are still open. Decision: **NO-GO**.
+See `docs/PRODUCTION_RELEASE_GATES.md` and `BUILD_STATUS.md`. Every count, percentage and
+"Current" label below is historical and is not current verification.
+
+Update 25 October 2026: production hardening and controlled-release verification started.
+`docs/PRODUCTION_RELEASE_GATES.md` is the current release control surface (candidate
+fingerprint, gates G0-G18, evidence boundaries, NO-GO decision);
+`docs/FUNCTIONAL_ACCEPTANCE_MATRIX.md` records requirement-to-evidence reconciliation. Every
+count, percentage and "Current" label below is historical and is not current verification.
+Production readiness is still not established; native PostgreSQL, external push/device
+acceptance, real-data/provider approval, independent review, hosting and deployment
+authorization remain open gates.
+
+Update 25 October 2026: Phase 6 notifications/web push and Phase 7 integration verification
+are recorded in `BUILD_STATUS.md`. The counts, percentages and "Current" labels below are
+historical checkpoints, not current verification. Production readiness is still not
+established; native PostgreSQL, external push/device acceptance, real-data/provider approval
+and deployment authorization remain open gates.
+
+Current22 October 2026 runtime, packaging and accessibility checkpoint: local
+engineering readiness about90%; production readiness is not established (not a
+certificate). The reference UI/provider checkpoint and the runtime packaging work are
+complete locally:
+- Clean full suite:1,350 tests/1,346 pass/0 fail/4 native skips
+  (artifacts/full-suite-2026-10-22-run2.log); focused UI source tests19/19 and
+  `npm run build` pass after the final CSS changes.
+- Docker image built and smoke-tested; Caddy2.10 configs validated with local TLS;
+  native pg_dump/pg_restore round trip passed on PostgreSQL18.6 over TLS; deploy
+  preflight stays ready:true/deployed:false/productionReady:false with zero network
+  requests; `npm audit --omit=dev` reports zero vulnerabilities.
+- Browser accessibility sweep over38 public/staff/worker screen states: zero structural
+  issues and zero contrast failures after fixes. Added localized skip links, darkened
+  failing muted/amber text, and raised select/switch/checkbox/text-button targets to at
+  least24px. Evidence: artifacts/a11y-2026-10-22/results.json.
+
+Remaining gates are external or approval-bound: production tier stays fail-closed;
+public DNS/ACME, deployed Neon connectivity, hosted concurrency, monitoring/alerting,
+real-data provider/privacy approval, email approval, production backup/restore
+rehearsal, an independent security review, physical-device/AT testing and deployment
+authorization remain open. No deployment, cloud account, billing or real data was used.
+Earlier checkpoints below are historical.
+
 Current local Reports checkpoint: [REPORT_LOCALIZATION.md](REPORT_LOCALIZATION.md).
 EN/AR/UR controls/states, exact create/retry recovery, preserved CSV bytes and30
 locale-width checks pass. Cleana16e0668:1,338 pass/four native skips/zero fail,

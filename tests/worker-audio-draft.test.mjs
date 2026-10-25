@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {saveAudioDraft,readAudioDraft,clearAudioDraft,AudioDraftError,audioDraftCopy} from '../src/worker-audio-draft.ts';
 import {encodeWav} from '../src/audio.ts';
+import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 const time=Date.parse('2026-10-07T12:00:00.000Z'),now=()=>time;
 const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2026-10-07T20:00:00.000Z'};
@@ -10,11 +11,7 @@ const samples=Float32Array.from({length:16000},(_,i)=>Math.sin(i/10)*.5);
 const bytes=encodeWav({duration:1,sampleRate:16000,numberOfChannels:1,getChannelData:()=>samples});
 
 test('saved-audio limits and every control have complete localized non-delivery copy',()=>{
-  const keys=Object.keys(audioDraftCopy.en).sort();
-  for(const language of ['en','ar','ur']){
-    assert.deepEqual(Object.keys(audioDraftCopy[language]).sort(),keys);
-    for(const value of Object.values(audioDraftCopy[language])){assert.ok(value.trim());if(language!=='en')assert.match(value,/[\u0600-\u06ff]/);}
-  }
+  assertWorkerDictionary(audioDraftCopy,'audioDraftCopy');
   assert.match(audioDraftCopy.en.privacy,/not a secure vault/);
   assert.match(audioDraftCopy.en.privacy,/Nothing uploads automatically/);
   assert.match(audioDraftCopy.en.failed,/No delivery is confirmed/);
@@ -24,6 +21,19 @@ const failure=code=>error=>error instanceof AudioDraftError && error.code===code
 function memory(){
   let value=null;
   return {get value(){return value;},set value(next){value=next;},async read(){return structuredClone(value);},async replace(revision,next,allowed){if(!allowed() || (value?.revision ?? null)!==revision)return false;value=structuredClone(next);return true;},async clear(){value=null;}};
+}
+async function withoutPresentationId(envelope){
+  const additionalData=new TextEncoder().encode(JSON.stringify(['understood-audio-draft-v1',envelope.revision,envelope.context]));
+  const raw=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(envelope.iv),additionalData},envelope.key,envelope.ciphertext));
+  const length=new DataView(raw.buffer,raw.byteOffset).getUint32(0,true);
+  const metadata=JSON.parse(new TextDecoder().decode(raw.slice(4,4+length)));delete metadata.presentationId;
+  const encoded=new TextEncoder().encode(JSON.stringify(metadata));
+  const packet=new Uint8Array(4+encoded.length+raw.length-4-length);
+  new DataView(packet.buffer).setUint32(0,encoded.length,true);
+  packet.set(encoded,4);packet.set(raw.slice(4+length),4+encoded.length);
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData},envelope.key,packet);
+  return {...envelope,iv,ciphertext};
 }
 test('opt-in encrypted audio retains exact IDs/bytes across fresh reads with a nonextractable key and no plaintext metadata',async()=>{
   const store=memory(),original=input();
@@ -47,6 +57,26 @@ test('another recording or exact version cannot overwrite a saved payload or rev
   const changed=new Uint8Array(bytes);changed[44]^=255;
   await assert.rejects(saveAudioDraft(store,session,scope,{...original,bytes:changed},true,()=>true,now),failure('invalid'));
   assert.equal((await readAudioDraft(store,session,scope,()=>true,now)).draft.submissionId,original.submissionId);
+});
+test('a translated-question binding is sealed with the recording, re-saves cannot change it, and legacy drafts read without one',async()=>{
+  const store=memory(),original=input(),presentationId=crypto.randomUUID();
+  const saved=await saveAudioDraft(store,session,scope,{...original,presentationId},true,()=>true,now);
+  assert.equal(saved.presentationId,presentationId);
+  assert.ok(!new TextDecoder().decode(store.value.ciphertext).includes(presentationId));
+  assert.equal((await readAudioDraft(store,session,scope,()=>true,now)).draft.presentationId,presentationId);
+  assert.equal((await saveAudioDraft(store,session,scope,{...original,presentationId},true,()=>true,now)).presentationId,presentationId);
+  for(const changed of [crypto.randomUUID(),null]){
+    await assert.rejects(saveAudioDraft(store,session,scope,{...original,presentationId:changed},true,()=>true,now),failure('invalid'));
+  }
+  assert.equal((await readAudioDraft(store,session,scope,()=>true,now)).draft.presentationId,presentationId);
+  await assert.rejects(saveAudioDraft(memory(),session,scope,{...original,presentationId:'bad'},true,()=>true,now),failure('invalid'));
+
+  const legacy=memory();
+  await saveAudioDraft(legacy,session,scope,{...original,presentationId},true,()=>true,now);
+  legacy.value=await withoutPresentationId(legacy.value);
+  const loaded=await readAudioDraft(legacy,session,scope,()=>true,now);
+  assert.equal(loaded.status,'saved');assert.equal(loaded.draft.presentationId,null);
+  await assert.rejects(saveAudioDraft(legacy,session,scope,{...original,presentationId},true,()=>true,now),failure('invalid'));
 });
 test('foreign contexts, changed identities/languages/expiry and expired cache are purged without disclosure',async()=>{
   for(const changed of [{...session,clientContext:'b'.repeat(64)},{...session,workerId:'other'},{...session,language:'ar'},{...session,mode:'live'},{...session,expiresAt:'2026-10-07T21:00:00.000Z'}]){

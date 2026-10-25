@@ -3,7 +3,7 @@ import { withTransaction } from './db.mjs';
 import { schemaName } from './migrate.mjs';
 import { publicationResponses } from './reports.mjs';
 import { responseRequest,responsePage,receiptRow,workerReceiptRow,submissionFilters,assignmentRequest,workerAssignmentRow,workerRequestReceiptInput,workerRequestReceiptRow } from '../responses.mjs';
-import { responseColumns } from '../recordings.mjs';
+import { postgresResponseColumns as responseColumns } from '../recordings.mjs';
 
 export function responseRead(pool,schema,fn) {
   schemaName(schema);
@@ -68,6 +68,8 @@ export async function workerRequestReceipt(pool,session,assignmentId,kind,reques
     let sql;
     if(kind==='help')sql=`SELECT c.id,c.status FROM help_requests h JOIN clarifications c ON c.id=h.case_id AND c.org_id=h.org_id AND c.site_id=h.site_id AND c.assignment_id=h.assignment_id
       WHERE h.assignment_id=$1 AND h.org_id=$2 AND h.site_id=$3 AND h.case_id=$4`;
+    else if(kind==='acknowledge')sql=`SELECT request_id AS id,received_at FROM acknowledgments
+      WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 AND request_id=$4`;
     else if(kind==='answer')sql=`SELECT t.id,t.outcome,t.assessment_status FROM submission_receipts sr JOIN attempts t ON t.assignment_id=sr.assignment_id AND t.org_id=sr.org_id AND t.submission_id=sr.submission_id
       WHERE sr.assignment_id=$1 AND sr.org_id=$2 AND t.site_id=$3 AND sr.submission_id=$4 AND sr.kind='typed'`;
     else sql=`SELECT r.id,r.status,r.received_at FROM submission_receipts sr JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.org_id=sr.org_id AND r.submission_id=sr.submission_id
@@ -111,9 +113,14 @@ export async function getPublicationResponse(pool,session,publicationId,assignme
       ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id WHERE a.id=$1 AND a.publication_id=$2 AND a.org_id=$3 AND a.site_id=$4`,
       [assignmentId,publicationId,session.org_id,session.site_id])).rows[0];
     if(!row) throw new Error('Response unavailable');
+    const acknowledgment=(await client.query('SELECT received_at FROM acknowledgments WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3',[assignmentId,session.org_id,session.site_id])).rows[0];
     const cases=(await client.query('SELECT id,status,reason FROM clarifications WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 ORDER BY created_at DESC,id DESC LIMIT 100',[assignmentId,session.org_id,session.site_id])).rows;
+    const responseMode=snapshot.responseMode || 'question',deliveryMode=snapshot.deliveryMode || 'both';
     return {publication,assignment:{id:row.id,worker:row.worker,language:row.language,dueAt:row.due_at?.toISOString() || null},
-      question:snapshot.question,facts:snapshot.facts,workerQuestion:snapshot.languages?.[row.language]?.question || null,
+      question:responseMode==='acknowledge'?null:snapshot.question,facts:snapshot.facts,
+      workerQuestion:responseMode==='acknowledge'?null:snapshot.languages?.[row.language]?.question || null,
+      responseMode,deliveryMode,
+      acknowledgedAt:acknowledgment?.received_at?.toISOString() || null,
       ...await submissionHistory(client,session,assignmentId,page,pageSize,true),cases};
   });
 }

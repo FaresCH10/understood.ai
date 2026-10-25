@@ -1,3 +1,4 @@
+import {workerLocale} from '../server/languages.mjs';
 import {caseTimestamp} from './clarification-locale.ts';
 export type ReportLocale='en'|'ar'|'ur';
 
@@ -49,6 +50,24 @@ export const reportTranslations={
   'Response status':['حالة الإجابات','جوابات کی حالت'],
   'match the rubric':['تطابق معايير التقييم','جانچ کے معیار سے مطابقت'],
   'awaiting assessment':['بانتظار التقييم','جانچ کا انتظار'],
+  'acknowledged':['تم الإقرار','اقرار شدہ'],
+  'acknowledged, not assessed':['تم الإقرار، بلا تقييم','اقرار شدہ، جانچ نہیں ہوئی'],
+  'resolved after follow-up':['حُلّت بعد المتابعة','فالو اپ کے بعد حل ہوا'],
+  'Response mode':['وضع الإجابة','جواب کی قسم'],
+  'Question':['سؤال','سوال'],
+  'Acknowledge only':['إقرار فقط','صرف اقرار'],
+  'Mode not recorded (legacy)':['الوضع غير مسجل (سجل قديم)','قسم درج نہیں (پرانا ریکارڈ)'],
+  'Delivery mode':['وضع التسليم','ترسیل کی قسم'],
+  'Text':['نص','متن'],
+  'Voice':['صوت','آواز'],
+  'Text and voice':['نص وصوت','متن اور آواز'],
+  'Delivery':['التسليم','ترسیل'],
+  'Captured audience':['الجمهور المحفوظ وقت الإرسال','بھیجتے وقت محفوظ سامعین'],
+  'Delivered':['تم التسليم','پہنچا دیا گیا'],
+  'Not delivered':['لم يُسلّم','نہیں پہنچا'],
+  'Preparing':['قيد التحضير','تیاری جاری ہے'],
+  'Blocked':['محجوب','روکا گیا'],
+  'Unreleased recipients are not counted as failing to respond.':['لا يُحتسب من لم تُحرّر تعليماته ضمن من لم يستجب.','جن افراد کو ہدایت جاری نہیں ہوئی وہ جواب نہ دینے میں شمار نہیں ہوتے۔'],
   'response completion':['اكتمال استلام الإجابات','جوابات کی تکمیل'],
   'Export request accepted. Check export history for its current status.':['تم قبول طلب التصدير. راجع سجل التصدير لمعرفة حالته الحالية.','برآمد کی درخواست قبول ہو گئی۔ موجودہ حالت کے لیے برآمد کی تاریخ دیکھیں۔'],
   'Export retry accepted. Check export history for its current status.':['تم قبول إعادة محاولة التصدير. راجع سجل التصدير لمعرفة حالتها الحالية.','برآمد کی دوبارہ کوشش قبول ہو گئی۔ موجودہ حالت کے لیے برآمد کی تاریخ دیکھیں۔'],
@@ -133,11 +152,13 @@ export function reportErrorText(locale:ReportLocale,message:string,fallback:Repo
   return reportText(locale,Object.hasOwn(known,message)?known[message]:fallback);
 }
 export function reportState(locale:ReportLocale,value:string){
-  const states:Record<string,ReportTextKey>={queued:'Queued',processing:'Processing',ready:'Ready',failed:'Failed',expired:'Expired',published:'Published',superseded:'Superseded',withdrawn:'Withdrawn',archived:'Archived'};
+  const states:Record<string,ReportTextKey>={queued:'Queued',processing:'Processing',preparing:'Preparing',ready:'Ready',failed:'Failed',expired:'Expired',published:'Published',superseded:'Superseded',withdrawn:'Withdrawn',archived:'Archived'};
   return reportText(locale,Object.hasOwn(states,value)?states[value]:'Status unavailable');
 }
 export function reportLanguage(locale:ReportLocale,value:string){
   const keys:Record<string,ReportTextKey>={en:'English (EN)',ar:'Arabic (AR)',ur:'Urdu (UR)'};
-  return Object.hasOwn(keys,value)?reportText(locale,keys[value]):value;
+  if(Object.hasOwn(keys,value))return reportText(locale,keys[value]);
+  const item=workerLocale(value);
+  return item?(locale==='en'?item.englishName:item.name):value;
 }
 export const reportTimestamp=caseTimestamp;

@@ -1,4 +1,30 @@
-export function usageModel({ mode = 'synthetic-demo', metrics = null, latestPublication = null,providerAllowance=null } = {}) {
+const unmanaged = Object.freeze({
+  configured: false, state: 'unmanaged', effectiveState: 'unmanaged', writeAllowed: true,
+  startedAt: null, endsAt: null, daysRemaining: null, workerLimit: null, plan: null,
+  termsReference: null, revision: 0, request: null,
+});
+
+export function usageEntitlement(summary, activeWorkers = 0) {
+  const value = summary ?? unmanaged;
+  if (!Number.isSafeInteger(activeWorkers) || activeWorkers < 0) throw new Error('Invalid active worker count');
+  return {
+    activeWorkers,
+    configured: value.configured,
+    state: value.state,
+    effectiveState: value.effectiveState,
+    writeAllowed: value.writeAllowed,
+    startedAt: value.startedAt,
+    endsAt: value.endsAt,
+    daysRemaining: value.daysRemaining,
+    workerLimit: value.workerLimit,
+    plan: value.plan,
+    termsReference: value.termsReference,
+    revision: value.revision,
+    request: value.request ?? null,
+  };
+}
+
+export function usageModel({ mode = 'synthetic-demo', metrics = null, latestPublication = null,providerAllowance=null,entitlement=null } = {}) {
   const values = metrics || { assigned: 0, responses: 0, matches: 0, clarifications: 0, pending: 0 };
   const synthetic = String(mode).startsWith('synthetic');
   const units = [
@@ -21,5 +47,6 @@ export function usageModel({ mode = 'synthetic-demo', metrics = null, latestPubl
       : { state: 'unavailable', evidence: 'Provider job pause controls require a configured production integration.' } },
     publication: latestPublication ? { id: latestPublication.id, version: latestPublication.version, state: latestPublication.state } : null,
     providerAllowance,
+    entitlement: entitlement ?? usageEntitlement(unmanaged),
   };
 }

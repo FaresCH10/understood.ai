@@ -11,7 +11,7 @@ export function getTextRetention(pool,session,{schema='public'}={}) {
     const purges=(await client.query('SELECT kind,count(*)::integer AS count FROM text_retention_purges WHERE org_id=$1 AND site_id=$2 GROUP BY kind',[session.org_id,session.site_id])).rows;
     return {revision:policy?.revision ?? 0,days:policy?.days ?? null,updatedAt:policy?.updated_at ?? null,options:textRetentionDays,
       canWrite:['owner','administrator'].includes(session.role),recoveryScope:staffRecoveryScope(session),completed:Object.fromEntries(purges.map(row=>[row.kind,row.count])),
-      limitations:'Scheduled cleanup redacts worker answer text, assessment quotes and recording transcripts, preserving outcomes and receipt/provenance hashes. Related stored report exports expire. Clarification messages/notes, briefing text, audio, audit metadata, backups and downloaded or disconnected device copies have separate lifecycles.'};
+      limitations:'Scheduled cleanup redacts worker answer text, assessment quotes, recording transcripts and translated answer-presentation copies, preserving outcomes and receipt/provenance hashes. Related stored report exports expire. Clarification messages/notes, briefing text, audio, audit metadata, backups and downloaded or disconnected device copies have separate lifecycles.'};
   });
 }
 export function textRetentionReceipt(pool,session,requestId,{schema='public'}={}) {
@@ -44,11 +44,18 @@ export function saveTextRetention(pool,session,input,{schema='public'}={}) {
   });
 }
 
-export async function redactExpiredText(client,{kind,id,assignmentId,publicationId,orgId,siteId}) {
+export async function redactExpiredText(client,{kind,id,assignmentId,submissionId,publicationId,orgId,siteId}) {
   if(kind==='attempt') {
     await client.query("UPDATE assessment_jobs SET status='blocked',lease_token=NULL,lease_until=NULL,error='Response text retention expired' WHERE attempt_id=$1 AND status<>'complete'",[id]);
     const deleted=(await client.query('SELECT 1 FROM worker_deletion_requests d JOIN assignments a ON a.worker_id=d.worker_id WHERE a.id=$1',[assignmentId])).rows.length;
     await client.query("UPDATE attempts SET answer_text=$2,reasons_json='[]',evidence_json='[]' WHERE id=$1",[id,deleted?'[Deleted]':'[Expired]']);
+    await client.query(`UPDATE presentation_artifacts SET status='failed',title=NULL,text=NULL,question=NULL,provider=NULL,live=NULL,
+      error_code='Response text retention expired',lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp()
+      WHERE assignment_id=$1 AND source_kind='answer' AND source_id=$2 AND status='pending'`,[assignmentId,submissionId]);
+    await client.query(`UPDATE presentation_artifacts SET title=CASE WHEN title IS NULL THEN NULL ELSE '[Expired]' END,
+      text='[Expired]',question=CASE WHEN question IS NULL THEN NULL ELSE '[Expired]' END,updated_at=clock_timestamp()
+      WHERE assignment_id=$1 AND source_kind='answer' AND source_id=$2 AND status='ready'
+        AND text NOT IN ('[Deleted]','[Expired]')`,[assignmentId,submissionId]);
   }else if(kind==='recording')await client.query("UPDATE recordings SET transcript=NULL,status='failed',lease_token=NULL,lease_until=NULL,retry_at=NULL,error='Recording text retention expired' WHERE id=$1",[id]);
   else throw Error('Invalid text retention kind');
   await client.query(`UPDATE report_exports SET status='expired',snapshot_json=NULL,csv=NULL,checksum=NULL,lease_token=NULL,lease_until=NULL,error=NULL
@@ -79,7 +86,7 @@ export async function processOneTextPurge(pool,{schema='public',kind='attempt'}=
     const row=(await client.query(`SELECT r.* FROM ${table} r WHERE r.id=$1 AND r.org_id=$2 AND r.site_id=$3 FOR UPDATE`,[candidate.id,policy.org_id,policy.site_id])).rows[0];
     await client.query('INSERT INTO text_retention_purges(kind,reference_id,org_id,site_id,assignment_id,policy_revision,days) VALUES($1,$2,$3,$4,$5,$6,$7)',
       [kind,row.id,policy.org_id,policy.site_id,row.assignment_id,policy.revision,policy.days]);
-    await redactExpiredText(client,{kind,id:row.id,assignmentId:row.assignment_id,publicationId:assignment.publication_id,orgId:policy.org_id,siteId:policy.site_id});
+    await redactExpiredText(client,{kind,id:row.id,assignmentId:row.assignment_id,submissionId:row.submission_id,publicationId:assignment.publication_id,orgId:policy.org_id,siteId:policy.site_id});
     await domainAudit(client,{...policy,principal_type:'system',principal_id:'retention-worker'},`retention.${kind}_text.purged`,row.id);
     return true;
   });

@@ -11,6 +11,15 @@ test('usage metadata validates real synthetic model shape without inventing enti
   assert.throws(()=>checkedUsageModel(row,'synthetic-credential','owner'));
 });
 
+test('a pending activation request keeps its capture revision after the entitlement advances',()=>{
+  const entitlement={activeWorkers:25,configured:true,state:'trial',effectiveState:'read_only',writeAllowed:false,startedAt:'2026-10-01T00:00:00.000Z',endsAt:'2026-10-15T00:00:00.000Z',daysRemaining:0,workerLimit:25,plan:'trial',termsReference:'terms-v1',revision:2,
+    request:{id:'04897a2a-3d28-481e-8361-c6ab5c3be586',state:'pending',note:'Please renew',entitlementRevision:1,requestedAt:'2026-10-10T00:00:00.000Z',decidedAt:null,decisionRef:null}};
+  const row=usageModel({mode:'synthetic-credential',metrics:{assigned:25,responses:1,matches:1,clarifications:0,pending:0},entitlement});
+  assert.deepEqual(checkedUsageModel(row,'synthetic-credential','owner'),row);
+  const future={...entitlement,request:{...entitlement.request,entitlementRevision:3}};
+  assert.throws(()=>checkedUsageModel(usageModel({mode:'synthetic-credential',entitlement:future}),'synthetic-credential','owner'));
+});
+
 test('organization allowance is UTC, scoped and non-billing evidence even when admission is available',()=>{
   assert.deepEqual(checkedProviderAllowance(allowance),allowance);
   const available={...allowance,limit:10,remaining:10,state:'available',reason:'available'};assert.deepEqual(checkedProviderAllowance(available),available);

@@ -7,7 +7,7 @@ export function processingProvenanceFilters(input={}){
   if(!Number.isSafeInteger(page) || page<1 || page>5000 || !Number.isSafeInteger(pageSize) || pageSize<1 || pageSize>20)throw Error('Invalid provider history page');return {page,pageSize};
 }
 const slug=value=>typeof value==='string' && /^[a-z0-9-]{1,80}$/.test(value);
-const model=value=>typeof value==='string' && /^[a-z0-9][a-z0-9.-]{2,80}$/.test(value);
+const model=value=>typeof value==='string' && /^[a-z0-9][a-z0-9.:/-]{2,79}$/.test(value);
 const reference=value=>typeof value==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 const keys=(value,names)=>!!value && typeof value==='object' && !Array.isArray(value) && Object.keys(value).sort().join(',')===[...names].sort().join(',');
 const iso=value=>{const parsed=new Date(value);if(value===null || value===undefined || !Number.isFinite(parsed.getTime()))throw Error('Provider history unavailable');return parsed.toISOString();};

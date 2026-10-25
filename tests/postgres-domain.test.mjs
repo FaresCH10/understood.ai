@@ -444,7 +444,10 @@ test('PostgreSQL worker inbox pages beyond 100 versions, keeps closed sent answe
     const before=(await db.query('SELECT * FROM submission_receipts ORDER BY sequence')).rows,audit=(await db.query('SELECT COUNT(*)::int n FROM audit')).rows[0].n;
     let result=await workerBriefings(pool,worker,{...options,history:true},{page:7,pageSize:20});assert.equal(result.total,126);assert.equal(result.items.length,6);assert.equal(result.items.at(-1).id,'inbox-assignment-000');
     assert.deepEqual(result.counts,{todo:3,sent:2,history:126,followup:0});assert.equal(result.items[0].language,'en');
-    assert.ok(!/rubric|source|facts|question|reasons|notes|answer_text|snapshot|sequence|storage/.test(JSON.stringify(result)));
+    const inboxText=JSON.stringify(result);
+    for(const key of ['rubric','source','facts','question','reasons','notes','answer_text','snapshot','sequence','storage'])
+      assert.ok(!inboxText.includes(`"${key}":`),key);
+    assert.ok(!inboxText.includes(answer));
     result=await workerBriefings(pool,worker,options,{view:'todo',pageSize:1});assert.equal(result.total,3);assert.equal(result.items.length,1);assert.ok(!['inbox-assignment-122','inbox-assignment-124',assignment].includes(result.items[0].id));
     result=await workerBriefings(pool,worker,options,{view:'sent'});assert.equal(result.total,2);assert.equal(result.items[0].state,'superseded');assert.equal(result.items[0].assessmentStatus,'pending');assert.equal(result.items[1].audioStatus,'received');
     await db.query("UPDATE recordings SET status='failed' WHERE id=$1",[audio.id]);
@@ -1438,7 +1441,7 @@ test('PostgreSQL directory validates scoped pagination, crews and edits without 
     for (const filters of [{pageSize:501},{org_id:'b'},{language:'xx'},{page:-1}]) await assert.rejects(listWorkers(pool,owner,filters,options),/Invalid/);
     await assert.rejects(listWorkers(pool,worker,{},options),/Forbidden/);
     const newcomer=await createWorker(pool,owner,{code:'New 001',language:'ar'},options);
-    await assert.rejects(createWorker(pool,owner,{code:'New 001',language:'ar'},options),/already exists/);
+    await assert.rejects(createWorker(pool,owner,{code:'New 001',language:'ar'},options),/Worker ID already in use/);
     await assert.rejects(createWorker(pool,owner,{code:'Injected',language:'en',site_id:'c'},options),/Invalid/);
     await assert.rejects(updateWorker(pool,{...owner,principal_id:'other',org_id:'b',site_id:'b'},newcomer.id,{language:'ur'},options),/unavailable/);
     const crew=await createCrew(pool,owner,{name:'Morning'},options);
