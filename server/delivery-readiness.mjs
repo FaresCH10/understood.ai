@@ -15,7 +15,9 @@ export function recipientDeliveryReadiness(prepared,worker,modes={}) {
     return {delivery:false,reason:'content_unavailable',language};
   if(responseMode==='question' && !nonempty(content.question,500))
     return {delivery:false,reason:'question_unavailable',language};
-  if(deliveryMode!=='text' && content.speech!=='device-synthesis-demo')
+  const generatedSpeech=prepared?.artifactBundle && typeof content.speech==='object'
+    && typeof content.speech?.body?.id==='string' && (responseMode!=='question' || typeof content.speech?.question?.id==='string');
+  if(deliveryMode!=='text' && content.speech!=='device-synthesis-demo' && !generatedSpeech)
     return {delivery:false,reason:'speech_unavailable',language};
   return {delivery:true,reason:null,language};
 }

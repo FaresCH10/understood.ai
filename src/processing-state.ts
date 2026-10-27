@@ -1,3 +1,4 @@
+import {isWorkerLanguage} from '../server/languages.mjs';
 export const processingKinds=['prepare','source_transcription','response_transcription','answer_check'] as const;
 export type ProcessingKind=typeof processingKinds[number];
 export const processingKindLabels:Record<ProcessingKind,string>={prepare:'Briefing preparation',source_transcription:'Source transcription',response_transcription:'Response transcription',answer_check:'Answer check'};
@@ -48,7 +49,7 @@ export function checkedProcessingJob(value:unknown,expectedId?:string):Processin
     for(const event of attempt.events)if(!object(event) || Object.keys(event).sort().join(',')!=='errorCode,language,occurredAt,origin,stage,state,step,track'
       || !Number.isInteger(event.step) || event.step<0 || event.step>101 || !['worker','preparation','grounding_check','translation','translation_check','speech','storage','finalization'].includes(event.stage)
       || !['started','completed','reused','failed'].includes(event.state) || !['generated','retained','override','cache','system'].includes(event.origin)
-      || event.language!==null && !['en','ar','ur'].includes(event.language) || event.track!==null && !['body','question'].includes(event.track)
+      || event.language!==null && !isWorkerLanguage(event.language) || event.track!==null && !['body','question'].includes(event.track)
       || event.errorCode!==null && (typeof event.errorCode!=='string' || !/^[a-z_]{1,80}$/.test(event.errorCode)) || !date(event.occurredAt))throw Error('Preparation stage cannot be verified.');
   }
   return value as ProcessingJob;

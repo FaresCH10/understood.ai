@@ -1,6 +1,9 @@
+import {providerDataClass} from './provider-policy.mjs';
 import {createHash,randomUUID} from 'node:crypto';
 import {inspectWav} from '../audio.mjs';
 import {bundleHash,glossaryContent,providerContent,translatedContent,translationCheck} from './prepared-bundle.mjs';
+
+import {isWorkerLanguage} from '../languages.mjs';
 
 const schema='case-followup-v1';
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -14,7 +17,7 @@ export class CaseFollowupError extends Error {
 const fail=code=>{throw new CaseFollowupError(code);};
 function checkedIdentity(value) {
   if(!keys(value,identityKeys) || !identityKeys.filter(key=>key!=='language').every(key=>typeof value[key]==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(value[key]))
-    || !uuid(value.requestId) || !['en','ar','ur'].includes(value.language))fail('invalid_followup');return {...value};
+    || !uuid(value.requestId) || !isWorkerLanguage(value.language))fail('invalid_followup');return {...value};
 }
 function sourceContent(source) {
   if(typeof source!=='string' || !source.trim() || source.length>1000)fail('invalid_followup');
@@ -33,9 +36,9 @@ export function caseFollowupInputHash(row,provider) {
 }
 
 export function checkedFollowupProvenance(value,model,language) {
-  if(!keys(value,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion']) || value.dataClass!=='synthetic'
+  if(!keys(value,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion']) || !providerDataClass(value)
     || !['adapter','textModel','speechModel','voice','promptVersion','schemaVersion'].every(key=>typeof value[key]==='string' && /^[A-Za-z0-9._-]{1,100}$/.test(value[key]))
-    || !['en','ar','ur'].includes(language) || model!==value[language==='en'?'speechModel':'textModel'])fail('invalid_provider');
+    || !isWorkerLanguage(language) || model!==value[language==='en'?'speechModel':'textModel'])fail('invalid_provider');
   return Object.freeze({...value});
 }
 
@@ -43,7 +46,7 @@ export function checkedFollowupProvenance(value,model,language) {
 // successful generation alone is never a delivered message or an assessment.
 export async function generateCaseFollowup({identity,source,glossary=null,dataClass,adapter,assertCurrent}) {
   const scope=checkedIdentity(identity),english=sourceContent(source);
-  if(dataClass!=='synthetic' || typeof assertCurrent!=='function')fail('invalid_followup');
+  if(!['synthetic','real'].includes(dataClass) || typeof assertCurrent!=='function')fail('invalid_followup');
   let terminology,provider;
   try {terminology=glossaryContent(glossary);provider=providerContent(adapter,dataClass);}catch{fail('invalid_followup');}
   const language=scope.language;
@@ -80,7 +83,7 @@ export function checkedCaseFollowupBundle(value,expectedDependencyHash) {
     || !/^[a-f0-9]{64}$/.test(expectedDependencyHash) || manifest.dependencyHash!==expectedDependencyHash || bundleHash(deps)!==expectedDependencyHash)fail('dependencies_changed');
   const scope=checkedIdentity(deps.identity),english=sourceContent(manifest.source);
   if(english.text!==manifest.source || deps.sourceHash!==hash(manifest.source) || !/^[a-f0-9]{64}$/.test(deps.glossaryHash)
-    || !Number.isSafeInteger(deps.glossaryRevision) || deps.glossaryRevision<0 || deps.provider?.dataClass!=='synthetic')fail('invalid_bundle');
+    || !Number.isSafeInteger(deps.glossaryRevision) || deps.glossaryRevision<0 || !providerDataClass(deps.provider))fail('invalid_bundle');
   let target;try{target=translatedContent(manifest.target,scope.language);if(target.text.length>1000)fail('invalid_bundle');}catch{fail('invalid_bundle');}
   if(scope.language==='en' && bundleHash(target)!==bundleHash(english))fail('invalid_bundle');
   if(!keys(manifest.checks,['translation']) || manifest.checks.translation!==(scope.language==='en'?'not_required':'passed'))fail('invalid_bundle');

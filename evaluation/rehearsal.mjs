@@ -7,7 +7,7 @@ import {bootstrapWorkspace} from '../server/postgres/workspace-bootstrap.mjs';
 import {authenticateStaff,requireSession,issueWorkerGrant,redeemWorkerGrant,revokeWorkerGrant} from '../server/postgres/auth.mjs';
 import {createWorker} from '../server/postgres/people.mjs';
 import {receiveSourceAudio,getSourceAudioReceipt,getSourceAudio} from '../server/postgres/source-audio.mjs';
-import {queuePreparation,editDraft} from '../server/postgres/preparation.mjs';
+import {createDraft,queuePreparation,editDraft} from '../server/postgres/preparation.mjs';
 import {readGlossarySnapshot} from '../server/postgres/glossary.mjs';
 import {domainTransaction,publish,submitAnswer} from '../server/postgres/domain.mjs';
 import {getAssignmentSpeech} from '../server/postgres/generated-audio.mjs';
@@ -101,8 +101,11 @@ async function runSyntheticPipeline({onStage,storage,storageAdapter,onInventory=
   }]));
   const session=token=>requireSession(pool,{headers:{cookie:`understood_session=${token}`}},options);
   const publication=PIPELINE_DATASET.publications[0],content={title:'Carton handover',facts:publication.askedFacts,question:publication.question,askedFacts:publication.askedFacts};
-  const english={title:content.title,text:publication.source,question:publication.question};
+  const choices=['Put 12 cartons at bay 4 and keep the exit clear.','Put 4 cartons at bay 12 and keep the exit clear.','Put 12 cartons at bay 4 and block the exit.','Put 12 cartons at bay 7 and keep the exit clear.'];
+  content.choices=choices;
+  const english={title:'Synthetic carton source',text:publication.source,question:publication.question,answerChoices:choices};
   const arabic={title:'تسليم الصناديق',text:'ضع 12 صندوقاً في المنطقة 4. أبق المخرج خالياً.',question:publication.languageQuestions.ar};
+  arabic.answerChoices=['ضع 12 صندوقاً في المنطقة 4 وأبق المخرج خالياً.','ضع 4 صناديق في المنطقة 12 وأبق المخرج خالياً.','ضع 12 صندوقاً في المنطقة 4 وأغلق المخرج.','ضع 12 صندوقاً في المنطقة 7 وأبق المخرج خالياً.'];
   const sourceBytes=wav(.2),answerBytes=wav(.15),speechBytes=wav(.25),voiceBytes=wav(.18);
   let owner,scope,draftId,pub,snapshot,typedEvaluation,recordedEvaluation,sourceEvidence,preparationEvidence,followupEvidence,metrics,voice;
   const workers=[],bindings=[];
@@ -157,21 +160,21 @@ async function runSyntheticPipeline({onStage,storage,storageAdapter,onInventory=
     });
     await check('automatic_preparation_translation_private_speech',async()=>{
       mock.structured('prepare',{source:publication.source,review:null},content,'askedFacts');
-      mock.structured('grounding',{source:publication.source,candidate:content},{sourceGrounded:true,questionAligned:true,ambiguous:false,
+      mock.structured('grounding',{source:publication.source,candidate:content},{sourceGrounded:true,questionAligned:true,choicesAligned:true,ambiguous:false,
         factEvidence:publication.askedFacts.map((quote,factIndex)=>({factIndex,quote})),askedFactIndexes:[0,1],reasons:[]},'factEvidence');
       mock.structured('translate',{content:english,terms:[]},arabic,'title');
       mock.structured('translation-check',{content:english,translation:arabic,language:'ar',terms:[]},faithful,'faithful');
       for(const [language,value] of [['en',english],['ar',arabic]])for(const kind of ['body','question'])mock.speech(`speech.${language}.${kind}`,kind==='body'?value.text:value.question,speechBytes);
       const glossary=await readGlossarySnapshot({query:(sql,args)=>db.query(sql,args)},scope.orgId,scope.siteId);
-      const input={source:publication.source,revision:1,languages:['en','ar'],review:null,glossary};
+      const input={source:publication.source,title:english.title,revision:1,languages:['en','ar'],review:null,glossary};
       const preparationAdapter=resolvePreparationAdapter({...env,UNDERSTOOD_PREPARATION_ADAPTER:'gemini-free',
         UNDERSTOOD_SYNTHETIC_PREPARATION_HASHES:JSON.stringify([preparationInputHash(input)])},{fetchImpl:mock.fetchImpl});
       await queuePreparation(pool,owner,draftId,1,options);
       const tasks=pipelineTasks({...config,preparationAdapter});assert.equal(await tasks.preparation(),true);assert.equal(await tasks.preparation(),false);
-      assert.equal((await db.query('SELECT state FROM briefings WHERE id=$1',[draftId])).rows[0].state,'ready');assert.equal(mock.requestCount,12);
+      assert.equal((await db.query('SELECT state FROM briefings WHERE id=$1',[draftId])).rows[0].state,'ready',JSON.stringify((await db.query('SELECT stage,state,error_code FROM preparation_stage_events ORDER BY step')).rows));assert.equal(mock.requestCount,12);
       const bundle=(await db.query("SELECT * FROM generated_bundles WHERE briefing_id=$1 AND revision=1 AND state='attached'",[draftId])).rows[0];
       const operations=(await preparationBundleOperations(db,bundle)).sort((a,b)=>a.preparation_context_json.step-b.preparation_context_json.step);
-      const argumentsByStep=[[publication.source,{review:null}],[publication.source,content],[english,'ar',{terms:[]}],[english,arabic,'ar',{terms:[]}],
+      const argumentsByStep=[[publication.source,{review:null,multipleChoice:true}],[publication.source,content],[english,'ar',{terms:[]}],[english,arabic,'ar',{terms:[]}],
         [english.text,'en'],[english.question,'en'],[arabic.text,'ar'],[arabic.question,'ar']];
       assert.equal(operations.length,8);
       preparationEvidence=[];
@@ -198,6 +201,19 @@ async function runSyntheticPipeline({onStage,storage,storageAdapter,onInventory=
       await assert.rejects(getAssignmentSpeech(pool,workers[1].session,workers[0].assignmentId,'question',storage,options),/unavailable|Forbidden/);
       await editDraft(pool,owner,draftId,{revision:1,title:'Later synthetic draft',source:'Put 5 cartons at bay 7.'},options);
       assert.equal(bundleHash((await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[pub.id])).rows[0].snapshot_json),bundleHash(snapshot));
+    });
+    await check('historical_written_question_fixture',async()=>{
+      // The current creation path above exercises checked MCQs. Written answers
+      // and recordings below explicitly exercise a retained pre-MCQ publication.
+      const title='Historical carton instruction';
+      const historical=await createDraft(pool,owner,{requestId:randomUUID(),title,source:publication.source,generationLanguages:['en','ar']},options);
+      const {answerChoices:enChoices,...en}=english,{answerChoices:arChoices,...ar}=arabic;
+      const prepared={title,source:publication.source,question:publication.question,facts:publication.askedFacts,rubric:{askedFacts:publication.askedFacts},
+        languages:{en:{...en,title,speech:'device-synthesis-demo'},ar:{...ar,speech:'device-synthesis-demo'}},provenance:{adapter:'synthetic-local-v1',live:false}};
+      await maintenance('historical-written-question-fixture',()=>db.query("UPDATE briefings SET state='ready',prepared_json=$2 WHERE id=$1",[historical.id,JSON.stringify(prepared)]));
+      pub=await publish(pool,owner,historical.id,{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:workers.map(worker=>worker.id)},{...options,integrationMode:'synthetic'});
+      snapshot=(await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[pub.id])).rows[0].snapshot_json;
+      for(const worker of workers)worker.assignmentId=(await db.query('SELECT id FROM assignments WHERE worker_id=$1 AND publication_id=$2',[worker.id,pub.id])).rows[0].id;
     });
     await check('typed_frozen_version_assessments_and_replay',async()=>{
       const inputs=[];
@@ -290,9 +306,9 @@ async function runSyntheticPipeline({onStage,storage,storageAdapter,onInventory=
       assert.deepEqual((await readPublicationReport(pool,owner,{...options,publicationId:pub.id})).metrics,metrics);
     });
     await check('exhausted_provider_budget_denies_next_generation',async()=>{
-      const draft=(await db.query('SELECT b.source,b.revision,c.generation_languages_json FROM briefings b JOIN draft_creations c ON c.briefing_id=b.id WHERE b.id=$1',[draftId])).rows[0];
+      const draft=(await db.query('SELECT b.title,b.source,b.revision,c.generation_languages_json FROM briefings b JOIN draft_creations c ON c.briefing_id=b.id WHERE b.id=$1',[draftId])).rows[0];
       const glossary=await readGlossarySnapshot({query:(sql,args)=>db.query(sql,args)},scope.orgId,scope.siteId);
-      const input={source:draft.source,revision:draft.revision,languages:draft.generation_languages_json,review:null,glossary};
+      const input={source:draft.source,title:draft.title,revision:draft.revision,languages:draft.generation_languages_json,review:null,glossary};
       const preparationAdapter=resolvePreparationAdapter({...env,UNDERSTOOD_PREPARATION_ADAPTER:'gemini-free',
         UNDERSTOOD_SYNTHETIC_PREPARATION_HASHES:JSON.stringify([preparationInputHash(input)])},{fetchImpl:mock.fetchImpl});
       await queuePreparation(pool,owner,draftId,draft.revision,options);

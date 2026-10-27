@@ -33,7 +33,7 @@ export function ensureCaseMessageSchema(db) {
     BEGIN SELECT RAISE(ABORT,'Conversation evidence is immutable'); END;`);
 }
 
-function scopedCase(db,session,id,write=false) {
+export function scopedCase(db,session,id,write=false) {
   caseMessageId(id);const type=session?.principal_type;
   if(!['staff','worker'].includes(type))throw Error('Forbidden');
   requireClarificationPrincipal(db,session,type,write);
@@ -60,7 +60,9 @@ export function listCaseMessages(db,session,caseId,filters={}) {
   const rows=db.prepare(`SELECT m.*,s.name AS author_name FROM case_messages m LEFT JOIN staff s ON s.id=m.actor_id AND m.actor_type='staff'
     AND s.org_id=m.org_id AND s.site_id=m.site_id WHERE m.case_id=? AND m.org_id=? AND m.site_id=? ORDER BY m.created_at DESC,m.id DESC LIMIT ? OFFSET ?`)
     .all(caseId,session.org_id,session.site_id,pageSize,(page-1)*pageSize);
-  return {items:rows.map(caseMessageRow),total,page,pageSize,status:thread.status,language:thread.language,canReply:thread.status==='open' && !!thread.active && thread.publication_state==='published'};
+  const spoken=new Set(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='case_followup_audio'").get() && rows.length
+    ? db.prepare(`SELECT request_id FROM case_followup_audio WHERE org_id=? AND site_id=? AND request_id IN (${rows.map(()=>'?').join(',')})`).all(session.org_id,session.site_id,...rows.map(row=>row.id)).map(row=>row.request_id) : []);
+  return {items:rows.map(row=>({...caseMessageRow(row),...(spoken.has(row.id)?{audioUrl:`/api/clarifications/${caseId}/messages/${row.id}/audio`}:{})})),total,page,pageSize,status:thread.status,language:thread.language,canReply:thread.status==='open' && !!thread.active && thread.publication_state==='published'};
 }
 export function sendCaseMessage(db,session,caseId,input) {
   const message=caseMessageInput(input);

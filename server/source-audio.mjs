@@ -1,3 +1,4 @@
+import {generationLanguageCheck,guardGenerationLanguages} from './generation-language-schema.mjs';
 import {randomUUID} from 'node:crypto';
 import {NOW,transaction} from './db.mjs';
 import {scheduleAuthority} from './schedules.mjs';
@@ -19,7 +20,7 @@ export function ensureSourceAudioSchema(db) {
     authority_json TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('storing','received','processing','transcribed','failed','blocked')),
     created_at TEXT NOT NULL,received_at TEXT,briefing_id TEXT REFERENCES briefings(id),
     lease_token TEXT,lease_until TEXT,error TEXT,attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts BETWEEN 0 AND 3),retry_at TEXT,
-    CHECK(id!=original_id),CHECK(generation_languages_json IS NULL OR generation_languages_json IN ('["en"]','["en","ar"]','["en","ur"]','["en","ar","ur"]')),
+    CHECK(id!=original_id),CHECK(${generationLanguageCheck}),
     CHECK((status='storing' AND received_at IS NULL) OR (status!='storing' AND received_at IS NOT NULL))
   ) STRICT;
   CREATE INDEX IF NOT EXISTS source_audio_status ON source_audio_requests(status,created_at);
@@ -57,6 +58,7 @@ export function ensureSourceAudioSchema(db) {
     BEGIN SELECT RAISE(ABORT,'Source cleanup history is immutable'); END;
   CREATE TRIGGER IF NOT EXISTS source_audio_purges_no_delete BEFORE DELETE ON source_audio_purges
     BEGIN SELECT RAISE(ABORT,'Source cleanup history is immutable'); END;`);
+  guardGenerationLanguages(db,'source_audio_requests');
 }
 
 // Storage and SQL cannot commit together: keep the journal and verify objects on exact retries.

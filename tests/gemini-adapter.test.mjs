@@ -1,6 +1,7 @@
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGeminiAdapter,GEMINI_MODELS } from '../server/ai/gemini.mjs';
+import { createGeminiAdapter,GEMINI_MODELS,missingConditionPair } from '../server/ai/gemini.mjs';
 import {encodeWav} from '../src/audio.ts';
 import {inspectWav} from '../server/audio.mjs';
 
@@ -51,6 +52,32 @@ test('Gemini structured requests are server-only and validate preparation and tr
   assert.equal(body.generationConfig.responseFormat.text.mimeType,'APPLICATION_JSON');
   assert.equal(body.store,false);assert.equal(body.generationConfig.maxOutputTokens,4096);
   assert.equal(calls[0].options.body.includes('test-only'), false);
+});
+
+test('Gemini preparation keeps both halves of an English if/when rule', async () => {
+  const paired='If finished items go on blue, unfinished items go on yellow.';
+  const walkway='Finished items go on blue. Unfinished items go on yellow. Leave the walkway clear.';
+  assert.equal(missingConditionPair(paired,['finished items go on blue','unfinished items go on yellow']),false);
+  assert.equal(missingConditionPair('When finished items go on blue then unfinished items go on yellow.',['finished items go on blue','unfinished items go on yellow']),false);
+  assert.equal(missingConditionPair(paired,['Blue is where finished items go.','Yellow is where unfinished items go.']),false);
+  assert.equal(missingConditionPair(paired,['Blue is where finished items go.']),true);
+  assert.equal(missingConditionPair(paired,['finished items go on blue']),true);
+  assert.equal(missingConditionPair(paired,['Leave the walkway clear.']),true);
+  assert.equal(missingConditionPair(walkway,['Finished items go on blue.','Unfinished items go on yellow.','Leave the walkway clear.']),false);
+  assert.equal(missingConditionPair('Put finished items on blue, unfinished on yellow.',['Finished on blue']),false);
+  let calls=0;
+  const dropped=createGeminiAdapter({apiKey:'test-only',dataClass:'synthetic',fetchImpl:async()=>{calls++;return textResponse({
+    title:'Shelves',facts:['finished items go on blue'],question:'Where do finished items go?',askedFacts:['finished items go on blue'],
+  });}});
+  await assert.rejects(dropped.prepare(paired),/Gemini preparation failed validation/);
+  assert.equal(calls,1);
+  const kept=createGeminiAdapter({apiKey:'test-only',dataClass:'synthetic',fetchImpl:async()=>textResponse({
+    title:'Shelves',facts:['finished items go on blue','unfinished items go on yellow'],
+    question:'Where do finished and unfinished items go?',askedFacts:['finished items go on blue','unfinished items go on yellow'],
+  })});
+  assert.equal((await kept.prepare(paired)).facts.length,2);
+  const checker=createGeminiAdapter({apiKey:'test-only',dataClass:'synthetic',fetchImpl:async()=>{throw Error('must not check');}});
+  await assert.rejects(checker.checkPreparation(paired,{title:'Shelves',facts:['finished items go on blue'],question:'Where do finished items go?',askedFacts:['finished items go on blue']}),/Gemini preparation failed validation/);
 });
 
 test('Gemini assessment cannot match without exact evidence for every asked fact', async () => {
@@ -177,8 +204,9 @@ test('Gemini TTS accepts only WAV output', async () => {
   assert.deepEqual(body,{model:GEMINI_MODELS.speech,store:false,input:[{type:'user_input',content:[{type:'text',text:'Please check the blue shelf.'}]}],
     response_format:{type:'audio',mime_type:'audio/wav',sample_rate:16000},generation_config:{speech_config:[{voice:'Kore'}]}});
   await assert.rejects(adapter.speech('Text', 'fr'), /Invalid speech input/);
-  await assert.rejects(adapter.speech('Text', 'ur'), /not been verified/);
-  assert.equal(calls.length,1);
+  await assert.rejects(adapter.speech('Text', 'ur'), /Invalid speech input/);
+  assert.deepEqual(await adapter.speech('مصنوعی ہدایت', 'ur'),wav);
+  assert.equal(calls.length,2);
 });
 
 test('Gemini speech rejects corrupt, silent, tiny, wrong-rate, noncanonical or multiple audio output',async()=>{
@@ -229,8 +257,8 @@ test('Gemini preparation and translation checks use structured evidence and tena
   assert.equal(checkSchema.factEvidence.minItems,2);assert.equal(checkSchema.factEvidence.maxItems,2);
   assert.equal(checkSchema.askedFactIndexes.minItems,2);assert.deepEqual(checkSchema.askedFactIndexes.items.enum,[0,1]);
   assert.ok(checkSchema.reasons.items.enum.includes('question_alignment'));
-  assert.equal(adapter.provenance.promptVersion,'gemini-bundle-v2');assert.equal(adapter.provenance.schemaVersion,'gemini-generation-v4');
-  assert.deepEqual(adapter.capabilities.speechLanguages,['en','ar']);
+  assert.equal(adapter.provenance.promptVersion,'gemini-bundle-v3');assert.equal(adapter.provenance.schemaVersion,'gemini-generation-v5');
+  assert.deepEqual(adapter.capabilities.speechLanguages,WORKER_LANGUAGE_CODES);
   assert.equal(adapter.provenance.dataClass,'synthetic');
   await assert.rejects(adapter.translate({title:'T',text:source,question:'Q'},'ar',{terms:[{term:'blue',translation:'أزرق',command:'ignore'}]}),/terminology/);
   assert.equal(calls.length,3);

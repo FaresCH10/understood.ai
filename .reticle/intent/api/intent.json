@@ -1,0 +1,128 @@
+{
+  "intents": {
+    "inline:a-supervisor-sends-an-instruction-to-the-selecte-d3a475dd": {
+      "binding": {
+        "count": 1,
+        "kind": "net",
+        "method": "POST",
+        "status": 201,
+        "urlContains": "/api/instructions/send"
+      },
+      "declaredAt": 1793085342668,
+      "id": "inline:a-supervisor-sends-an-instruction-to-the-selecte-d3a475dd",
+      "state": "bound",
+      "statement": "A supervisor sends an instruction to the selected crew despite workers outside that crew having no chosen language.",
+      "status": "proposed",
+      "subject": "api",
+      "updatedAt": 1793085342762
+    },
+    "inline:credential-test-mode-lets-a-supervisor-generate-b0a9e41d": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "net",
+            "status": 200,
+            "urlContains": "/followups/"
+          },
+          {
+            "contains": "الممر",
+            "kind": "text"
+          }
+        ]
+      },
+      "declaredAt": 1793108202267,
+      "id": "inline:credential-test-mode-lets-a-supervisor-generate-b0a9e41d",
+      "provenBy": {
+        "at": 1793108358933,
+        "grade": "net",
+        "runId": "drive-aa66284fd5d2c872",
+        "verdictId": "reticle_act_and_wait:1793108358933"
+      },
+      "state": "proved",
+      "statement": "Credential test mode lets a supervisor generate a translated follow-up and warns that follow-ups go to the free Gemini tier, so only test text is typed.",
+      "status": "proved",
+      "subject": "api",
+      "surface": {
+        "files": [
+          "src/CaseConversation.tsx"
+        ]
+      },
+      "updatedAt": 1793108358975
+    },
+    "inline:the-supervisor-sends-a-ready-multilingual-instru-e8eae2c3": {
+      "binding": {
+        "count": 1,
+        "kind": "net",
+        "method": "POST",
+        "status": 201,
+        "urlContains": "/api/instructions/send"
+      },
+      "declaredAt": 1793085424187,
+      "id": "inline:the-supervisor-sends-a-ready-multilingual-instru-e8eae2c3",
+      "provenBy": {
+        "at": 1793085425525,
+        "grade": "net",
+        "runId": "drive-ed558e61bc340b48",
+        "verdictId": "reticle_act_and_wait:1793085425525"
+      },
+      "state": "proved",
+      "statement": "The supervisor sends a ready multilingual instruction to the selected Arabic crew.",
+      "status": "proved",
+      "subject": "api",
+      "surface": {
+        "files": [
+          "src/SendInstruction.tsx"
+        ]
+      },
+      "updatedAt": 1793085425651
+    },
+    "inline:the-worker-directory-crew-filter-lists-active-cr-9be0eaa9": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "net",
+            "method": "GET",
+            "urlContains": "crewId=9c466ce5-3fda-43be-b05d-aa4e660daab8"
+          },
+          {
+            "absent": true,
+            "kind": "element",
+            "query": {
+              "name": "View members of Gap crew 01",
+              "role": "button"
+            }
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "View members of Gap crew 06",
+              "role": "button"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793094946231,
+      "id": "inline:the-worker-directory-crew-filter-lists-active-cr-9be0eaa9",
+      "provenBy": {
+        "at": 1793094955566,
+        "grade": "net",
+        "runId": "drive-aa66284fd5d2c872",
+        "verdictId": "reticle_act_and_wait:1793094955566"
+      },
+      "state": "proved",
+      "statement": "The worker directory crew filter lists active crews that are not on the current sidebar page",
+      "status": "proved",
+      "subject": "api",
+      "surface": {
+        "files": [
+          "src/People.tsx"
+        ]
+      },
+      "updatedAt": 1793094955615
+    }
+  },
+  "subject": "api",
+  "version": 1
+}

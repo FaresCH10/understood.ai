@@ -1,3 +1,4 @@
+import {assertProductionAdmission} from './production-admission.mjs';
 import { createServer } from 'node:http';
 import {sendPrivateWav} from '../audio-response.mjs';
 import {withPostgresClient} from './db.mjs';
@@ -22,7 +23,7 @@ import {receiveSourceAudio,getSourceAudioReceipt,getSourceAudio,listSourceAudio}
 import {retrySourceAudio,getSourceRetryReceipt} from './source-audio-retry.mjs';
 import { resolveAuthConfig,requireLocalRequest,verifyMutationOrigin,sessionCookie,clearSessionCookie } from '../auth.mjs';
 import { authenticateStaff,redeemWorkerGrant,requireSession,revokeSession,issueWorkerGrant,revokeWorkerGrant,listWorkerGrants } from './auth.mjs';
-import {workerCompanyContext,workerCredentialStatus,issueWorkerCredentialSetup,completeWorkerSetup,authenticateWorker} from './worker-credentials.mjs';
+import {workerCompanyContext,workerCredentialStatus,authenticateWorker,assignWorkerPassword} from './worker-credentials.mjs';
 import { grantIssueInput } from '../auth.mjs';
 import {requestRecovery,resetPassword} from './account-recovery.mjs';
 import {requestRegistration,resendRegistration,verifyRegistration} from './registration.mjs';
@@ -147,7 +148,7 @@ for(const message of ['Invitation request conflict','Invitation revision changed
 conflicts.add('Draft review request conflict');
 for(const message of ['Draft languages request conflict','Draft languages unchanged'])conflicts.add(message);
 for(const message of ['Onboarding request conflict','Onboarding revision changed'])conflicts.add(message);
-for(const message of ['Instruction request conflict','Instruction audience exceeds limit','This instruction requires an answer',
+for(const message of ['Instruction request conflict','Instruction audience exceeds limit','Instruction crew audience exceeds limit','Choose a language for every selected worker in Team before sending.','This instruction requires an answer',
   'Instruction retry conflict','Instruction retry limit reached','Instruction retry unavailable','Instruction deadline passed',
   'Briefing content expired'])conflicts.add(message);
 for(const message of ['Presentation language changed','Presentation request conflict','Presentation source conflict'])conflicts.add(message);
@@ -158,7 +159,7 @@ conflicts.add('Draft version changed');
 for(const message of ['Staff request conflict','Staff revision changed','Staff access is revoked','Staff access unchanged','Last active site owner must be retained']) conflicts.add(message);
 for(const message of ['Template request conflict','Template revision changed','Template is archived','Template is active']) conflicts.add(message);
 for(const message of ['Glossary request conflict','Glossary revision changed','Glossary term is removed','Glossary term is active','Glossary term already exists','Glossary dependency changed','Live glossary generation unavailable']) conflicts.add(message);
-const badInput = new Set(['Invalid USD amount','Invalid invoice request','Invalid payment request','Invalid invoice filter','Payment date must not be in the future','Invalid JSON','Request too large','Title or source is invalid','Invalid draft request','Invalid draft revision',
+const badInput = new Set(['Select one of the published choices','Invalid USD amount','Invalid invoice request','Invalid payment request','Invalid invoice filter','Payment date must not be in the future','Invalid JSON','Request too large','Title or source is invalid','Invalid draft request','Invalid draft revision',
   'Invalid search request','Invalid worker','Invalid crew request',
   'Invalid repeat request','Invalid repeat deadline',
   'Invalid case review','Invalid case deadline',
@@ -217,10 +218,11 @@ export function createPostgresRehearsalServer(pool,{storage,dataClass,schema,...
   return createServer(postgresHandler(pool,{...options,storage,schema,config:{...config,dataClass,caseFollowupAdapter:options.caseFollowupAdapter},cookieName:'understood_pg_rehearsal',backend:'postgres-rehearsal',requestAddress:req=>{requireLocalRequest(req);return req.socket.remoteAddress;}}));
 }
 export function createPostgresHostedServer(pool,{config,storage,publicBuild}={}) {
+  if(config?.tier==='production')assertProductionAdmission(config);
   if(config?.service!=='api' || config.operatorAccess!==false || config.runtimeRoleProfile!=='application' || config.providerVerification!==undefined
-    || config.tier!=='staging' || config.dataClass!=='synthetic' || config.integrationMode!=='synthetic' || config.accessMode!=='credential'
+    || !(config.tier==='staging'&&config.dataClass==='synthetic'&&config.integrationMode==='synthetic'||config.tier==='production'&&config.dataClass==='real'&&config.integrationMode==='live') || config.accessMode!=='credential'
     || typeof config.requestAddress!=='function' || typeof publicBuild!=='function' || typeof pool?.connect!=='function')throw Error('Invalid hosted synthetic runtime');
-  return createServer(postgresHandler(pool,{...config,config,storage,publicBuild,secure:true,cookieName:'__Host-understood_session',backend:'postgres-hosted-synthetic'}));
+  return createServer(postgresHandler(pool,{...config,config,storage,publicBuild,secure:true,cookieName:'__Host-understood_session',backend:config.integrationMode==='live'?'postgres-hosted-live':'postgres-hosted-synthetic'}));
 }
 function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestAddress,secure=false,publicBuild,...options}) {
   const voiceAvailable=!!storage && ['save','read','remove','exists'].every(key=>typeof storage[key]==='function');
@@ -229,12 +231,15 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
   const pushAdapter=options.pushAdapter ?? resolvePushAdapter(options.pushEnv);
   const cookieOptions={name:cookieName,secure};
   const pipeline=pipelineStatus(options);
-  const repository={schema,integrationMode:'synthetic',cookieName,pipeline,providerVerification:options.providerVerification};
+  const repository={schema,integrationMode:config.integrationMode??'synthetic',cookieName,pipeline,providerVerification:options.providerVerification,storage};
   const mail=options.mail ?? {available:false};
   const destination=pilotDestination(options.pilotDestination);
   const advanceInstructionPreparation=async(started,session)=>{
     const state=()=>domainTransaction(pool,repository.schema,async client=>(await client.query(
       'SELECT state FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3',[started.briefingId,session.org_id,session.site_id])).rows[0]?.state);
+    // Provider preparation belongs to the background worker. An HTTP status poll
+    // must never claim that job with the local demo processor.
+    if(options.preparationAdapter||repository.integrationMode==='live')return state();
     let current=await state();
     for(let i=0;i<10 && current==='processing';i++) {
       if(!await processOnePreparation(pool,{schema:repository.schema,integrationMode:'synthetic'})) break;
@@ -248,7 +253,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
       // Health exposes no tenant data and also serves a private load-balancer check.
       if(secure && req.url==='/api/health' && req.method==='GET' && req.headers['x-forwarded-proto']===undefined) {
         await withPostgresClient(pool,client=>client.query('SELECT 1'));
-        return send(res,200,{status:'ok',mode:'synthetic-credential',backend});
+        return send(res,200,{status:'ok',mode:`${config.aiMode}-credential`,backend});
       }
       const address=requestAddress(req);
       if(secure)res.setHeader('strict-transport-security','max-age=31536000');
@@ -256,7 +261,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
       requestPath=path;
       if (path==='/api/health' && req.method==='GET') {
         await withPostgresClient(pool,client=>client.query('SELECT 1'));
-        return send(res,200,{status:'ok',mode:'synthetic-credential',backend});
+        return send(res,200,{status:'ok',mode:`${config.aiMode}-credential`,backend});
       }
       if(!path.startsWith('/api/') && publicBuild)return publicBuild(req,res,url);
       if (req.method!=='GET') verifyMutationOrigin(req,config);
@@ -299,7 +304,8 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
         return send(res,200,{ok:true},{'set-cookie':sessionCookie(login.session.token,login.session.maxSeconds,cookieOptions)});
       }
       if (path==='/api/auth/worker/redeem' && req.method==='POST') {
-        const body=await readJson(req),session=await redeemWorkerGrant(pool,body.token,repository);
+        const body=await readJson(req);if(!['token','company','workerId','password'].every(key=>typeof body[key]==='string' && body[key].length>0))throw new Error('Invalid credentials');
+        const session=await authenticateWorker(pool,body,req.socket.remoteAddress,repository);
         return send(res,200,{ok:true},{'set-cookie':sessionCookie(session.token,session.maxSeconds,cookieOptions)});
       }
       if(path==='/api/auth/worker/context' && req.method==='GET') {
@@ -314,8 +320,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
       }
       if(path==='/api/auth/worker/setup' && req.method==='POST') {
         if(url.search) throw new Error('Invalid input');
-        const session=await completeWorkerSetup(pool,await readJson(req),address,repository);
-        return send(res,200,{ok:true},{'set-cookie':sessionCookie(session.token,session.maxSeconds,cookieOptions)});
+        return send(res,410,{error:'Use the worker ID and password assigned by your company.'});
       }
       if (path==='/api/logout' && req.method==='POST') {
         let actor;
@@ -328,7 +333,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
       }
       let session;
       try {session=await requireSession(pool,req,repository);} catch (error) {
-        if (path==='/api/session' && req.method==='GET' && error.message==='Sign in required') return send(res,200,{authenticated:false,mode:'synthetic-credential'});
+        if (path==='/api/session' && req.method==='GET' && error.message==='Sign in required') return send(res,200,{authenticated:false,mode:`${config.aiMode}-credential`});
         throw error;
       }
       verifyClientSession(req,session,path);
@@ -341,7 +346,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
         receipt:(s,id)=>getSourceAudioReceipt(pool,s,id,repository),
         audio:(s,id,kind)=>getSourceAudio(pool,s,id,storage,kind,repository),
       }))return;
-      if (path==='/api/session' && req.method==='GET') return send(res,200,{authenticated:true,mode:'synthetic-credential',...clientSessionContext(session),...await sessionContext(pool,session,repository)});
+      if (path==='/api/session' && req.method==='GET') return send(res,200,{authenticated:true,mode:`${config.aiMode}-credential`,...clientSessionContext(session),...await sessionContext(pool,session,repository)});
       if(path==='/api/auth/worker/redemption' && req.method==='GET')return send(res,200,await readWorkerRedemption(pool,session,redemptionHttpInput(req,url),repository));
       if(path==='/api/search' && req.method==='GET')return send(res,200,await searchSite(pool,session,searchQuery(url.searchParams),repository));
       if(path==='/api/account/sites' && req.method==='GET') return send(res,200,await listAccountSites(pool,session,Object.fromEntries(url.searchParams),repository));
@@ -516,7 +521,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
       }
       if(path==='/api/privacy/recording-notice' && ['GET','POST'].includes(req.method)){
         const language=recordingNoticeLanguage(url.searchParams,session,req.method);
-        return send(res,200,req.method==='GET'?await getRecordingNotice(pool,session,{...repository,language}):await saveRecordingNotice(pool,session,await readJson(req),repository));
+        return send(res,200,req.method==='GET'?await getRecordingNotice(pool,session,{...repository,language}):await saveRecordingNotice(pool,session,await readJson(req,100000),repository));
       }
       const noticeRequest=path.match(/^\/api\/privacy\/recording-notice\/requests\/([^/]+)$/);
       if(noticeRequest && req.method==='GET'){
@@ -555,10 +560,17 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
         if(url.search) throw new Error('Invalid credential request');
         return send(res,200,await workerCredentialStatus(pool,session,workerCredentials[1],repository));
       }
+      const workerPasswordAssignment=path.match(/^\/api\/people\/workers\/([^/]+)\/credentials\/password$/);
+      if(workerPasswordAssignment && req.method==='POST'){
+        if(config.accessMode!=='credential')return send(res,404,{error:'Not found'});
+        if(url.search)throw new Error('Invalid input');
+        return send(res,200,await assignWorkerPassword(pool,session,decodeURIComponent(workerPasswordAssignment[1]),await readJson(req),repository));
+      }
       const workerCredentialSetup=path.match(/^\/api\/people\/workers\/([^/]+)\/credentials\/setup$/);
       if(workerCredentialSetup && req.method==='POST') {
         if(url.search) throw new Error('Invalid credential request');
-        return send(res,201,await issueWorkerCredentialSetup(pool,session,workerCredentialSetup[1],await readJson(req),repository));
+        await workerCredentialStatus(pool,session,workerCredentialSetup[1],repository);
+        return send(res,410,{error:'Assign the worker ID and password from Team.'});
       }
       const grant=path.match(/^\/api\/worker-grants\/([^/]+)\/revoke$/);
       if (grant && req.method==='POST') {
@@ -678,8 +690,8 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
         if(receiptId && req.method==='GET'){if(url.search)throw Error('Invalid conversation request');return send(res,200,{...await caseMessageReceiptLookup(pool,session,id,receiptId,repository),clientContext:clientSessionContext(session).clientContext});}
         if(!receiptId && req.method==='GET') {
           const thread=await listCaseMessages(pool,session,id,Object.fromEntries(url.searchParams),repository);
-          return send(res,200,{...thread,caseId:id,clientContext:clientSessionContext(session).clientContext,canVoice:session.principal_type==='worker' && voiceAvailable && thread.canReply,canGenerate:session.principal_type==='staff' && config.dataClass==='synthetic'
-            && config.caseFollowupAdapter?.provenance?.dataClass==='synthetic'
+          return send(res,200,{...thread,caseId:id,clientContext:clientSessionContext(session).clientContext,canVoice:session.principal_type==='worker' && voiceAvailable && thread.canReply,canGenerate:session.principal_type==='staff' && ['synthetic','real'].includes(config.dataClass)
+            && config.caseFollowupAdapter?.provenance?.dataClass===config.dataClass
             && !!config.caseFollowupAdapter?.capabilities?.speechLanguages.includes(thread.language)});
         }
         if(!receiptId && req.method==='POST'){if(url.search)throw Error('Invalid conversation request');return send(res,200,{...await sendCaseMessage(pool,session,id,await readJson(req),repository),clientContext:clientSessionContext(session).clientContext});}
@@ -921,7 +933,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
           if(url.search)throw Error('Invalid presentation request');
           const body=await readJson(req);
           return send(res,200,{...await createPresentation(pool,session,id,body,
-            {schema,translator:presentationTranslator,generationAllowed:presentationGenerationAllowed}),clientContext:clientSessionContext(session).clientContext});
+            {schema,queueGeneration:config.integrationMode==='live',translator:presentationTranslator,generationAllowed:presentationGenerationAllowed}),clientContext:clientSessionContext(session).clientContext});
         }
         if (!action && req.method==='GET') return send(res,200,{...await workerBriefing(pool,session,id,repository),canVoiceHelp:voiceAvailable});
         if (action==='help' && req.method==='GET') return send(res,200,await workerHelpCases(pool,session,id,repository));
@@ -983,7 +995,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
       if (unavailable.has(message)) return send(res,404,{error:message});
       if (typeof message==='string' && message.startsWith('Worker capacity reached')) return send(res,409,{error:message});
       if (conflicts.has(message)) return send(res,409,{error:message});
-      if (badInput.has(message)) return send(res,['Request too large','Recording is too large','CSV exceeds 256 KiB limit'].includes(message) ? 413 : 400,{error:message});
+      if (badInput.has(message) || /^Recipient language is unavailable: (?:unknown|[A-Z]{2}(?:-[A-Z]+)?(?:, [A-Z]{2}(?:-[A-Z]+)?)*)$/.test(message)) return send(res,['Request too large','Recording is too large','CSV exceeds 256 KiB limit'].includes(message) ? 413 : 400,{error:message});
       return send(res,503,{error:'Operation unavailable. Retry after checking the service.'});
     }
   };

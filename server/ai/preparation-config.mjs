@@ -1,8 +1,10 @@
+import {WORKER_LANGUAGE_CODES} from '../languages.mjs';
 import {createGeminiAdapter,GEMINI_MODELS} from './gemini.mjs';
 import {createOpenRouterAdapter,OPENROUTER_FREE_MODEL} from './openrouter.mjs';
 import {bundleHash} from './prepared-bundle.mjs';
+import {createProviderPacer} from './provider-pacing.mjs';
 
-export const preparationInputHash=({source,revision,languages,review=null,glossary})=>bundleHash({source,revision,languages,review,glossary});
+export const preparationInputHash=({source,title,revision,languages,review=null,glossary})=>bundleHash({source,...(typeof title==='string'?{title}:{}),revision,languages,review,glossary});
 
 const hybridProvenance=Object.freeze({adapter:'openrouter-gemini-bundle-v1',dataClass:'synthetic',
   textModel:OPENROUTER_FREE_MODEL,speechModel:GEMINI_MODELS.speech,voice:'Kore',
@@ -22,17 +24,17 @@ export function resolvePreparationAdapter(env=process.env,{fetchImpl=fetch}={}) 
   }catch {throw Error('Set exact synthetic preparation input hashes before enabling generation');}
   const permitted=new Set(hashes);
   if(mode==='gemini-free') {
-    const options={apiKey:env.GEMINI_API_KEY,dataClass:'synthetic',fetchImpl};
-    const select=adapter=>Object.freeze(Object.fromEntries(['provenance','capabilities','prepare','checkPreparation','translate','checkTranslation','speech'].map(key=>[key,adapter[key]])));
+    const options={apiKey:env.GEMINI_API_KEY,dataClass:'synthetic',fetchImpl,paceRequest:createProviderPacer({intervalMs:fetchImpl===fetch?6000:0,intervals:{[GEMINI_MODELS.speech]:fetchImpl===fetch?20000:0}})};
+    const select=adapter=>Object.freeze(Object.fromEntries(['provenance','capabilities','supportsMultipleChoice','prepare','checkPreparation','translate','checkTranslation','speech'].map(key=>[key,adapter[key]])));
     return Object.freeze({...select(createGeminiAdapter(options)),permitsPreparation:input=>permitted.has(preparationInputHash(input)),
       withJournal:requestJournal=>select(createGeminiAdapter({...options,requestJournal}))});
   }
   const textModel=env.OPENROUTER_MODEL || OPENROUTER_FREE_MODEL;
   const textOptions={apiKey:env.OPENROUTER_API_KEY,dataClass:'synthetic',textModel,fetchImpl};
-  const audioOptions={apiKey:env.GEMINI_API_KEY,dataClass:'synthetic',fetchImpl};
+  const audioOptions={apiKey:env.GEMINI_API_KEY,dataClass:'synthetic',fetchImpl,paceRequest:createProviderPacer({intervalMs:fetchImpl===fetch?6000:0,intervals:{[GEMINI_MODELS.speech]:fetchImpl===fetch?20000:0}})};
   const provenance=Object.freeze({...hybridProvenance,textModel});
-  const select=(text,audio)=>Object.freeze({provenance,capabilities:Object.freeze({textLanguages:Object.freeze(['en','ar','ur']),
-    speechLanguages:Object.freeze(['en','ar'])}),prepare:text.prepare,checkPreparation:text.checkPreparation,translate:text.translate,
+  const select=(text,audio)=>Object.freeze({provenance,capabilities:Object.freeze({textLanguages:WORKER_LANGUAGE_CODES,
+    speechLanguages:WORKER_LANGUAGE_CODES}),supportsMultipleChoice:text.supportsMultipleChoice,prepare:text.prepare,checkPreparation:text.checkPreparation,translate:text.translate,
     checkTranslation:text.checkTranslation,speech:audio.speech});
   return Object.freeze({...select(createOpenRouterAdapter(textOptions),createGeminiAdapter(audioOptions)),
     permitsPreparation:input=>permitted.has(preparationInputHash(input)),

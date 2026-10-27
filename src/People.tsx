@@ -181,6 +181,7 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
   const changing=useRef(false);
   const [workers, setWorkers] = useState<WorkerPage | null>(null);
   const [crews, setCrews] = useState<CrewPage|null>(null);
+  const [crewChoices,setCrewChoices]=useState<CrewPage|null>(null);
   const [crewSearch,setCrewSearch]=useState(''),[crewStatus,setCrewStatus]=useState('all'),[crewPage,setCrewPage]=useState(1);
   const [crewLoading,setCrewLoading]=useState(true),[crewError,setCrewError]=useState('');
   const [selected, setSelected] = useState<Worker | null>(null);
@@ -230,6 +231,22 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
       .catch((reason:Error) => {if(!controller.signal.aborted && current()) setCrewError(reason.message);}).finally(() => {if(!controller.signal.aborted && current()) setCrewLoading(false);});
     return () => controller.abort();
   },[refresh,revision,crewSearch,crewStatus,crewPage,canManage,initialCrewId,peopleApi,current]);
+
+  useEffect(() => {
+    if(!canManage) return;
+    const controller=new AbortController();
+    (async()=>{
+      const items:CrewPage['items']=[];
+      let page=1,total=0;
+      do {
+        const result=await peopleApi<CrewPage>(`/crews?status=active&page=${page}&pageSize=100`,'GET',undefined,controller.signal);
+        if(controller.signal.aborted || !current())return;
+        items.push(...result.items);total=result.total;page+=1;
+      } while(items.length<total && page<=50); // ponytail: 50 pages is 5,000 crews. A larger page is refused by the API.
+      if(!controller.signal.aborted && current())setCrewChoices({items,total,page:1,pageSize:Math.max(items.length,1)});
+    })().catch(()=>{if(!controller.signal.aborted && current())setCrewChoices({items:[],total:0,page:1,pageSize:100});});
+    return ()=>controller.abort();
+  },[refresh,revision,canManage,peopleApi,current]);
 
   useEffect(() => { setConfirmDisable(false);setDeletionLocked(true); }, [selected?.id]);
   useEffect(() => { setConfirmDisable(false); }, [selected?.crew_id]);
@@ -303,7 +320,7 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
       <label className="search-box"><Search size={18} /><span className="sr-only">{t.searchWorkers}</span><input dir="auto" ref={workerSearchInput} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={t.searchPlaceholder} /></label>
       <label className="select-label">{t.language}<select value={language} onChange={(event) => { setLanguage(event.target.value); setPage(1); }}><option value="all">{t.allLanguages}</option><option value="unset">{t.notSelected}</option>{WORKER_LOCALES.map(item=><option key={item.code} value={item.code}>{languages[item.code]}</option>)}</select></label>
       <label className="select-label">{t.access}<select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="active">{t.active}</option><option value="inactive">{t.disabled}</option><option value="all">{t.allStatuses}</option></select></label>
-      <label className="select-label">{t.membership}<select value={workerCrew.id} onChange={(event) => {setWorkerCrew({id:event.target.value,name:''});setPage(1);}}><option value="all">{t.allCrews}</option><option value="none">{t.noCrew}</option>{!['all','none'].includes(workerCrew.id) && <option dir="auto" value={workerCrew.id}>{workerCrew.name || t.selectedCrew}</option>}</select></label>
+      <label className="select-label">{t.membership}<select value={workerCrew.id} onChange={(event) => {const crew=crewChoices?.items.find(item=>item.id===event.target.value);setWorkerCrew({id:event.target.value,name:crew?.name || ''});setPage(1);}}><option value="all">{t.allCrews}</option><option value="none">{t.noCrew}</option>{crewChoices?.items.map(crew=><option key={crew.id} dir="auto" value={crew.id}>{crew.name}</option>)}{!['all','none'].includes(workerCrew.id) && !crewChoices?.items.some(crew=>crew.id===workerCrew.id) && <option dir="auto" value={workerCrew.id}>{workerCrew.name || t.selectedCrew}</option>}</select></label>
     </div>
     {error && <p className="notice" role="alert">{peopleErrorText(locale,new Error(error))}</p>}
     {message && <p className="notice notice-green" role="status">{peopleMessageText(locale,message)}</p>}

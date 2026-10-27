@@ -151,6 +151,7 @@ export function sweepOverdueAssignments(db,{now=NOW(),limit=50,force=false,inter
       JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
       WHERE a.due_at IS NOT NULL AND a.due_at<=? AND p.state='published'
         AND NOT EXISTS(SELECT 1 FROM submission_receipts sr WHERE sr.assignment_id=a.id AND sr.org_id=a.org_id)
+      AND NOT EXISTS(SELECT 1 FROM acknowledgments ak WHERE ak.assignment_id=a.id AND ak.org_id=a.org_id)
         AND NOT EXISTS(SELECT 1 FROM audit au WHERE au.org_id=a.org_id AND au.site_id=a.site_id
           AND au.action='assignment.overdue' AND au.object_id=a.id)
       ORDER BY a.due_at,a.id LIMIT ?`).all(now,limit);

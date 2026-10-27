@@ -11,9 +11,9 @@ const copy = Object.freeze({
   missing: 'No published version contains a complete stored language artifact.',
   present: 'A published version contains title, text and question fields for this language.',
   ui: 'Worker UI labels, direction and text fallback are localized in every selectable locale; native-speaker review is still pending.',
-  translationUnsupported: 'Configured translation coverage is English, Arabic and Urdu only; this worker UI locale has no content translation support.',
+  translationUnsupported: 'No stored demo translation or configured translation provider is available for this locale.',
   translationUndeclared: 'The configured translation adapter does not declare this language.',
-  speechUnsupported: 'Configured speech coverage is English and Arabic only; this worker UI locale has no speech support.',
+  speechUnsupported: 'No stored demo speech or configured speech provider is available for this locale.',
   speechUndeclared: 'The configured speech adapter does not declare this language.',
 });
 
@@ -26,7 +26,7 @@ function contentState(snapshot, code) {
   return { state: present ? 'ready' : 'missing', evidence: present ? copy.present : copy.missing };
 }
 
-export function languageReadinessModel({ mode = 'synthetic-demo', publication = null, testedAt = null,generationDefaults=['en','ar','ur'],pipeline=pipelineStatus(),stageTests=STAGE_TESTS.map(test=>({...test,state:'untested'})) } = {}) {
+export function languageReadinessModel({ mode = 'synthetic-demo', publication = null, testedAt = null,generationDefaults=['en','ar','ur'],pipeline=pipelineStatus(),stageTests=STAGE_TESTS.map(test=>({...test,state:'untested'})),verifiedArtifactLanguages=[] } = {}) {
   const defaults=generationLanguages(generationDefaults);
   const synthetic = String(mode).startsWith('synthetic');
   const snapshot = publication?.snapshot || null;
@@ -36,17 +36,17 @@ export function languageReadinessModel({ mode = 'synthetic-demo', publication = 
       ? { state: 'not_tested', evidence: copy.synthetic }
       : { state: 'unavailable', evidence: 'Provider configuration is not verified in this environment.' };
     const translationStage=pipeline.stages.find(stage=>stage.id==='translation'),speechStage=pipeline.stages.find(stage=>stage.id==='speech');
-    let translation=!languageCapability(definition.code,'translation')
+    let translation=!languageCapability(definition.code,'translation') && !(translationStage.configuration==='configured' && translationStage.declaredLanguages.includes(definition.code))
       ? {state:'unavailable',evidence:copy.translationUnsupported}
       : translationStage.configuration!=='configured' ? provider
       : translationStage.declaredLanguages.includes(definition.code)
-      ? {state:'not_tested',evidence:'Synthetic translation adapter is configured; language accuracy and live translation have not been verified.'}
+      ? {state:'not_tested',evidence:pipeline.dataClass==='real'?'Production translation is configured; independent language-quality evaluation is still required.':'Synthetic translation adapter is configured; language accuracy and live translation have not been verified.'}
       : {state:'unavailable',evidence:copy.translationUndeclared};
-    let speech=!languageCapability(definition.code,'speech')
+    let speech=!languageCapability(definition.code,'speech') && !(speechStage.configuration==='configured' && speechStage.declaredLanguages.includes(definition.code))
       ? {state:'unavailable',evidence:copy.speechUnsupported}
       : speechStage.configuration!=='configured' ? provider
       : speechStage.declaredLanguages.includes(definition.code)
-      ? {state:'not_tested',evidence:'Synthetic speech adapter is configured; live speech has not been verified.'}
+      ? {state:'not_tested',evidence:pipeline.dataClass==='real'?'Production speech is configured; independent language-quality evaluation is still required.':'Synthetic speech adapter is configured; live speech has not been verified.'}
       : {state:'unavailable',evidence:copy.speechUndeclared};
     const check=(stage,current)=>{
       const test=stageTests.find(test=>test.stage===stage && test.language===definition.code);
@@ -57,25 +57,29 @@ export function languageReadinessModel({ mode = 'synthetic-demo', publication = 
         evidence:stage==='translation'?'Fixed synthetic translation and automated comparison only; language accuracy is not certified.':'Fixed synthetic WAV format and nonempty audio only; speech accuracy and quality are not certified.'};
     };
     translation=check('translation',translation);speech=check('speech',speech);
+    if(content.state==='ready' && verifiedArtifactLanguages.includes(definition.code)){
+      translation={state:'ready',evidence:'The published translation passed its stored completeness checks. This is artifact readiness, not native-speaker accuracy certification.'};
+      speech={state:'ready',evidence:'Both published speech tracks passed private-storage integrity checks. Speech quality still requires listening review.'};
+    }
     return { ...definition,generationDefault:defaults.includes(definition.code), ui: { state: 'ready', evidence: copy.ui }, content, translation, speech };
   });
   return {
     generatedAt: testedAt || new Date().toISOString(),
     mode,
-    dataClass: synthetic ? 'synthetic' : 'unknown',
-    realDataAllowed: false,
+    dataClass: pipeline.dataClass==='real'?'real':synthetic ? 'synthetic' : 'unknown',
+    realDataAllowed: pipeline.dataClass==='real'&&pipeline.realDataAllowed===true,
     pipeline:stageVerificationPipeline(pipeline,stageTests),stageTests,
     provider: {
-      adapter: pipeline.stages.some(stage=>stage.configuration==='configured') ? 'gemini-synthetic-runtime' : synthetic ? 'synthetic-local-v1' : 'unverified',
+      adapter: pipeline.dataClass==='real'?'gemini-approved-v1':pipeline.stages.some(stage=>stage.configuration==='configured') ? 'gemini-synthetic-runtime' : synthetic ? 'synthetic-local-v1' : 'unverified',
       connection: synthetic ? { state: 'not_tested', evidence: copy.synthetic } : { state: 'unavailable', evidence: 'Provider connection has not been verified.' },
-      evidence: synthetic ? 'Synthetic-only environment. Keep real worker data off free-tier providers.' : 'Live provider evidence is required before production data access.',
+      evidence: pipeline.dataClass==='real'?'Approved production adapter configured. Language quality and deployed connections require separate verification.':synthetic ? 'Synthetic-only environment. Keep real worker data off free-tier providers.' : 'Live provider evidence is required before production data access.',
     },
     publication: publication ? { id: publication.id, version: publication.version, state: publication.state } : null,
     languages,
     tests: {
       connection: { state: 'not_tested', evidence: synthetic ? copy.synthetic : 'No connection test has completed.' },
       translation: { state: 'not_tested', evidence: 'Fixed-fixture results above do not certify language accuracy or the full pipeline.' },
-      speech: { state: 'not_tested', evidence: 'Fixed-fixture results above do not certify speech quality; Urdu speech remains unsupported.' },
+      speech: { state: 'not_tested', evidence: 'Stored audio and fixed-fixture results do not certify speech quality in every language.' },
     },
   };
 }

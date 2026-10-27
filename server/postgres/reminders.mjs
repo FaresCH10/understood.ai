@@ -32,6 +32,7 @@ export async function processOneReminder(pool,{schema='public'}={}) {
       AND NOT EXISTS(SELECT 1 FROM briefing_archives b WHERE b.briefing_id=p.briefing_id)
       AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=a.worker_id AND d.org_id=a.org_id)
       AND NOT EXISTS(SELECT 1 FROM submission_receipts sr WHERE sr.assignment_id=a.id AND sr.org_id=a.org_id)
+      AND NOT EXISTS(SELECT 1 FROM acknowledgments ak WHERE ak.assignment_id=a.id AND ak.org_id=a.org_id)
       FOR SHARE OF p,w`,[row.assignment_id])).rows.length>0;
     await client.query("UPDATE assignment_reminders SET state=$1,finished_at=clock_timestamp() WHERE assignment_id=$2 AND state='queued'",[eligible?'visible':'skipped',row.assignment_id]);
     if(eligible)await recordWorkerEvent(client,{orgId:row.org_id,siteId:row.site_id,workerId:row.worker_id,kind:'deadline.reminder',

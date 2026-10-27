@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "text \"Key facts match\"",
+  "observed": "no element matched {\"text\":\"Key facts match\"}",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "e573",
+        "source": {
+          "file": "src/WorkerSubmissionReceipt.tsx",
+          "line": 54,
+          "column": 4
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793024330066-click-2eb5c808",
+  "createdAt": 1793024330066,
+  "seen": 1,
+  "lastSeenAt": 1793024330066
+}

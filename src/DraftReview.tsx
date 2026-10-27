@@ -1,3 +1,4 @@
+import {type WorkerLocaleCode} from '../server/languages.mjs';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {Pencil,RefreshCw,Save,X,TriangleAlert} from 'lucide-react';
 import {readPendingReview,savePendingReview,clearPendingReview,pendingReviewContent,checkedReviewResult,type PendingReview,type TranslationEdits} from './review-recovery';
@@ -8,7 +9,7 @@ import type {StaffRequestAuthority} from './useStaffRequest';
 import {retainStaffRequest} from './staff-request';
 type Review={revision:number;question:string;facts:string[];askedFacts:string[];translations?:TranslationEdits};
 type Prepared={question:string;facts:string[];rubric?:{askedFacts:string[]}};
-type TranslationTarget={code:'ar'|'ur';name:string;dir:'rtl';title:string;text:string;question:string};
+type TranslationTarget={code:Exclude<WorkerLocaleCode,'en'>;name:string;dir:'ltr'|'rtl';title:string;text:string;question:string};
 class ReviewError extends Error {constructor(message:string,public uncertain=false){super(message);}}
 const lines=(text:string)=>text.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
 export function useReviewRecovery(scope?:string|null) {

@@ -29,7 +29,7 @@ const secretFree=value=>assert.doesNotMatch(JSON.stringify(value),new RegExp(`${
 test('runtime stage projection is bounded, immutable, synthetic-only and never calls adapters',()=>{
   const config=rehearsalConfig(env),pipeline=pipelineStatus(config);
   assert.equal(pipeline.stages.length,7);assert.ok(pipeline.stages.every(stage=>stage.configuration==='configured' && stage.verification==='not_tested'));
-  assert.deepEqual(pipeline.stages.find(stage=>stage.id==='speech').declaredLanguages,['en','ar']);
+  assert.deepEqual(pipeline.stages.find(stage=>stage.id==='speech').declaredLanguages,WORKER_LANGUAGE_CODES);
   assert.deepEqual(pipeline.stages.find(stage=>stage.id==='source').declaredLanguages,[]);
   assert.equal(pipeline.realDataAllowed,false);assert.equal(pipeline.productionReady,false);secretFree(pipeline);
   assert.throws(()=>pipeline.stages[0].models.push('forged'));assert.throws(()=>pipeline.stages[0].configuration='verified');
@@ -49,9 +49,9 @@ test('inspection separates stored content, declared capabilities and unperformed
   assert.equal(model.languages.find(row=>row.code==='ar').content.state,'ready');
   assert.equal(model.languages.find(row=>row.code==='ar').translation.state,'not_tested');
   assert.equal(model.languages.find(row=>row.code==='ar').speech.state,'not_tested');
-  assert.equal(model.languages.find(row=>row.code==='ur').speech.state,'unavailable');
-  assert.equal(model.languages.find(row=>row.code==='hi').translation.state,'unavailable');
-  assert.equal(model.languages.find(row=>row.code==='hi').speech.state,'unavailable');
+  assert.equal(model.languages.find(row=>row.code==='ur').speech.state,'not_tested');
+  assert.equal(model.languages.find(row=>row.code==='hi').translation.state,'not_tested');
+  assert.equal(model.languages.find(row=>row.code==='hi').speech.state,'not_tested');
   assert.equal(model.languages.find(row=>row.code==='hi').content.state,'missing');
   assert.ok(Object.values(model.tests).every(row=>row.state==='not_tested'));secretFree(model);
   assert.equal(model.provider.adapter,'gemini-synthetic-runtime');assert.equal(model.realDataAllowed,false);
@@ -82,7 +82,7 @@ test('authenticated HTTP inspection is read-only and only an explicitly budgeted
     assert.equal((await call('/language-readiness')).status,401);
     const owner=await login('owner@example.test'),response=await call('/language-readiness',owner);
     assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-store/);const report=await response.json();
-    assert.deepEqual(report.pipeline,pipelineStatus(config));assert.equal(report.languages.find(row=>row.code==='ur').speech.state,'unavailable');secretFree(report);
+    assert.deepEqual(report.pipeline,pipelineStatus(config));assert.equal(report.languages.find(row=>row.code==='ur').speech.state,'not_tested');secretFree(report);
     const inspected=await call('/language-readiness/test',owner,{});assert.equal(inspected.status,200);
     assert.deepEqual((await inspected.json()).pipeline,report.pipeline);
     assert.equal((await call('/language-readiness/test',owner,{pipeline:{productionReady:true}})).status,400);

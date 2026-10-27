@@ -75,7 +75,7 @@ export function responseRow(row) {
   const acknowledgedAt=audio ? null : row.acknowledged_at;
   const receivedAt=audio ? row.audio_at : row.attempt_at || acknowledgedAt;
   return {assignmentId:row.assignment_id,worker:row.code,language:row.language,
-    status:outcome || (audio && row.audio_status==='failed' ? 'failed_audio' : acknowledgedAt ? 'acknowledged' : receivedAt ? 'assessment_pending' : 'awaiting_response'),
+    status:outcome || (audio && ['failed','blocked'].includes(row.audio_status) ? 'failed_audio' : acknowledgedAt ? 'acknowledged' : receivedAt ? 'assessment_pending' : 'awaiting_response'),
     outcome:outcome || null,receivedAt:receivedAt instanceof Date ? receivedAt.toISOString() : receivedAt || null};
 }
 
@@ -274,6 +274,7 @@ export function getPublicationResponse(db,session,publicationId,assignmentId,inp
       question:responseMode==='acknowledge'?null:snapshot.question,facts:snapshot.facts,
       workerQuestion:responseMode==='acknowledge'?null:deliveredContent?.question || snapshot.languages?.[assignment.language]?.question || null,
       responseMode,deliveryMode,
+      ...(snapshot.rubric?.mode==='multiple-choice'?{questionType:'multiple-choice',choices:deliveredContent?.choices || snapshot.languages?.[assignment.language]?.choices || snapshot.languages?.en?.choices}:{}),
       acknowledgedAt:acknowledgment?.received_at || null,
       ...submissionHistory(db,session,assignmentId,page,pageSize,true),cases};
   });

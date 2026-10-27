@@ -1,3 +1,4 @@
+import {isWorkerLanguage,type WorkerLocaleCode} from '../server/languages.mjs';
 import {sameWorkerSession,validWorkerSession,type PageSession} from './session-state.ts';
 import {workerRecordingNotice} from './notice-recovery.ts';
 import {workerResponseState} from './worker-state.ts';
@@ -6,9 +7,9 @@ import type {AudioDraftStore} from './worker-audio-draft.ts';
 import {privateDeviceAllowed} from './worker-device-policy.ts';
 
 export const offlineLimits={briefings:5,bytes:10*1024*1024,hours:24,audioBytes:2880044} as const;
-type Language='en'|'ar'|'ur';
+type Language=WorkerLocaleCode;
 export type OfflineNotice={revision:number;configured:boolean;language:Language;notice:string|null};
-export type OfflineBriefing={scope:RecordingScope;title:string;text:string;question:string;savedAt:string;expiresAt:string;answerUntil:string|null;canRecord:boolean;notice:OfflineNotice;audio:{body:string|null;question:string|null}};
+export type OfflineBriefing={responseMode?:'acknowledge';questionType?:'multiple-choice';choices?:{id:string;text:string}[];scope:RecordingScope;title:string;text:string;question:string|null;savedAt:string;expiresAt:string;answerUntil:string|null;canRecord:boolean;notice:OfflineNotice;audio:{body:string|null;question:string|null}};
 export type OfflineBundle={session:PageSession;briefings:OfflineBriefing[]};
 export class OfflineError extends Error {
   readonly code:'invalid'|'storage'|'session'|'limit'|'unavailable';
@@ -62,13 +63,14 @@ function checkedBundle(value:unknown,now:number):OfflineBundle {
     || !Array.isArray(bundle.briefings) || !bundle.briefings.length || bundle.briefings.length>offlineLimits.briefings)throw new OfflineError('invalid');
   const ids=new Set<string>();
   for(const item of bundle.briefings){
-    if(!exact(item,'answerUntil,audio,canRecord,expiresAt,notice,question,savedAt,scope,text,title') || !exact(item.scope,'assignmentId,language,publicationId,version')
+    if(!exact(item,item.responseMode==='acknowledge'?'answerUntil,audio,canRecord,expiresAt,notice,question,responseMode,savedAt,scope,text,title':item.questionType==='multiple-choice'?'answerUntil,audio,canRecord,choices,expiresAt,notice,question,questionType,savedAt,scope,text,title':'answerUntil,audio,canRecord,expiresAt,notice,question,savedAt,scope,text,title') || !exact(item.scope,'assignmentId,language,publicationId,version')
       || !text(item.scope.assignmentId,100) || !text(item.scope.publicationId,100) || !Number.isSafeInteger(item.scope.version) || item.scope.version<1
-      || !['en','ar','ur'].includes(item.scope.language) || !text(item.title,300) || !text(item.text,20000) || !text(item.question,2000)
+      || !isWorkerLanguage(item.scope.language) || !text(item.title,300) || !text(item.text,20000) || (item.responseMode==='acknowledge' ? item.question!==null || item.canRecord || item.audio?.question!==null : !text(item.question,2000))
       || !iso(item.savedAt) || !iso(item.expiresAt) || Date.parse(item.savedAt)>now || Date.parse(item.expiresAt)<=Date.parse(item.savedAt)
       || Date.parse(item.expiresAt)>Math.min(Date.parse(session.expiresAt!),Date.parse(item.savedAt)+86400000)
       || item.answerUntil!==null && !iso(item.answerUntil) || typeof item.canRecord!=='boolean' || !exact(item.audio,'body,question')
       || !exact(item.notice,'configured,language,notice,revision') || ids.has(item.scope.assignmentId))throw new OfflineError('invalid');
+    if(item.questionType==='multiple-choice' && (!Array.isArray(item.choices) || item.choices.length!==4 || item.canRecord || item.choices.some(choice=>!exact(choice,'id,text') || !/^[a-f0-9]{32}$/.test(choice.id) || !text(choice.text,5000)) || new Set(item.choices.map(choice=>choice.id)).size!==4))throw new OfflineError('invalid');
     try{workerRecordingNotice(item.notice,item.scope.language);}catch{throw new OfflineError('invalid');}ids.add(item.scope.assignmentId);
     for(const audio of [item.audio.body,item.audio.question])if(audio!==null)offlineAudioBytes(audio);
   }
@@ -157,10 +159,12 @@ export async function fetchOfflineBriefing(send:typeof fetch,session:PageSession
       const {response,bytes}=await get(value.speechUrls[part],offlineLimits.audioBytes);if(response.headers.get('content-type')?.split(';')[0]!=='audio/wav')throw new OfflineError('invalid');
       audio[part]=base64(bytes);offlineAudioBytes(audio[part]);
     }
-    const notice=await json(`/api/privacy/recording-notice?${new URLSearchParams({language:scope.language})}`);workerRecordingNotice(notice,scope.language);
-    const last=detail(await json(path));if(JSON.stringify(last.content)!==JSON.stringify(value.content) || (last.repeatRequest?.id ?? null)!==(value.repeatRequest?.id ?? null))throw new OfflineError('session');await identity();guard();
+    const notice=value.responseMode==='acknowledge' || value.content?.questionType==='multiple-choice'?{revision:0,configured:false,language:scope.language,notice:null}:await json(`/api/privacy/recording-notice?${new URLSearchParams({language:scope.language})}`);workerRecordingNotice(notice,scope.language);
+    const last=detail(await json(path));if(last.responseMode!==value.responseMode || JSON.stringify(last.content)!==JSON.stringify(value.content) || (last.repeatRequest?.id ?? null)!==(value.repeatRequest?.id ?? null))throw new OfflineError('session');await identity();guard();
     const savedAt=new Date(now()).toISOString(),expiresAt=new Date(Math.min(Date.parse(expected.expiresAt!),now()+86400000)).toISOString();
-    const item:OfflineBriefing={scope:{...scope},title:last.content?.title,text:last.content?.text,question:last.content?.question,savedAt,expiresAt,answerUntil:last.repeatRequest?.dueAt ?? last.dueAt ?? null,canRecord:workerResponseState(last,now()).canRespond,
+    const item:OfflineBriefing={scope:{...scope},title:last.content?.title,text:last.content?.text,question:last.responseMode==='acknowledge'?null:last.content?.question,savedAt,expiresAt,answerUntil:last.repeatRequest?.dueAt ?? last.dueAt ?? null,canRecord:last.responseMode!=='acknowledge' && last.content?.questionType!=='multiple-choice' && workerResponseState(last,now()).canRespond,
+      ...(last.responseMode==='acknowledge'?{responseMode:'acknowledge' as const}:{}),
+      ...(last.content?.questionType==='multiple-choice'?{questionType:'multiple-choice',choices:last.content.choices}:{}),
       notice:{revision:notice.revision,configured:notice.configured,language:scope.language,notice:notice.notice},audio};
     checkedBundle({session:{authenticated:true,role:'worker',workerId:expected.workerId,language:expected.language,mode:expected.mode,clientContext:expected.clientContext,expiresAt:expected.expiresAt},briefings:[item]},now());return item;
   }catch(error){if(error instanceof OfflineError)throw error;throw new OfflineError('unavailable');}

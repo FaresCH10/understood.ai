@@ -1,5 +1,7 @@
 # Hosted synthetic runtime
 
+A separate production Gemini adapter and admitted production launcher are now implemented. This document describes the unchanged synthetic staging contract. See [PRODUCTION_GEMINI_INTEGRATION.md](PRODUCTION_GEMINI_INTEGRATION.md) for production configuration and the external gates that remain open.
+
 This is a deployment foundation, not production approval. The launcher accepts only explicit `staging`, synthetic AI/data, credential access and an isolated `understood_stage_*` schema. Production, real data, demo access and ordinary free-tier worker-content dispatch fail closed. Fixed synthetic verification has a default-off, worker-only opt-in described below. The loopback rehearsal launcher remains available.
 
 ## Fixed Synthetic Verification

@@ -530,8 +530,9 @@ export function decideWorkerLanguageRequest(db, session, id, input) {
     }
     audit(db, session, value.action === 'approve' ? 'worker.language_request_approved'
       : 'worker.language_request_rejected', id);
-    recordWorkerEvent(db,{orgId:session.org_id,siteId:session.site_id,workerId:row.worker_id,kind:'language.decided',
-      objectType:'language_request',objectId:id,dedupeKey:`language.decided:${id}`,now});
+    const decisionKind=value.action==='approve'?'language.approved':'language.rejected';
+    recordWorkerEvent(db,{orgId:session.org_id,siteId:session.site_id,workerId:row.worker_id,kind:decisionKind,
+      objectType:'language_request',objectId:id,dedupeKey:`${decisionKind}:${id}`,now});
     return { ...languageRequestRow(db.prepare('SELECT * FROM worker_language_requests WHERE id=?').get(id)), duplicate: false };
   });
 }

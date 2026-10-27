@@ -6,7 +6,7 @@ export type PresentationStatus='ready'|'pending'|'failed';
 export type PresentationState=PresentationStatus|'not_required'|'unavailable'|'deferred';
 export type PresentationReason='content_expired'|'content_unavailable'|'answer_not_ready'|'translation_not_enabled'
   |'translation_failed'|'translation_invalid'|'language_capability_unavailable'|'generation_paused'|string;
-export type InstructionPresentationContent={title:string;text:string;question:string|null};
+export type InstructionPresentationContent={title:string;text:string;question:string|null;questionType?:'multiple-choice';choices?:{id:string;text:string}[]};
 export type AnswerPresentationContent={text:string};
 
 export type WorkerPresentationArtifact={
@@ -50,11 +50,14 @@ function checkedContent(kind:PresentationSourceKind,value:unknown,ready:boolean)
     return null;
   }
   if(kind==='instruction'){
-    if(!exact(value,['title','text','question'])||!safeText(value.title,120)||!safeText(value.text,5000)
+    if((!exact(value,['title','text','question'])&&!exact(value,['title','text','question','questionType','choices']))||!safeText(value.title,120)||!safeText(value.text,5000)
       ||(value.question!==null&&!safeText(value.question,500)))throw new WorkerPresentationError('invalid');
-    return {title:value.title,text:value.text,question:value.question} as InstructionPresentationContent;
+    if('choices' in value && (value.questionType!=='multiple-choice'||!Array.isArray(value.choices)||value.choices.length!==4
+      ||new Set(value.choices.map(choice=>choice?.id)).size!==4||value.choices.some(choice=>!exact(choice,['id','text'])
+        ||typeof choice.id!=='string'||!/^[a-f0-9]{32}$/.test(choice.id)||!safeText(choice.text,5000))))throw new WorkerPresentationError('invalid');
+    return {title:value.title,text:value.text,question:value.question,...('choices' in value?{questionType:'multiple-choice',choices:value.choices}: {})} as InstructionPresentationContent;
   }
-  if(!exact(value,['text'])||!safeText(value.text,2000))throw new WorkerPresentationError('invalid');
+  if(!exact(value,['text'])||!safeText(value.text,5000))throw new WorkerPresentationError('invalid');
   return {text:value.text} as AnswerPresentationContent;
 }
 

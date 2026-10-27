@@ -1,3 +1,4 @@
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import {validStaffSession,type PageSession} from './session-state.ts';
 import {staffRequestBinding} from './staff-request.ts';
 
@@ -75,9 +76,12 @@ export function checkedStaffRecordingPage(value:unknown,caseId:string,page:numbe
 }
 export function checkedStaffRecordingNotice(value:unknown,session:PageSession,declaredLanguage:RecordingLanguage):string|null{
   author(session);if(!language(declaredLanguage)||!exact(value,['revision','configured','notices','canWrite','recoveryScope'])||!Number.isSafeInteger(value.revision)||Number(value.revision)<0||Number(value.revision)>1000000000
-    ||typeof value.configured!=='boolean'||value.canWrite!==(session.staffRole==='owner')||value.recoveryScope!==(session.staffRole==='owner'?session.staffScope:null)||!exact(value.notices,['en','ar','ur']))return fail('invalid');
-  for(const lang of ['en','ar','ur']){const text=value.notices[lang];if(typeof text!=='string'||text.length>2000||/[\u0000-\u0008\u000b-\u001f\u007f\u202a-\u202e\u2066-\u2069]/.test(text)||(value.configured?text.trim().length<20:text!==''))return fail('invalid');}
-  return value.configured?value.notices[declaredLanguage] as string:null;
+    ||typeof value.configured!=='boolean'||value.canWrite!==(session.staffRole==='owner')||value.recoveryScope!==(session.staffRole==='owner'?session.staffScope:null)||!value.notices || typeof value.notices!=='object' || Array.isArray(value.notices) || Object.keys(value.notices).some(key=>!WORKER_LANGUAGE_CODES.includes(key as typeof WORKER_LANGUAGE_CODES[number])))return fail('invalid');
+  const notices=value.notices as Record<string,string>;
+  if(!['en','ar','ur'].every(key=>key in notices))return fail('invalid');
+  for(const text of Object.values(notices)){if(typeof text!=='string'||text.length>2000||/[\u0000-\u0008\u000b-\u001f\u007f\u202a-\u202e\u2066-\u2069]/.test(text)||(text!==''&&text.trim().length<20))return fail('invalid');}
+  if(value.configured!==Object.values(notices).some(text=>!!text))return fail('invalid');
+  return notices[declaredLanguage] || null;
 }
 export async function requestStaffRecording(fetcher:typeof fetch,session:PageSession,scope:StaffRecordingScope,pending:StaffRecordingPending,operation:{kind:'receipt'}|{kind:'send';bytes:Uint8Array},signal:AbortSignal,current:()=>boolean,canMutate:()=>boolean=current):Promise<StaffRecordingReceipt>{
   const identity={...session},selection={...scope},retained={...pending},binding=staffRequestBinding(session);

@@ -219,7 +219,9 @@ export async function processOneInvitation(pool,config,{schema='public',send=sen
     return {...row,lease,message};
   });
   if(!job) return false;if(job.ignored) return true;
-  let providerId;try {const result=await send(config,job.id,job.message);if(typeof result?.providerId==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(result.providerId)) providerId=result.providerId;}catch {}
+  let providerId,mailCode='send_failed';
+  try {const result=await send(config,job.id,job.message);if(typeof result?.providerId==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(result.providerId)) providerId=result.providerId;}
+  catch(error){const status=Number(error?.status);mailCode=Number.isInteger(status)&&status>=400&&status<600?`http_${status}`:'send_failed';}
   await inSchema(pool,schema,async client=>{
     const ref=await invitationRow(client,job.invitation_id);if(!ref) return;
     // Journal an already-dispatched mail result even if access was paused meanwhile.
@@ -227,7 +229,10 @@ export async function processOneInvitation(pool,config,{schema='public',send=sen
     const row=(await client.query("SELECT 1 FROM staff_invitation_mail WHERE id=$1 AND state='processing' AND lease_token=$2 AND lease_until>clock_timestamp() AND expires_at>clock_timestamp() FOR UPDATE",[job.id,job.lease])).rows[0];if(!row) return;
     if(!await live(client,invitation) || invitation.revision!==job.generation) await client.query("UPDATE staff_invitation_mail SET state='ignored',payload=NULL,lease_token=NULL,lease_until=NULL WHERE id=$1",[job.id]);
     else if(providerId) await client.query("UPDATE staff_invitation_mail SET state='sent',payload=NULL,provider_id=$1,lease_token=NULL,lease_until=NULL WHERE id=$2",[providerId,job.id]);
-    else await client.query(`UPDATE staff_invitation_mail SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,payload=CASE WHEN attempts>=3 THEN NULL ELSE payload END,
+    else {
+      if(job.attempts+1>=3) console.error(`invitation mail failed state=failed code=${mailCode}`);
+      await client.query(`UPDATE staff_invitation_mail SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,payload=CASE WHEN attempts>=3 THEN NULL ELSE payload END,
       next_at=clock_timestamp()+$1*interval '1 second',lease_token=NULL,lease_until=NULL WHERE id=$2`,[30*(job.attempts+1),job.id]);
+    }
   });return true;
 }

@@ -1,0 +1,281 @@
+{
+  "intents": {
+    "inline:a-failed-recovery-storage-write-sends-no-instruc-8d4bab52": {
+      "binding": {
+        "contains": "PASS: storage failure prevented the send",
+        "kind": "text"
+      },
+      "declaredAt": 1793001498548,
+      "id": "inline:a-failed-recovery-storage-write-sends-no-instruc-8d4bab52",
+      "provenBy": {
+        "at": 1793001499480,
+        "grade": "presence",
+        "runId": "drive-b5bdd4493a55c30a",
+        "verdictId": "reticle_act_and_wait:1793001499480"
+      },
+      "state": "proved",
+      "statement": "A failed recovery-storage write sends no instruction request.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "tests/browser/functional-audit.tsx"
+        ],
+        "route": "/tests/browser/functional-audit.html"
+      },
+      "updatedAt": 1793001499523
+    },
+    "inline:a-temporary-connection-failure-keeps-the-unsent-19ce49a2": {
+      "binding": {
+        "contains": "PASS: draft retained and server actions resumed",
+        "kind": "text"
+      },
+      "declaredAt": 1793001344994,
+      "id": "inline:a-temporary-connection-failure-keeps-the-unsent-19ce49a2",
+      "provenBy": {
+        "at": 1793001345756,
+        "grade": "presence",
+        "runId": "drive-b5bdd4493a55c30a",
+        "verdictId": "reticle_act_and_wait:1793001345756"
+      },
+      "state": "proved",
+      "statement": "A temporary connection failure keeps the unsent answer and restores server actions after session verification.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "tests/browser/functional-audit.tsx"
+        ],
+        "route": "/tests/browser/functional-audit.html"
+      },
+      "updatedAt": 1793001345783
+    },
+    "inline:applying-a-template-fills-the-instruction-source-1121ee23": {
+      "binding": {
+        "contains": "Applied “Template title”",
+        "kind": "text"
+      },
+      "declaredAt": 1793001628684,
+      "id": "inline:applying-a-template-fills-the-instruction-source-1121ee23",
+      "provenBy": {
+        "at": 1793001648027,
+        "grade": "presence",
+        "runId": "drive-b5bdd4493a55c30a",
+        "verdictId": "reticle_act_and_wait:1793001648027"
+      },
+      "state": "proved",
+      "statement": "Applying a template fills the instruction source and selects Type mode.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "src/NewBriefing.tsx"
+        ],
+        "route": "/tests/browser/functional-audit.html"
+      },
+      "updatedAt": 1793001648056
+    },
+    "inline:leaving-send-cancels-future-preparation-status-c-770ef8b6": {
+      "binding": {
+        "contains": "PASS: polling stops on unmount.",
+        "kind": "text"
+      },
+      "declaredAt": 1792997137500,
+      "id": "inline:leaving-send-cancels-future-preparation-status-c-770ef8b6",
+      "provenBy": {
+        "at": 1792997213265,
+        "grade": "presence",
+        "runId": "drive-88bce0f92c4e05d0",
+        "verdictId": "reticle_act_and_wait:1792997213265"
+      },
+      "state": "proved",
+      "statement": "Leaving Send cancels future preparation-status checks even while preparation is pending.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "tests/browser/review-bugfixes.tsx"
+        ],
+        "route": "/tests/browser/review-bugfixes.html"
+      },
+      "updatedAt": 1792997213281
+    },
+    "inline:reading-one-unread-notification-refills-the-curr-3d8f5b34": {
+      "binding": {
+        "contains": "Page 1 / 2 · 19",
+        "kind": "text"
+      },
+      "declaredAt": 1793001454911,
+      "id": "inline:reading-one-unread-notification-refills-the-curr-3d8f5b34",
+      "provenBy": {
+        "at": 1793001455643,
+        "grade": "presence",
+        "runId": "drive-b5bdd4493a55c30a",
+        "verdictId": "reticle_act_and_wait:1793001455643"
+      },
+      "state": "proved",
+      "statement": "Reading one unread notification refills the current page before the worker can advance.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "src/WorkerNotifications.tsx"
+        ],
+        "route": "/tests/browser/functional-audit.html"
+      },
+      "updatedAt": 1793001455662
+    },
+    "inline:send-status-continues-polling-unchanged-preparat-deaf5679": {
+      "binding": {
+        "contains": "PASS: three automatic status checks reached publication after two unchanged responses.",
+        "kind": "text"
+      },
+      "declaredAt": 1792997077993,
+      "id": "inline:send-status-continues-polling-unchanged-preparat-deaf5679",
+      "provenBy": {
+        "at": 1792997087722,
+        "grade": "presence",
+        "runId": "drive-88bce0f92c4e05d0",
+        "verdictId": "reticle_act_and_wait:1792997087722"
+      },
+      "state": "proved",
+      "statement": "Send status continues polling unchanged preparation responses until publication completes.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "src/SendInstruction.tsx"
+        ],
+        "route": "/tests/browser/review-bugfixes.html"
+      },
+      "updatedAt": 1792997087754
+    },
+    "inline:the-supervisor-can-read-the-applied-template-tex-adaaff33": {
+      "binding": {
+        "contains": "PASS: template is visible in Type mode",
+        "kind": "text"
+      },
+      "declaredAt": 1793001628759,
+      "id": "inline:the-supervisor-can-read-the-applied-template-tex-adaaff33",
+      "provenBy": {
+        "at": 1793001649672,
+        "grade": "presence",
+        "runId": "drive-b5bdd4493a55c30a",
+        "verdictId": "reticle_act_and_wait:1793001649672"
+      },
+      "state": "proved",
+      "statement": "The supervisor can read the applied template text in the active source field.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "tests/browser/functional-audit.tsx"
+        ],
+        "route": "/tests/browser/functional-audit.html"
+      },
+      "updatedAt": 1793001649694
+    },
+    "inline:the-supervisor-sees-an-error-before-any-send-whe-a0bd626d": {
+      "binding": {
+        "contains": "Send recovery could not be saved. No instruction was sent.",
+        "kind": "text"
+      },
+      "declaredAt": 1793001497517,
+      "id": "inline:the-supervisor-sees-an-error-before-any-send-whe-a0bd626d",
+      "provenBy": {
+        "at": 1793001498467,
+        "grade": "presence",
+        "runId": "drive-b5bdd4493a55c30a",
+        "verdictId": "reticle_act_and_wait:1793001498467"
+      },
+      "state": "proved",
+      "statement": "The supervisor sees an error before any send when recovery storage cannot retain the request.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "src/SendInstruction.tsx"
+        ],
+        "route": "/tests/browser/functional-audit.html"
+      },
+      "updatedAt": 1793001498488
+    },
+    "inline:the-translated-view-displays-the-question-and-al-3f3c0a63": {
+      "binding": {
+        "contains": "हिंदी विकल्प 4",
+        "kind": "text"
+      },
+      "declaredAt": 1793001650877,
+      "id": "inline:the-translated-view-displays-the-question-and-al-3f3c0a63",
+      "provenBy": {
+        "at": 1793001651754,
+        "grade": "presence",
+        "runId": "drive-b5bdd4493a55c30a",
+        "verdictId": "reticle_act_and_wait:1793001651754"
+      },
+      "state": "proved",
+      "statement": "The translated view displays the question and all four answer options in the approved language.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "src/WorkerPresentationView.tsx"
+        ],
+        "route": "/tests/browser/functional-audit.html"
+      },
+      "updatedAt": 1793001651790
+    },
+    "inline:translated-choices-keep-the-frozen-option-ids-us-72118af9": {
+      "binding": {
+        "contains": "PASS: translated choices retain all grading IDs",
+        "kind": "text"
+      },
+      "declaredAt": 1793001651878,
+      "id": "inline:translated-choices-keep-the-frozen-option-ids-us-72118af9",
+      "provenBy": {
+        "at": 1793001652651,
+        "grade": "presence",
+        "runId": "drive-b5bdd4493a55c30a",
+        "verdictId": "reticle_act_and_wait:1793001652651"
+      },
+      "state": "proved",
+      "statement": "Translated choices keep the frozen option IDs used to grade the worker answer.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "tests/browser/functional-audit.tsx"
+        ],
+        "route": "/tests/browser/functional-audit.html"
+      },
+      "updatedAt": 1793001652680
+    },
+    "inline:unread-notification-item-11-is-visible-after-ite-f9ce9e3e": {
+      "binding": {
+        "contains": "PASS: unread page refilled with item 11",
+        "kind": "text"
+      },
+      "declaredAt": 1793001455796,
+      "id": "inline:unread-notification-item-11-is-visible-after-ite-f9ce9e3e",
+      "provenBy": {
+        "at": 1793001456548,
+        "grade": "presence",
+        "runId": "drive-b5bdd4493a55c30a",
+        "verdictId": "reticle_act_and_wait:1793001456548"
+      },
+      "state": "proved",
+      "statement": "Unread notification item 11 is visible after item 1 is read, so pagination skips no item.",
+      "status": "proved",
+      "subject": "tests",
+      "surface": {
+        "files": [
+          "tests/browser/functional-audit.tsx"
+        ],
+        "route": "/tests/browser/functional-audit.html"
+      },
+      "updatedAt": 1793001456569
+    }
+  },
+  "subject": "tests",
+  "version": 1
+}

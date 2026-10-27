@@ -120,6 +120,7 @@ export async function receiveRecording(db, session, assignmentId, submissionId, 
   requireWritableEntitlement(db,session.org_id);
   if (assignment.state !== 'published') throw new Error('Assignment unavailable');
   if (assignment.due_at && assignment.due_at<=NOW()) throw new Error('Assignment deadline passed');
+  if(JSON.parse(assignment.snapshot_json)?.rubric?.mode==='multiple-choice')throw new Error('Select one of the published choices');
   if (JSON.parse(assignment.snapshot_json)?.responseMode==='acknowledge') throw new Error('This instruction only requires confirmation');
   if (db.prepare('SELECT 1 FROM attempts WHERE assignment_id=? AND submission_id=?').get(assignmentId, submissionId))
     throw new Error('Submission ID conflict');

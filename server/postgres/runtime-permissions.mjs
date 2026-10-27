@@ -8,7 +8,7 @@ import {inspectRuntimeUpdateColumns} from './runtime-column-permissions.mjs';
 import {inspectIdentityRuntimeGuards} from './identity-permissions.mjs';
 import {caseWorkflowUpdates,inspectCaseWorkflowRuntimeGuards} from './case-workflow-permissions.mjs';
 
-const workerColumnUpdates=Object.freeze({provider_verification_jobs:verificationJobUpdates,organizations:Object.freeze(['id']),sites:Object.freeze(['id']),
+const workerColumnUpdates=Object.freeze({presentation_translation_jobs:Object.freeze(['state','attempts','lease_token','lease_until','retry_at','error_code','updated_at']),provider_verification_jobs:verificationJobUpdates,organizations:Object.freeze(['id']),sites:Object.freeze(['id']),
   staff:Object.freeze(['id']),staff_accounts:Object.freeze(['id']),staff_credentials:Object.freeze(['staff_id']),staff_access_revisions:Object.freeze(['staff_id']),...caseWorkflowUpdates});
 const workerColumnTables=Object.freeze(Object.keys(workerColumnUpdates));
 
@@ -27,7 +27,7 @@ provider_requests provider_verifications provider_verification_authorities provi
 site_lifecycle_requests case_routing case_messages case_followups case_followup_audio case_repeats case_reviews case_voice clarification_action_receipts clarification_creations preparation_authorities
 instruction_sends instruction_deliveries instruction_retries acknowledgments worker_language_requests worker_credentials worker_setup_tokens
 organization_entitlements organization_entitlement_transitions organization_activation_requests
-presentation_artifacts answer_presentation_bindings
+presentation_artifacts answer_presentation_bindings presentation_translation_jobs
 generated_bundle_operations text_retention_policies text_retention_requests text_retention_purges restore_privacy_retirements case_retention_policies
 case_retention_requests case_content_purges generated_retention_policies generated_retention_requests generated_audio_retirements generated_audio_removals
 restore_access_restrictions publication_report_audience usage_change_requests activity_retention_policies activity_retention_requests activity_identity_purges

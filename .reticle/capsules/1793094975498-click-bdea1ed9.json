@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "text \"Continue as Worker 029\"",
+  "observed": "no element matched {\"text\":\"Continue as Worker 029\"}",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "",
+        "source": {
+          "file": "src/main.tsx",
+          "line": 551,
+          "column": 248
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793094975498-click-bdea1ed9",
+  "createdAt": 1793094975498,
+  "seen": 1,
+  "lastSeenAt": 1793094975498
+}

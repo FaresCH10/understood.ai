@@ -1,3 +1,4 @@
+import {assignWorkerPassword} from '../server/postgres/worker-credentials.mjs';
 import test from 'node:test';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
 const fetch=createSessionContextFetch();
@@ -11,7 +12,7 @@ import { createDraft,queuePreparation } from '../server/postgres/preparation.mjs
 import { publish,submitAnswer } from '../server/postgres/domain.mjs';
 import { getBriefing,workerBriefings,workerBriefing } from '../server/postgres/read-models.mjs';
 import { provisionStaffCredential,issueWorkerGrant } from '../server/postgres/auth.mjs';
-import { CANONICAL_SOURCE } from '../server/domain.mjs';
+import { CANONICAL_SOURCE,syntheticPrepare } from '../server/domain.mjs';
 import {encodeWav} from '../src/audio.ts';
 
 const env={UNDERSTOOD_TIER:'local',UNDERSTOOD_AI_MODE:'synthetic',UNDERSTOOD_ACCESS_MODE:'credential',
@@ -120,12 +121,13 @@ test('standalone rehearsal API verifies schema and scheduled stages prepare and 
     assert.equal((await getBriefing(pool,owner,draft.id,config)).state,'ready');
     const pub=await publish(pool,owner,draft.id,{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['w']},config);
     const assignment=(await db.query('SELECT id FROM assignments WHERE publication_id=$1',[pub.id])).rows[0].id;
-    const receipt=await submitAnswer(pool,{principal_type:'worker',principal_id:'w',org_id:'a',site_id:'a'},assignment,randomUUID(),'Finished blue; unfinished yellow.',config);
+    const receipt=await submitAnswer(pool,{principal_type:'worker',principal_id:'w',org_id:'a',site_id:'a'},assignment,randomUUID(),(await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[pub.id])).rows[0].snapshot_json.rubric.correctChoiceId,config);
     assert.equal(receipt.assessmentStatus,'pending');
     const worker={principal_type:'worker',principal_id:'w',org_id:'a',site_id:'a'};
     assert.equal((await workerBriefings(pool,worker,config)).items[0].assessmentStatus,'pending');
+    await assignWorkerPassword(pool,owner,'w',{expectedCode:(await db.query("SELECT code FROM workers WHERE id='w'")).rows[0].code,workerId:'WORKER-001',password:'Assigned synthetic worker password',confirmed:true},config);
     const grant=await issueWorkerGrant(pool,owner,'w',60,config);
-    const redemption=await fetch(`${base}/api/auth/worker/redeem`,{method:'POST',headers:{origin:config.publicOrigin,'content-type':'application/json'},body:JSON.stringify({token:grant.token})});
+    const redemption=await fetch(`${base}/api/auth/worker/redeem`,{method:'POST',headers:{origin:config.publicOrigin,'content-type':'application/json'},body:JSON.stringify({token:grant.token,company:'a',workerId:'WORKER-001',password:'Assigned synthetic worker password'})});
     assert.equal(redemption.status,200);
     const workerCookie=redemption.headers.get('set-cookie').split(';')[0];
     assert.equal((await fetch(`${base}/api/retention/text`,{headers:{cookie:workerCookie}})).status,403);
@@ -142,10 +144,14 @@ test('standalone rehearsal API verifies schema and scheduled stages prepare and 
     const attempt=(await db.query('SELECT outcome,assessment_status FROM attempts WHERE id=$1',[receipt.id])).rows[0];
     assert.equal(attempt.outcome,'matched');assert.equal(attempt.assessment_status,'complete');
     assert.equal((await getBriefing(pool,owner,draft.id,config)).publications[0].metrics.matches,1);
+    // Keep historical free-text voice coverage alongside the new MCQ draft path.
+    await db.query("INSERT INTO briefings(id,org_id,site_id,title,source,state,prepared_json) VALUES('legacy-voice','a','a','Historical voice',$1,'ready',$2)",[CANONICAL_SOURCE,JSON.stringify(syntheticPrepare(CANONICAL_SOURCE))]);
+    const voicePub=await publish(pool,owner,'legacy-voice',{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['w']},config);
+    const voiceAssignment=(await db.query('SELECT id FROM assignments WHERE publication_id=$1',[voicePub.id])).rows[0].id;
     const audio=Buffer.from(encodeWav({duration:1,sampleRate:16000,numberOfChannels:1,getChannelData:()=>new Float32Array(16000).fill(0.2)})),submissionId=randomUUID();
     const session=await (await fetch(`${base}/api/session`,{headers:{cookie:workerCookie}})).json();
     const headers={cookie:workerCookie,origin:config.publicOrigin,'content-type':'audio/wav','x-submission-id':submissionId,'x-client-session-context':session.clientContext};
-    const voiceResponse=await fetch(`${base}/api/worker/briefings/${assignment}/audio`,{method:'POST',headers,body:audio});assert.equal(voiceResponse.status,201);
+    const voiceResponse=await fetch(`${base}/api/worker/briefings/${voiceAssignment}/audio`,{method:'POST',headers,body:audio});assert.equal(voiceResponse.status,201);
     const voice=await voiceResponse.json();assert.equal(voice.status,'received');
     const status=()=>fetch(`${base}/api/recordings/${voice.id}`,{headers:{cookie:workerCookie}}).then(response=>response.json());
     assert.equal((await status()).aiStatus,'pending');
@@ -153,15 +159,15 @@ test('standalone rehearsal API verifies schema and scheduled stages prepare and 
     const recordingAdapter={permitsRecording:()=>true,async transcribe(bytes){assert.deepEqual(bytes,audio);return {text:'Finished blue; unfinished yellow.'};},assess:syntheticAssessmentAdapter.assess};
     const processed=await runWorkerCycle(rehearsalTasks(pool,storage,{...config,recordingAdapter}));assert.equal(processed.recording,true);
     assert.equal((await status()).aiStatus,'transcribed');
-    const replay=await fetch(`${base}/api/worker/briefings/${assignment}/audio`,{method:'POST',headers,body:audio});assert.equal(replay.status,200);assert.equal((await replay.json()).id,voice.id);
+    const replay=await fetch(`${base}/api/worker/briefings/${voiceAssignment}/audio`,{method:'POST',headers,body:audio});assert.equal(replay.status,200);assert.equal((await replay.json()).id,voice.id);
     assert.equal((await db.query('SELECT count(*)::int n FROM recordings')).rows[0].n,1);
     assert.equal((await db.query('SELECT count(*)::int n FROM attempts')).rows[0].n,2);
     assert.equal((await getBriefing(pool,owner,draft.id,config)).publications[0].metrics.matches,1);
-    await db.query("UPDATE publications SET state='withdrawn' WHERE id=$1",[pub.id]);
+    await db.query("UPDATE publications SET state='withdrawn' WHERE id=ANY($1::text[])",[[pub.id,voicePub.id]]);
     assert.equal((await workerBriefings(pool,worker,config)).items.length,0);
     assert.equal((await workerBriefing(pool,worker,assignment,config)).state,'withdrawn');
     const history=await (await fetch(`${base}/api/worker/history`,{headers:{cookie:workerCookie}})).json();
-    assert.deepEqual(history.items.map((item) => [item.id,item.state,item.outcome]),[[assignment,'withdrawn','matched']]);
+    assert.deepEqual(history.items.filter(item=>item.id===assignment).map((item) => [item.id,item.state,item.outcome]),[[assignment,'withdrawn','matched']]);
     const logout=await fetch(`${base}/api/logout`,{method:'POST',headers:{cookie,origin:config.publicOrigin}});
     assert.match(logout.headers.get('set-cookie'),/^understood_pg_rehearsal=;.*Max-Age=0/);
     assert.equal((await fetch(`${base}/api/overview`,{headers:{cookie}})).status,401);

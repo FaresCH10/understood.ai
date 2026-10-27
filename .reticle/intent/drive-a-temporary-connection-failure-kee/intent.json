@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-a-temporary-connection-failure-keeps-the-unsent": {
+      "declaredAt": 1793001423023,
+      "id": "flow:drive-a-temporary-connection-failure-keeps-the-unsent",
+      "state": "declared",
+      "statement": "A temporary connection failure keeps the unsent answer and restores server actions after session verification.",
+      "status": "proposed",
+      "subject": "drive-a-temporary-connection-failure-kee",
+      "surface": {
+        "flow": "drive-a-temporary-connection-failure-keeps-the-unsent"
+      },
+      "updatedAt": 1793001423028
+    }
+  },
+  "subject": "drive-a-temporary-connection-failure-kee",
+  "version": 1
+}

@@ -1,0 +1,363 @@
+{
+  "version": 2,
+  "name": "drive-the-worker-directory-crew-filter-lists-active-cr",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793104808065,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Crew name"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Crew name"
+          },
+          "args": {
+            "value": "Gap crew 01"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Create crew"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Gap crew",
+            "satisfies": {
+              "property": "matchesPattern",
+              "pattern": "Gap crew \\d[\\d,.]*"
+            }
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Crew name"
+          },
+          "args": {
+            "value": "Gap crew 02"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Create crew"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Gap crew",
+            "satisfies": {
+              "property": "matchesPattern",
+              "pattern": "Gap crew \\d[\\d,.]*"
+            }
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Crew name"
+          },
+          "args": {
+            "value": "Gap crew 03"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Create crew"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Gap crew",
+            "satisfies": {
+              "property": "matchesPattern",
+              "pattern": "Gap crew \\d[\\d,.]*"
+            }
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Crew name"
+          },
+          "args": {
+            "value": "Gap crew 04"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Create crew"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Gap crew",
+            "satisfies": {
+              "property": "matchesPattern",
+              "pattern": "Gap crew \\d[\\d,.]*"
+            }
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Crew name"
+          },
+          "args": {
+            "value": "Gap crew 05"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Create crew"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Gap crew",
+            "satisfies": {
+              "property": "matchesPattern",
+              "pattern": "Gap crew \\d[\\d,.]*"
+            }
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Crew name"
+          },
+          "args": {
+            "value": "Gap crew 06"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Create crew"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 359
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Gap crew",
+            "satisfies": {
+              "property": "matchesPattern",
+              "pattern": "Gap crew \\d[\\d,.]*"
+            }
+          }
+        }
+      ],
+      "timeoutMs": 15000,
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "combobox",
+        "name": "Membership All crews No crew Gap crew 01 Gap crew 02 Gap crew 03 Gap crew 04 Gap crew 05 Gap crew 06"
+      },
+      "args": {
+        "value": "9c466ce5-3fda-43be-b05d-aa4e660daab8"
+      },
+      "action": "select",
+      "source": {
+        "file": "src/People.tsx",
+        "line": 316
+      },
+      "timeoutMs": 10000,
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Sign out"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 551
+      },
+      "timeoutMs": 10000,
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Continue as Worker 029"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 496
+      },
+      "expect": {
+        "kind": "text",
+        "absent": true,
+        "contains": "Worker",
+        "satisfies": {
+          "property": "matchesPattern",
+          "pattern": "Worker \\d[\\d,.]*"
+        }
+      },
+      "timeoutMs": 12000,
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "سنیں اور جواب دیں"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1198
+      },
+      "timeoutMs": 10000,
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "ہدایات سنیں"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1230
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "اس زبان کے لیے اس آلے پر آواز دستیاب نہیں"
+      },
+      "timeoutMs": 8000,
+      "page": "/"
+    }
+  ],
+  "intent": "The worker directory crew filter lists active crews that are not on the current sidebar page",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "Cursor"
+  },
+  "intentId": "flow:drive-the-worker-directory-crew-filter-lists-active-cr"
+}

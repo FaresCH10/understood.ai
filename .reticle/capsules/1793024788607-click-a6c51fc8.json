@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "text \"QA shelf handover\"",
+  "observed": "no element matched {\"text\":\"QA shelf handover\"}",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "e904",
+        "source": {
+          "file": "src/main.tsx",
+          "line": 545,
+          "column": 312
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793024788607-click-a6c51fc8",
+  "createdAt": 1793024788607,
+  "seen": 1,
+  "lastSeenAt": 1793024788607
+}

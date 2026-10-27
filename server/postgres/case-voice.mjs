@@ -6,7 +6,7 @@ import {scopedCase} from './case-messages.mjs';
 import {routeNewCase} from './case-routing.mjs';
 import {requireSiteOperational} from './site-lifecycle.mjs';
 
-const labels={en:'Voice message',ar:'رسالة صوتية',ur:'صوتی پیغام'};
+const labels={en:'Voice message',ar:'رسالة صوتية',ur:'صوتی پیغام',hi:'आवाज़ संदेश',bn:'ভয়েস বার্তা',ml:'ശബ്ദ സന്ദേശം',ta:'குரல் செய்தி',te:'వాయిస్ సందేశం',ne:'आवाज सन्देश',fil:'Mensahe ng boses',si:'හඬ පණිවිඩය',ru:'Голосовое сообщение','pa-Guru':'ਆਵਾਜ਼ ਸੁਨੇਹਾ','pa-Arab':'آواز دا پیغام',id:'Pesan suara'};
 const receipt=row=>({id:row.request_id,caseId:row.requested_case_id,assignmentId:row.assignment_id,kind:row.kind,sha256:row.sha256,status:row.status,createdAt:new Date(row.created_at).toISOString(),receivedAt:row.received_at?new Date(row.received_at).toISOString():null});
 async function assignment(client,session,id) {
   await requirePrincipal(client,session,'worker');

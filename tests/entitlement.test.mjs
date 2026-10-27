@@ -112,7 +112,8 @@ test('trial expiry is read-only on the server clock and manual read-only blocks 
 
     const questionAssignment=assignmentId(db,question.publicationId),ackAssignment=assignmentId(db,acknowledgement.publicationId),
       ackAssignment2=assignmentId(db,acknowledgement2.publicationId);
-    const answerSubmission=randomUUID(),answer=submitAnswer(db,worker,questionAssignment,answerSubmission,'I will move the red ladder to the north bay.');
+    const choice=JSON.parse(db.prepare('SELECT snapshot_json FROM publications WHERE id=?').get(question.publicationId).snapshot_json).rubric.correctChoiceId;
+    const answerSubmission=randomUUID(),answer=submitAnswer(db,worker,questionAssignment,answerSubmission,choice);
     assert.equal(answer.duplicate,false);
     const ackRequest=randomUUID(),ack=acknowledgeAssignment(db,worker,ackAssignment,ackRequest);
     assert.equal(ack.duplicate,false);
@@ -123,7 +124,7 @@ test('trial expiry is read-only on the server clock and manual read-only blocks 
 
     moveEntitlement(db,'read_only');
     assert.equal(entitlementState(db,'cedar').effectiveState,'read_only');
-    const replayedAnswer=submitAnswer(db,worker,questionAssignment,answerSubmission,'I will move the red ladder to the north bay.');
+    const replayedAnswer=submitAnswer(db,worker,questionAssignment,answerSubmission,choice);
     assert.equal(replayedAnswer.duplicate,true);assert.equal(replayedAnswer.id,answer.id);
     assert.equal(acknowledgeAssignment(db,worker,ackAssignment,ackRequest).duplicate,true);
     assert.equal(requestHelp(db,worker,questionAssignment,{requestId:helpRequest,text:'Which bay exactly?'}).duplicate,true);
@@ -211,7 +212,7 @@ test('PostgreSQL entitlement parity blocks new writes, settles a preparing send 
     const question=await completePgInstructionSend(pool,pgOwner,questionInput.requestId,options);
     const questionAssignment=(await db.query("SELECT id FROM assignments WHERE publication_id=$1 AND worker_id='w1'",[question.publicationId])).rows[0].id;
     const submission=randomUUID();
-    await submitPgAnswer(pool,pgWorker,questionAssignment,submission,'I will move the red ladder to the north bay.',options);
+    await submitPgAnswer(pool,pgWorker,questionAssignment,submission,(await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[question.publicationId])).rows[0].snapshot_json.rubric.correctChoiceId,options);
     const ackRequest=randomUUID();
     await acknowledgePgAssignment(pool,pgWorker,ackAssignment,ackRequest,options);
 

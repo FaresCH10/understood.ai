@@ -1,3 +1,4 @@
+import {providerDataClass} from '../ai/provider-policy.mjs';
 import { randomUUID } from 'node:crypto';
 import { inspectWav } from '../audio.mjs';
 import { domainTransaction,domainAudit } from './domain.mjs';
@@ -24,7 +25,7 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
       return {...row,exhausted:true};
     }
     const token = randomUUID();
-    await client.query(`UPDATE recordings SET status='processing',attempts=attempts+1,lease_token=$2,lease_until=clock_timestamp()+interval '180 seconds',retry_at=NULL,error=NULL WHERE id=$1`,[row.id,token]);
+    await client.query(`UPDATE recordings SET status='processing',attempts=attempts+1,lease_token=$2,lease_until=clock_timestamp()+interval '300 seconds',retry_at=NULL,error=NULL WHERE id=$1`,[row.id,token]);
     return {...row,attempts:row.attempts+1,token};
   });
   if (!job) return false;
@@ -33,9 +34,9 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
   let transcriptionOperation=null,assessmentOperation=null;
   const stageAdapter=async(kind,model,maxRequests,inputHash,provenance)=>{
     if(typeof adapter.withJournal!=='function')return adapter;
-    if(adapter.provenance?.dataClass!=='synthetic' || typeof adapter.permitsRecording!=='function')throw Error('Recording provider provenance unavailable');
+    if(!providerDataClass(adapter.provenance) || typeof adapter.permitsRecording!=='function')throw Error('Recording provider provenance unavailable');
     const operation=await domainTransaction(pool,schema,client=>reserveProviderOperation(client,
-      {orgId:job.org_id,kind,referenceId:job.id,claimToken:job.token,model,dataClass:'synthetic',maxRequests,inputHash,provenance}));
+      {orgId:job.org_id,kind,referenceId:job.id,claimToken:job.token,model,dataClass:adapter.provenance.dataClass,maxRequests,inputHash,provenance}));
     if(kind==='recording-transcription')transcriptionOperation=operation;else assessmentOperation=operation;
     return adapter.withJournal(providerRequestJournal(pool,operation,{schema}));
   };
@@ -64,7 +65,7 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
       const bytes=await storage.read(job), info=inspectWav(bytes);
       if (info.sha256!==job.sha256 || info.bytes!==job.bytes) throw new Error('Private recording integrity check failed');
       if(!await current())return true;
-      const transcriber=await stageAdapter('recording-transcription',adapter.transcriptionModel,4,
+      const transcriber=await stageAdapter('recording-transcription',adapter.transcriptionModel,adapter.provenance?.dataClass==='real'?1:4,
         recordingTranscriptionInputHash(job,frozenInput),adapter.transcriptionProvenance);
       transcript=(await transcriber.transcribe(bytes,'audio/wav'))?.text;
       if (typeof transcript!=='string' || !transcript.trim() || transcript.length>2000) throw new Error('Transcript unavailable');

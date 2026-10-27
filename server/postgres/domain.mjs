@@ -1,7 +1,8 @@
+import {assessMultipleChoice} from '../multiple-choice.mjs';
 import { randomUUID } from 'node:crypto';
 import { withTransaction } from './db.mjs';
 import { schemaName } from './migrate.mjs';
-import { publicationInput,readySnapshot,withdrawalInput } from '../briefing-input.mjs';
+import { publicationInput,readySnapshot,unavailableRecipientLanguage,withdrawalInput } from '../briefing-input.mjs';
 import {readGlossarySnapshot} from './glossary.mjs';
 import {assertGlossaryCurrent} from '../glossary-input.mjs';
 import {generatedBundleEvidence,verifyGeneratedAudio} from './generated-audio.mjs';
@@ -92,7 +93,8 @@ export async function publicationPreflight(pool,session,briefingId,input,request
     if(!Number.isSafeInteger(request.nextVersion))throw Error('Invalid publication version');
     const row=(await client.query('SELECT prepared_json FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3',[briefingId,session.org_id,session.site_id])).rows[0];
     if(!row?.prepared_json?.artifactBundle) return null;
-    if(integrationMode!=='synthetic') throw Error('Live publication artifact verification is unavailable');
+    if(!['synthetic','live'].includes(integrationMode))throw Error('Invalid publication integration mode');
+    if(row.prepared_json.provenance?.dataClass!==(integrationMode==='live'?'real':'synthetic'))throw Error('Publication data class does not match runtime');
     return {evidence:await generatedBundleEvidence(client,{...session,briefing_id:briefingId},row.prepared_json),snapshotHash:bundleHash(row.prepared_json)};
   });
   if(preflight?.replay) return preflight;
@@ -116,19 +118,23 @@ export async function checkedPublication(client,session,briefing,request,{integr
   let snapshot;
   const glossary=await readGlossarySnapshot(client,session.org_id,session.site_id);
   if(briefing.prepared_json?.artifactBundle) {
-    if(integrationMode!=='synthetic' || !preflight || preflight.snapshotHash!==bundleHash(briefing.prepared_json)
+    if(!['synthetic','live'].includes(integrationMode) || briefing.prepared_json.provenance?.dataClass!==(integrationMode==='live'?'real':'synthetic') || !preflight || preflight.snapshotHash!==bundleHash(briefing.prepared_json)
       || briefing.state!=='ready') throw Error('Briefing is not technically ready');
     const {manifest}=await generatedBundleEvidence(client,{...session,briefing_id:briefingId},briefing.prepared_json);
     const review=(await client.query('SELECT content_json FROM draft_reviews WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',[briefingId,session.org_id,session.site_id])).rows[0]?.content_json ?? null;
     const reviewHash=createHash('sha256').update(JSON.stringify(reviewContent(review,briefing.revision))).digest('hex');
     if(manifest.source!==briefing.source || manifest.dependencies.revision!==briefing.revision || manifest.dependencies.reviewHash!==reviewHash) throw Error('Draft revision changed');
     if(manifest.dependencies.glossaryHash!==glossary.hash || manifest.dependencies.glossaryRevision!==glossary.revision) throw Error('Glossary dependency changed');
-    if(workers.some(worker=>{
+    const missingLanguages=workers.filter(worker=>{
       const language=manifest.languages[worker.language];
       return !language || (publicationModes.responseMode==='question' && !nonempty(language.question,500))
         || (publicationModes.deliveryMode!=='text' && (!language.speech?.body || !language.speech?.question));
-    })) throw Error('Recipient language is unavailable');
-    snapshot=briefing.prepared_json;
+    }).map(worker=>worker.language);
+    if(missingLanguages.length) throw Error(unavailableRecipientLanguage(missingLanguages));
+    if(publicationModes.responseMode==='question'
+      && (await client.query('SELECT 1 FROM instruction_sends WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',[briefingId,session.org_id,session.site_id])).rows.length
+      && manifest.rubric.mode!=='multiple-choice')throw Error('Briefing is not technically ready');
+    snapshot={...briefing.prepared_json,...publicationModes};
   }else {
     snapshot=readySnapshot(briefing,workers,integrationMode,publicationModes);
     assertGlossaryCurrent(snapshot,glossary);
@@ -222,7 +228,7 @@ export async function submitAnswer(pool,session,assignmentId,submissionId,answer
   return domainTransaction(pool,schema,async (client) => {
     await requirePrincipal(client,session,'worker');
     // Serialize all typed/audio receipt acceptance on this assignment, not on timestamps or identity allocation alone.
-    const assignment = (await client.query(`SELECT id,publication_id,due_at FROM assignments WHERE id=$1 AND org_id=$2 AND site_id=$3 AND worker_id=$4 FOR UPDATE`,
+    const assignment = (await client.query(`SELECT id,publication_id,due_at,language FROM assignments WHERE id=$1 AND org_id=$2 AND site_id=$3 AND worker_id=$4 FOR UPDATE`,
       [assignmentId,session.org_id,session.site_id,session.principal_id])).rows[0];
     if (!assignment) throw new Error('Assignment unavailable');
     const previous = (await client.query(`SELECT id,answer_text,outcome,assessment_status FROM attempts WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 AND submission_id=$4`,
@@ -232,10 +238,11 @@ export async function submitAnswer(pool,session,assignmentId,submissionId,answer
       return {id:previous.id,outcome:previous.outcome,assessmentStatus:previous.assessment_status,duplicate:true};
     }
     await requireWritableEntitlement(client,session.org_id);
-    const publication = (await client.query(`SELECT state,snapshot_json->>'responseMode' AS response_mode,publication_content_available(id) AS content_available
+    const publication = (await client.query(`SELECT state,snapshot_json,snapshot_json->>'responseMode' AS response_mode,publication_content_available(id) AS content_available
       FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE`,[assignment.publication_id,session.org_id,session.site_id])).rows[0];
     if (publication?.state!=='published' || !publication.content_available) throw new Error('Assignment unavailable');
     if(publication.response_mode==='acknowledge') throw new Error('This instruction only requires confirmation');
+    if(publication.snapshot_json?.rubric?.mode==='multiple-choice')assessMultipleChoice(answer,publication.snapshot_json,assignment.language);
     const repeatId=await acceptingRepeat(client,session,assignment);
     if ((await client.query('SELECT 1 FROM recordings WHERE assignment_id=$1 AND submission_id=$2',[assignmentId,submissionId])).rows.length) throw new Error('Submission ID conflict');
     const presentation=await checkedPresentationBinding(client,session,assignmentId,presentationId);

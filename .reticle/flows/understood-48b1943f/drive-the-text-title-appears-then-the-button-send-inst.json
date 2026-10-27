@@ -1,0 +1,556 @@
+{
+  "version": 2,
+  "name": "drive-the-text-title-appears-then-the-button-send-inst",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793024236026,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Work email"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Work email"
+          },
+          "args": {
+            "value": "supervisor@example.test"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 505
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Password"
+          },
+          "args": {
+            "value": "<redacted: supply at replay>",
+            "secret": "RETICLE_SECRET_PASSWORD"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 506
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Sign in"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 511
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Invalid credentials"
+          }
+        }
+      ],
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Password"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Password"
+          },
+          "args": {
+            "value": "<redacted: supply at replay>",
+            "secret": "RETICLE_SECRET_PASSWORD_2"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 506
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Sign in"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 511
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Good"
+          }
+        }
+      ],
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Send instruction"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 592
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Title"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Instruction"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Instruction"
+          },
+          "args": {
+            "value": "Put finished items on the blue shelf. Put unfinished items on the yellow shelf. Leave the walkway clear."
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 218
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Text only"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 244
+          }
+        }
+      ],
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "button",
+          "name": "Send instruction"
+        },
+        "state": "disabled"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Title"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Title"
+          },
+          "args": {
+            "value": "QA shelf handover"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 214
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Send instruction"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 257
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "sent"
+          }
+        }
+      ],
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Open instruction"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SendInstruction.tsx",
+        "line": 199
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "QA shelf handover"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Team"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 545
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Crew name"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Crew name"
+          },
+          "args": {
+            "value": "Audit Morning Crew"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 349
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Create crew"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 349
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Audit Morning Crew"
+          }
+        }
+      ],
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Add worker"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/People.tsx",
+        "line": 299
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Worker ID"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Worker ID"
+          },
+          "args": {
+            "value": "QA004"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 329
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Worker name"
+          },
+          "args": {
+            "value": "Audit Extra Worker"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 330
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "combobox",
+            "name": "Preferred language Worker chooses on first use English Arabic Hindi Urdu Bengali Malayalam Tamil Telugu Nepali Filipino Sinhala Russian Punjabi (Gurmukhi) Punjabi (Shahmukhi) Indonesian"
+          },
+          "args": {
+            "value": "en"
+          },
+          "action": "select",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 331
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Save worker"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/People.tsx",
+            "line": 333
+          }
+        }
+      ],
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "AS Audit Supervisor Supervisor · Sign out"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 546
+      },
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "link",
+        "name": "Sign in"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "Sign in"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/PublicProduct.tsx",
+            "line": 64
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Company ID and password"
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "Company ID and password"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 520
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Worker ID"
+          }
+        }
+      ],
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Company ID"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Company ID"
+          },
+          "args": {
+            "value": "bb690c33-41b9-493c-9d48-470d5637dc03"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/WorkerAccessEntry.tsx",
+            "line": 40
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Worker ID"
+          },
+          "args": {
+            "value": "QA001"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/WorkerAccessEntry.tsx",
+            "line": 41
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Password"
+          },
+          "args": {
+            "value": "<redacted: supply at replay>",
+            "secret": "RETICLE_SECRET_PASSWORD_3"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/WorkerAccessEntry.tsx",
+            "line": 42
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Sign in"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/WorkerAccessEntry.tsx",
+            "line": 47
+          }
+        }
+      ],
+      "page": "/",
+      "writes": true
+    }
+  ],
+  "intent": "The text \"Title\" appears, then the button \"Send instruction\" is disabled",
+  "intentDerived": true,
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  }
+}

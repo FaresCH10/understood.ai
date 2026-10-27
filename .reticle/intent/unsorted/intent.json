@@ -1,0 +1,615 @@
+{
+  "intents": {
+    "crew-filter-pages": {
+      "declaredAt": 1793107273971,
+      "id": "crew-filter-pages",
+      "state": "declared",
+      "statement": "The worker directory crew filter lists every active crew, including crews past the first hundred.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/People.tsx"
+        ]
+      },
+      "updatedAt": 1793107383313
+    },
+    "followup-audio": {
+      "declaredAt": 1793107273971,
+      "id": "followup-audio",
+      "state": "declared",
+      "statement": "A local demo follow-up stores checked translated text and plays a private voice file when speech succeeds.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "updatedAt": 1793107274080
+    },
+    "inline:a-correct-multiple-choice-answer-is-recorded-and-92d99898": {
+      "binding": {
+        "contains": "Matched key facts",
+        "kind": "text"
+      },
+      "declaredAt": 1793024340804,
+      "id": "inline:a-correct-multiple-choice-answer-is-recorded-and-92d99898",
+      "provenBy": {
+        "at": 1793024341047,
+        "grade": "presence",
+        "runId": "drive-7ea3b4212ccd66d1",
+        "verdictId": "reticle_assert:1793024341047"
+      },
+      "state": "proved",
+      "statement": "A correct multiple-choice answer is recorded and assessed as matching the instruction.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793024341132
+    },
+    "inline:a-submitted-answer-remains-accessible-in-the-wor-421b1d58": {
+      "binding": {
+        "contains": "QA shelf handover",
+        "kind": "text"
+      },
+      "declaredAt": 1793024608168,
+      "id": "inline:a-submitted-answer-remains-accessible-in-the-wor-421b1d58",
+      "provenBy": {
+        "at": 1793024608260,
+        "grade": "presence",
+        "runId": "drive-7ea3b4212ccd66d1",
+        "verdictId": "reticle_wait_for:1793024608260"
+      },
+      "state": "proved",
+      "statement": "A submitted answer remains accessible in the worker's Sent answers list.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/WorkerDevice.tsx"
+        ]
+      },
+      "updatedAt": 1793024608314
+    },
+    "inline:a-supervisor-can-create-a-crew-and-save-worker-m-1c64897e": {
+      "binding": {
+        "contains": "1 worker",
+        "kind": "text"
+      },
+      "declaredAt": 1793025173366,
+      "id": "inline:a-supervisor-can-create-a-crew-and-save-worker-m-1c64897e",
+      "state": "bound",
+      "statement": "A supervisor can create a crew and save worker membership.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "updatedAt": 1793025173382
+    },
+    "inline:a-supervisor-can-open-a-follow-up-that-is-transl-0931032c": {
+      "binding": {
+        "contains": "Needs your attention",
+        "kind": "text"
+      },
+      "declaredAt": 1793105033399,
+      "id": "inline:a-supervisor-can-open-a-follow-up-that-is-transl-0931032c",
+      "provenBy": {
+        "at": 1793105034262,
+        "grade": "presence",
+        "runId": "drive-aa66284fd5d2c872",
+        "verdictId": "reticle_act_and_wait:1793105034262"
+      },
+      "state": "proved",
+      "statement": "A supervisor can open a follow-up that is translated into the worker language.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793105034344
+    },
+    "inline:a-supervisor-can-open-the-workspace-0cf69b67": {
+      "binding": {
+        "contains": "View all instructions",
+        "kind": "text"
+      },
+      "declaredAt": 1793094839978,
+      "id": "inline:a-supervisor-can-open-the-workspace-0cf69b67",
+      "provenBy": {
+        "at": 1793094842518,
+        "grade": "presence",
+        "runId": "drive-aa66284fd5d2c872",
+        "verdictId": "reticle_act_and_wait:1793094842518"
+      },
+      "state": "proved",
+      "statement": "A supervisor can open the workspace",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793094842551
+    },
+    "inline:a-supervisor-can-request-another-answer-without-4ff94028": {
+      "binding": {
+        "contains": "Repeat receipt verified: Pending.",
+        "kind": "text"
+      },
+      "declaredAt": 1793024783241,
+      "id": "inline:a-supervisor-can-request-another-answer-without-4ff94028",
+      "provenBy": {
+        "at": 1793024783476,
+        "grade": "presence",
+        "runId": "drive-7ea3b4212ccd66d1",
+        "verdictId": "reticle_assert:1793024783476"
+      },
+      "state": "proved",
+      "statement": "A supervisor can request another answer without replacing the original answer or assessment.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793024783552
+    },
+    "inline:a-supervisor-cannot-send-an-instruction-until-it-15c74728": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Send instruction",
+          "role": "button"
+        },
+        "state": "disabled"
+      },
+      "declaredAt": 1793024111031,
+      "id": "inline:a-supervisor-cannot-send-an-instruction-until-it-15c74728",
+      "provenBy": {
+        "at": 1793024111169,
+        "grade": "presence",
+        "runId": "drive-7ea3b4212ccd66d1",
+        "verdictId": "reticle_assert:1793024111169"
+      },
+      "state": "proved",
+      "statement": "A supervisor cannot send an instruction until its required title is supplied.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793024111223
+    },
+    "inline:a-supervisor-follow-up-is-delivered-in-the-worke-4855ae93": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "يرجى ترك الممر فارغاً.",
+            "kind": "text"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Generate and send follow-up",
+              "role": "button"
+            },
+            "state": "visible"
+          },
+          {
+            "kind": "not",
+            "predicate": {
+              "contains": "Follow-up translation is not connected",
+              "kind": "text"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793105080654,
+      "id": "inline:a-supervisor-follow-up-is-delivered-in-the-worke-4855ae93",
+      "provenBy": {
+        "at": 1793105080772,
+        "grade": "presence",
+        "runId": "drive-aa66284fd5d2c872",
+        "verdictId": "reticle_assert:1793105080772"
+      },
+      "state": "proved",
+      "statement": "A supervisor follow-up is delivered in the worker language.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793105080833
+    },
+    "inline:a-worker-can-sign-in-with-company-assigned-crede-a3be5154": {
+      "binding": {
+        "contains": "QA shelf handover",
+        "kind": "text"
+      },
+      "declaredAt": 1793024254148,
+      "id": "inline:a-worker-can-sign-in-with-company-assigned-crede-a3be5154",
+      "provenBy": {
+        "at": 1793024254276,
+        "grade": "presence",
+        "runId": "drive-7ea3b4212ccd66d1",
+        "verdictId": "reticle_assert:1793024254276"
+      },
+      "state": "proved",
+      "statement": "A worker can sign in with company-assigned credentials and see only assigned instructions.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793024254306
+    },
+    "inline:a-worker-sees-the-missing-voice-message-in-the-w-1a43c74a": {
+      "binding": {
+        "contains": "اس زبان کے لیے اس آلے پر آواز دستیاب نہیں",
+        "kind": "text"
+      },
+      "declaredAt": 1793094963618,
+      "id": "inline:a-worker-sees-the-missing-voice-message-in-the-w-1a43c74a",
+      "provenBy": {
+        "at": 1793095019507,
+        "grade": "presence",
+        "runId": "drive-aa66284fd5d2c872",
+        "verdictId": "reticle_act_and_wait:1793095019507"
+      },
+      "state": "proved",
+      "statement": "A worker sees the missing-voice message in the worker interface language",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793095019543
+    },
+    "inline:a-wrong-arabic-multiple-choice-answer-is-shown-a-44d56513": {
+      "binding": {
+        "contains": "تحتاج إلى توضيح",
+        "kind": "text"
+      },
+      "declaredAt": 1793025330542,
+      "id": "inline:a-wrong-arabic-multiple-choice-answer-is-shown-a-44d56513",
+      "provenBy": {
+        "at": 1793025330670,
+        "grade": "presence",
+        "runId": "drive-7ea3b4212ccd66d1",
+        "verdictId": "reticle_assert:1793025330670"
+      },
+      "state": "proved",
+      "statement": "A wrong Arabic multiple-choice answer is shown as needing clarification, rather than as a match.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793025330679
+    },
+    "inline:a-wrong-factual-choice-is-marked-for-clarificati-b8fcad15": {
+      "binding": {
+        "contains": "تحتاج إلى توضيح",
+        "kind": "text"
+      },
+      "declaredAt": 1793085608998,
+      "id": "inline:a-wrong-factual-choice-is-marked-for-clarificati-b8fcad15",
+      "state": "bound",
+      "statement": "A wrong factual choice is marked for clarification.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "updatedAt": 1793085609044
+    },
+    "inline:ending-a-worker-session-immediately-removes-priv-fc89ee68": {
+      "binding": {
+        "contains": "This worker session is locked",
+        "kind": "text"
+      },
+      "declaredAt": 1793024648105,
+      "id": "inline:ending-a-worker-session-immediately-removes-priv-fc89ee68",
+      "state": "bound",
+      "statement": "Ending a worker session immediately removes private instruction content.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "updatedAt": 1793024648155
+    },
+    "inline:requesting-another-language-leaves-the-worker-in-2903f9b7": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "Waiting for supervisor review:",
+            "kind": "text"
+          },
+          {
+            "contains": "Current language:",
+            "kind": "text"
+          },
+          {
+            "contains": "English",
+            "kind": "text"
+          }
+        ]
+      },
+      "declaredAt": 1793024359714,
+      "id": "inline:requesting-another-language-leaves-the-worker-in-2903f9b7",
+      "provenBy": {
+        "at": 1793024359869,
+        "grade": "presence",
+        "runId": "drive-7ea3b4212ccd66d1",
+        "verdictId": "reticle_assert:1793024359869"
+      },
+      "state": "proved",
+      "statement": "Requesting another language leaves the worker interface in the approved language until supervisor review.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793024359937
+    },
+    "inline:selecting-a-crew-shows-only-that-crew-s-worker-l-53a2c0de": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "AR 1",
+            "kind": "text",
+            "scope": "main"
+          },
+          {
+            "absent": true,
+            "contains": "EN 1",
+            "kind": "text",
+            "scope": "main"
+          },
+          {
+            "absent": true,
+            "contains": "need a language selected",
+            "kind": "text",
+            "scope": "main"
+          }
+        ]
+      },
+      "declaredAt": 1793085325588,
+      "id": "inline:selecting-a-crew-shows-only-that-crew-s-worker-l-53a2c0de",
+      "provenBy": {
+        "at": 1793085325807,
+        "grade": "presence",
+        "runId": "drive-ed558e61bc340b48",
+        "verdictId": "reticle_assert:1793085325807"
+      },
+      "state": "proved",
+      "statement": "Selecting a crew shows only that crew's worker languages and ignores workers outside the crew.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793085325926
+    },
+    "inline:the-assigned-worker-opens-the-instruction-in-ara-cd1bde48": {
+      "binding": {
+        "contains": "الأزرق",
+        "kind": "text"
+      },
+      "declaredAt": 1793085576340,
+      "id": "inline:the-assigned-worker-opens-the-instruction-in-ara-cd1bde48",
+      "provenBy": {
+        "at": 1793085577109,
+        "grade": "presence",
+        "runId": "drive-ed558e61bc340b48",
+        "verdictId": "reticle_act_and_wait:1793085577109"
+      },
+      "state": "proved",
+      "statement": "The assigned worker opens the instruction in Arabic and sees localized answer options.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793085577201
+    },
+    "inline:the-selected-arabic-crew-received-one-instructio-abcf70bb": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "Instruction sent",
+            "kind": "text",
+            "scope": "main"
+          },
+          {
+            "contains": "1 of 1",
+            "kind": "text",
+            "scope": "main"
+          }
+        ]
+      },
+      "declaredAt": 1793085493350,
+      "id": "inline:the-selected-arabic-crew-received-one-instructio-abcf70bb",
+      "provenBy": {
+        "at": 1793085493497,
+        "grade": "presence",
+        "runId": "drive-ed558e61bc340b48",
+        "verdictId": "reticle_assert:1793085493497"
+      },
+      "state": "proved",
+      "statement": "The selected Arabic crew received one instruction for its one worker.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/SendInstruction.tsx"
+        ]
+      },
+      "updatedAt": 1793085493557
+    },
+    "inline:the-supervisor-dashboard-identifies-a-worker-s-w-fc9ea577": {
+      "binding": {
+        "contains": "QA shelf handover · incorrect choice",
+        "kind": "text"
+      },
+      "declaredAt": 1793025711371,
+      "id": "inline:the-supervisor-dashboard-identifies-a-worker-s-w-fc9ea577",
+      "provenBy": {
+        "at": 1793025711600,
+        "grade": "presence",
+        "runId": "drive-7ea3b4212ccd66d1",
+        "verdictId": "reticle_assert:1793025711600"
+      },
+      "state": "proved",
+      "statement": "The supervisor dashboard identifies a worker's wrong choice for follow-up.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793025711621
+    },
+    "inline:the-supervisor-sees-the-worker-s-incorrect-choic-97d81670": {
+      "binding": {
+        "contains": "Incorrect choice",
+        "kind": "text"
+      },
+      "declaredAt": 1793085726093,
+      "id": "inline:the-supervisor-sees-the-worker-s-incorrect-choic-97d81670",
+      "provenBy": {
+        "at": 1793085726207,
+        "grade": "presence",
+        "runId": "drive-ed558e61bc340b48",
+        "verdictId": "reticle_wait_for:1793085726207"
+      },
+      "state": "proved",
+      "statement": "The supervisor sees the worker's incorrect choice as a clarification.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/WorkerSubmissionReceipt.tsx"
+        ]
+      },
+      "updatedAt": 1793085726291
+    },
+    "inline:the-worker-s-wrong-factual-choice-has-the-clarif-49a9bc4d": {
+      "binding": {
+        "contains": "تحتاج إلى توضيح",
+        "kind": "text"
+      },
+      "declaredAt": 1793085617612,
+      "id": "inline:the-worker-s-wrong-factual-choice-has-the-clarif-49a9bc4d",
+      "provenBy": {
+        "at": 1793085618106,
+        "grade": "presence",
+        "runId": "drive-ed558e61bc340b48",
+        "verdictId": "reticle_assert:1793085618105"
+      },
+      "state": "proved",
+      "statement": "The worker's wrong factual choice has the clarification outcome.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/WorkerSubmissionReceipt.tsx"
+        ]
+      },
+      "updatedAt": 1793085618420
+    },
+    "inline:unread-notifications-remain-visible-when-the-wor-ffbb6f8b": {
+      "binding": {
+        "contains": "Unread (20)",
+        "kind": "text"
+      },
+      "declaredAt": 1793001431426,
+      "id": "inline:unread-notifications-remain-visible-when-the-wor-ffbb6f8b",
+      "state": "bound",
+      "statement": "Unread notifications remain visible when the worker filters the list.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "updatedAt": 1793001431435
+    },
+    "inline:voice-capture-stays-unavailable-when-the-site-ha-f994030e": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "element",
+            "query": {
+              "name": "Record",
+              "role": "button"
+            },
+            "state": "disabled"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Upload",
+              "role": "button"
+            },
+            "state": "disabled"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Type",
+              "role": "button"
+            },
+            "state": "pressed"
+          },
+          {
+            "contains": "Write an instruction",
+            "kind": "text"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Briefing text 0 / 4000 characters",
+              "role": "textbox"
+            },
+            "state": "enabled"
+          }
+        ]
+      },
+      "declaredAt": 1793094865177,
+      "id": "inline:voice-capture-stays-unavailable-when-the-site-ha-f994030e",
+      "provenBy": {
+        "at": 1793094868464,
+        "grade": "presence",
+        "runId": "drive-aa66284fd5d2c872",
+        "verdictId": "reticle_assert:1793094868464"
+      },
+      "state": "proved",
+      "statement": "Voice capture stays unavailable when the site has no transcription provider",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793094868505
+    },
+    "pilot-languages": {
+      "declaredAt": 1793107273971,
+      "id": "pilot-languages",
+      "state": "declared",
+      "statement": "The public pilot form can request every worker language, while the walkthrough example stays English, Arabic and Urdu.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/PublicProduct.tsx"
+        ]
+      },
+      "updatedAt": 1793107321071
+    }
+  },
+  "subject": "unsorted",
+  "version": 1
+}

@@ -1,0 +1,21 @@
+{
+  "intents": {
+    "flow:drive-credential-test-mode-lets-a-supervisor-generate": {
+      "binding": {
+        "flow": "drive-credential-test-mode-lets-a-supervisor-generate"
+      },
+      "declaredAt": 1793108417081,
+      "id": "flow:drive-credential-test-mode-lets-a-supervisor-generate",
+      "state": "bound",
+      "statement": "Credential test mode lets a supervisor generate a translated follow-up and warns that follow-ups go to the free Gemini tier, so only test text is typed.",
+      "status": "proposed",
+      "subject": "drive-credential-test-mode-lets-a-superv",
+      "surface": {
+        "flow": "drive-credential-test-mode-lets-a-supervisor-generate"
+      },
+      "updatedAt": 1793108417134
+    }
+  },
+  "subject": "drive-credential-test-mode-lets-a-superv",
+  "version": 1
+}

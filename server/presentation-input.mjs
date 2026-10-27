@@ -1,3 +1,4 @@
+import {checkedPresentationChoices} from './presentation-choice-input.mjs';
 import {createHash} from 'node:crypto';
 import {isWorkerLanguage,languageCapability} from './languages.mjs';
 
@@ -27,7 +28,7 @@ const scriptByLanguage=Object.freeze({
 const hasLetters=/\p{L}/u;
 
 export function presentationLanguage(value,capability='ui') {
-  if(typeof value!=='string' || !isWorkerLanguage(value) || !languageCapability(value,capability))return false;
+  if(typeof value!=='string' || !isWorkerLanguage(value) || capability!=='translation' && !languageCapability(value,capability))return false;
   return true;
 }
 
@@ -46,12 +47,12 @@ export function presentationRequest(value) {
 
 export function presentationInstructionContent(value) {
   if(!value || typeof value!=='object' || Array.isArray(value))throw new Error('Invalid presentation content');
-  return Object.freeze({title:text(value.title,120),text:text(value.text,5000),question:optionalText(value.question,500)});
+  return Object.freeze({title:text(value.title,120),text:text(value.text,5000),question:optionalText(value.question,500),...(value.questionType==='multiple-choice'?{questionType:'multiple-choice',choices:checkedPresentationChoices(value.choices)}:{})});
 }
 
 export function presentationAnswerContent(value) {
   if(!value || typeof value!=='object' || Array.isArray(value))throw new Error('Invalid presentation content');
-  return Object.freeze({text:text(value.text,2000)});
+  return Object.freeze({text:text(value.text,5000)});
 }
 
 export function translatedPresentationContent(kind,value,targetLanguage) {
@@ -61,11 +62,11 @@ export function translatedPresentationContent(kind,value,targetLanguage) {
     : presentationAnswerContent(value);
   const pattern=scriptByLanguage[targetLanguage];
   if(pattern){
-    for(const part of Object.values(content)){
+    for(const part of [content.title,content.text,content.question,...(content.choices??[]).map(choice=>choice.text)]){
       if(part && hasLetters.test(part) && !pattern.test(part))throw new Error('Presentation translation language mismatch');
     }
   }
-  return content;
+  return {...content};
 }
 
 export function presentationSourceHash(kind,originalLanguage,content) {
@@ -82,7 +83,7 @@ export function presentationArtifact(row) {
   const ready=row.status==='ready';
   const content=ready
     ? row.source_kind==='instruction'
-      ? {title:row.title,text:row.text,question:row.question??null}
+      ? {title:row.title,text:row.text,question:row.question??null,...(row.choices_json?{questionType:'multiple-choice',choices:checkedPresentationChoices(typeof row.choices_json==='string'?JSON.parse(row.choices_json):row.choices_json)}:{})}
       : {text:row.text}
     : null;
   return Object.freeze({

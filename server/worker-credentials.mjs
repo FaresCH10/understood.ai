@@ -4,7 +4,7 @@ import {tokenHash,passwordRecordSync,passwordMatchesSync} from './auth-crypto.mj
 import {consumeAuthBudget,recordAuthFailure} from './auth-budget.mjs';
 import {createSession} from './auth.mjs';
 import {requireWorkerSiteAccess} from './site-access.mjs';
-import {companyLocator,normalizeWorkerLogin,workerLoginInput,workerSetupClaimInput,credentialSetupInput} from './worker-credentials-input.mjs';
+import {companyLocator,normalizeWorkerLogin,workerLoginInput,workerSetupClaimInput,credentialSetupInput,assignedCredentialInput} from './worker-credentials-input.mjs';
 
 const WORKER_AUTH_LIMIT=8;
 
@@ -178,7 +178,16 @@ export function authenticateWorker(db,input,remoteAddress=''){
       const current=db.prepare(query).get(value.company,value.login);
       if(!current || current.credential_revision!==row.credential_revision || current.password_hash!==row.password_hash)
         throw new Error('Invalid credentials');
-      const session=createSession(db,{id:current.worker_id,org_id:current.org_id,site_id:current.site_id},'worker','credential',null,8*3600,current.credential_revision);
+      let grantId=null,maxSeconds=8*3600;
+      if(value.token){
+        const grant=db.prepare(`SELECT * FROM worker_grants WHERE token_hash=? AND worker_id=? AND org_id=? AND site_id=?`).get(tokenHash(value.token),current.worker_id,current.org_id,current.site_id);
+        if(!grant || grant.used_at || grant.redeemed_at || grant.revoked_at || grant.expires_at<=NOW())throw new Error('Invalid credentials');
+        maxSeconds=Math.min(2*3600,Math.floor((Date.parse(grant.expires_at)-Date.now())/1000));
+        if(maxSeconds<1)throw new Error('Invalid credentials');
+        if(db.prepare('UPDATE worker_grants SET redeemed_at=? WHERE id=? AND redeemed_at IS NULL AND revoked_at IS NULL').run(NOW(),grant.id).changes!==1)throw new Error('Invalid credentials');
+        grantId=grant.id;
+      }
+      const session=createSession(db,{id:current.worker_id,org_id:current.org_id,site_id:current.site_id},'worker','credential',grantId,maxSeconds,grantId?null:current.credential_revision);
       db.prepare('INSERT INTO audit VALUES (?,?,?,?,?,?,?,?)').run(randomUUID(),current.org_id,current.site_id,'worker',
         current.worker_id,'worker.signed_in',current.worker_id,NOW());
       db.prepare('DELETE FROM auth_attempts WHERE key_hash=?').run(keys.accountKey);
@@ -191,3 +200,21 @@ export function authenticateWorker(db,input,remoteAddress=''){
 }
 
 export {companyLocator,normalizeWorkerLogin};
+
+export function assignWorkerPassword(db,session,workerId,input){
+  const value=assignedCredentialInput(input,session?.org_id || ''),record=passwordRecordSync(value.password);
+  return transaction(db,()=>{
+    requireCredentialStaff(db,session);requireWorkerSiteAccess(db,session.org_id,session.site_id);
+    const worker=workerScope(db,session,workerId);
+    if(!worker.active)throw new Error('Worker unavailable');
+    if(normalizeWorkerLogin(worker.code)!==value.expectedCode)throw new Error('Worker code changed');
+    if(db.prepare('SELECT worker_id FROM worker_credentials WHERE org_id=? AND login_id=? AND worker_id<>?').get(session.org_id,value.login,worker.id))throw new Error('Worker ID already in use');
+    const now=NOW();revokeWorkerAccess(db,worker,now);
+    db.prepare("UPDATE worker_credentials SET state='setup',password_salt=NULL,password_hash=NULL,password_changed_at=NULL,credential_revision=credential_revision+1,updated_at=? WHERE worker_id=?").run(now,worker.id);
+    db.prepare(`INSERT INTO worker_credentials(worker_id,org_id,site_id,login_id,state,password_salt,password_hash,credential_revision,setup_issued_at,password_changed_at,created_at,updated_at)
+      VALUES(?,?,?,?,'active',?,?,1,NULL,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET login_id=excluded.login_id,state='active',password_salt=excluded.password_salt,password_hash=excluded.password_hash,credential_revision=worker_credentials.credential_revision+1,setup_issued_at=NULL,password_changed_at=excluded.password_changed_at,updated_at=excluded.updated_at`)
+      .run(worker.id,worker.org_id,worker.site_id,value.login,record.salt,record.derived,now,now,now);
+    db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),worker.org_id,worker.site_id,'staff',session.principal_id,'worker.password_assigned',worker.id,now);
+    return {workerId:worker.id,companyId:worker.org_id,loginId:value.login,state:'active'};
+  });
+}

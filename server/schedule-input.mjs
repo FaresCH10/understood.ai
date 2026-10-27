@@ -25,7 +25,7 @@ export function scheduleFailure(error) {
   const message=error?.message;
   if(['Forbidden','Scheduled authority changed','Sign in required'].includes(message))return 'Publication authority changed';
   if(['Draft revision changed','Draft version changed','Scheduled content changed','Glossary dependency changed','Briefing is not technically ready','Briefing is archived','Briefing unavailable'].includes(message))return 'Scheduled draft changed or is unavailable';
-  if(['Recipient unavailable','Recipient language is unavailable','Recipient language not selected','Scheduled recipient language changed'].includes(message))return 'Scheduled recipients changed or are unavailable';
+  if((typeof message==='string' && message.startsWith('Recipient language is unavailable')) || ['Recipient unavailable','Recipient language not selected','Scheduled recipient language changed'].includes(message))return 'Scheduled recipients changed or are unavailable';
   if(message==='Deadline must be in the future')return 'Response deadline passed before publication';
   return null;
 }
@@ -37,6 +37,6 @@ export function scheduleHttpError(error) {
   if(['Schedule request conflict','A publication schedule is already pending','Schedule is already closed','Draft revision changed'].includes(message))return {status:409,error:message};
   if(['Invalid publication schedule','Invalid schedule page','Invalid publication request','Invalid deadline','Invalid deadline reminder','Invalid JSON','Confirm schedule cancellation',
     'Scheduled publication must be in the future','Deadline must follow scheduled publication','Deadline must be in the future','Briefing is not technically ready',
-    'Recipient unavailable','Recipient language is unavailable','Recipient language not selected','Briefing is archived','Glossary dependency changed','Live publication artifact verification is unavailable'].includes(message))return {status:400,error:message};
+    'Recipient unavailable','Recipient language not selected','Briefing is archived','Glossary dependency changed','Live publication artifact verification is unavailable'].includes(message) || (typeof message==='string' && message.startsWith('Recipient language is unavailable')))return {status:400,error:message};
   return {status:message==='Request too large'?413:503,error:'Publication scheduling unavailable. Refresh schedules before retrying.'};
 }

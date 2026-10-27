@@ -26,11 +26,14 @@ export function notificationId(value) {
   if(typeof value!=='string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(value))throw Error('Invalid notification request');
   return value;
 }
+const briefingNotificationActions=new Set(['briefing.prepared','briefing.published','briefing.withdrawn']);
 export function notificationRow(row) {
   const kind=notificationKinds[row.action];
   if(!kind)throw Error('Notification unavailable');
   const iso=value=>value instanceof Date ? value.toISOString() : value;
-  return {id:row.id,kind:row.action,label:kind.label,destination:kind.destination,occurredAt:iso(row.occurred_at),readAt:iso(row.read_at) ?? null};
+  const title=typeof row.title==='string'?row.title.trim():'';
+  const subject=briefingNotificationActions.has(row.action) && title && title.length<=120 && !/[\u0000-\u001f]/.test(title)?title:null;
+  return {id:row.id,kind:row.action,label:kind.label,subject,destination:kind.destination,occurredAt:iso(row.occurred_at),readAt:iso(row.read_at) ?? null};
 }
 export function notificationWindow() {
   const asOf=new Date().toISOString();

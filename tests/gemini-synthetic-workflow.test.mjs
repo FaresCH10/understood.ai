@@ -13,10 +13,12 @@ const wav=()=>Buffer.from(encodeWav({duration:1,sampleRate:16000,numberOfChannel
 function root(t){const path=mkdtempSync(join(tmpdir(),'understood-gemini-workflow-'));t.after(()=>rmSync(path,{recursive:true,force:true}));return path;}
 function script() {
   const mock=scriptedProvider(),facts=CANONICAL_SOURCE.split(/(?<=\.)\s+/),askedFacts=facts.slice(0,2);
-  const content={title:'Shelves',facts,question:QUESTION,askedFacts},english={title:'Shelves',text:CANONICAL_SOURCE,question:QUESTION};
+  const choices=[CANONICAL_SOURCE,'Put finished items on yellow and unfinished items on blue. Keep the walkway clear.','Put finished items on blue and unfinished items on yellow. Block the walkway.','Put finished items on red and unfinished items on green. Keep the walkway clear.'];
+  const content={title:'Shelves',facts,question:QUESTION,askedFacts,choices},english={title:'Synthetic shelf handover',text:CANONICAL_SOURCE,question:QUESTION,answerChoices:choices};
   const ar=syntheticPrepare(CANONICAL_SOURCE).languages.ar,arabic={title:ar.title,text:ar.text,question:ar.question};
+  arabic.answerChoices=[ar.text,'ضع المكتمل على الأصفر وغير المكتمل على الأزرق وأبق الممر خالياً.','ضع المكتمل على الأزرق وغير المكتمل على الأصفر وأغلق الممر.','ضع المكتمل على الأحمر وغير المكتمل على الأخضر وأبق الممر خالياً.'];
   mock.structured('prepare',{source:CANONICAL_SOURCE,review:null},content,'askedFacts');
-  mock.structured('grounding',{source:CANONICAL_SOURCE,candidate:content},{sourceGrounded:true,questionAligned:true,ambiguous:false,
+  mock.structured('grounding',{source:CANONICAL_SOURCE,candidate:content},{sourceGrounded:true,questionAligned:true,choicesAligned:true,ambiguous:false,
     factEvidence:facts.map((quote,factIndex)=>({factIndex,quote})),askedFactIndexes:[0,1],reasons:[]},'factEvidence');
   mock.structured('translate',{content:english,terms:[]},arabic,'title');
   mock.structured('translation-check',{content:english,translation:arabic,language:'ar',terms:[]},{faithful:true,complete:true,languageCorrect:true,terminologyApplied:true,reasons:[]},'faithful');

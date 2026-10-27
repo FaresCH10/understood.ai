@@ -8,6 +8,11 @@ const speechLanguages=handle=>Array.isArray(handle?.capabilities?.speechLanguage
 
 // Project only known runtime contracts. Never serialize handles, credentials or input allowlists.
 export function pipelineStatus(config={}) {
+  if(config.integrationMode==='live'){
+    const settings=config.geminiSettings,ids=['source','preparation','translation','speech','assessment','recording','followup'];
+    const names=['Source transcription','Content preparation','Translation','Generated speech','Typed answer checking','Recorded answer checking','Clarification follow-up'];
+    return Object.freeze({dataClass:'real',realDataAllowed:true,productionReady:false,stages:Object.freeze(ids.map((id,index)=>Object.freeze({id,name:names[index],configuration:settings?'configured':'disabled',verification:'not_tested',models:Object.freeze(settings?[id==='source'||id==='recording'?settings.transcriptionModel:id==='speech'?settings.speechModel:settings.textModel]:[]),declaredLanguages:Object.freeze(settings?[...(id==='speech'?settings.speechLanguages:settings.textLanguages)]:[]),evidence:'Approved production configuration. Actual model and language quality still require provider evaluation; request quotas and current authority are enforced.'})))});
+  }
   const preparation=config.preparationAdapter,source=config.sourceAdapter,recording=config.recordingAdapter,
     assessment=config.assessmentAdapter,followup=config.caseFollowupAdapter;
   const prepared=bundle(preparation) && methods(preparation,['prepare','checkPreparation','translate','checkTranslation','speech','permitsPreparation','withJournal']);
@@ -29,7 +34,7 @@ export function pipelineStatus(config={}) {
       'Generated text and question must pass structured completeness checks. Declared language support is not an accuracy evaluation.'],
     ['speech','Generated speech',prepared,
       prepared?[preparation.provenance.speechModel]:[],speechLanguages(preparation) ?? [],
-      'Private WAV generation and exact readback required. Urdu speech is unsupported by the configured speech adapter.'],
+      'Private WAV generation and exact readback are required for every requested locale. Declared coverage is not a language-quality evaluation.'],
     ['assessment','Typed answer checking',typedAssessment,
       typedAssessment?[assessment.provenance.model]:[],[], 
       'Exact answer/question/frozen-rubric allowlist, active worker, current job and request quotas required.'],

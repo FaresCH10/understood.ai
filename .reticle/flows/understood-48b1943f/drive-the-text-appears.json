@@ -1,0 +1,91 @@
+{
+  "version": 2,
+  "name": "drive-the-text-appears",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793025456181,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "radio",
+        "name": "استبدل هذه التعليمات بخطوات من اختيارك."
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "radio",
+            "name": "استبدل هذه التعليمات بخطوات من اختيارك."
+          },
+          "args": {},
+          "action": "check",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 1234
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "أرسل الإجابة"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 1238
+          },
+          "expect": {
+            "kind": "net",
+            "method": "POST",
+            "urlContains": "/answers",
+            "status": 201
+          },
+          "writes": true
+        }
+      ],
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "تحديث هذه الإجابة"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerSubmissionReceipt.tsx",
+        "line": 54
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "تحتاج إلى توضيح"
+      },
+      "page": "/"
+    }
+  ],
+  "intent": "The text \"تحتاج إلى توضيح\" appears",
+  "intentDerived": true,
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  }
+}

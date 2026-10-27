@@ -1,0 +1,84 @@
+{
+  "version": 2,
+  "name": "drive-the-supervisor-can-read-the-applied-template-tex",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793001650662,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Check applied template"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 42
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "combobox",
+        "name": "Template No template Shelf template"
+      },
+      "args": {
+        "value": "template-one"
+      },
+      "action": "select",
+      "source": {
+        "file": "src/NewBriefing.tsx",
+        "line": 177
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Applied “Template title”"
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Check applied template"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 42
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "PASS: template is visible in Type mode"
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "startPath": "/tests/browser/functional-audit.html",
+  "intent": "The supervisor can read the applied template text in the active source field.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-the-supervisor-can-read-the-applied-template-tex"
+}

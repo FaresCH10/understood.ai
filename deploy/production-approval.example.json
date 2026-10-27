@@ -1,0 +1,137 @@
+{
+  "format": "understood-production-approval-v1",
+  "candidateFingerprint": "",
+  "approvedAt": "",
+  "validUntil": "",
+  "scope": {
+    "customer": "",
+    "languages": [
+      "en",
+      "ar",
+      "hi",
+      "ur",
+      "bn",
+      "ml",
+      "ta",
+      "te",
+      "ne",
+      "fil",
+      "si",
+      "ru",
+      "pa-Guru",
+      "pa-Arab",
+      "id"
+    ],
+    "workerCapacity": 25,
+    "dataClass": "real",
+    "freeTierDispatch": "none"
+  },
+  "gates": {
+    "G0": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G1": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G2": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G3": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G4": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G5": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G6": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G7": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G8": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G9": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G10": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G11": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G12": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G13": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G14": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G15": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G16": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G17": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "G18": {
+      "status": "pending",
+      "evidence": ""
+    }
+  },
+  "approvals": {
+    "product": {
+      "reviewer": "",
+      "reference": ""
+    },
+    "engineering": {
+      "reviewer": "",
+      "reference": ""
+    },
+    "security": {
+      "reviewer": "",
+      "reference": ""
+    },
+    "privacy": {
+      "reviewer": "",
+      "reference": ""
+    },
+    "accessibility": {
+      "reviewer": "",
+      "reference": ""
+    },
+    "operations": {
+      "reviewer": "",
+      "reference": ""
+    },
+    "provider": {
+      "reviewer": "",
+      "reference": ""
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "text \"Choose\"",
+  "observed": "no element matched {\"text\":\"Choose\"}",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "e517",
+        "source": {
+          "file": "src/main.tsx",
+          "line": 1169,
+          "column": 16
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793024299321-click-c85ebb3a",
+  "createdAt": 1793024299321,
+  "seen": 1,
+  "lastSeenAt": 1793024299321
+}

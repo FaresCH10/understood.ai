@@ -123,3 +123,20 @@ test('deletion waits for voice purge and proves object absence, while cleaned jo
     assert.equal((await f.db.query('SELECT text FROM case_messages')).rows[0].text,'[Deleted]');
   }finally{await f.close();}
 });
+
+test('voice help and replies accept every registered worker locale without null labels',async()=>{
+  const f=await fixture();try{
+    const {WORKER_LANGUAGE_CODES}=await import('../server/languages.mjs');
+    for(const language of WORKER_LANGUAGE_CODES){
+      const id=`locale-${language}`,assignment=`assignment-${language}`;
+      await f.db.query("INSERT INTO workers(id,org_id,site_id,code,language) VALUES($1,'cedar','beirut',$1,$2)",[id,language]);
+      await f.db.query("INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES($1,'cedar','beirut','shelf-v3',$2,$3)",[assignment,id,language]);
+      const session={...worker,principal_id:id},request=randomUUID();
+      const help=await receiveCaseVoice(f.pool,session,assignment,'help',request,request,wav(),f.storage);
+      assert.equal(help.status,'received',language);
+      await receiveCaseVoice(f.pool,session,assignment,'reply',help.caseId,randomUUID(),wav(),f.storage);
+      const messages=await listCaseMessages(f.pool,session,help.caseId);
+      assert.equal(messages.total,2);assert.ok(messages.items.every(message=>message.text?.trim()&&message.language===language),language);
+    }
+  }finally{await f.close();}
+});

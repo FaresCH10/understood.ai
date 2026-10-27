@@ -1,8 +1,11 @@
+import {entitlementSummary} from '../entitlement-model.mjs';
+import {queuePresentationJob} from './presentation-jobs.mjs';
+import {checkedPresentationChoices} from '../presentation-choice-input.mjs';
 import {randomUUID} from 'node:crypto';
 import {domainTransaction,domainAudit,requirePrincipal} from './domain.mjs';
 import {dispatchAllowed} from './operations-gates.mjs';
-import {entitlementState} from './entitlements.mjs';
-import {languageCapability} from '../languages.mjs';
+import {readEntitlement} from './entitlements.mjs';
+import {translatePresentation} from '../presentation-choices.mjs';
 import {
   presentationRequest,presentationInstructionContent,presentationAnswerContent,
   presentationSourceHash,translatedPresentationContent,presentationArtifact,
@@ -54,9 +57,13 @@ async function sourceFor(client,session,assignment,input){
   const retained=(await client.query("SELECT 1 FROM text_retention_purges WHERE kind='attempt' AND reference_id=$1 AND org_id=$2 AND site_id=$3",
     [attempt.id,session.org_id,session.site_id])).rows.length;
   if(retained)return {state:'unavailable',reason:'content_expired',originalLanguage:attempt.original_language,approvedLanguage};
-  let sourceContent;
-  try{sourceContent=presentationAnswerContent({text:attempt.answer_text});}catch{return {state:'unavailable',reason:'content_unavailable',originalLanguage,approvedLanguage};}
-  const answerLanguage=attempt.original_language;
+  let sourceContent,answerLanguage=attempt.original_language;
+  try{
+    const snapshot=assignment.snapshot_json;
+    const choice=snapshot?.rubric?.mode==='multiple-choice'?snapshot.languages?.[assignment.language]?.choices?.find(item=>item.id===attempt.answer_text):null;
+    if(choice)answerLanguage=assignment.language;
+    sourceContent=presentationAnswerContent({text:choice?.text??attempt.answer_text});
+  }catch{return {state:'unavailable',reason:'content_unavailable',originalLanguage,approvedLanguage};}
   return {originalLanguage:answerLanguage,approvedLanguage:assignment.approved_language,sourceContent,snapshotContent:null,
     sourceHash:presentationSourceHash('answer',answerLanguage,sourceContent)};
 }
@@ -87,15 +94,15 @@ async function insertReady(client,assignment,input,source,content,provider,live)
   const id=randomUUID();
   return (await client.query(`INSERT INTO presentation_artifacts(id,org_id,site_id,worker_id,assignment_id,publication_id,
     publication_version,source_kind,source_id,original_language,target_language,source_hash,status,title,text,question,
-    provider,live,error_code,lease_token,lease_until,created_at,updated_at,ready_at)
+    provider,live,error_code,lease_token,lease_until,created_at,updated_at,ready_at,choices_json)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'ready',$13,$14,$15,$16,$17,NULL,NULL,NULL,
-      clock_timestamp(),clock_timestamp(),clock_timestamp()) RETURNING *`,
+      clock_timestamp(),clock_timestamp(),clock_timestamp(),$18) RETURNING *`,
   [id,assignment.org_id,assignment.site_id,assignment.worker_id,assignment.id,assignment.publication_id,
     assignment.version,input.sourceKind,input.sourceId,source.originalLanguage,source.approvedLanguage,source.sourceHash,
-    content.title??null,content.text,content.question??null,provider,live])).rows[0];
+    content.title??null,content.text,content.question??null,provider,live,content.choices?JSON.stringify(content.choices):null])).rows[0];
 }
 
-export async function createPresentation(pool,session,assignmentId,input,{schema='public',translator=null,generationAllowed=true}={}){
+export async function createPresentation(pool,session,assignmentId,input,{schema='public',translator=null,generationAllowed=true,queueGeneration=false}={}){
   const request=presentationRequest(input);
   let pending=null;
   const prepared=await domainTransaction(pool,schema,async client=>{
@@ -109,15 +116,15 @@ export async function createPresentation(pool,session,assignmentId,input,{schema
     const byId=await findById(client,request.requestId);
     if(byId){
       if(!matchesSource(byId,assignment,request,source))throw new Error('Presentation request conflict');
-      return {response:resultFor(byId,source)};
+      if(byId.status!=='pending'||byId.lease_until?.getTime()>Date.now()||queueGeneration)return {response:resultFor(byId,source),choiceSource:source};
     }
     let existing=await findByIdentity(client,assignment,request,source.approvedLanguage);
     if(existing){
       if(existing.source_hash!==source.sourceHash || existing.original_language!==source.originalLanguage)
         throw new Error('Presentation source conflict');
       if(existing.status!=='pending' || (existing.lease_until && existing.lease_until.getTime()>Date.now()))
-        return {response:resultFor(existing,source)};
-      if(!(await entitlementState(client,assignment.org_id)).writeAllowed)
+        return {response:resultFor(existing,source),choiceSource:source};
+      if(!entitlementSummary(await readEntitlement(client,assignment.org_id)).writeAllowed)
         return {response:nonArtifact('deferred',source,'generation_paused')};
       const token=randomUUID();
       const claimed=(await client.query(`UPDATE presentation_artifacts SET lease_token=$2,
@@ -130,12 +137,12 @@ export async function createPresentation(pool,session,assignmentId,input,{schema
 
     if(source.snapshotContent){
       existing=await insertReady(client,assignment,request,source,source.snapshotContent,'publication-snapshot-v1',false);
-      return {response:resultFor(existing,source)};
+      return {response:resultFor(existing,source),choiceSource:source};
     }
-    if(!languageCapability(source.approvedLanguage,'translation'))
+    if(translator?.capabilities?.textLanguages && !translator.capabilities.textLanguages.includes(source.approvedLanguage))
       return {response:nonArtifact('unavailable',source,'language_capability_unavailable')};
-    if(typeof translator?.translate!=='function')return {response:nonArtifact('unavailable',source,'translation_not_enabled')};
-    if(generationAllowed!==true || !(await entitlementState(client,assignment.org_id)).writeAllowed)
+    if(typeof translator?.translate!=='function'&&!queueGeneration)return {response:nonArtifact('unavailable',source,'translation_not_enabled')};
+    if(generationAllowed!==true || !entitlementSummary(await readEntitlement(client,assignment.org_id)).writeAllowed)
       return {response:nonArtifact('deferred',source,'generation_paused')};
     if(!await dispatchAllowed(client,session.org_id,{provider:true}))
       return {response:nonArtifact('deferred',source,'generation_paused')};
@@ -145,23 +152,50 @@ export async function createPresentation(pool,session,assignmentId,input,{schema
       publication_version,source_kind,source_id,original_language,target_language,source_hash,status,title,text,question,
       provider,live,error_code,lease_token,lease_until,created_at,updated_at,ready_at)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pending',NULL,NULL,NULL,NULL,NULL,NULL,$13,
-        clock_timestamp()+interval '120 seconds',clock_timestamp(),clock_timestamp(),NULL)`,
+        clock_timestamp()+$14*interval '1 second',clock_timestamp(),clock_timestamp(),NULL)`,
     [request.requestId,assignment.org_id,assignment.site_id,assignment.worker_id,assignment.id,assignment.publication_id,
       assignment.version,request.sourceKind,request.sourceId,source.originalLanguage,source.approvedLanguage,
-      source.sourceHash,token]);
+      source.sourceHash,token,queueGeneration?0:120]);
     pending={id:request.requestId,source,token};
     return {pending:true};
   });
-  if(prepared.response)return prepared.response;
+  if(prepared.response){
+    if(queueGeneration&&prepared.response.presentation&&(prepared.response.status==='pending'||prepared.response.status==='ready'&&prepared.choiceSource?.sourceContent.choices&&!prepared.response.presentation.content?.choices)){await domainTransaction(pool,schema,client=>queuePresentationJob(client,prepared.response.presentation.id,session));return prepared.response;}
+    const source=prepared.choiceSource,result=prepared.response;
+    if(result.status!=='ready'||!source?.sourceContent.choices||result.presentation.content?.choices)return result;
+    const allowed=await domainTransaction(pool,schema,async client=>{
+      await requirePrincipal(client,session,'worker');
+      return entitlementSummary(await readEntitlement(client,session.org_id)).writeAllowed && await dispatchAllowed(client,session.org_id,{provider:true});
+    });
+    let choices=source.snapshotContent?.choices;
+    if(!choices){
+      if(generationAllowed!==true||!allowed)return nonArtifact('deferred',source,'generation_paused');
+      if(typeof translator?.translate!=='function')return nonArtifact('unavailable',source,'translation_not_enabled');
+      try{choices=(await translatePresentation(translator,'instruction',source.originalLanguage,source.approvedLanguage,source.sourceContent)).content.choices;}
+      catch(error){if(error.code==='presentation_deferred')throw error;return nonArtifact('unavailable',source,'translation_invalid');}
+    }
+    choices=checkedPresentationChoices(choices,source.sourceContent.choices);
+    return domainTransaction(pool,schema,async client=>{
+      await requirePrincipal(client,session,'worker');
+      const assignment=await loadAssignment(client,session,assignmentId,{lock:true}),current=await sourceFor(client,session,assignment,request);
+      if(current.state||current.sourceHash!==source.sourceHash||current.approvedLanguage!==source.approvedLanguage)throw new Error('Presentation source conflict');
+      const updated=(await client.query(`UPDATE presentation_artifacts SET choices_json=$2 WHERE id=$1 AND status='ready'
+        AND choices_json IS NULL AND text NOT IN ('[Deleted]','[Expired]') RETURNING id`,[result.presentation.id,JSON.stringify(choices)])).rows[0];
+      if(updated)await domainAudit(client,session,'presentation.choices_added',result.presentation.id);
+      return resultFor(await findById(client,result.presentation.id),source);
+    });
+  }
   if(!pending)throw new Error(UNAVAILABLE);
+  if(queueGeneration)return domainTransaction(pool,schema,async client=>{await queuePresentationJob(client,pending.id,session);return resultFor(await findById(client,pending.id),pending.source);});
 
   const finish=(status,fields,errorCode=null)=>domainTransaction(pool,schema,async client=>{
+    if(status==='ready'){await requirePrincipal(client,session,'worker');const assignment=await loadAssignment(client,session,assignmentId),current=await sourceFor(client,session,assignment,request);if(current.state||current.sourceHash!==pending.source.sourceHash||current.approvedLanguage!==pending.source.approvedLanguage){status='failed';fields={};errorCode='presentation_source_changed';}}
     const row=(await client.query(`UPDATE presentation_artifacts SET status=$2,title=$3,text=$4,question=$5,provider=$6,
       live=$7,error_code=$8,lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp(),
-      ready_at=CASE WHEN $2='ready' THEN clock_timestamp() ELSE NULL END
+      choices_json=$10,ready_at=CASE WHEN $2='ready' THEN clock_timestamp() ELSE NULL END
       WHERE id=$1 AND status='pending' AND lease_token=$9 RETURNING *`,
     [pending.id,status,fields.title??null,fields.text??null,fields.question??null,fields.provider??null,
-      fields.live===undefined?null:fields.live===true,errorCode,pending.token])).rows[0];
+      fields.live===undefined?null:fields.live===true,errorCode,pending.token,fields.choices?JSON.stringify(fields.choices):null])).rows[0];
     if(row)await domainAudit(client,session,status==='ready'?'presentation.ready':'presentation.failed',row.id);
     const current=row ?? await findById(client,pending.id);
     if(!current)throw new Error(UNAVAILABLE);
@@ -170,9 +204,8 @@ export async function createPresentation(pool,session,assignmentId,input,{schema
 
   let translated;
   try{
-    translated=await translator.translate({kind:request.sourceKind,sourceLanguage:pending.source.originalLanguage,
-      targetLanguage:pending.source.approvedLanguage,content:pending.source.sourceContent});
-  }catch{return finish('failed',{},'translation_failed');}
+    translated=await translatePresentation(translator,request.sourceKind,pending.source.originalLanguage,pending.source.approvedLanguage,pending.source.sourceContent);
+  }catch(error){if(error.code==='presentation_deferred'){await domainTransaction(pool,schema,client=>client.query("UPDATE presentation_artifacts SET lease_until=clock_timestamp() WHERE id=$1 AND status='pending' AND lease_token=$2",[pending.id,pending.token]));throw error;}return finish('failed',{},error.code==='translation_invalid'?'translation_invalid':'translation_failed');}
   let content;
   try{
     content=translatedPresentationContent(request.sourceKind,translated?.content,pending.source.approvedLanguage);

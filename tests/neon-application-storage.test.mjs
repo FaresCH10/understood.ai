@@ -52,7 +52,7 @@ test('actual six-family application workflow uses the real Neon adapter, normal 
   const f=fixture(),checkpoints=[],result=await rehearseNeonApplicationStorage(env,{...f.dependencies,checkpoint:async value=>checkpoints.push(structuredClone(value))});
   assert.equal(checkpoints[0].state,'checking');
   assert.equal(result.state,'passed',JSON.stringify(result));assert.equal(result.cleanup,'owned-objects-absent-from-current-branch');assert.equal(result.objects.length,9);
-  assert.equal(result.workflow.checks.length,10);assert.equal(result.workflow.privateStorage.objects,9);assert.equal(result.applicationCloudStorageVerified,true);assert.equal(result.bucketEmptyAfterCleanup,true);
+  assert.equal(result.workflow.checks.length,11);assert.equal(result.workflow.privateStorage.objects,9);assert.equal(result.applicationCloudStorageVerified,true);assert.equal(result.bucketEmptyAfterCleanup,true);
   assert.deepEqual(result.workflow.privateStorage.families,{'case-followup':1,'case-voice':1,generated:4,recording:1,source:1,'source-original':1});
   for(const row of result.objects){assert.equal(row.putAttempted,true);assert.equal(row.writeAcknowledged,true);assert.equal(row.anonymousReadDenied,true);assert.equal(row.conditionalOverwriteRejected,true);assert.equal(row.originalBytesPreserved,true);assert.equal(row.cleanup,'removed-from-current-branch');}
   assert.equal(f.objects.size,0);assert.equal(f.anonymous.length,9);assert.equal(f.destroyed,1);

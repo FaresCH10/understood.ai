@@ -1,3 +1,4 @@
+import {isWorkerLanguage} from '../server/languages.mjs';
 import type {MessageSession} from './case-message-recovery.ts';
 import type {RecordingLanguage} from './recording-notice.ts';
 import {validConversationSession} from './conversation-request.ts';
@@ -11,7 +12,7 @@ export async function readWorkerRecordingNotice(send:typeof fetch,session:Messag
   const identity={...session},requestSignal=AbortSignal.any([signal,AbortSignal.timeout(15000)]);
   const guard=()=>{if(!current()||!validConversationSession(identity)||!validConversationSession(session)||identity.clientContext!==session.clientContext||identity.expiresAt!==session.expiresAt)throw new WorkerRecordingNoticeError('session');};
   const active=()=>{if(requestSignal.aborted)throw new WorkerRecordingNoticeError('unavailable');guard();};
-  active();if(!['en','ar','ur'].includes(language))throw new WorkerRecordingNoticeError('invalid');
+  active();if(!isWorkerLanguage(language))throw new WorkerRecordingNoticeError('invalid');
   let response:Response,value:unknown;
   try{
     response=await send(`/api/privacy/recording-notice?${new URLSearchParams({language})}`,{method:'GET',credentials:'include',cache:'no-store',redirect:'error',signal:requestSignal,headers:{'x-client-session-context':identity.clientContext}});

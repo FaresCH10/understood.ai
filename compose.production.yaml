@@ -1,0 +1,105 @@
+name: understood-production
+
+services:
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    env_file:
+      - ./deploy/.env.caddy
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/caddy:/etc/caddy/sites:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      edge:
+        ipv4_address: 172.30.0.10
+    depends_on:
+      api:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build: .
+    image: understood:local
+    restart: unless-stopped
+    command: ["node", "scripts/postgres-hosted.mjs", "api"]
+    env_file:
+      - ./.env.production
+    environment:
+      PORT: "10000"
+      UNDERSTOOD_TRUSTED_PROXY_NETWORKS: '["172.30.0.10/32"]'
+    networks:
+      edge:
+        ipv4_address: 172.30.0.11
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:10000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 35s
+    volumes:
+      - ./deploy/runtime:/run/understood:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  worker:
+    image: understood:local
+    restart: unless-stopped
+    command: ["node", "scripts/postgres-hosted.mjs", "worker"]
+    env_file:
+      - ./.env.production
+      - ./.env.production.worker
+    environment:
+      UNDERSTOOD_TRUSTED_PROXY_NETWORKS: '["172.30.0.10/32"]'
+    networks:
+      edge:
+        ipv4_address: 172.30.0.12
+    depends_on:
+      api:
+        condition: service_healthy
+    stop_grace_period: 90s
+    volumes:
+      - ./deploy/runtime:/run/understood:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  edge:
+    name: understood_edge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  caddy_data:
+  caddy_config:

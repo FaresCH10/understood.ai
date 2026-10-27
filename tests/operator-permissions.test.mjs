@@ -7,6 +7,7 @@ import {configureRuntimePermissions,verifyRuntimePermissions,runtimeTablePolicy,
 import {operatorColumnPolicy} from '../server/postgres/operator-permissions.mjs';
 import {domainTransaction,publish,submitAnswer} from '../server/postgres/domain.mjs';
 import {processOnePreparation} from '../server/postgres/preparation.mjs';
+import {legacyWrittenQuestion} from './helpers/legacy-written-question.mjs';
 import {requestExport} from '../server/postgres/exports.mjs';
 import {provisionOperator,authenticateOperator,revokeOperator} from '../server/postgres/operators.mjs';
 import {operationsOverview,operationsTenants,operationsJobs,operationsAudit,saveOperatorControl,retryOperationsJob,operatorReceipt} from '../server/postgres/operations.mjs';
@@ -38,6 +39,7 @@ async function fixture() {
   await db.query("INSERT INTO briefings(id,org_id,site_id,title,source,state) VALUES('published-draft','cedar','beirut','Synthetic source',$1,'processing')",[CANONICAL_SOURCE]);
   await db.exec("INSERT INTO jobs(id,org_id,site_id,briefing_id,revision,kind,status,due_at) VALUES('prepare-original','cedar','beirut','published-draft',1,'prepare','queued',clock_timestamp())");
   await processOnePreparation(pool,options);
+  await legacyWrittenQuestion(pool,'published-draft',options);
   const publication=await publish(pool,owner,'published-draft',{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['worker'],dueAt:null},options);
   const assignment=(await db.query('SELECT id FROM assignments WHERE publication_id=$1',[publication.id])).rows[0];
   await submitAnswer(pool,{principal_type:'worker',principal_id:'worker',org_id:'cedar',site_id:'beirut'},assignment.id,randomUUID(),'Private worker answer content',options);
@@ -73,7 +75,7 @@ test('hosted service commands select an exact fixed profile without application 
 
 test('actual operator column role authenticates and runs metadata, control and all three retries without content grants',async()=>{
   const f=await fixture();try {
-    const configured=await f.configure();await f.runtime();assert.equal((await verifyMigrations(f.pool,{schema})).migrations,108);
+    const configured=await f.configure();await f.runtime();assert.equal((await verifyMigrations(f.pool,{schema})).migrations,113);
     assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema,profile:'operator'}),configured);
     await assert.rejects(verifyRuntimePermissions(f.pool,{schema,profile:'application'}),/privileges/);
     const login=await f.login(),actor=login.session;

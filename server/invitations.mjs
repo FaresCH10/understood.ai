@@ -204,12 +204,17 @@ export async function processOneInvitation(db,config,{send=sendAuthMail}={}) {
     return {...row,lease,message};
   });
   if(!job) return false;if(job.ignored) return true;
-  let providerId;try {const result=await send(config,job.id,job.message);if(typeof result?.providerId==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(result.providerId)) providerId=result.providerId;}catch {}
+  let providerId,mailCode='send_failed';
+  try {const result=await send(config,job.id,job.message);if(typeof result?.providerId==='string' && /^[a-zA-Z0-9_-]{1,100}$/.test(result.providerId)) providerId=result.providerId;}
+  catch(error){const status=Number(error?.status);mailCode=Number.isInteger(status)&&status>=400&&status<600?`http_${status}`:'send_failed';}
   transaction(db,()=>{
     const now=NOW(),row=db.prepare("SELECT 1 FROM staff_invitation_mail WHERE id=? AND state='processing' AND lease_token=? AND lease_until>? AND expires_at>?").get(job.id,job.lease,now,now);if(!row) return;
     const invitation=db.prepare('SELECT * FROM staff_invitations WHERE id=?').get(job.invitation_id);
     if(!live(db,invitation) || invitation.revision!==job.generation) db.prepare("UPDATE staff_invitation_mail SET state='ignored',payload=NULL,lease_token=NULL,lease_until=NULL WHERE id=?").run(job.id);
     else if(providerId) db.prepare("UPDATE staff_invitation_mail SET state='sent',payload=NULL,provider_id=?,lease_token=NULL,lease_until=NULL WHERE id=?").run(providerId,job.id);
-    else db.prepare("UPDATE staff_invitation_mail SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,payload=CASE WHEN attempts>=3 THEN NULL ELSE payload END,next_at=?,lease_token=NULL,lease_until=NULL WHERE id=?").run(later(30000*(job.attempts+1)),job.id);
+    else {
+      if(job.attempts+1>=3) console.error(`invitation mail failed state=failed code=${mailCode}`);
+      db.prepare("UPDATE staff_invitation_mail SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,payload=CASE WHEN attempts>=3 THEN NULL ELSE payload END,next_at=?,lease_token=NULL,lease_until=NULL WHERE id=?").run(later(30000*(job.attempts+1)),job.id);
+    }
   });return true;
 }

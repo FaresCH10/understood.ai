@@ -16,6 +16,7 @@ export function deliveryContent(content) {
   if(!content || typeof content!=='object' || Array.isArray(content)) return null;
   const value={title:content.title,text:content.text};
   if(typeof content.question==='string') value.question=content.question;
+  if(content.questionType==='multiple-choice'){value.questionType=content.questionType;value.choices=content.choices;}
   if(typeof content.speech==='string' || (content.speech && typeof content.speech==='object')) value.speech=content.speech;
   return value;
 }

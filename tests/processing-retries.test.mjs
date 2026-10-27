@@ -14,6 +14,7 @@ import {processOneRecording as sqliteProcess} from '../server/recording-worker.m
 import {processOneRecording as pgProcess} from '../server/postgres/recording-worker.mjs';
 import {processOneAssessment} from '../server/postgres/assessment-worker.mjs';
 import {createDraft,queuePreparation,processOnePreparation} from '../server/postgres/preparation.mjs';
+import {legacyWrittenQuestion} from './helpers/legacy-written-question.mjs';
 import {publish,submitAnswer} from '../server/postgres/domain.mjs';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {encodeWav} from '../src/audio.ts';
@@ -43,6 +44,7 @@ async function fixture(pg,kind='response_transcription',schema='public'){
       INSERT INTO workers(id,org_id,site_id,code,language) VALUES('worker','cedar','beirut','001','en');`);
     const draft=await createDraft(pool,owner,{requestId:randomUUID(),title:'Frozen synthetic briefing',source:CANONICAL_SOURCE},{schema});
     await queuePreparation(pool,owner,draft.id,1,{schema});await processOnePreparation(pool,{schema,integrationMode:'synthetic'});
+    await legacyWrittenQuestion(pool,draft.id,{schema});
     await publish(pool,owner,draft.id,{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['worker']},{schema,integrationMode:'synthetic'});workerId='worker';
   }else {seed(raw);workerId='worker-30';raw.exec("INSERT INTO staff VALUES('other','cedar','beirut','Other','supervisor',1),('auditor','cedar','beirut','Auditor','auditor',1)");}
   const assignment=(await query('SELECT * FROM assignments WHERE worker_id=$1',[workerId]))[0],worker={...owner,principal_type:'worker',principal_id:workerId};

@@ -37,13 +37,13 @@ export async function currentPreparationOperation(client,referenceId,claimToken,
   checkedPreparationOperation(context,provenance,{orgId,referenceId,claimToken,model,inputHash});
   const job=await currentPreparationProviderClaim(client,referenceId,claimToken,orgId);
   if(job.site_id!==context.siteId || job.briefing_id!==context.briefingId || job.revision!==context.revision)throw Error('Provider preparation scope changed');
-  const draft=(await client.query('SELECT source FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3',[job.briefing_id,orgId,job.site_id])).rows[0];
+  const draft=(await client.query('SELECT source,title FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3',[job.briefing_id,orgId,job.site_id])).rows[0];
   const review=(await client.query('SELECT content_json FROM draft_reviews WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',[job.briefing_id,orgId,job.site_id])).rows[0]?.content_json ?? null;
   const glossary=await readGlossarySnapshot(client,orgId,job.site_id);
   const regeneration=(await client.query(`SELECT b.manifest_json FROM briefing_regeneration_requests r JOIN generated_bundles b ON b.id=r.baseline_bundle_id AND b.org_id=r.org_id AND b.site_id=r.site_id
     WHERE r.briefing_id=$1 AND r.org_id=$2 AND r.site_id=$3 AND r.accepted_revision=$4`,[job.briefing_id,orgId,job.site_id,job.revision])).rows[0];
   const languages=regeneration?.manifest_json.dependencies.languages ?? await readGenerationLanguages(client,orgId,job.site_id,context.languages,job.briefing_id);
-  if(!draft || preparationInputHash({source:draft.source,revision:job.revision,languages,review,glossary})!==context.rootHash)throw Error('Provider preparation input changed');
+  if(!draft || preparationInputHash({source:draft.source,title:draft.title,revision:job.revision,languages,review,glossary})!==context.rootHash)throw Error('Provider preparation input changed');
   const active=(await client.query(`SELECT 1 FROM preparation_stage_events e WHERE job_id=$1 AND run_id=$2 AND step=$3 AND state='started'
     AND stage=$4 AND language=$5 AND track IS NOT DISTINCT FROM $6 AND origin='generated'
     AND NOT EXISTS(SELECT 1 FROM preparation_stage_events done WHERE done.job_id=e.job_id AND done.run_id=e.run_id AND done.step=e.step AND done.state IN ('completed','failed'))`,

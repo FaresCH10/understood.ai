@@ -1,4 +1,6 @@
+import {passwordRecord} from '../server/auth-crypto.mjs';
 import test from 'node:test';
+import {legacyWrittenQuestion} from './helpers/legacy-written-question.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
 const fetch=createSessionContextFetch();
 import assert from 'node:assert/strict';
@@ -49,6 +51,8 @@ async function fixture() {
   await db.query("INSERT INTO staff(id,org_id,site_id,name,role) VALUES ('owner','a','a','Owner','owner'),('other','b','b','Other','owner'),('auditor','a','a','Auditor','auditor')");
   await db.query("INSERT INTO workers(id,org_id,site_id,code,language) VALUES ('w1','a','a','001','en'),('w2','a','a','002','ur'),('w3','a','c','003','ar'),('wb','b','b','001','en')");
   await db.query(`INSERT INTO briefings(id,org_id,site_id,title,source,state,prepared_json) VALUES ('brief','a','a','Shelf',$1,'ready',$2)`,[CANONICAL_SOURCE,JSON.stringify(syntheticPrepare(CANONICAL_SOURCE))]);
+  const credential=await passwordRecord('Assigned synthetic worker password');
+  await db.query("INSERT INTO worker_credentials(worker_id,org_id,site_id,login_id,state,password_salt,password_hash,credential_revision,password_changed_at) VALUES('w1','a','a','001','active',$1,$2,1,clock_timestamp())",[credential.salt,credential.derived]);
   return {db,pool,queries,setFail(value) {fail=value;},loseNextCommit() {loseCommit=true;},async assignment(publicationId,workerId='w1') {return (await db.query('SELECT id FROM assignments WHERE publication_id=$1 AND worker_id=$2',[publicationId,workerId])).rows[0].id;}};
 }
 
@@ -99,7 +103,7 @@ test('PostgreSQL exact worker receipt lookup reauthorizes, minimizes fields and 
     await assert.rejects(workerRequestReceipt(pool,worker,assignment,'other',typedId,options),/Invalid response filter/);
     assert.equal(await snapshot(),before);
     await withHttp(f,async({request})=>{
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       const clientContext=(await (await request('/session',member)).json()).clientContext;
       const beforeReads=await snapshot();
       for(const [kind,requestId] of [['answer',typedId],['help',helpId],['audio',audioId]]){
@@ -154,7 +158,7 @@ test('PostgreSQL draft copy preserves evidence, rolls back, and replays after lo
     await provisionStaffCredential(pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password:'long-enough-password'},options);
     await withHttp(f,async({request})=>{
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const grant=await issueWorkerGrant(pool,owner,'w1',30,options),workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const grant=await issueWorkerGrant(pool,owner,'w1',30,options),workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       const payload={requestId:randomUUID(),revision:2,title:'HTTP draft copy',confirmed:true};
       assert.equal((await request('/briefings/brief/copy',null,post(payload))).status,401);
       assert.equal((await request('/briefings/brief/copy',workerCookie,post(payload))).status,403);
@@ -285,7 +289,7 @@ test('PostgreSQL archive preserves received answers, closes new work and safely 
     await provisionStaffCredential(pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password:'long-enough-password'},options);
     await withHttp(f,async({request})=>{
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const grant=await issueWorkerGrant(pool,owner,'w1',30,options),workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const grant=await issueWorkerGrant(pool,owner,'w1',30,options),workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       const payload={requestId:randomUUID(),revision:1,nextVersion:1,reason:'HTTP archive',confirmed:true},path=`/briefings/${copy.id}/archive`;
       assert.equal((await request(path,null,post(payload))).status,401);assert.equal((await request(path,workerCookie,post(payload))).status,403);
       assert.equal((await request('/briefings/missing/archive',staff,post(payload))).status,404);
@@ -381,7 +385,7 @@ test('PostgreSQL response drilldown isolates exact publication and paged receipt
       assert.equal((await request(`${directoryPath}?status=all`,staff)).status,400);assert.equal((await request(`${directoryPath}?pageSize=51`,staff)).status,400);
       assert.equal((await (await request(`${directoryPath}?page=2&pageSize=1`,staff)).json()).items[0].publicationId,pub.id);
       const grant=await issueWorkerGrant(pool,owner,'w1',60,options);
-      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       const ownPath=`/worker/briefings/${assignment}/submissions`;
       assert.equal((await request(ownPath,staff)).status,403);assert.equal((await request(`${ownPath}?status=all`,workerCookie)).status,400);
       const result=await (await request(`${ownPath}?pageSize=1`,workerCookie)).json();assert.equal(result.total,3);assert.equal(result.assignment.state,'superseded');assert.ok(!/rubric|reasons|evidence|notes|sequence/.test(JSON.stringify(result)));
@@ -460,7 +464,7 @@ test('PostgreSQL worker inbox pages beyond 100 versions, keeps closed sent answe
     await assert.rejects(workerBriefings(pool,{...worker,access_mode:'credential',grant_id:'revoked'},options),/Sign in required/);
     const grant=await issueWorkerGrant(pool,owner,'w1',60,options);
     await withHttp(f,async ({request}) => {
-      const cookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const cookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       for(const query of ['?view=unknown','?pageSize=51','?worker_id=wb','?history=true']) assert.equal((await request(`/worker/history${query}`,cookie)).status,400);
       const result=await (await request('/worker/history?page=7&pageSize=20',cookie)).json();assert.equal(result.total,126);assert.equal(result.items.length,6);
       assert.equal((await (await request('/worker/briefings?view=sent',cookie)).json()).total,2);
@@ -507,7 +511,7 @@ test('PostgreSQL withdrawal is scoped, atomic, exactly replayed and preserves pe
     const grant=await issueWorkerGrant(pool,owner,'w1',30,options);
     await withHttp(f,async ({request}) => {
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       assert.equal((await request('/briefings/brief/withdraw',null,post(input))).status,401);
       assert.equal((await request('/briefings/brief/withdraw',member,post(input))).status,403);
       assert.equal((await request('/briefings/brief/withdraw',staff,post({...input,reason:''}))).status,400);
@@ -548,7 +552,7 @@ test('PostgreSQL overview and preparation queue report scoped live evidence, exa
     const grant=await issueWorkerGrant(pool,owner,'w1',30,options);
     await withHttp(f,async ({request}) => {
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       assert.equal((await request('/overview',staff)).status,200); assert.equal((await request('/processing',staff)).status,200);
       const checkedDetail=await request(`/processing/${encodeURIComponent(checkJob.id)}`,staff);assert.equal(checkedDetail.status,200);assert.equal((await checkedDetail.json()).id,checkJob.id);
       assert.equal((await request('/overview',member)).status,403); assert.equal((await request('/processing',member)).status,403);
@@ -770,7 +774,7 @@ test('PostgreSQL HTTP import/export contracts enforce scope, raw body limits and
     const pub=await publish(pool,owner,'brief',request(),options),grant=await issueWorkerGrant(pool,owner,'w1',30,options);
     await withHttp(f,async ({request}) => {
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       const importId=randomUUID(),path=`/people/imports/preview?requestId=${importId}&filename=crew.csv`,upload={method:'POST',headers:{'content-type':'text/csv; charset=utf-8'},body:'worker_id,language\nNew import,ar\n'};
       assert.equal((await request(path,member,upload)).status,403);
       assert.equal((await request(path+'&org_id=b',staff,upload)).status,400);
@@ -923,7 +927,7 @@ test('PostgreSQL HTTP activity and help enforce credentials, scope, filter bound
       assert.equal((await request('/audit')).status,401);
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
       const foreign=cookieOf(await request('/auth/staff/login',null,post({email:'other@example.test',password:'long-enough-password'})));
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       assert.equal((await request('/audit?org_id=b',staff)).status,400);
       assert.equal((await request('/clarifications?status=closed',staff)).status,400);
       for (const path of ['/audit','/audit.csv','/clarifications']) assert.equal((await request(path,member)).status,403);
@@ -1322,7 +1326,7 @@ test('PostgreSQL preparation stale leases and audit failure cannot save readines
     assert.equal(failed.state,'failed'); assert.equal(failed.prepared,null);
     await queuePreparation(pool,owner,draft.id,1,options); await processOnePreparation(pool,options);
     assert.equal((await getBriefing(pool,owner,draft.id,options)).state,'ready');
-    await assert.rejects(processOnePreparation(pool,{...options,integrationMode:'live'}),/unavailable/);
+    await assert.rejects(processOnePreparation(pool,{...options,integrationMode:'live'}),/Provider integration does not match runtime/);
     assert.equal(await processOnePreparation(pool,options),false);
   } finally {await db.close();}
 });
@@ -1348,9 +1352,9 @@ test('PostgreSQL HTTP rehearsal denies production/demo/public schema and exercis
       const publication=await publicationResponse.json();
       assert.equal((await request('/briefings/brief/publish',staff,post(publicationInput))).status,200);
       const issued=await request('/worker-grants',staff,post({workerId:'w1'})); assert.equal(issued.status,201);
-      const grant=await issued.json(),redeemed=await request('/auth/worker/redeem',null,post({token:grant.token})); assert.equal(redeemed.status,200);
+      const grant=await issued.json(),redeemed=await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})); assert.equal(redeemed.status,200);
       const workerCookie=cookieOf(redeemed);
-      assert.equal((await request('/auth/worker/redeem',null,post({token:grant.token}))).status,401);
+      assert.equal((await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'}))).status,401);
       assert.equal((await request('/briefings',workerCookie)).status,403);
       assert.equal((await request('/reports',workerCookie)).status,403);
       const inbox=await (await request('/worker/briefings',workerCookie)).json(); assert.equal(inbox.items.length,1);
@@ -1400,6 +1404,7 @@ test('PostgreSQL HTTP rehearsal bounds JSON/audio, redacts internal failures and
       const id=(await created.json()).id;
       assert.equal((await request(`/briefings/${id}/process`,staff,post({revision:1}))).status,202);
       await processOnePreparation(f.pool,options);
+      await legacyWrittenQuestion(f.pool,id,options);
       assert.equal((await (await request(`/briefings/${id}`,staff)).json()).state,'ready');
       const published=await (await request(`/briefings/${id}/publish`,staff,post(makePublicationRequest()))).json();
       const grant=await (await request('/worker-grants',staff,post({workerId:'w1'}))).json();
@@ -1409,7 +1414,7 @@ test('PostgreSQL HTTP rehearsal bounds JSON/audio, redacts internal failures and
       assert.equal((await request(`${accessPath}?org_id=b`,staff)).status,400);
       assert.equal((await request('/people/workers/wb/access',staff)).status,404);
       assert.equal((await request('/worker-grants',staff,post({workerId:'w1',expiresInMinutes:null}))).status,400);
-      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       assert.equal((await request(accessPath,workerCookie)).status,403);
       assert.equal((await (await request(accessPath,staff)).json()).items[0].status,'redeemed');
       assert.equal((await request(`/worker-grants/${grant.id}/revoke`,staff,post({workerId:'w1'}))).status,400);
@@ -1635,7 +1640,7 @@ test('PostgreSQL HTTP directory routes use the existing people contract and deny
       const rows=await (await request('/people/workers?search=HTTP&pageSize=5',staff)).json(); assert.equal(rows.total,1); assert.equal(rows.items[0].language,'ur');
       assert.equal((await request('/people/workers',staff,post({code:'HTTP Worker',language:'en'}))).status,409);
       const grant=await (await request('/worker-grants',staff,post({workerId:'w1'}))).json();
-      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       assert.equal((await request('/people/workers',workerCookie)).status,403);
       assert.equal((await request('/people/crews',workerCookie)).status,403);
       const crewPath=`/people/crews/${crew.id}`,rename={name:'HTTP Renamed',expectedName:crew.name};

@@ -1,8 +1,5 @@
-export const artifactLanguages = [
-  { code:'en', name:'English', dir:'ltr' },
-  { code:'ar', name:'Arabic', dir:'rtl' },
-  { code:'ur', name:'Urdu', dir:'rtl' },
-] as const;
+import {WORKER_LOCALES,workerLocale} from '../server/languages.mjs';
+export const artifactLanguages = WORKER_LOCALES.map(locale=>({code:locale.code,name:locale.englishName,dir:locale.direction}));
 
 type StoredLanguage = { title?:unknown; text?:unknown; question?:unknown; speech?:unknown };
 export type PreparedArtifacts = {
@@ -32,7 +29,13 @@ export function languageArtifacts(prepared:PreparedArtifacts|null,source:string,
 }
 
 export function artifactVoiceLanguage(language:string,code:string) {
-  return language.toLowerCase().replaceAll('_','-').split('-')[0]===code;
+  const locale=workerLocale(code),tag=language.replaceAll('_','-');
+  if(!locale)return false;
+  if(locale.base==='pa'){
+    try{const voice=new Intl.Locale(tag).maximize();return voice.language==='pa' && voice.script===(code==='pa-Arab'?'Arab':'Guru');}catch{return false;}
+  }
+  const base=tag.toLowerCase().split('-')[0];
+  return base===locale.base || locale.code==='fil' && base==='tl';
 }
 
 export function artifactSpeechUrls(value:unknown,briefingId:string|undefined,selection:string,revision:number,code:string) {

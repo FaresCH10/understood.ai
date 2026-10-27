@@ -14,7 +14,7 @@ export function searchQuery(params){
 }
 export const allowedSearchKinds=(role,archived)=>searchRoles.includes(role)?role==='auditor' || archived?['briefing']:[...searchKinds]:[];
 export function searchSelect(kind,where){
-  const columns={briefing:{table:'briefings',label:'title',status:"CASE WHEN EXISTS(SELECT 1 FROM briefing_archives a WHERE a.briefing_id=t.id AND a.org_id=t.org_id AND a.site_id=t.site_id) THEN 'archived' ELSE state END"},
+  const columns={briefing:{table:'briefings',label:'title',status:"CASE WHEN EXISTS(SELECT 1 FROM briefing_archives a WHERE a.briefing_id=t.id AND a.org_id=t.org_id AND a.site_id=t.site_id) THEN 'archived' ELSE COALESCE((SELECT p.state FROM publications p WHERE p.briefing_id=t.id AND p.org_id=t.org_id AND p.site_id=t.site_id ORDER BY p.version DESC LIMIT 1),state) END"},
     worker:{table:'workers',label:'code',status:"CASE WHEN active THEN 'active' ELSE 'inactive' END"},
     crew:{table:'crews',label:'name',status:"CASE WHEN active THEN 'active' ELSE 'archived' END"}}[kind];
   if(!columns)throw Error('Invalid search category');

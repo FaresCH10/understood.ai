@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-a-supervisor-can-open-the-workspace": {
+      "declaredAt": 1793104808043,
+      "id": "flow:drive-a-supervisor-can-open-the-workspace",
+      "state": "declared",
+      "statement": "A supervisor can open the workspace",
+      "status": "proposed",
+      "subject": "drive-a-supervisor-can-open-the-workspac",
+      "surface": {
+        "flow": "drive-a-supervisor-can-open-the-workspace"
+      },
+      "updatedAt": 1793104808053
+    }
+  },
+  "subject": "drive-a-supervisor-can-open-the-workspac",
+  "version": 1
+}

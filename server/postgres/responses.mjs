@@ -120,6 +120,7 @@ export async function getPublicationResponse(pool,session,publicationId,assignme
       question:responseMode==='acknowledge'?null:snapshot.question,facts:snapshot.facts,
       workerQuestion:responseMode==='acknowledge'?null:snapshot.languages?.[row.language]?.question || null,
       responseMode,deliveryMode,
+      ...(snapshot.rubric?.mode==='multiple-choice'?{questionType:'multiple-choice',choices:snapshot.languages?.[row.language]?.choices || snapshot.languages?.en?.choices}:{}),
       acknowledgedAt:acknowledgment?.received_at?.toISOString() || null,
       ...await submissionHistory(client,session,assignmentId,page,pageSize,true),cases};
   });

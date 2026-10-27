@@ -3,6 +3,8 @@ export const workerEventKinds = Object.freeze({
   'clarification.followup': {destination:'help'},
   'repeat.available': {destination:'inbox'},
   'language.decided': {destination:'inbox'},
+  'language.approved': {destination:'inbox'},
+  'language.rejected': {destination:'inbox'},
   'deadline.reminder': {destination:'inbox'},
 });
 export const workerEventLabels = Object.freeze({
@@ -10,6 +12,8 @@ export const workerEventLabels = Object.freeze({
   'clarification.followup':'New follow-up',
   'repeat.available':'Repeat requested',
   'language.decided':'Language request updated',
+  'language.approved':'Language request approved',
+  'language.rejected':'Language request rejected',
   'deadline.reminder':'Deadline reminder',
 });
 export const staffPushKinds = Object.freeze([

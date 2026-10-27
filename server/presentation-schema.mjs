@@ -46,6 +46,8 @@ export function ensurePresentationSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_answer_presentation_bindings_presentation ON answer_presentation_bindings(presentation_id);
   `);
 
+  if(!db.prepare('PRAGMA table_info(presentation_artifacts)').all().some(column=>column.name==='choices_json'))db.exec('ALTER TABLE presentation_artifacts ADD COLUMN choices_json TEXT');
+
   const recordingColumns=new Set(db.prepare('PRAGMA table_info(recordings)').all().map(column=>column.name));
   if(recordingColumns.size){
     if(!recordingColumns.has('presentation_id'))db.exec('ALTER TABLE recordings ADD COLUMN presentation_id TEXT REFERENCES presentation_artifacts(id)');
@@ -129,4 +131,18 @@ export function ensurePresentationSchema(db) {
             AND NEW.presented_question IN ('[Deleted]','[Expired]')))
       BEGIN SELECT RAISE(ABORT,'Recording presentation provenance is immutable'); END;
   `);
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS presentation_choices_insert BEFORE INSERT ON presentation_artifacts
+      WHEN NEW.choices_json IS NOT NULL AND (NEW.status<>'ready' OR NEW.source_kind<>'instruction' OR NOT json_valid(NEW.choices_json) OR json_type(NEW.choices_json)<>'array' OR json_array_length(NEW.choices_json)<>4)
+      BEGIN SELECT RAISE(ABORT,'Invalid presentation choices'); END;
+    CREATE TRIGGER IF NOT EXISTS presentation_choices_update BEFORE UPDATE OF choices_json ON presentation_artifacts
+      WHEN NEW.choices_json IS NOT OLD.choices_json AND NOT (
+        (OLD.choices_json IS NULL AND NEW.choices_json IS NOT NULL AND NEW.status='ready' AND NEW.source_kind='instruction' AND NEW.text NOT IN ('[Deleted]','[Expired]') AND json_valid(NEW.choices_json) AND json_type(NEW.choices_json)='array' AND json_array_length(NEW.choices_json)=4)
+        OR (NEW.choices_json IS NULL AND NEW.text IN ('[Deleted]','[Expired]')))
+      BEGIN SELECT RAISE(ABORT,'Presentation choices are immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS presentation_choices_redaction AFTER UPDATE OF text ON presentation_artifacts
+      WHEN NEW.text IN ('[Deleted]','[Expired]') AND NEW.choices_json IS NOT NULL
+      BEGIN UPDATE presentation_artifacts SET choices_json=NULL WHERE id=NEW.id; END;
+  `);
+
 }

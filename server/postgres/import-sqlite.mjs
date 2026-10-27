@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
+import {checkedPresentationChoices} from '../presentation-choice-input.mjs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyLocalBackup } from '../../scripts/local-backup.mjs';
@@ -170,6 +171,7 @@ function snapshotRows(path) {
       if (table === 'draft_creations' && actual.includes('generation_languages_json')) fields.push('generation_languages_json');
       if(table==='report_exports' && actual.includes('filters_json'))fields.push('filters_json');
       if(table==='recordings')for(const field of ['presentation_id','presentation_language','presented_question'])if(actual.includes(field))fields.push(field);
+      if(table==='presentation_artifacts' && actual.includes('choices_json'))fields.push('choices_json');
       if (actual.length !== fields.length || actual.some((field) => !fields.includes(field))) throw new Error('Unsupported source columns');
       result[table] = db.prepare(`SELECT ${fields.join(',')} FROM ${table} LIMIT 100001`).all();
       total += result[table].length;
@@ -186,7 +188,7 @@ function snapshotRows(path) {
       const publication=publications.get(row.publication_id);
       if (!publication || publication.org_id!==row.org_id || publication.site_id!==row.site_id) throw new Error('Source scope mismatch');
       const languages=JSON.parse(publication.snapshot_json).languages;
-      if (!['en','ar','ur'].includes(row.language) || !languages?.[row.language]) throw new Error('Source assignment language unavailable');
+      if (!isWorkerLanguage(row.language) || !languages?.[row.language]) throw new Error('Source assignment language unavailable');
     }
     for (const table of ['attempts', 'clarifications']) for (const row of result[table]) {
       const assignment = assignments.get(row.assignment_id);
@@ -315,6 +317,12 @@ function valuesFor(table, row, now) {
     if(attached && !isWorkerLanguage(copy.presentation_language)) throw new Error('Invalid source recording presentation');
   }
   if(table==='presentation_artifacts') {
+    copy.choices_json ??= null;
+    if(copy.choices_json!==null) {
+      if(copy.status!=='ready' || copy.source_kind!=='instruction' || ['[Deleted]','[Expired]'].includes(copy.text))throw Error('Invalid source presentation choices');
+      try {copy.choices_json=JSON.stringify(checkedPresentationChoices(JSON.parse(copy.choices_json)));}
+      catch {throw Error('Invalid source presentation choices');}
+    }
     if(!isWorkerLanguage(copy.original_language) || !isWorkerLanguage(copy.target_language)
       || copy.original_language===copy.target_language) throw new Error('Invalid source presentation language');
     if(copy.live!==null && copy.live!==undefined) {
@@ -381,6 +389,7 @@ export async function importSqliteBackup(pool, { source, schema, requestId, data
       if(table==='draft_creations')fields.push('generation_languages_json');
       if(table==='report_exports')fields.push('filters_json');
       if(table==='recordings')fields.push('presentation_id','presentation_language','presented_question');
+      if(table==='presentation_artifacts')fields.push('choices_json');
       const placeholders = fields.map((_, index) => `$${index + 1}`).join(',');
       const sql = `INSERT INTO "${table}" (${fields.map((field) => `"${field}"`).join(',')}) ${table === 'submission_receipts' ? 'OVERRIDING SYSTEM VALUE ' : ''}VALUES (${placeholders})`;
       // Maintenance-only, empty-target import of validated history. Runtime roles

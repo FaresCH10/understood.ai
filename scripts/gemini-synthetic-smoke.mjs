@@ -64,7 +64,7 @@ export async function syntheticSmoke({apiKey,mode='connection',fetchImpl=fetch,p
     }
     return response;
   };
-  const adapter=createGeminiAdapter({apiKey,dataClass:'synthetic',timeoutMs:20000,fetchImpl:observedFetch,requestJournal:journal});
+  const adapter=createGeminiAdapter({apiKey,dataClass:'synthetic',timeoutMs:90000,fetchImpl:observedFetch,requestJournal:journal});
   try {
     if(mode==='connection') {
       const prepared=await adapter.prepare(CANONICAL_SOURCE);

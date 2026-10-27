@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "text \"Private device · saving is available\"",
+  "observed": "no element matched {\"text\":\"Private device · saving is available\"}",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "e764",
+        "source": {
+          "file": "src/WorkerDevice.tsx",
+          "line": 92,
+          "column": 588
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793024594778-click-7c8b1abb",
+  "createdAt": 1793024594778,
+  "seen": 1,
+  "lastSeenAt": 1793024594778
+}

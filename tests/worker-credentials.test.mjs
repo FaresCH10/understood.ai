@@ -6,7 +6,7 @@ import {createAppServer} from '../server/index.mjs';
 import {provisionStaffCredential} from '../server/auth.mjs';
 import {tokenHash} from '../server/auth-crypto.mjs';
 import {workerCompanyContext,workerCredentialStatus,issueWorkerCredentialSetup,completeWorkerSetup,authenticateWorker} from '../server/worker-credentials.mjs';
-import {workerLoginInput,workerSetupClaimInput,credentialSetupInput,normalizeWorkerLogin} from '../server/worker-credentials-input.mjs';
+import {workerLoginInput,workerSetupClaimInput,credentialSetupInput,normalizeWorkerLogin,assignedCredentialInput} from '../server/worker-credentials-input.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
 
 const fetch=createSessionContextFetch();
@@ -14,6 +14,12 @@ const origin='http://127.0.0.1:3020';
 const options={tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin};
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const PASSWORD='synthetic worker password';
+
+test('company assignment and worker login reject the same company-equal password',()=>{
+  const value={expectedCode:'Worker 014',workerId:'worker 014',password:'company-a',confirmed:true};
+  assert.throws(()=>assignedCredentialInput(value,'company-a'),/Invalid password/);
+  assert.throws(()=>workerLoginInput({company:'company-a',workerId:'worker 014',password:value.password}),/Invalid password/);
+});
 
 function withDb(run) {
   const db=openDatabase(':memory:');
@@ -137,14 +143,13 @@ test('HTTP routes require verified staff, exact input and set credential cookies
     assert.equal((await request('/auth/worker/login?x=1',null,{method:'POST',body:JSON.stringify({company:'cedar',workerId:'worker 014',password:PASSWORD})})).status,400);
     assert.equal((await request('/people/workers/worker-14/credentials')).status,401);
     assert.equal((await request('/people/workers/harbor-worker/credentials',staffCookie)).status,404);
-    const issued=await request('/people/workers/worker-14/credentials/setup',staffCookie,{method:'POST',body:JSON.stringify({expectedCode:'Worker 014',confirmed:false})});
-    assert.equal(issued.status,400);
-    const created=await request('/people/workers/worker-14/credentials/setup',staffCookie,{method:'POST',body:JSON.stringify({expectedCode:'Worker 014',confirmed:true,expiresInMinutes:30})});
-    assert.equal(created.status,201);
-    const code=(await created.json()).setupCode;assert.match(code,/^[A-Za-z0-9_-]{43}$/);
-    const wrong=await request('/auth/worker/setup',null,{method:'POST',body:JSON.stringify({company:'cedar',workerId:'worker 014',code:'b'.repeat(43),password:PASSWORD})});
-    assert.equal(wrong.status,401);assert.deepEqual(await wrong.json(),{error:'Invalid or expired setup code'});
-    const claimed=await request('/auth/worker/setup',null,{method:'POST',body:JSON.stringify({company:'cedar',workerId:'worker 014',code,password:PASSWORD})});
+    const blocked=await request('/people/workers/worker-14/credentials/setup',staffCookie,{method:'POST',body:JSON.stringify({expectedCode:'Worker 014',confirmed:true})});
+    assert.equal(blocked.status,410);
+    const legacy=await request('/auth/worker/setup',null,{method:'POST',body:JSON.stringify({company:'cedar',workerId:'worker 014',code:'b'.repeat(43),password:PASSWORD})});
+    assert.equal(legacy.status,410);assert.equal(legacy.headers.get('set-cookie'),null);
+    const assigned=await request('/people/workers/worker-14/credentials/password',staffCookie,{method:'POST',body:JSON.stringify({expectedCode:'Worker 014',workerId:'worker 014',password:PASSWORD,confirmed:true})});
+    assert.equal(assigned.status,200);assert.ok(!JSON.stringify(await assigned.json()).includes(PASSWORD));
+    const claimed=await request('/auth/worker/login',null,{method:'POST',body:JSON.stringify({company:'cedar',workerId:'worker 014',password:PASSWORD})});
     assert.equal(claimed.status,200);assert.match(claimed.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);
     const workerCookie=claimed.headers.get('set-cookie').split(';')[0];
     assert.equal((await request('/worker/briefings',workerCookie)).status,200);
@@ -152,8 +157,8 @@ test('HTTP routes require verified staff, exact input and set credential cookies
     const session=await (await request('/session',workerCookie)).json();
     assert.equal(session.authenticated,true);assert.equal(session.role,'worker');assert.match(session.clientContext,/^[a-f0-9]{64}$/);
     assert.equal((await request('/auth/worker/login',null,{method:'POST',body:JSON.stringify({company:'cedar',workerId:'worker 014',password:PASSWORD})})).status,200);
-    const reset=await request('/people/workers/worker-14/credentials/setup',staffCookie,{method:'POST',body:JSON.stringify({expectedCode:'Worker 014',confirmed:true})});
-    assert.equal(reset.status,201);
+    const reset=await request('/people/workers/worker-14/credentials/password',staffCookie,{method:'POST',body:JSON.stringify({expectedCode:'Worker 014',workerId:'worker 014',password:'new company assigned password',confirmed:true})});
+    assert.equal(reset.status,200);
     assert.equal((await request('/worker/briefings',workerCookie)).status,401);
   });
 });

@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "name": "drive-send-status-continues-polling-unchanged-preparat",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1792997115638,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Title"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Title"
+          },
+          "args": {
+            "value": "Clear the walkway"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 208
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Instruction"
+          },
+          "args": {
+            "value": "Keep the walkway clear before the next shift."
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 212
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Text only"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 237
+          }
+        }
+      ],
+      "page": "/tests/browser/review-bugfixes.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Send instruction"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SendInstruction.tsx",
+        "line": 250
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "PASS: three automatic status checks reached publication after two unchanged responses."
+      },
+      "timeoutMs": 15000,
+      "page": "/tests/browser/review-bugfixes.html",
+      "writes": true
+    }
+  ],
+  "intent": "Send status continues polling unchanged preparation responses until publication completes.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/review-bugfixes.html"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/review-bugfixes.html"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-send-status-continues-polling-unchanged-preparat"
+}

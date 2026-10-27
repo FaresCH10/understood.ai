@@ -1,3 +1,4 @@
+import {isWorkerLanguage} from '../languages.mjs';
 import {randomUUID} from 'node:crypto';
 import {bundleHash} from '../ai/prepared-bundle.mjs';
 import {withBackupSnapshot,backupTables,privateObjectInventory,databaseInventory} from './backup.mjs';
@@ -174,7 +175,7 @@ export function validatePrivacyLedger(ledger,baseline){
     const assignment=assignmentsById.get(row.assignment_id),actor=ledger.tables.staff.find(staff=>staff.id===row.actor_id);
     if(Object.keys(row).sort().join(',')!=='actor_id,actor_role,actor_type,assignment_id,bytes,cleanup_state,created_at,id,kind,language,org_id,received_at,request_id,requested_case_id,sha256,site_id,status,worker_id'
       ||!assignment||assignment.org_id!==row.org_id||assignment.site_id!==row.site_id||assignment.worker_id!==row.worker_id
-      ||!['en','ar','ur'].includes(row.language)||!digest(row.sha256)||!Number.isSafeInteger(row.bytes)||row.bytes<45||row.bytes>2880044
+      ||!isWorkerLanguage(row.language)||!digest(row.sha256)||!Number.isSafeInteger(row.bytes)||row.bytes<45||row.bytes>2880044
       ||!['storing','received','failed'].includes(row.status)||!['active','cleaning','cleaned'].includes(row.cleanup_state)
       ||!Number.isFinite(Date.parse(row.created_at))||Date.parse(row.created_at)>Date.parse(ledger.capturedAt)
       ||(row.status==='received'?!Number.isFinite(Date.parse(row.received_at))||Date.parse(row.received_at)<Date.parse(row.created_at)||Date.parse(row.received_at)>Date.parse(ledger.capturedAt):row.received_at!==null)

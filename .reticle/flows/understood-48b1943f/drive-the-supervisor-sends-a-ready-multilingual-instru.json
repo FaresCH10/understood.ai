@@ -1,0 +1,89 @@
+{
+  "version": 2,
+  "name": "drive-the-supervisor-sends-a-ready-multilingual-instru",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793085518685,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Send instruction"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 592
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Send instruction"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SendInstruction.tsx",
+        "line": 259
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "net",
+            "method": "POST",
+            "urlContains": "/api/instructions/send",
+            "status": 201,
+            "count": 1
+          },
+          {
+            "kind": "allOf",
+            "predicates": [
+              {
+                "kind": "text",
+                "contains": "Instruction sent",
+                "scope": "main"
+              },
+              {
+                "kind": "text",
+                "scope": "main",
+                "contains": "of",
+                "satisfies": {
+                  "property": "matchesPattern",
+                  "pattern": "\\d[\\d,.]* of \\d[\\d,.]*"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "timeoutMs": 20000,
+      "page": "/",
+      "writes": true
+    }
+  ],
+  "startPath": "/",
+  "intent": "The supervisor sends a ready multilingual instruction to the selected Arabic crew.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-the-supervisor-sends-a-ready-multilingual-instru"
+}

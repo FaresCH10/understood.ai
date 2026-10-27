@@ -1,3 +1,5 @@
+import {processOneRecording} from './recording-worker.mjs';
+import {withMultipleChoice} from './multiple-choice.mjs';
 import { randomUUID } from 'node:crypto';
 import { openDatabase, NOW, transaction } from './db.mjs';
 import { syntheticPrepare } from './domain.mjs';
@@ -31,6 +33,8 @@ import {pilotDestination} from './pilot-input.mjs';
 import {expirePushSubscriptions,processOnePushDelivery,sweepOverdueAssignments} from './notification-events.mjs';
 import {resolvePushAdapter} from './push-adapter.mjs';
 import {processOneCaseEscalation} from './case-routing.mjs';
+import {processOneCaseFollowup} from './case-followups.mjs';
+import {resolveCaseFollowup} from './ai/case-followup-config.mjs';
 import {ensureStaffCaseRecordingSchema} from './staff-case-recording-schema.mjs';
 import {processOneStaffCaseRecordingPurge} from './staff-case-recordings.mjs';
 import {audioStore} from './private-storage.mjs';
@@ -58,9 +62,11 @@ export function processOne(db) {
       const send=instructionSendForBriefing(db,briefing.id,job.org_id,job.site_id);
       const review=getDraftReview(db,briefing.id,job.org_id,job.site_id);
       if(review && review.revision!==job.revision) throw new Error('Obsolete draft review');
-      const prepared = send
+      let prepared = send
         ? syntheticInstructionPrepare(briefing,send)
         : checkedSyntheticGlossary(checkedSyntheticReview(syntheticPrepare(briefing.source),review),readGlossarySnapshot(db,job.org_id,job.site_id));
+      if(prepared.languages?.en){prepared={...prepared,title:briefing.title,languages:{...prepared.languages,en:{...prepared.languages.en,title:briefing.title}}};}
+      if(!send)prepared=withMultipleChoice(prepared,{preserveQuestions:true,preserveAskedFacts:true});
       const languages=readGenerationLanguages(db,job.org_id,job.site_id,['en','ar','ur'],job.briefing_id)
         .filter(language=>prepared.languages?.[language]);
       prepared.languages=Object.fromEntries(languages.map(language=>[language,prepared.languages[language]]));
@@ -82,6 +88,7 @@ export function processOne(db) {
 if (process.argv[1]?.endsWith('worker.mjs')) {
   const config=resolveAuthConfig();
   const sourceAdapter=resolveSourceTranscription();
+  const followupAdapter=resolveCaseFollowup();
   const pushAdapter=resolvePushAdapter();
   const mail=config.accessMode==='credential' ? resolveMailConfig({publicOrigin:config.publicOrigin,allowLocal:true}) : {available:false};
   const db = openDatabase();
@@ -97,7 +104,9 @@ if (process.argv[1]?.endsWith('worker.mjs')) {
       for(let i=0;i<5 && await processOneSourceAudioCleanup(db);i++) {}
       for(let i=0;i<5 && await processOneStaffCaseRecordingPurge(db,privateAudio);i++) {}
       for(let i=0;i<5 && await processOneSourceAudio(db,sourceAdapter);i++) {}
+      for(let i=0;i<5 && await processOneRecording(db,null);i++) {}
       for(let i=0;i<5 && processOneCaseEscalation(db);i++) {}
+      if(await processOneCaseFollowup(db,followupAdapter)) {}
       for(let i=0;i<5 && processOneDeletionRedaction(db);i++) {}
       for(let i=0;i<5 && processOneDeletionPseudonym(db);i++) {}
       for(let i=0;i<5 && await processOneDeletionCompletion(db);i++) {}

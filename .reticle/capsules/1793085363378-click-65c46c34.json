@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "POST /api/instructions/send → 201",
+  "observed": "/api/instructions/send responded 409 (expected 201)",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "",
+        "source": {
+          "file": "src/SendInstruction.tsx",
+          "line": 259,
+          "column": 8
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793085363378-click-65c46c34",
+  "createdAt": 1793085363379,
+  "seen": 1,
+  "lastSeenAt": 1793085363379
+}

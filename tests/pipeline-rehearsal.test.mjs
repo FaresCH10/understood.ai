@@ -29,12 +29,12 @@ test('scripted transport rejects unplanned or changed inputs and retains only bo
   const pending=scriptedProvider();pending.structured('prepare',{}, {},'title');assert.throws(()=>pending.finish(),/not all executed/);
 });
 
-test('normal credential/audio/publication/answer/help/report paths complete without network or fabricated business rows',async()=>{
+test('current MCQ generation and explicit historical written-answer fixtures exercise credential/audio/help/report paths without network',async()=>{
   const stages=[],originalFetch=globalThis.fetch;
   globalThis.fetch=async()=>assert.fail('The rehearsal must not use an external network transport');
   let report;
   try {report=await runPipelineRehearsal({onStage:name=>stages.push(name)});}finally{globalThis.fetch=originalFetch;}
-  assert.equal(stages.length,10);assert.deepEqual(report.checks,stages.map(name=>({name,status:'passed'})));
+  assert.equal(stages.length,11);assert.deepEqual(report.checks,stages.map(name=>({name,status:'passed'})));
   assert.ok(Object.isFrozen(report));assert.ok(Object.isFrozen(report.typedEvaluation));
   assert.deepEqual(report.metrics,{assigned:5,responses:5,matches:3,clarifications:2,unassessed:0,pending:0,completion:100});
   assert.equal(report.providerEvidence.scriptedRequests,24);assert.equal(report.providerEvidence.externalRequests,0);
@@ -48,11 +48,11 @@ test('normal credential/audio/publication/answer/help/report paths complete with
   assert.equal(report.workerPermissions.hiddenTables,15);assert.equal(report.workerPermissions.nativeAuthentication,'not-tested');
   assert.equal(report.workerPermissions.apiIdentity,'embedded-application-role');
   assert.equal(report.apiPermissions.profile,'application');assert.equal(report.apiPermissions.verified,true);
-  assert.equal(report.apiPermissions.writableTables,137);assert.equal(report.apiPermissions.readOnlyTables,14);assert.equal(report.apiPermissions.hiddenTables,7);
-  assert.equal(report.apiPermissions.taskExecutions,10);assert.deepEqual(report.apiPermissions.stages,[...stages].sort());
+  assert.equal(report.apiPermissions.writableTables,138);assert.equal(report.apiPermissions.readOnlyTables,14);assert.equal(report.apiPermissions.hiddenTables,7);
+  assert.equal(report.apiPermissions.taskExecutions,11);assert.deepEqual(report.apiPermissions.stages,[...stages].sort());
   assert.equal(report.apiPermissions.nativeAuthentication,'not-tested');assert.equal(report.apiPermissions.schemaOwnerUsedForCustomerOperations,false);
   assert.equal(report.apiPermissions.roleRestoredAfterNestedWork,true);
-  assert.deepEqual(report.apiPermissions.maintenanceStages,['workspace-bootstrap','provider-policy-fixture','pause-provider','resume-provider']);
+  assert.deepEqual(report.apiPermissions.maintenanceStages,['workspace-bootstrap','provider-policy-fixture','pause-provider','resume-provider','historical-written-question-fixture']);
   assert.equal(report.typedEvaluation.metrics.completed,4);assert.equal(report.typedEvaluation.metrics.failed,0);
   assert.equal(report.typedEvaluation.metrics.notRun,0);assert.equal(report.typedEvaluation.metrics.outcomeDisagreements,0);
   assert.ok(report.typedEvaluation.results.every(row=>row.provenance.model===GEMINI_MODELS.text && /^[a-f0-9]{64}$/.test(row.inputHash)));

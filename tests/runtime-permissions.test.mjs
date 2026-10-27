@@ -186,7 +186,7 @@ test('application SQL role cannot read operator password/session material or cre
 
 test('application role retains required control reads but cannot suspend tenants, pause dispatch, change quotas or forge operator evidence',async()=>{
   const f=await fixture();try {
-    const configured=await f.configure();assert.equal(configured.writableTables,137);assert.equal(configured.readOnlyTables,14);assert.equal(configured.hiddenTables,7);
+    const configured=await f.configure();assert.equal(configured.writableTables,138);assert.equal(configured.readOnlyTables,14);assert.equal(configured.hiddenTables,7);
     const columns=(await f.db.query('SELECT table_name,column_name FROM information_schema.columns WHERE table_schema=$1 AND ordinal_position=1',[schema])).rows;
     await f.runtime();assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema}),configured);
     for(const table of ['operator_requests','provider_verifications','tenant_controls','system_controls','provider_policies','operator_audit']) {
@@ -253,7 +253,7 @@ test('worker cannot edit customer template or glossary libraries but prepares a 
     const draft=await changeTemplate(f.pool,owner,'use',template.id,{requestId:randomUUID(),confirmed:true,revision:1,title:'Synthetic library draft'},options);
     const before=await inventory();assert.ok(before.every(rows=>rows.length===1));
     await f.owner();const configured=await f.configure('worker');
-    assert.equal(configured.writableTables,108);assert.equal(configured.readOnlyTables,35);
+    assert.equal(configured.writableTables,109);assert.equal(configured.readOnlyTables,35);
     await f.runtime();assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema,profile:'worker'}),configured);
     const glossary=await withTransaction(f.pool,client=>readGlossarySnapshot(client,'org','site'));
     assert.equal(glossary.terms.length,1);
@@ -554,7 +554,7 @@ test('worker organization/site row-lock grants cannot create, rename, delete or 
   try{
     await f.db.exec("INSERT INTO organizations VALUES('empty-org','Unused synthetic');INSERT INTO sites VALUES('empty-site','empty-org','Unused site','UTC')");
     const before=await inventory();await f.configure('worker');await f.runtime();
-    const configured=await verifyRuntimePermissions(f.pool,{schema,profile:'worker'});assert.equal(configured.writableTables,108);
+    const configured=await verifyRuntimePermissions(f.pool,{schema,profile:'worker'});assert.equal(configured.writableTables,109);
     await domainTransaction(f.pool,schema,async client=>{await requireTenantActive(client,'org');await requireWorkerSiteAccess(client,'org','site');});
     for(const table of ['organizations','sites']){
       await withTransaction(f.pool,client=>client.query(`SELECT id FROM ${table} ORDER BY id FOR UPDATE`));

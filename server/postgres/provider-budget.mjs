@@ -1,3 +1,5 @@
+import {currentPresentationProviderClaim} from './presentation-jobs.mjs';
+import {providerDataClass} from '../ai/provider-policy.mjs';
 import {randomUUID} from 'node:crypto';
 import {domainTransaction} from './domain.mjs';
 import {dispatchAllowed} from './operations-gates.mjs';
@@ -51,12 +53,12 @@ async function currentSource(client,referenceId,claimToken,orgId,inputHash) {
 }
 
 export async function reserveProviderOperation(client,{orgId,kind,referenceId,model,dataClass,maxRequests,claimToken=null,inputHash=null,provenance=null,preparationContext=null}) {
-  if(dataClass!=='synthetic' || !['source-transcription','connection-test','stage-test','case-followup','recording-transcription','recording-assessment','preparation','typed-assessment'].includes(kind) || typeof referenceId!=='string' || !/^[A-Za-z0-9_-]{1,100}$/.test(referenceId)
+  if(!['synthetic','real'].includes(dataClass) || dataClass==='real'&&(['connection-test','stage-test'].includes(kind)||!providerDataClass(provenance)||provenance.dataClass!==dataClass) || !['source-transcription','connection-test','stage-test','case-followup','recording-transcription','recording-assessment','preparation','typed-assessment','presentation'].includes(kind) || typeof referenceId!=='string' || !/^[A-Za-z0-9_-]{1,100}$/.test(referenceId)
     || typeof model!=='string' || !/^[a-z0-9][a-z0-9.:/-]{2,79}$/.test(model) || !Number.isInteger(maxRequests) || maxRequests<1 || maxRequests>64
     || (['connection-test','stage-test'].includes(kind)?orgId!==null || claimToken!==null:typeof orgId!=='string' || !/^[A-Za-z0-9_-]{1,100}$/.test(orgId) || typeof claimToken!=='string' || !/^[a-f0-9-]{36}$/i.test(claimToken)))throw Error('Invalid provider reservation');
   if(kind!=='preparation' && preparationContext!==null)throw Error('Invalid provider input evidence');
-  if(['typed-assessment','source-transcription','recording-transcription','recording-assessment','preparation'].includes(kind)) {
-    if(typeof inputHash!=='string' || !/^[a-f0-9]{64}$/.test(inputHash) || !provenance || provenance.dataClass!=='synthetic'
+  if(['typed-assessment','source-transcription','recording-transcription','recording-assessment','preparation','presentation'].includes(kind)) {
+    if(typeof inputHash!=='string' || !/^[a-f0-9]{64}$/.test(inputHash) || !provenance || provenance.dataClass!==dataClass
       || provenance.model!==model || Object.keys(provenance).sort().join(',')!=='adapter,dataClass,model,promptVersion,schemaVersion'
       || !['adapter','promptVersion','schemaVersion'].every(key=>typeof provenance[key]==='string' && /^[a-z0-9-]{1,80}$/.test(provenance[key])))throw Error('Invalid assessment provenance');
   }else if(kind==='case-followup') {
@@ -67,6 +69,7 @@ export async function reserveProviderOperation(client,{orgId,kind,referenceId,mo
   if(kind==='case-followup')await currentFollowup(client,referenceId,claimToken,orgId,inputHash,provenance,model);
   if(kind==='recording-transcription' || kind==='recording-assessment')await currentRecording(client,referenceId,claimToken,orgId,kind,inputHash);
   if(kind==='preparation')await currentPreparationOperation(client,referenceId,claimToken,orgId,preparationContext,provenance,model,inputHash);
+  if(kind==='presentation')await currentPresentationProviderClaim(client,referenceId,claimToken,orgId,inputHash);
   if(kind==='typed-assessment')await currentAssessment(client,referenceId,claimToken,orgId,inputHash);
   // One short quota lock counts reservations across every worker before dispatch.
   await client.query("SELECT pg_advisory_xact_lock(hashtextextended(current_schema()||':provider-quota',0))");
@@ -79,7 +82,7 @@ export async function reserveProviderOperation(client,{orgId,kind,referenceId,mo
   if(usage.global+maxRequests>global.max_daily_requests || orgId!==null && usage.tenant+maxRequests>tenant.max_daily_requests)throw Error('Provider request quota reached');
   const id=randomUUID();
   await client.query(`INSERT INTO provider_operations(id,org_id,kind,reference_id,claim_token,model,data_class,reserved_requests,quota_day,input_hash,provenance_json,preparation_context_json)
-    VALUES($1,$2,$3,$4,$5,$6,'synthetic',$7,$8,$9,$10,$11)`,[id,orgId,kind,referenceId,claimToken,model,maxRequests,day,inputHash,provenance===null?null:JSON.stringify(provenance),preparationContext===null?null:JSON.stringify(preparationContext)]);
+    VALUES($1,$2,$3,$4,$5,$6,$12,$7,$8,$9,$10,$11)`,[id,orgId,kind,referenceId,claimToken,model,maxRequests,day,inputHash,provenance===null?null:JSON.stringify(provenance),preparationContext===null?null:JSON.stringify(preparationContext),dataClass]);
   return {id,orgId,maxRequests};
 }
 export function providerRequestJournal(pool,operation,{schema='public'}={}) {
@@ -94,6 +97,7 @@ export function providerRequestJournal(pool,operation,{schema='public'}={}) {
         if(row.kind==='case-followup')await currentFollowup(client,row.reference_id,row.claim_token,row.org_id,row.input_hash,row.provenance_json,row.model);
         if(!cleanup && (row.kind==='recording-transcription' || row.kind==='recording-assessment'))await currentRecording(client,row.reference_id,row.claim_token,row.org_id,row.kind,row.input_hash);
         if(row.kind==='preparation')await currentPreparationOperation(client,row.reference_id,row.claim_token,row.org_id,row.preparation_context_json,row.provenance_json,row.model,row.input_hash);
+        if(row.kind==='presentation')await currentPresentationProviderClaim(client,row.reference_id,row.claim_token,row.org_id,row.input_hash);
         if(row.kind==='typed-assessment')await currentAssessment(client,row.reference_id,row.claim_token,row.org_id,row.input_hash);
         if(['connection-test','stage-test'].includes(row.kind)) {
           if(cleanup)throw Error('Provider verification cleanup is not permitted');

@@ -74,10 +74,11 @@ for(const postgres of [false,true]) {
     const f=await fixture(postgres),now=Date.now();t.mock.timers.enable({apis:['Date'],now});f.setClock(now);
     const advance=value=>{t.mock.timers.setTime(value);f.setClock(value);};
     try {
-      for(const kind of ['answered','disabled','withdrawn','archived','superseded','authority','expired']) {
+      for(const kind of ['answered','acknowledged','disabled','withdrawn','archived','superseded','authority','expired']) {
         await f.brief(kind);const published=await f.publish(kind,input({workerIds:['w1']}));
         const assignment=(await f.exec('SELECT id FROM assignments WHERE publication_id=?',[published.id])).rows[0].id;
         if(kind==='answered')await f.exec("INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at) VALUES('a',?,'received-typed-only','typed',?)",[assignment,new Date().toISOString()]);
+        if(kind==='acknowledged')await f.exec("INSERT INTO acknowledgments(request_id,org_id,site_id,assignment_id,worker_id,received_at) VALUES(?,'a','a',?,'w1',?)",[randomUUID(),assignment,new Date().toISOString()]);
         if(kind==='disabled')await f.exec(`UPDATE workers SET active=${postgres?'false':'0'} WHERE id='w1'`);
         if(['withdrawn','superseded','archived'].includes(kind))await f.exec('UPDATE publications SET state=? WHERE id=?',[kind,published.id]);
         if(kind==='authority'){await f.exec("UPDATE staff SET role='supervisor' WHERE id='owner'");await f.exec("UPDATE staff SET role='owner' WHERE id='owner'");}

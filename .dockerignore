@@ -14,3 +14,4 @@ docs
 *.log
 images.rar
 deploy/.local
+deploy/runtime/

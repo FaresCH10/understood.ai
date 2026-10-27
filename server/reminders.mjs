@@ -28,7 +28,8 @@ export function processOneReminder(db) {
       AND p.state='published' AND a.due_at>? AND w.active=1
       AND NOT EXISTS(SELECT 1 FROM briefing_archives b WHERE b.briefing_id=p.briefing_id)
       AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=a.worker_id AND d.org_id=a.org_id)
-      AND NOT EXISTS(SELECT 1 FROM submission_receipts sr WHERE sr.assignment_id=a.id AND sr.org_id=a.org_id)`)
+      AND NOT EXISTS(SELECT 1 FROM submission_receipts sr WHERE sr.assignment_id=a.id AND sr.org_id=a.org_id)
+      AND NOT EXISTS(SELECT 1 FROM acknowledgments ak WHERE ak.assignment_id=a.id AND ak.org_id=a.org_id)`)
       .get(row.assignment_id,row.org_id,row.site_id,row.worker_id,now);
     db.prepare("UPDATE assignment_reminders SET state=?,finished_at=? WHERE assignment_id=? AND state='queued'").run(eligible?'visible':'skipped',now,row.assignment_id);
     if(eligible)recordWorkerEvent(db,{orgId:row.org_id,siteId:row.site_id,workerId:row.worker_id,kind:'deadline.reminder',

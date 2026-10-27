@@ -32,7 +32,7 @@ async function fixture(languages=['en','ar'],sourceText=source) {
   const objects=new Map(),storage={async save(row,bytes){objects.set(row.id,Buffer.from(bytes));},async read(row){if(!objects.has(row.id))throw Error('No object');return objects.get(row.id);},async remove(row){objects.delete(row.id);}};
   const draft=await createDraft(pool,owner,{requestId:randomUUID(),title:'Synthetic instructions',source:sourceText,generationLanguages:languages});
   const glossary=await readGlossarySnapshot({query:(sql,args)=>db.query(sql,args)},'a','a');
-  const input={source:sourceText,revision:1,languages,review:null,glossary};
+  const input={source:sourceText,title:'Synthetic instructions',revision:1,languages,review:null,glossary};
   const queued=await queuePreparation(pool,owner,draft.id,1);
   return {db,pool,storage,objects,draft,queued,input,close:()=>db.close()};
 }
@@ -46,6 +46,9 @@ function adapterFor(input,calls,onCall=async()=>{},content={title:'Shelves',fact
       :fields.factEvidence?{sourceGrounded:true,questionAligned:true,ambiguous:false,factEvidence:content.facts.map((quote,factIndex)=>({factIndex,quote})),askedFactIndexes:content.askedFacts.map(fact=>content.facts.indexOf(fact)),reasons:[]}
       :fields.faithful?{faithful:true,complete:true,languageCorrect:true,terminologyApplied:true,reasons:[]}
       :content.translation;
+    if(fields.choices)result.choices=[content.askedFacts.join(' '),'Put finished items on yellow and unfinished items on blue.','Keep the walkway blocked.','Put finished items on red and unfinished items on green.'];
+    if(fields.choicesAligned)result.choicesAligned=true;
+    if(fields.answerChoices)result.answerChoices=[content.translation.text,'ضع العناصر المكتملة على الرف الأصفر وغير المكتملة على الرف الأزرق.','أبق الممر مغلقاً.','ضع العناصر المكتملة على الرف الأحمر وغير المكتملة على الرف الأخضر.'];
     return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(result)}]}}]});
   }});
 }
@@ -68,7 +71,7 @@ test('preparation provider is default-off and requires exact bounded synthetic i
   assert.doesNotMatch(JSON.stringify(adapter),/test-only/);
 });
 
-test('noncanonical preparation, private Arabic speech, publication and typed assessment use one exact frozen rubric',async()=>{
+test('noncanonical preparation, private Arabic speech, publication and multiple-choice assessment use one exact frozen rubric',async()=>{
   const facts=['Put 12 cartons at bay 4.','Keep the exit clear.'];
   const content={title:'Carton handover',facts,question:'How many cartons go to which bay, and what must stay clear?',askedFacts:facts,
     translation:{title:'تسليم الصناديق',text:'ضع 12 صندوقاً في المنطقة 4. أبق المخرج خالياً.',question:'كم صندوقاً ستضع وفي أي منطقة، وما الذي يجب أن يبقى خالياً؟'}};
@@ -79,7 +82,9 @@ test('noncanonical preparation, private Arabic speech, publication and typed ass
     const pub=await publish(f.pool,owner,f.draft.id,{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['w']},{integrationMode:'synthetic',storage:f.storage});
     const assignment=(await f.db.query('SELECT id FROM assignments')).rows[0].id,worker={org_id:'a',site_id:'a',principal_type:'worker',principal_id:'w'};
     assert.deepEqual(await getAssignmentSpeech(f.pool,worker,assignment,'question',f.storage),audio);
-    const answer='سأضع 12 صندوقاً في المنطقة 4 وأبقي المخرج خالياً.',submissionId=randomUUID();
+    const frozen=(await f.db.query('SELECT snapshot_json FROM publications WHERE id=$1',[pub.id])).rows[0].snapshot_json;
+    assert.equal(frozen.languages.en.title,'Synthetic instructions');assert.equal(frozen.rubric.mode,'multiple-choice');
+    const answer=frozen.rubric.correctChoiceId,submissionId=randomUUID();
     const receipt=await submitAnswer(f.pool,worker,assignment,submissionId,answer);assert.equal(receipt.assessmentStatus,'pending');
     const assessmentInput={answer,question:content.translation.question,askedFacts:facts,language:'ar',publicationId:pub.id,version:1};
     const adapter=resolveAssessmentAdapter({...env,UNDERSTOOD_ASSESSMENT_ADAPTER:'gemini-free',
@@ -90,11 +95,11 @@ test('noncanonical preparation, private Arabic speech, publication and typed ass
         evidence:facts.map((_,factIndex)=>({factIndex,quote:answer}))})}]}}]});
     }});
     await editDraft(f.pool,owner,f.draft.id,{revision:1,title:'Different draft',source:'Put 5 cartons at bay 7.'});
-    assert.equal(await rehearsalTasks(f.pool,f.storage,{schema:'public',assessmentAdapter:adapter}).assessment(),true);assert.equal(assessmentCalls.length,1);
+    assert.equal(await rehearsalTasks(f.pool,f.storage,{schema:'public',assessmentAdapter:adapter}).assessment(),true);assert.equal(assessmentCalls.length,0);
     assert.equal((await f.db.query('SELECT outcome FROM attempts WHERE id=$1',[receipt.id])).rows[0].outcome,'matched');
     const snapshot=(await f.db.query('SELECT snapshot_json FROM publications WHERE id=$1',[pub.id])).rows[0].snapshot_json;
     assert.deepEqual(snapshot.rubric.askedFacts,facts);assert.equal(snapshot.languages.ar.question,content.translation.question);
-    assert.equal((await f.db.query('SELECT count(*)::int n FROM provider_requests')).rows[0].n,9);
+    assert.equal((await f.db.query('SELECT count(*)::int n FROM provider_requests')).rows[0].n,8);
     assert.equal((await f.db.query('SELECT count(*)::int n FROM clarifications')).rows[0].n,0);
     assert.equal((await submitAnswer(f.pool,worker,assignment,submissionId,answer)).duplicate,true);
   }finally{await f.close();}
@@ -118,7 +123,7 @@ test('scheduled English/Arabic generation meters all stages and publishes exact 
     assert.ok(operations.every(row=>row.input_hash===bundleHash(row.preparation_context_json) && row.provenance_json.model===row.model));
     assert.ok(operations.every(row=>row.preparation_context_json.rootHash===preparationInputHash(f.input)));
     assert.deepEqual(operations.map(row=>row.preparation_context_json.stage),['preparation','grounding_check','translation','translation_check','speech','speech','speech','speech']);
-    assert.equal(operations[0].preparation_context_json.argumentsHash,bundleHash([f.input.source,{review:null}]));
+    assert.equal(operations[0].preparation_context_json.argumentsHash,bundleHash([f.input.source,{review:null,multipleChoice:true}]));
     assert.deepEqual(operations.slice(4).map(row=>[row.preparation_context_json.language,row.preparation_context_json.track]),[['en','body'],['en','question'],['ar','body'],['ar','question']]);
     const bundle=(await f.db.query('SELECT * FROM generated_bundles')).rows[0];assert.equal(bundle.provider_operation_count,8);
     const links=(await f.db.query('SELECT operation_id FROM generated_bundle_operations WHERE bundle_id=$1',[bundle.id])).rows;
@@ -203,12 +208,12 @@ test('provider preparation refuses legacy unattributed jobs and changed access r
   }
 });
 
-test('unallowlisted inputs, unsupported Urdu speech and closed quotas never dispatch or fall back to demo readiness',async()=>{
-  for(const failure of ['input','ur','quota']) {
-    const f=await fixture(failure==='ur'?['en','ar','ur']:['en','ar']),calls=[];
+test('unallowlisted inputs and closed quotas never dispatch or fall back to demo readiness',async()=>{
+  for(const failure of ['input','quota']) {
+    const f=await fixture(['en','ar']),calls=[];
     try {
       if(failure==='quota')await f.db.exec("UPDATE provider_policies SET enabled=false WHERE scope_key='tenant:a'");
-      const input=failure==='ur'?{...f.input,languages:['en','ar','ur']}:failure==='input'?{...f.input,source:'Another synthetic source'}:f.input;
+      const input=failure==='input'?{...f.input,source:'Another synthetic source'}:f.input;
       await stage(f,adapterFor(input,calls));assert.equal(calls.length,0);assert.equal(f.objects.size,0);
       const row=(await f.db.query('SELECT state,prepared_json FROM briefings WHERE id=$1',[f.draft.id])).rows[0];
       assert.equal(row.state,'failed');assert.equal(row.prepared_json,null);

@@ -5,7 +5,7 @@ import {checkedNotification,checkedNotificationPage,pendingNotificationSignature
 import {completeArtifactMutation,checkedArtifactScope} from '../src/artifact-request.ts';
 import {StaffRequestError,retainStaffRequest} from '../src/staff-request.ts';
 
-const item={id:'notice-original',kind:'briefing.prepared',...notificationKinds['briefing.prepared'],occurredAt:'2026-10-14T00:00:00.000Z',readAt:null};
+const item={id:'notice-original',kind:'briefing.prepared',...notificationKinds['briefing.prepared'],subject:null,occurredAt:'2026-10-14T00:00:00.000Z',readAt:null};
 const pending={requestId:item.id,body:{},item},accepted={...item,readAt:'2026-10-14T00:01:00.000Z'};
 const store=()=>{const rows=new Map();return {getItem:key=>rows.get(key)??null,setItem:(key,value)=>rows.set(key,value),removeItem:key=>rows.delete(key)};};
 

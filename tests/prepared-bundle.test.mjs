@@ -53,13 +53,36 @@ test('prepared bundle freezes exact-text speech dependencies and only the asked 
 });
 const hashBytes=bytes=>createHash('sha256').update(bytes).digest('hex');
 
+test('Arabic source is translated and independently checked before English speech and delivery',async()=>{
+  const original='أبق الممر خالياً.',english={title:'Clear walkway',text:'Keep the walkway clear.',question:'What must remain clear?'};
+  const {input,calls}=fixture({
+    async prepare(){return {title:english.title,facts:['Keep the walkway clear.'],question:english.question,askedFacts:['Keep the walkway clear.']};},
+    async checkPreparation(){return {sourceGrounded:true,questionAligned:true,ambiguous:false,factEvidence:[{factIndex:0,quote:original}],askedFactIndexes:[0],reasons:[]};},
+    async translate(value,language){calls.push(['translate',value,language]);assert.equal(value.text,original);assert.equal(language,'en');return english;},
+    async checkTranslation(value,translated,language){calls.push(['checkTranslation',value,translated,language]);assert.equal(value.text,original);assert.deepEqual(translated,english);assert.equal(language,'en');return faithful();},
+  });
+  input.source=original;input.languages=['en'];input.multipleChoice=true;
+  const bundle=await prepareLanguageBundle(input);
+  assert.equal(bundle.manifest.source,original);assert.equal(bundle.manifest.languages.en.text,english.text);
+  assert.equal(bundle.manifest.checks.translations.en,'passed');
+  assert.ok(calls.some(call=>call[0]==='speech'&&call[1]===english.text&&call[2]==='en'));
+  assert.equal(preparedAudioReferences(bundle.manifest).length,2);
+  const retained=await prepareLanguageBundle({...input,revision:2,regeneration:{kind:'audio',language:'en',bundle,review:null}});
+  assert.equal(retained.manifest.languages.en.text,english.text);
+  assert.equal(calls.filter(call=>call[0]==='translate').length,1);
+  input.adapter.checkTranslation=async()=>({...faithful(),languageCorrect:false});
+  await rejectsCode(prepareLanguageBundle(input),'translation_check_failed');
+  input.adapter.translate=async()=>({...english,text:original});
+  await rejectsCode(prepareLanguageBundle(input),'invalid_translation');
+});
+
 test('incompatible languages and real data are rejected before any provider call',async()=>{
   for(const change of [input=>{input.adapter.capabilities.speechLanguages=['en','ar'];},input=>{input.dataClass='privacy-approved';}]) {
     const {input,calls}=fixture();change(input);
     await rejectsCode(prepareLanguageBundle(input),input.dataClass==='synthetic' ? 'language_capability_unavailable' : 'invalid_provider');assert.equal(calls.length,0);
   }
   let called=false;const adapter=createGeminiAdapter({apiKey:'test-only',dataClass:'synthetic',fetchImpl:async()=>{called=true;throw Error('No network allowed');}});
-  await rejectsCode(prepareLanguageBundle({...fixture().input,adapter}),'language_capability_unavailable');assert.equal(called,false);
+  await rejectsCode(prepareLanguageBundle({...fixture().input,adapter}),'preparation_failed');assert.equal(called,true);
 });
 
 test('revision/access fencing stops generation before calls, after callbacks and after provider results',async()=>{
@@ -93,6 +116,7 @@ test('invalid private preparation, grounding evidence and ambiguity cannot becom
     [{...check(),askedFactIndexes:[0,2]},'invalid_question_evidence'],
     [{...check(),reasons:['invented_code']},'invalid_preparation_check'],
     [{...check(),questionAligned:false,reasons:['unsupported_content']},'preparation_check_failed'],
+    [{...check(),reasons:['omitted_pairing']},'preparation_check_failed'],
   ];
   for(const [result,code] of cases) {
     const {input,calls}=fixture({async checkPreparation(){return result;}});await rejectsCode(prepareLanguageBundle(input),code);
@@ -108,6 +132,22 @@ test('translation checks must pass independently before any generated speech',as
   }
   const {input,calls}=fixture({async translate(){return {title:'Wrong',text:'أين',question:'Wrong'};}});
   await rejectsCode(prepareLanguageBundle(input),'invalid_translation');assert.equal(calls.some(call=>call[0]==='speech'),false);
+});
+
+test('one rejected generated translation can be repaired, but failures and authored overrides never become ready',async()=>{
+  let checks=0,translations=0;
+  const {input}=fixture({async translate(){translations++;return {title:'الرفوف',text:'ضع المنتجات على الرف الأزرق.',question:'أين المنتجات؟'};},
+    async checkTranslation(){return ++checks===1?{...faithful(),faithful:false,reasons:['unsupported_content']}:faithful();}});
+  const events=[];input.onStage=event=>events.push(event);
+  const bundle=await prepareLanguageBundle(input);
+  assert.equal(translations,3);assert.equal(checks,3);
+  assert.equal(events.filter(event=>event.state==='failed').length,1);
+  assert.equal(events.filter(event=>event.state==='started').length,14);
+  assert.equal(preparedAudioReferences(bundle.manifest).length,6);
+  let failedChecks=0,spoken=0;
+  const failed=fixture({async checkTranslation(){failedChecks++;return {...faithful(),faithful:false,reasons:['unsupported_content']};},async speech(){spoken++;return wav();}});
+  await rejectsCode(prepareLanguageBundle(failed.input),'translation_check_failed');
+  assert.equal(failedChecks,2);assert.equal(spoken,0);
 });
 
 test('review and glossary snapshots bind dependencies and pass only matching tenant terminology',async()=>{

@@ -47,7 +47,7 @@ export async function processOneSourceAudio(pool,adapter,storage,repository) {
     const operation=await domainTransaction(pool,repository?.schema ?? 'public',async client=>{
       if(!await dispatchAllowed(client,row.org_id,{provider:true}))throw Error('Provider dispatch paused');
       return reserveProviderOperation(client,{orgId:row.org_id,kind:'source-transcription',referenceId:row.request_id,claimToken:row.lease_token,
-        model:adapter.model,dataClass:'synthetic',maxRequests:4,inputHash:sourceTranscriptionInputHash(row),provenance:adapter.transcriptionProvenance});
+        model:adapter.model,dataClass:adapter.provenance.dataClass,maxRequests:adapter.provenance.dataClass==='real'?1:4,inputHash:sourceTranscriptionInputHash(row),provenance:adapter.transcriptionProvenance});
     });
     const result=await adapter.withJournal(providerRequestJournal(pool,operation,repository)).transcribe(bytes,mime);
     return {...result,providerOperationId:operation.id};

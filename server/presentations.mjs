@@ -1,10 +1,11 @@
+import {checkedPresentationChoices} from './presentation-choice-input.mjs';
 import {randomUUID} from 'node:crypto';
 import {NOW,transaction} from './db.mjs';
 import {ensurePresentationSchema} from './presentation-schema.mjs';
 import {requireWorkerSiteAccess} from './site-access.mjs';
 import {workerCredentialSessionValid} from './auth.mjs';
 import {entitlementState} from './entitlements.mjs';
-import {languageCapability} from './languages.mjs';
+import {translatePresentation} from './presentation-choices.mjs';
 import {
   presentationRequest,presentationInstructionContent,presentationAnswerContent,
   presentationSourceHash,translatedPresentationContent,presentationArtifact,
@@ -75,9 +76,13 @@ function sourceFor(db,session,assignment,input){
     WHERE t.assignment_id=? AND t.org_id=? AND a.site_id=? AND t.submission_id=?`)
     .get(assignment.language,assignment.id,session.org_id,session.site_id,input.sourceId);
   if(!attempt)return {state:'unavailable',reason:'answer_not_ready',originalLanguage,approvedLanguage};
-  let sourceContent;
-  try{sourceContent=presentationAnswerContent({text:attempt.answer_text});}catch{return {state:'unavailable',reason:'content_unavailable',originalLanguage,approvedLanguage};}
-  const answerLanguage=attempt.original_language;
+  let sourceContent,answerLanguage=attempt.original_language;
+  try{
+    const snapshot=JSON.parse(assignment.snapshot_json);
+    const choice=snapshot?.rubric?.mode==='multiple-choice'?snapshot.languages?.[assignment.language]?.choices?.find(item=>item.id===attempt.answer_text):null;
+    if(choice)answerLanguage=assignment.language;
+    sourceContent=presentationAnswerContent({text:choice?.text??attempt.answer_text});
+  }catch{return {state:'unavailable',reason:'content_unavailable',originalLanguage,approvedLanguage};}
   return {originalLanguage:answerLanguage,approvedLanguage:assignment.approved_language,sourceContent,snapshotContent:null,
     sourceHash:presentationSourceHash('answer',answerLanguage,sourceContent)};
 }
@@ -106,11 +111,11 @@ function insertReady(db,assignment,input,source,content,provider,live,now){
   const id=randomUUID();
   db.prepare(`INSERT INTO presentation_artifacts(id,org_id,site_id,worker_id,assignment_id,publication_id,publication_version,
     source_kind,source_id,original_language,target_language,source_hash,status,title,text,question,provider,live,error_code,
-    lease_token,lease_until,created_at,updated_at,ready_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'ready',?,?,?,?,?,NULL,NULL,NULL,?,?,?)`)
+    lease_token,lease_until,created_at,updated_at,ready_at,choices_json)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'ready',?,?,?,?,?,NULL,NULL,NULL,?,?,?,?)`)
     .run(id,assignment.org_id,assignment.site_id,assignment.worker_id,assignment.id,assignment.publication_id,
       assignment.version,input.sourceKind,input.sourceId,source.originalLanguage,source.approvedLanguage,source.sourceHash,
-      content.title??null,content.text,content.question??null,provider,live?1:0,now,now,now);
+      content.title??null,content.text,content.question??null,provider,live?1:0,now,now,now,content.choices?JSON.stringify(content.choices):null);
   return findById(db,id);
 }
 
@@ -134,13 +139,13 @@ export async function createPresentation(db,session,assignmentId,input,{translat
     const byId=findById(db,request.requestId);
     if(byId){
       if(!matchesSource(byId,assignment,request,source))throw new Error('Presentation request conflict');
-      return {response:resultFor(byId,source)};
+      return {response:resultFor(byId,source),choiceSource:source};
     }
     let existing=findByIdentity(db,assignment,request,source.approvedLanguage);
     if(existing){
       if(existing.source_hash!==source.sourceHash || existing.original_language!==source.originalLanguage)
         throw new Error('Presentation source conflict');
-      if(existing.status!=='pending' || Date.parse(existing.lease_until||'')>Date.now())return {response:resultFor(existing,source)};
+      if(existing.status!=='pending' || Date.parse(existing.lease_until||'')>Date.now())return {response:resultFor(existing,source),choiceSource:source};
       if(!entitlementState(db,assignment.org_id).writeAllowed)return {response:nonArtifact('deferred',source,'generation_paused')};
       const token=randomUUID(),now=NOW();
       const claimed=db.prepare(`UPDATE presentation_artifacts SET lease_token=?,lease_until=?,updated_at=?
@@ -152,9 +157,9 @@ export async function createPresentation(db,session,assignmentId,input,{translat
 
     if(source.snapshotContent){
       existing=insertReady(db,assignment,request,source,source.snapshotContent,'publication-snapshot-v1',false,NOW());
-      return {response:resultFor(existing,source)};
+      return {response:resultFor(existing,source),choiceSource:source};
     }
-    if(!languageCapability(source.approvedLanguage,'translation'))
+    if(translator?.capabilities?.textLanguages && !translator.capabilities.textLanguages.includes(source.approvedLanguage))
       return {response:nonArtifact('unavailable',source,'language_capability_unavailable')};
     if(typeof translator?.translate!=='function')return {response:nonArtifact('unavailable',source,'translation_not_enabled')};
     if(generationAllowed!==true || !entitlementState(db,assignment.org_id).writeAllowed)
@@ -171,16 +176,36 @@ export async function createPresentation(db,session,assignmentId,input,{translat
     pending={row:findById(db,id),source,token,assignment};
     return {pending:true};
   });
-  if(prepared.response)return prepared.response;
+  if(prepared.response){
+    const source=prepared.choiceSource,result=prepared.response;
+    if(result.status!=='ready'||!source?.sourceContent.choices||result.presentation.content?.choices)return result;
+    let choices=source.snapshotContent?.choices;
+    if(!choices){
+      if(generationAllowed!==true||!entitlementState(db,session.org_id).writeAllowed)return nonArtifact('deferred',source,'generation_paused');
+      if(typeof translator?.translate!=='function')return nonArtifact('unavailable',source,'translation_not_enabled');
+      try{choices=(await translatePresentation(translator,'instruction',source.originalLanguage,source.approvedLanguage,source.sourceContent)).content.choices;}
+      catch{return nonArtifact('unavailable',source,'translation_invalid');}
+    }
+    choices=checkedPresentationChoices(choices,source.sourceContent.choices);
+    return transaction(db,()=>{
+      workerAuthority(db,session);
+      const assignment=loadAssignment(db,session,assignmentId),current=sourceFor(db,session,assignment,request);
+      if(current.state||current.sourceHash!==source.sourceHash||current.approvedLanguage!==source.approvedLanguage)throw new Error('Presentation source conflict');
+      const changed=db.prepare(`UPDATE presentation_artifacts SET choices_json=? WHERE id=? AND status='ready'
+        AND choices_json IS NULL AND text NOT IN ('[Deleted]','[Expired]')`).run(JSON.stringify(choices),result.presentation.id).changes;
+      if(changed)auditPresentation(db,session,'presentation.choices_added',result.presentation.id,NOW());
+      return resultFor(findById(db,result.presentation.id),source);
+    });
+  }
   if(!pending)throw new Error(UNAVAILABLE);
 
   const finish=(status,fields,errorCode=null)=>{
     const now=NOW();
     return transaction(db,()=>{
       const changes=db.prepare(`UPDATE presentation_artifacts SET status=?,title=?,text=?,question=?,provider=?,live=?,error_code=?,
-        lease_token=NULL,lease_until=NULL,updated_at=?,ready_at=? WHERE id=? AND status='pending' AND lease_token=?`)
+        lease_token=NULL,lease_until=NULL,choices_json=?,updated_at=?,ready_at=? WHERE id=? AND status='pending' AND lease_token=?`)
         .run(status,fields.title??null,fields.text??null,fields.question??null,fields.provider??null,
-          fields.live===undefined?null:(fields.live?1:0),errorCode,
+          fields.live===undefined?null:(fields.live?1:0),errorCode,fields.choices?JSON.stringify(fields.choices):null,
           now,status==='ready'?now:null,pending.row.id,pending.token).changes;
       const row=findById(db,pending.row.id);
       if(changes===1)auditPresentation(db,session,status==='ready'?'presentation.ready':'presentation.failed',row.id,now);
@@ -190,9 +215,8 @@ export async function createPresentation(db,session,assignmentId,input,{translat
 
   let translated;
   try{
-    translated=await translator.translate({kind:request.sourceKind,sourceLanguage:pending.source.originalLanguage,
-      targetLanguage:pending.source.approvedLanguage,content:pending.source.sourceContent});
-  }catch{return finish('failed',{},'translation_failed');}
+    translated=await translatePresentation(translator,request.sourceKind,pending.source.originalLanguage,pending.source.approvedLanguage,pending.source.sourceContent);
+  }catch(error){return finish('failed',{},error.code==='translation_invalid'?'translation_invalid':'translation_failed');}
   let content;
   try{
     content=translatedPresentationContent(request.sourceKind,translated?.content,pending.source.approvedLanguage);

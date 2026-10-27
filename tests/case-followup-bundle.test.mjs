@@ -69,7 +69,7 @@ test('real data, unsupported capabilities and malformed scope fail before provid
     value=>{value.source='';},value=>{value.source='x'.repeat(1001);},value=>{value.adapter.capabilities.speechLanguages=['en'];}]) {
     const f=fixture();mutate(f.input);await assert.rejects(generateCaseFollowup(f.input),CaseFollowupError);assert.equal(f.calls.length,0);
   }
-  let network=0;const f=fixture('ur');f.input.adapter=createGeminiAdapter({apiKey:'synthetic-test-only',dataClass:'synthetic',fetchImpl:async()=>{network++;throw Error('No network');}});
+  let network=0;const f=fixture('ur');f.input.adapter={...createGeminiAdapter({apiKey:'synthetic-test-only',dataClass:'synthetic',fetchImpl:async()=>{network++;throw Error('No network');}}),capabilities:{textLanguages:['en'],speechLanguages:['en']}};
   await rejects(generateCaseFollowup(f.input),'language_unavailable');assert.equal(network,0);
 });
 test('failed translation validation/check never reaches speech and provider errors stay redacted',async()=>{
@@ -93,4 +93,15 @@ test('provider mutation cannot rewrite captured source, identity, terminology or
   const bundle=await generateCaseFollowup(f.input);
   assert.equal(bundle.manifest.source,'Please explain where unfinished items go.');assert.equal(bundle.manifest.dependencies.identity.siteId,'beirut');
   assert.equal(f.calls.at(-1)[1],'النص الصحيح');
+});
+
+test('follow-up identity and provenance accept all configured translation and speech locales',async()=>{
+  const {WORKER_LANGUAGE_CODES}=await import('../server/languages.mjs');
+  const samples={en:'Follow up',ar:'متابعة',ur:'متابعة',hi:'अनुवर्ती',bn:'অনুসরণ',ml:'തുടരുക',ta:'தொடரவும்',te:'కొనసాగించు',ne:'जारी',fil:'Sundin',si:'ඉදිරියට',ru:'Продолжить','pa-Guru':'ਜਾਰੀ','pa-Arab':'متابعة',id:'Lanjutkan'};
+  for(const language of WORKER_LANGUAGE_CODES){
+    const sample=samples[language],f=fixture(language,{capabilities:{textLanguages:WORKER_LANGUAGE_CODES,speechLanguages:WORKER_LANGUAGE_CODES},
+      async translate(){return {title:sample,text:sample,question:sample+'?'};}});
+    const result=await generateCaseFollowup(f.input);assert.equal(result.manifest.dependencies.identity.language,language);
+    assert.equal(checkedCaseFollowupBundle(result,result.manifest.dependencyHash).manifest.dependencies.identity.language,language);
+  }
 });

@@ -1,0 +1,107 @@
+{
+  "version": 2,
+  "name": "drive-leaving-send-cancels-future-preparation-status-c-ddbb28",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1792997408407,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Title"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Title"
+          },
+          "args": {
+            "value": "Pending cancellation"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 208
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Instruction"
+          },
+          "args": {
+            "value": "Keep the walkway clear before the next shift."
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 212
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Send instruction"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 250
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Preparation is still running."
+          }
+        }
+      ],
+      "page": "/tests/browser/review-bugfixes.html",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Unmount and check cancellation"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/review-bugfixes.tsx",
+        "line": 21
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "PASS: polling stops on unmount."
+      },
+      "timeoutMs": 6500,
+      "page": "/tests/browser/review-bugfixes.html"
+    }
+  ],
+  "intent": "Leaving Send cancels future preparation-status checks even while preparation is pending.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/review-bugfixes.html"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/review-bugfixes.html"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-leaving-send-cancels-future-preparation-status-c-ddbb28"
+}

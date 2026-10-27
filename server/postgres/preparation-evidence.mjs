@@ -18,7 +18,7 @@ export async function preparationBundleOperations(client,bundle) {
   for(const operation of rows) {
     const context=operation.preparation_context_json,provenance=operation.provenance_json;
     checkedPreparationOperation(context,provenance,{orgId:bundle.org_id,referenceId:bundle.job_id,claimToken:bundle.job_lease,model:operation.model,inputHash:operation.input_hash});
-    if(operation.kind!=='preparation' || operation.reserved_requests!==1 || operation.data_class!=='synthetic'
+    if(operation.kind!=='preparation' || operation.reserved_requests!==1 || operation.data_class!==provider.dataClass
       || context.siteId!==bundle.site_id || context.briefingId!==bundle.briefing_id || context.revision!==bundle.revision
       || context.providerHash!==bundleHash(provider) || bundleHash(context.languages)!==bundleHash(bundle.manifest_json.dependencies.languages)
       || bundleHash(provenance)!==bundleHash(preparationStageProvenance(provider,context.stage)))fail();
@@ -36,7 +36,7 @@ export async function preparationBundleOperations(client,bundle) {
 export async function linkPreparationOperations(client,bundle,operationIds) {
   const all=(await client.query("SELECT id FROM provider_operations WHERE kind='preparation' AND reference_id=$1 AND org_id=$2 AND claim_token=$3",[bundle.job_id,bundle.org_id,bundle.job_lease])).rows;
   if(operationIds===null) {if(all.length || bundle.provider_operation_count!==null)fail();return;}
-  if(!Array.isArray(operationIds) || operationIds.length<1 || operationIds.length>64 || !operationIds.every(uuid)
+  if(!Array.isArray(operationIds) || operationIds.length<1 || operationIds.length>68 || !operationIds.every(uuid)
     || new Set(operationIds).size!==operationIds.length || operationIds.length!==all.length || bundle.provider_operation_count!==operationIds.length
     || all.some(row=>!operationIds.includes(row.id)))fail();
   for(const operationId of operationIds)await client.query(`INSERT INTO generated_bundle_operations(bundle_id,operation_id,org_id,site_id,job_id)

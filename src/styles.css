@@ -316,6 +316,8 @@ ul{padding-inline-start:21px;line-height:1.7}
 .page-foot{color:#667186;text-align:right;font-size:.72rem;margin-top:15px}
 .toast{position:fixed;right:18px;bottom:18px;max-width:330px;background:#123c38;color:#fff;padding:13px 16px;border-radius:7px;box-shadow:0 8px 24px #0003;z-index:10;font-size:.9rem}
 .entry-page{min-height:100vh;padding:34px 4vw;background:#fbfcfa}
+.entry-page:has(> .entry-inner){display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;column-gap:24px;row-gap:12px}
+.entry-page>.entry-inner{flex:1 0 100%}
 .entry-page>.brand{color:#073b37}
 .entry-inner{min-height:calc(100vh - 100px);max-width:980px;margin:auto;display:grid;grid-template-columns:1.1fr .9fr;gap:65px;align-items:center}
 .entry-heading h1{font-size:3.5rem;color:#073b37}
@@ -468,6 +470,7 @@ button.device-action-row:hover{background:#f7faf9}
 .briefing-text{line-height:1.8}.hidden{display:none}
 .empty-state{border:1px solid #e4e8e7;border-radius:8px;padding:26px;text-align:center;color:#5d6a7e}
 .receipt-mark{width:105px;height:105px;margin:35px auto 22px;background:#dcf5eb;color:#00745e;border-radius:50%;display:grid;place-items:center}
+.receipt-mark-partial{background:#fff4d6;color:#8a5a00}
 .receipt-title{text-align:center;font-size:2rem!important}.receipt-copy{text-align:center;color:#6a758a;font-size:1.1rem;margin-bottom:32px}
 [dir="rtl"] .worker-card,[dir="rtl"] .worker-content{text-align:right}
 [dir="rtl"] .worker-card-head>svg{transform:scaleX(-1)}

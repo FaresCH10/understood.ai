@@ -14,6 +14,7 @@ import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential,issueWorkerGrant,redeemWorkerGrant} from '../server/postgres/auth.mjs';
 import {readWorkerRecordingNotice} from '../src/worker-recording-notice.ts';
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const admin={...owner,principal_id:'admin',role:'administrator'};
@@ -29,8 +30,9 @@ test('notice language query allows one explicit worker read language, never staf
 test('site notice input bounds all languages, explicit confirmation and immutable revision intent',()=>{
   const value=input();assert.equal(recordingNoticeInput(value).notices.ar,value.notices.ar);
   for(const patch of [{confirmed:false},{revision:'0'},{revision:-1},{requestId:'bad'},{site_id:'foreign'},{scope:'[]'},{scope:undefined},
-    {notices:{...value.notices,en:'short'}},{notices:{...value.notices,ar:''}},{notices:{...value.notices,ur:'a'.repeat(2001)}},
+    {notices:{...value.notices,en:'short'}},{notices:{...value.notices,ur:'a'.repeat(2001)}},
     {notices:{...value.notices,en:'Unsafe\u202e direction override content'}},{notices:{en:value.notices.en}},{notices:[]}])assert.throws(()=>recordingNoticeInput({...value,...patch}));
+  assert.equal(recordingNoticeInput({...value,notices:{...value.notices,ar:''}}).notices.ar,'');
   assert.deepEqual(recordingNoticeInput({...value,notices:{en:'',ar:'',ur:''}}).notices,{en:'',ar:'',ur:''});
 });
 async function fixture(pg){
@@ -91,7 +93,9 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} site notices are 
     assert.equal((await call('/privacy/recording-notice',cookie,input())).status,409);
     assert.equal((await call('/privacy/recording-notice',cookie,{...input(),revision:2,scope:JSON.stringify(['harbor','harbor-yard','harbor-owner'])})).status,409);
     assert.equal((await f.get(owner)).revision,2);
-    const httpChange={...input(),revision:2};assert.equal((await call('/privacy/recording-notice',cookie,httpChange)).status,200);
+    const httpChange={...input(),revision:2,notices:Object.fromEntries(WORKER_LANGUAGE_CODES.map(code=>[code,`${code}: ${'Site recording information. '.repeat(65)}`.trim()]))};
+    assert.ok(Buffer.byteLength(JSON.stringify(httpChange))>16384);
+    assert.equal((await call('/privacy/recording-notice',cookie,httpChange)).status,200);
     assert.equal((await (await call(`/privacy/recording-notice/requests/${httpChange.requestId}`,cookie)).json()).revision,3);
     let workerCookie;
     if(pg){const grant=await issueWorkerGrant(f.pool,owner,'worker-14',30,f.options),identity=await redeemWorkerGrant(f.pool,grant.token,f.options);workerCookie=`understood_pg_rehearsal=${identity.token}`;}
@@ -102,7 +106,7 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} site notices are 
     for(const query of ['?language=fr','?language=en&language=ar','?site=other'])assert.equal((await workerRead(query)).status,400);
     assert.equal((await call('/privacy/recording-notice?language=en',cookie)).status,400);
     const transport=(path,options)=>globalThis.fetch(base.replace(/\/api$/,'')+path,{...options,headers:{...options.headers,cookie:workerCookie,origin:config.publicOrigin}});
-    for(const language of ['en','ar','ur'])assert.equal(await readWorkerRecordingNotice(transport,workerSession,language,new AbortController().signal,()=>true),httpChange.notices[language]);
+    for(const language of WORKER_LANGUAGE_CODES)assert.equal(await readWorkerRecordingNotice(transport,workerSession,language,new AbortController().signal,()=>true),httpChange.notices[language]);
     assert.equal((await f.get(worker)).language,'ar');
     await f.raw(pg?"UPDATE staff SET active=false WHERE id='maya'":"UPDATE staff SET active=0 WHERE id='maya'");await assert.rejects(async()=>f.save(owner,httpChange),/Forbidden/);
   }finally{if(server)await new Promise(resolve=>server.close(resolve));await f.close();}

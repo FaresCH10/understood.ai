@@ -19,3 +19,4 @@ checkruns.json
 jobs.json
 eval-contract.json
 eval-rehearsal.json
+deploy/runtime/

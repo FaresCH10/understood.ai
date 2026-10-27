@@ -1,3 +1,4 @@
+import {isWorkerLanguage} from './languages.mjs';
 const stages=['worker','preparation','grounding_check','translation','translation_check','speech','storage','finalization'];
 const errors=['preparation_failed','grounding_check_failed','translation_failed','translation_check_failed','speech_failed',
   'invalid_preparation','invalid_preparation_check','invalid_grounding_evidence','invalid_question_evidence','ambiguous_source',
@@ -15,7 +16,7 @@ export function preparationStage(value) {
     || !Number.isInteger(value.step) || value.step<0 || value.step>101 || !stages.includes(value.stage)
     || !['started','completed','reused','failed'].includes(value.state)
     || !['generated','retained','override','cache','system'].includes(value.origin)
-    || !(value.language===null || ['en','ar','ur'].includes(value.language))
+    || !(value.language===null || isWorkerLanguage(value.language))
     || !(value.track===null || ['body','question'].includes(value.track))
     || (value.stage==='speech' ? value.track===null || value.language===null : value.track!==null)
     || (['worker','storage','finalization'].includes(value.stage) ? value.language!==null || value.origin!=='system' : value.language===null)

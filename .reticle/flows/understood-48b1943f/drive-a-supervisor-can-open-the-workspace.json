@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "name": "drive-a-supervisor-can-open-the-workspace",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793104808021,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Continue as Maya, supervisor"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 495
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "View all instructions"
+      },
+      "timeoutMs": 15000,
+      "page": "/",
+      "writes": true
+    }
+  ],
+  "startPath": "/",
+  "intent": "A supervisor can open the workspace",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "Cursor"
+  },
+  "intentId": "flow:drive-a-supervisor-can-open-the-workspace"
+}

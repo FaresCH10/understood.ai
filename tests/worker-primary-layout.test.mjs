@@ -23,7 +23,7 @@ test('worker primary flow precedes mounted saved-work tools without hiding recov
   const source=await readFile(new URL('../src/main.tsx',import.meta.url),'utf8');
   const question=source.indexOf('<section className="worker-card question-card">'),help=source.indexOf('<section className="worker-card" id="worker-help">');
   const tools=['<WorkerOfflineSaveView key=','<WorkerAudioDraftView key=','<WorkerTextDraftView key='].map(value=>source.indexOf(value));
-  const submissions=source.indexOf('<WorkerSubmissions key=');
+  const submissions=source.indexOf('<WorkerSubmissions ');
   assert.ok(question>0&&help>question);
   for(const position of tools)assert.ok(position>help&&position<submissions);
   assert.equal(source.match(/<WorkerOfflineSaveView key=/g).length,1);assert.equal(source.match(/<WorkerAudioDraftView key=/g).length,1);assert.equal(source.match(/<WorkerTextDraftView key=/g).length,1);

@@ -17,11 +17,13 @@ export interface LanguageCapability {
 }
 export declare const WORKER_LOCALES: readonly WorkerLocale[];
 export declare const WORKER_LANGUAGE_CODES: readonly WorkerLocaleCode[];
+export declare const GENERATION_LANGUAGE_CODES: readonly WorkerLocaleCode[];
 export declare const RTL_LANGUAGE_CODES: readonly WorkerLocaleCode[];
 export declare function workerLocale(code: string): WorkerLocale | null;
 export declare function isWorkerLanguage(code: unknown): code is WorkerLocaleCode;
 export declare function languageDirection(code: string): LanguageDirection | null;
 export declare function sqlLanguageList(): string;
+export declare function languageTextMatches(code:string,text:string):boolean;
 export declare const LANGUAGE_CAPABILITIES: Readonly<Record<WorkerLocaleCode, LanguageCapability>>;
 export declare function languageCapability(code: string, stage: keyof LanguageCapability): boolean;
 export declare const UI_LANGUAGE_CODES: readonly WorkerLocaleCode[];

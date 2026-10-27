@@ -85,11 +85,11 @@ export function FirstRunOnboarding({authority,refresh,onCompleted,onNavigate,onR
   return <section className="first-run" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     <header className="first-run-heading"><span className="public-kicker">{t.kicker}</span><h1 ref={heading} tabIndex={-1}>{done?t.readyTitle:t.title}</h1><p>{done?t.readyLead:t.lead}</p></header>
     {done ? <div className="panel first-run-ready">
-      <CheckCircle2 size={34}/><h2>{t.readyTitle}</h2><p>{state.completed?t.completedNote:t.readyLead}</p>
+      <CheckCircle2 size={34}/>{state.completed && <p>{t.completedNote}</p>}
       <div className="actions"><button type="button" className="button primary" onClick={()=>onNavigate('people/new')}><Users size={18}/>{t.addTeam}</button><button type="button" className="button outline" onClick={()=>onNavigate('send')}><ArrowRight size={18}/>{t.firstInstruction}</button><button type="button" className="button subtle" onClick={()=>onNavigate('overview')}>{t.today}</button></div>
     </div> : <form className="panel first-run-form" onSubmit={save}>
       <div className="first-run-step"><Globe2 size={20}/><label className="field">{t.siteName}<input required minLength={2} maxLength={120} disabled={busy} value={siteName} onChange={event=>{setSiteName(event.target.value);touch();}}/></label><p className="field-hint">{t.siteNameHint}</p></div>
-      <div className="first-run-step"><Clock3 size={20}/><label className="field">{t.timezone}<select disabled={busy} value={timezone} onChange={event=>{setTimezone(event.target.value);touch();}}>{timezoneOptions(timezone).map(zone=><option key={zone} value={zone}>{zone}</option>)}</select></label><p className="field-hint">{t.timezoneHint} {browserSuggestionSuffix(state.site.timezone,t)}</p></div>
+      <div className="first-run-step"><Clock3 size={20}/><label className="field">{t.timezone}<select disabled={busy} value={timezone} onChange={event=>{setTimezone(event.target.value);touch();}}>{timezoneOptions(timezone).map(zone=><option key={zone} value={zone}>{zone}</option>)}</select></label><p className="field-hint">{t.timezoneHint}</p></div>
       <div className="first-run-step"><Languages size={20}/><fieldset className="first-run-language"><legend>{t.language}</legend><label className="billing-confirm"><input type="radio" name="staff-language" checked={language==='en'} disabled={busy} onChange={()=>{setLanguage('en');touch();}}/><span>English</span></label><label className="billing-confirm"><input type="radio" name="staff-language" checked={language==='ar'} disabled={busy} onChange={()=>{setLanguage('ar');touch();}}/><span lang="ar">العربية</span></label></fieldset><p className="field-hint">{t.languageHint}</p></div>
       {error && <p role="alert" className="record-error">{error}{conflict && <> <button type="button" className="text-link" onClick={()=>{setVersion(value=>value+1);onRefresh();}}>{t.errorReload}</button></>}</p>}
       {draft.current && <p role="status" className="muted">{t.pending}</p>}
@@ -97,8 +97,4 @@ export function FirstRunOnboarding({authority,refresh,onCompleted,onNavigate,onR
       <div className="actions"><button className="button primary" disabled={busy || !confirmed}>{busy?t.saving:draft.current?t.retry:t.save}<ArrowRight size={18}/></button></div>
     </form>}
   </section>;
-}
-function browserSuggestionSuffix(stored:string,t:typeof en) {
-  const suggested=suggestedTimezone(stored);
-  return suggested!==stored?` ${t.browserSuggestion}`:'';
 }

@@ -141,11 +141,11 @@ test('operator pause fences provider calls and stale leases cannot deliver',asyn
     assert.equal(f.objects.size,0);
   }finally{await f.close();}
 });
-test('follow-up configuration is explicit, disabled by default and synthetic-only',()=>{
+test('follow-up configuration is explicit, disabled by default and synthetic-only',async()=>{
   assert.equal(resolveCaseFollowup({}),null);
   for(const env of [{UNDERSTOOD_CASE_FOLLOWUP_ADAPTER:'other'}, {UNDERSTOOD_CASE_FOLLOWUP_ADAPTER:'gemini',UNDERSTOOD_DATA_CLASS:'real',GEMINI_API_KEY:'synthetic-key'}])assert.throws(()=>resolveCaseFollowup(env),/Invalid/);
   const adapter=resolveCaseFollowup({UNDERSTOOD_CASE_FOLLOWUP_ADAPTER:'gemini',UNDERSTOOD_DATA_CLASS:'synthetic',GEMINI_API_KEY:'synthetic-key'},{fetchImpl:async()=>{throw Error('Never called');}});
-  assert.equal(typeof adapter.withJournal,'function');assert.deepEqual(adapter.capabilities.speechLanguages,['en','ar']);
+  assert.equal(typeof adapter.withJournal,'function');assert.deepEqual(adapter.capabilities.speechLanguages,(await import('../server/languages.mjs')).WORKER_LANGUAGE_CODES);
 });
 test('Gemini follow-up dispatch requires persisted quotas and journals exactly three mocked requests',async()=>{
   const f=await fixture();let calls=0;try{

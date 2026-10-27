@@ -15,3 +15,20 @@ export const workerCredentialEntryText={
   'pa-Arab':{modes:'سائن اِن کرن دا طریقہ',loginMode:'ورکر آئی ڈی تے پاس ورڈ',setupMode:'پہلی واری سیٹ اپ',linkMode:'رسائی لنک',company:'کمپنی آئی ڈی',companyHint:'اپنی ورکر سائن اِن شیٹ اُتے دِتی کمپنی آئی ڈی ورتو۔ جے نئیں لبھدی تے سپروائزر نوں پچھو۔',workerId:'ورکر آئی ڈی',password:'پاس ورڈ',newPassword:'پاس ورڈ بناؤ',confirmPassword:'پاس ورڈ دی تصدیق کرو',setupCode:'اک واری ورتن والا سیٹ اپ کوڈ',setupHint:'اوہ کوڈ ورتو جو سپروائزر نے دِتا اے۔ ایہ اک واری چلدا اے فیر مُک جاندا اے۔',login:'سائن اِن کرو',setup:'پاس ورڈ بنا کے سائن اِن کرو',passwordShort:'گھٹ توں گھٹ 8 اکھر ورتو۔',passwordMismatch:'پاس ورڈ نئیں ملدے۔',failedLogin:'سائن اِن دی تصدیق نئیں ہوئی۔ کمپنی آئی ڈی، ورکر آئی ڈی تے پاس ورڈ چیک کرو، یا سپروائزر توں مدد منگو۔',failedSetup:'سیٹ اپ دی تصدیق نئیں ہوئی۔ سیٹ اپ کوڈ چیک کرو یا سپروائزر توں نواں کوڈ منگو۔'},
   id:{modes:'Cara masuk',loginMode:'ID pekerja dan kata sandi',setupMode:'Penyiapan pertama kali',linkMode:'Tautan akses',company:'ID perusahaan',companyHint:'Gunakan ID perusahaan pada lembar masuk pekerja Anda. Tanyakan kepada pengawas jika Anda tidak memilikinya.',workerId:'ID pekerja',password:'Kata sandi',newPassword:'Buat kata sandi',confirmPassword:'Konfirmasi kata sandi',setupCode:'Kode penyiapan sekali pakai',setupHint:'Gunakan kode yang diberikan pengawas Anda. Kode ini hanya berlaku sekali lalu kedaluwarsa.',login:'Masuk',setup:'Buat kata sandi dan masuk',passwordShort:'Gunakan minimal 8 karakter.',passwordMismatch:'Kata sandi tidak cocok.',failedLogin:'Masuk tidak terkonfirmasi. Periksa ID perusahaan, ID pekerja, dan kata sandi, atau minta bantuan pengawas.',failedSetup:'Penyiapan tidak terkonfirmasi. Periksa kode penyiapan atau minta kode baru kepada pengawas.'},
 };
+export const workerCompanyMemoryText:Record<keyof typeof workerCredentialEntryText,{remember:string;hint:string}>={
+  en:{remember:'Remember company ID on this device',hint:'Only on your own phone. Leave this off on a shared device.'},
+  ar:{remember:'تذكّر معرّف الشركة على هذا الجهاز',hint:'على هاتفك الشخصي فقط. اتركه غير محدد على جهاز مشترك.'},
+  hi:{remember:'इस डिवाइस पर कंपनी आईडी याद रखें',hint:'केवल अपने फ़ोन पर। साझा डिवाइस पर इसे बंद रखें।'},
+  ur:{remember:'اس آلے پر کمپنی آئی ڈی یاد رکھیں',hint:'صرف اپنے فون پر۔ مشترکہ آلے پر اسے بند رکھیں۔'},
+  bn:{remember:'এই ডিভাইসে কোম্পানি আইডি মনে রাখুন',hint:'শুধু নিজের ফোনে। শেয়ার করা ডিভাইসে এটি বন্ধ রাখুন।'},
+  ml:{remember:'ഈ ഉപകരണത്തിൽ കമ്പനി ഐഡി ഓർമ്മിക്കുക',hint:'നിങ്ങളുടെ സ്വന്തം ഫോണിൽ മാത്രം. പങ്കിട്ട ഉപകരണത്തിൽ ഇത് ഓഫ് ആക്കി വയ്ക്കുക.'},
+  ta:{remember:'இந்தச் சாதனத்தில் நிறுவன ஐடியை நினைவில் வை',hint:'உங்கள் சொந்த தொலைபேசியில் மட்டும். பகிரப்பட்ட சாதனத்தில் இதை அணைத்து வையுங்கள்.'},
+  te:{remember:'ఈ పరికరంలో కంపెనీ IDని గుర్తుంచుకో',hint:'మీ స్వంత ఫోన్‌లో మాత్రమే. పంచుకునే పరికరంలో దీన్ని ఆపి ఉంచండి.'},
+  ne:{remember:'यो उपकरणमा कम्पनी आईडी सम्झनुहोस्',hint:'आफ्नै फोनमा मात्र। साझा उपकरणमा यसलाई बन्द राख्नुहोस्।'},
+  fil:{remember:'Tandaan ang Company ID sa device na ito',hint:'Sa sarili mong telepono lang. Huwag itong gamitin sa shared na device.'},
+  si:{remember:'මෙම උපාංගයේ සමාගම් හැඳුනුම්පත මතක තබා ගන්න',hint:'ඔබේම දුරකථනයේ පමණි. බෙදාගන්නා උපාංගයක මෙය අක්‍රිය කර තබන්න.'},
+  ru:{remember:'Запомнить ID компании на этом устройстве',hint:'Только на вашем личном телефоне. На общем устройстве не включайте.'},
+  'pa-Guru':{remember:'ਇਸ ਡਿਵਾਈਸ ’ਤੇ ਕੰਪਨੀ ਆਈਡੀ ਯਾਦ ਰੱਖੋ',hint:'ਸਿਰਫ਼ ਆਪਣੇ ਫ਼ੋਨ ’ਤੇ। ਸਾਂਝੇ ਡਿਵਾਈਸ ’ਤੇ ਇਸਨੂੰ ਬੰਦ ਰੱਖੋ।'},
+  'pa-Arab':{remember:'ایس ڈیوائس اُتے کمپنی آئی ڈی یاد رکھو',hint:'صرف اپنے فون اُتے۔ سانجھی ڈیوائس اُتے ایہنوں بند رکھو۔'},
+  id:{remember:'Ingat ID perusahaan di perangkat ini',hint:'Hanya di ponsel Anda sendiri. Jangan aktifkan di perangkat bersama.'},
+};

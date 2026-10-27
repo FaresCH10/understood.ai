@@ -37,7 +37,7 @@ function syntheticAdapter() {
   return adapter;
 }
 async function bundle() {
-  return prepareLanguageBundle({source,revision:1,languages:['en'],dataClass:'synthetic',adapter:syntheticAdapter(),assertCurrent:async()=>true});
+  return prepareLanguageBundle({source,title:'Shelves',revision:1,languages:['en'],dataClass:'synthetic',adapter:syntheticAdapter(),assertCurrent:async()=>true});
 }
 async function fixture() {
   const db=new PGlite();let fail='',loseCommit=false;
@@ -89,7 +89,7 @@ function multilingualAdapter(calls=[]) {
 }
 async function readyMultilingual(f,storage,adapter,review=null) {
   if(review) await f.db.query('INSERT INTO draft_reviews VALUES($1,$2,$3,$4)',['brief','a','a',JSON.stringify(review)]);
-  const value=await prepareLanguageBundle({source,revision:1,languages:['en','ar','ur'],review,dataClass:'synthetic',adapter,assertCurrent:async()=>true});
+  const value=await prepareLanguageBundle({source,title:'Shelves',revision:1,languages:['en','ar','ur'],review,dataClass:'synthetic',adapter,assertCurrent:async()=>true});
   const id=randomUUID();await stagePreparedBundle(f.pool,f.job,value,storage,{...options,bundleId:id});await attachPreparedBundle(f.pool,f.job,id,storage,options);
   return value;
 }
@@ -101,7 +101,12 @@ test('site generation defaults select real synthetic-adapter bundles while activ
     const change=async(revision,languages)=>updateSettings(f.pool,owner,'site',{requestId:randomUUID(),revision,name:'Site A',timezone:'UTC',generationLanguages:languages,confirmed:true},options);
     await change(0,['en']);await f.db.exec("UPDATE jobs SET status='queued',lease_token=NULL,lease_until=NULL WHERE id='job'");
     const prepare=adapter.prepare;let changed=false;
-    adapter.prepare=async(...args)=>{if(!changed){changed=true;await change(1,['en','ar']);}return prepare(...args);};
+    adapter.prepare=async(...args)=>{
+      // The claim must outlive a bounded 120-second provider request plus pacing.
+      const lease=(await f.db.query("SELECT EXTRACT(EPOCH FROM (lease_until-clock_timestamp())) AS seconds FROM jobs WHERE status='processing' AND kind='prepare'")).rows[0];
+      assert.ok(Number(lease.seconds)>150);
+      if(!changed){changed=true;await change(1,['en','ar']);}return prepare(...args);
+    };
     await processOnePreparation(f.pool,{...options,integrationMode:'synthetic',adapter,storage});
     let current=(await f.db.query("SELECT prepared_json,state FROM briefings WHERE id='brief'")).rows[0];assert.equal(current.state,'ready');assert.deepEqual(current.prepared_json.dependencies.languages,['en']);
     assert.equal(calls.filter(call=>call[0]==='translate').length,0);assert.deepEqual((await getSettings(f.pool,owner,options)).site.generationLanguages,['en','ar']);
@@ -366,7 +371,7 @@ test('generated publication freezes audio and assignment language; private playb
   try {
     await audience(f);const {value,id}=await ready(f,storage);
     const request={requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['worker']},publishOptions={...options,integrationMode:'synthetic',storage};
-    await assert.rejects(publish(f.pool,owner,'brief',request,{...publishOptions,integrationMode:'live'}),/Live publication/);
+    await assert.rejects(publish(f.pool,owner,'brief',request,{...publishOptions,integrationMode:'live'}),/Publication data class|Live publication/);
     await assert.rejects(publish(f.pool,owner,'brief',{...request,workerIds:['foreign']},publishOptions),/Recipient unavailable/);
     await f.db.query("UPDATE workers SET language='ar' WHERE id='worker'");
     await assert.rejects(publish(f.pool,owner,'brief',request,publishOptions),/Recipient language/);

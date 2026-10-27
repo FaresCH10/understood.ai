@@ -1,3 +1,4 @@
+import {isWorkerLanguage} from '../server/languages.mjs';
 type Store=Pick<Storage,'getItem'|'setItem'|'removeItem'>;
 export type MessageSession={clientContext:string;expiresAt:string};
 export type PendingMessage={id:string;hash:string;kind?:'followup'|'deadline'|'disagree'};
@@ -31,6 +32,6 @@ export function clearPendingMessage(storage:Store,session:MessageSession,caseId:
 }
 export function checkedMessageReceipt(value:unknown,caseId:string,id:string) {
   const row=value as {id:string;caseId:string;language:string;createdAt:string};
-  if(!row || row.id!==id || row.caseId!==caseId || !['en','ar','ur'].includes(row.language) || typeof row.createdAt!=='string'
+  if(!row || row.id!==id || row.caseId!==caseId || !isWorkerLanguage(row.language) || typeof row.createdAt!=='string'
     || !Number.isFinite(Date.parse(row.createdAt)))throw Error('Conversation acknowledgement cannot be verified.');return row;
 }

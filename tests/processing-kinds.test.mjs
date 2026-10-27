@@ -16,6 +16,7 @@ import {listProcessing as listSqlite,getProcessing as getSqlite} from '../server
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {createDraft as draftPg,queuePreparation as queuePg,editDraft as editPg,processOnePreparation} from '../server/postgres/preparation.mjs';
 import {publish as publishPg,submitAnswer as submitPg} from '../server/postgres/domain.mjs';
+import {legacyWrittenQuestion} from './helpers/legacy-written-question.mjs';
 import {receiveSourceAudio as sourcePg,sourceAudioJournal as journalPg} from '../server/postgres/source-audio.mjs';
 import {receiveRecording as recordingPg} from '../server/postgres/recordings.mjs';
 import {listProcessing as listPg,getProcessing as getPg} from '../server/postgres/read-models.mjs';
@@ -45,6 +46,7 @@ async function mixedFixture(pg,t) {
       INSERT INTO workers(id,org_id,site_id,code,language) VALUES('w1','cedar','beirut','001','en'),('w2','cedar','beirut','002','en');`);
     const draft=await draftPg(pool,owner,{requestId:randomUUID(),title:'Published source title',source:CANONICAL_SOURCE});briefingId=draft.id;
     await queuePg(pool,owner,draft.id,1);await processOnePreparation(pool,{integrationMode:'synthetic'});
+    await legacyWrittenQuestion(pool,draft.id);
     await publishPg(pool,owner,draft.id,{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['w1','w2']},{integrationMode:'synthetic'});
   }else {
     seed(db);db.prepare("INSERT INTO staff VALUES('auditor','cedar','beirut','Auditor','auditor',1)").run();

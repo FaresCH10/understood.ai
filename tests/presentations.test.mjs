@@ -166,7 +166,7 @@ function postgresBackend(){
 test('presentation input keeps every UI locale selectable while translation stays capability-bound',()=>{
   assert.equal(WORKER_LANGUAGE_CODES.length,15);
   for(const language of WORKER_LANGUAGE_CODES)assert.equal(presentationLanguage(language,'ui'),true);
-  assert.deepEqual(WORKER_LANGUAGE_CODES.filter((language)=>presentationLanguage(language,'translation')),['en','ar','ur']);
+  assert.deepEqual(WORKER_LANGUAGE_CODES.filter((language)=>presentationLanguage(language,'translation')),WORKER_LANGUAGE_CODES);
   for(const language of ['fr','pa','EN','','en-US'])assert.equal(presentationLanguage(language,'ui'),false);
   const requestId=randomUUID();
   assert.deepEqual(presentationRequest({requestId,sourceKind:'instruction'}),
@@ -231,7 +231,7 @@ async function runPresentationContract(backend){
     assert.equal(await backend.binding(ctx,asWorker('w-en'),'a-en',null),null);
 
     const unsupported=await backend.create(ctx,asWorker('w-hi'),'a-hi',{requestId:randomUUID(),sourceKind:'instruction'});
-    assert.equal(unsupported.status,'unavailable');assert.equal(unsupported.reason,'language_capability_unavailable');
+    assert.equal(unsupported.status,'unavailable');assert.equal(unsupported.reason,'translation_not_enabled');
     assert.equal(unsupported.targetLanguage,'hi');assert.equal(unsupported.presentation,null);
 
     const noTranslator=await backend.create(ctx,asWorker('w-ur'),'a-ur',{requestId:randomUUID(),sourceKind:'instruction'});
@@ -447,4 +447,39 @@ test('SQLite read-only entitlements pause new presentation generation while cach
 
 test('PostgreSQL read-only entitlements pause new presentation generation while cached and snapshot content stays readable',async()=>{
   await runReadOnlyPresentationContract(postgresBackend());
+});
+
+for(const backend of [sqliteBackend(),postgresBackend()])test(`${backend.name} approved-language presentations retain MCQ options and upgrade old caches`,async()=>{
+  const ctx=await backend.open();try{
+    const {withMultipleChoice}=await import('../server/multiple-choice.mjs');
+    const frozen=withMultipleChoice({source:enInstruction.text,title:enInstruction.title,question:enInstruction.question,rubric:{askedFacts:[enInstruction.text]},languages:{en:enInstruction}});
+    const original=JSON.stringify(frozen),session=asWorker('w-hi'),now=new Date().toISOString();
+    await backend.run(ctx,"INSERT INTO briefings(id,org_id,site_id,title,source,state,created_at,updated_at) VALUES('b-choice','org','site','Choice','Synthetic','ready',?,?)",[now,now]);
+    await backend.run(ctx,"INSERT INTO publications(id,org_id,site_id,briefing_id,version,snapshot_json,published_at,state) VALUES('p-choice','org','site','b-choice',1,?,?,'published')",[original,now]);
+    await backend.run(ctx,"INSERT INTO publications(id,org_id,site_id,briefing_id,version,snapshot_json,published_at,state) VALUES('p-cache','org','site','b-choice',2,?,?,'published')",[original,now]);
+    for(const id of ['a-choice','a-cache'])await backend.run(ctx,"INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language,created_at) VALUES(?,'org','site',?,'w-hi','en',?)",[id,id==='a-cache'?'p-cache':'p-choice',now]);
+    let calls=0;const translator={capabilities:{textLanguages:['en','hi']},async translate({content}){calls++;return {provider:'synthetic-hi-v1',live:false,content:{title:'निर्देश',text:'अनुवाद '+content.text,question:'आपको क्या करना है?'}};}};
+    const ready=await backend.create(ctx,session,'a-choice',{requestId:randomUUID(),sourceKind:'instruction'},{translator});
+    assert.equal(ready.status,'ready');assert.equal(calls,4);assert.equal(ready.presentation.content.questionType,'multiple-choice');
+    const translated=ready.presentation.content.choices;
+    assert.deepEqual(translated.map(x=>x.id),frozen.languages.en.choices.map(x=>x.id));assert.ok(translated.every(x=>x.text.startsWith('अनुवाद ')));
+    assert.equal((await backend.list(ctx,session,'a-choice')).items[0].content.choices.length,4);
+    const cached=await backend.create(ctx,session,'a-choice',{requestId:randomUUID(),sourceKind:'instruction'},{translator});assert.equal(cached.presentation.id,ready.presentation.id);assert.equal(calls,4);
+    const id=randomUUID();await backend.run(ctx,`INSERT INTO presentation_artifacts(id,org_id,site_id,worker_id,assignment_id,publication_id,publication_version,
+      source_kind,source_id,original_language,target_language,source_hash,status,title,text,question,provider,live,created_at,updated_at,ready_at)
+      VALUES(?,'org','site','w-hi','a-cache','p-cache',2,'instruction','','en','hi',?,'ready','निर्देश','पुराना पाठ','पुराना प्रश्न','synthetic-hi-v1',false,?,?,?)`,
+      [id,presentationSourceHash('instruction','en',frozen.languages.en),now,now,now]);
+    const upgraded=await backend.create(ctx,session,'a-cache',{requestId:randomUUID(),sourceKind:'instruction'},{translator});
+    assert.equal(upgraded.status,'ready');assert.equal(upgraded.presentation.id,id);assert.equal(upgraded.presentation.content.text,'पुराना पाठ');assert.equal(upgraded.presentation.content.choices.length,4);
+    await assert.rejects(async()=>backend.run(ctx,'UPDATE presentation_artifacts SET choices_json=? WHERE id=?',[JSON.stringify([...translated].reverse()),id]),/immutable/);
+    assert.deepEqual(JSON.parse(await backend.snapshot(ctx,'p-choice')),JSON.parse(original));
+    const selected=frozen.rubric.correctChoiceId;
+    const receipt=await backend.submit(ctx,session,'a-choice',randomUUID(),selected,ready.presentation.id);
+    assert.equal((await backend.attempt(ctx,receipt.id)).answer_text,selected);
+    const answer=await backend.create(ctx,session,'a-choice',{requestId:randomUUID(),sourceKind:'answer',sourceId:receipt.submissionId??(await backend.attempt(ctx,receipt.id)).submission_id},{translator});
+    assert.equal(answer.status,'ready');assert.ok(answer.presentation.content.text.includes(enInstruction.text));
+    await backend.requestDeletion(ctx,owner,'w-hi',{requestId:randomUUID(),expectedCode:'Worker 004',reason:'worker_request',confirmed:true});
+    assert.equal(await backend.redact(ctx),true);
+    for(const artifactId of [ready.presentation.id,id]){const row=await backend.artifact(ctx,artifactId);assert.equal(row.text,'[Deleted]');assert.equal(row.choices_json,null);}
+  }finally{await backend.close(ctx);}
 });

@@ -1,3 +1,4 @@
+import {assertProductionAdmission} from './production-admission.mjs';
 import {createServer} from 'node:http';
 import {send} from '../http.mjs';
 import {verifyMutationOrigin} from '../auth.mjs';
@@ -7,8 +8,9 @@ import {withPostgresClient} from './db.mjs';
 
 // Hosted startup verifies the dedicated column profile before this boundary listens.
 export function createPostgresOperatorServer(pool,{config,publicBuild}={}) {
+  if(config?.tier==='production')assertProductionAdmission(config);
   if(config?.service!=='operator' || config.runtimeRoleProfile!=='operator' || config.operatorAccess!==true
-    || config.tier!=='staging' || config.dataClass!=='synthetic' || config.integrationMode!=='synthetic' || config.aiMode!=='synthetic'
+    || !(config.tier==='staging'&&config.dataClass==='synthetic'&&config.integrationMode==='synthetic'&&config.aiMode==='synthetic'||config.tier==='production'&&config.dataClass==='real'&&config.integrationMode==='live'&&config.aiMode==='live')
     || config.accessMode!=='credential' || !config.customerOrigin || config.customerOrigin===config.publicOrigin
     || config.storageConfig || config.providerVerification!==undefined || config.storageChecks!==false || config.mail?.available!==false || config.pilotDestination!==null
     || typeof config.requestAddress!=='function' || typeof publicBuild!=='function' || typeof pool?.connect!=='function')
@@ -18,7 +20,7 @@ export function createPostgresOperatorServer(pool,{config,publicBuild}={}) {
     try {
       if(req.url==='/api/health' && req.method==='GET' && req.headers['x-forwarded-proto']===undefined) {
         await withPostgresClient(pool,client=>client.query('SELECT 1'));
-        return send(res,200,{status:'ok',mode:'synthetic-credential',backend:'postgres-operator-synthetic'});
+        return send(res,200,{status:'ok',mode:`${config.aiMode}-credential`,backend:`postgres-operator-${config.aiMode}`});
       }
       const address=config.requestAddress(req);
       res.setHeader('strict-transport-security','max-age=31536000');
@@ -26,7 +28,7 @@ export function createPostgresOperatorServer(pool,{config,publicBuild}={}) {
       if(!path.startsWith('/api/'))return publicBuild(req,res,url);
       if(path==='/api/health' && req.method==='GET' && !url.search) {
         await withPostgresClient(pool,client=>client.query('SELECT 1'));
-        return send(res,200,{status:'ok',mode:'synthetic-credential',backend:'postgres-operator-synthetic'});
+        return send(res,200,{status:'ok',mode:`${config.aiMode}-credential`,backend:`postgres-operator-${config.aiMode}`});
       }
       if(!path.startsWith('/api/ops/'))return send(res,404,{error:'Not found'});
       if(req.method!=='GET')verifyMutationOrigin(req,config);

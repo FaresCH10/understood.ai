@@ -62,7 +62,7 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} creat
 test('SQLite creation-choice upgrade retains earlier receipt hashes and does not invent a selection',async()=>{
   const f=await fixture(false);
   try {
-    const input=body(),original=await f.create(input);f.db.exec('ALTER TABLE draft_creations DROP COLUMN generation_languages_json');
+    const input=body(),original=await f.create(input);f.db.exec('DROP TRIGGER IF EXISTS draft_creations_generation_locales_insert;DROP TRIGGER IF EXISTS draft_creations_generation_locales_update;ALTER TABLE draft_creations DROP COLUMN generation_languages_json');
     ensureBriefingSchema(f.db);ensureBriefingSchema(f.db);
     const row=f.db.prepare('SELECT request_hash,generation_languages_json FROM draft_creations WHERE request_id=?').get(input.requestId);assert.equal(row.request_hash,original.requestHash);assert.equal(row.generation_languages_json,null);
     assert.deepEqual(await f.create(input),{...original,duplicate:true});await assert.rejects(async()=>f.create({...input,generationLanguages:['en']}),/conflict/);

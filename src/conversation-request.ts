@@ -1,13 +1,14 @@
 import type {MessageSession} from './case-message-recovery.ts';
+import {isWorkerLanguage,type WorkerLocaleCode} from '../server/languages.mjs';
 
 export type ConversationFailure='session'|'invalid'|'unavailable'|'closed'|'translation'|'conflict'|'blocked'|'recovery';
 export class ConversationRequestError extends Error {
   readonly code:ConversationFailure;
   constructor(code:ConversationFailure){super(code);this.code=code;}
 }
-export type ConversationMessage={id:string;caseId:string;language:'en'|'ar'|'ur';createdAt:string;author:'staff'|'worker';authorName:string;text:string;audioUrl?:string;kind?:'voice'};
-export type ConversationPage={caseId:string;clientContext:string;items:ConversationMessage[];total:number;page:number;pageSize:20;status:'open'|'resolved';language:'en'|'ar'|'ur';canReply:boolean;canGenerate:boolean;canVoice:boolean};
-export type ConversationReceipt={id:string;caseId:string;language:'en'|'ar'|'ur';createdAt:string;clientContext:string;status?:'queued'|'processing'|'delivered'|'failed';deliveredAt?:string|null;errorCode?:string|null};
+export type ConversationMessage={id:string;caseId:string;language:WorkerLocaleCode;createdAt:string;author:'staff'|'worker';authorName:string;text:string;audioUrl?:string;kind?:'voice'};
+export type ConversationPage={caseId:string;clientContext:string;items:ConversationMessage[];total:number;page:number;pageSize:20;status:'open'|'resolved';language:WorkerLocaleCode;canReply:boolean;canGenerate:boolean;canVoice:boolean};
+export type ConversationReceipt={id:string;caseId:string;language:WorkerLocaleCode;createdAt:string;clientContext:string;status?:'queued'|'processing'|'delivered'|'failed';deliveredAt?:string|null;errorCode?:string|null};
 export type ConversationOperation={kind:'page';page:number}|{kind:'message'|'followup';requestId:string;text?:string};
 export function conversationComposerPolicy({worker,pendingKind,canGenerate,language,includeAudio}:{worker:boolean;pendingKind:'message'|'followup'|null;canGenerate:boolean;language:string|undefined;includeAudio:boolean}){
   const kind=pendingKind??(!worker&&canGenerate&&(language!=='en'||includeAudio)?'followup':'message');
@@ -18,7 +19,7 @@ const requestId=(value:unknown):value is string=>typeof value==='string'&&/^[a-f
 const integer=(value:unknown,min:number,max:number)=>Number.isSafeInteger(value)&&Number(value)>=min&&Number(value)<=max;
 const exact=(value:unknown,keys:string[]):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',');
 const date=(value:unknown):value is string=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString()===value;
-const language=(value:unknown)=>['en','ar','ur'].includes(value as string);
+const language=(value:unknown):value is WorkerLocaleCode=>isWorkerLanguage(value);
 const invalid=()=>{throw new ConversationRequestError('invalid');};
 export function validConversationSession(session:MessageSession,now=Date.now()){
   return !!session&&/^[a-f0-9]{64}$/.test(session.clientContext)&&date(session.expiresAt)&&Date.parse(session.expiresAt)>now;

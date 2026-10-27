@@ -1,0 +1,105 @@
+{
+  "version": 2,
+  "name": "drive-a-temporary-connection-failure-keeps-the-unsent",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793001423012,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Unsent draft"
+      },
+      "args": {
+        "value": "My retained answer"
+      },
+      "action": "fill",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 28
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Simulate temporary connection loss"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 29
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Checking your connection"
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Restore connection"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 29
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Checking your connection",
+        "absent": true
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Check retained draft"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 29
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "PASS: draft retained and server actions resumed"
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "startPath": "/tests/browser/functional-audit.html",
+  "intent": "A temporary connection failure keeps the unsent answer and restores server actions after session verification.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-a-temporary-connection-failure-keeps-the-unsent"
+}

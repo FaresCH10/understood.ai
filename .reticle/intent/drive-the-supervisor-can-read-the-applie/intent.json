@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-the-supervisor-can-read-the-applied-template-tex": {
+      "declaredAt": 1793001650683,
+      "id": "flow:drive-the-supervisor-can-read-the-applied-template-tex",
+      "state": "declared",
+      "statement": "The supervisor can read the applied template text in the active source field.",
+      "status": "proposed",
+      "subject": "drive-the-supervisor-can-read-the-applie",
+      "surface": {
+        "flow": "drive-the-supervisor-can-read-the-applied-template-tex"
+      },
+      "updatedAt": 1793001650690
+    }
+  },
+  "subject": "drive-the-supervisor-can-read-the-applie",
+  "version": 1
+}

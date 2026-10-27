@@ -1,5 +1,5 @@
 import type {WorkerUiLanguage} from './worker-ui-language';
-export type RecordingLanguage = 'en' | 'ar' | 'ur';
+export type RecordingLanguage = WorkerUiLanguage;
 export const conversationRecorderText:Record<WorkerUiLanguage,{permission:string;format:string;error:string;failed:string}>={
   en:{permission:'Microphone access is unavailable. Check browser permission or type a message when available.',format:'This voice message could not be prepared. Record again or type a message when available.',error:'Voice message receipt is unconfirmed. Keep this preview and check the voice message receipt.',failed:'Voice recording is unavailable. Unsent audio may be lost. Use the message field when available, or reload this page.'},
   ar:{permission:'الميكروفون غير متاح. تحقق من إذن المتصفح أو اكتب رسالة عند توفر الحقل.',format:'تعذر تجهيز الرسالة الصوتية. سجّل مرة أخرى أو اكتب رسالة عند توفر الحقل.',error:'استلام الرسالة الصوتية غير مؤكد. احتفظ بهذه المعاينة وتحقق من استلام الرسالة الصوتية.',failed:'التسجيل الصوتي غير متاح. قد يُفقد الصوت غير المرسل. استخدم حقل الرسالة عند توفره أو أعد تحميل هذه الصفحة.'},
@@ -186,7 +186,7 @@ export function conversationRecordingNotice(language:WorkerUiLanguage) {
   return {title:value.title,local:voice[language].local,access:value.access,processing:voice[language].processing,retention:value.retention};
 }
 
-export function staffCaseRecordingNotice(language:RecordingLanguage){
+export function staffCaseRecordingNotice(language:'en'|'ar'|'ur'){
   const value=copy[language],staff={
     en:{local:'Unsent audio stays on this page. Leaving or reloading can lose the preview. Saving requires a separate action.',access:'Saved audio is private to authorized site owners and supervisors.',processing:'This is a staff record, not a worker answer. It is not sent to AI and does not resolve the case automatically.'},
     ar:{local:'يبقى الصوت غير المرسل في هذه الصفحة. قد تفقد المعاينة عند المغادرة أو إعادة التحميل. يتطلب الحفظ إجراءً منفصلًا.',access:'الصوت المحفوظ خاص بمالكي الموقع والمشرفين المخولين.',processing:'هذا سجل للموظف وليس إجابة عامل. لا يُرسل إلى الذكاء الاصطناعي ولا يحل الحالة تلقائيًا.'},

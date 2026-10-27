@@ -1,0 +1,30 @@
+{
+  "intents": {
+    "flow:drive-leaving-send-cancels-future-preparation-status-c": {
+      "declaredAt": 1792997157757,
+      "id": "flow:drive-leaving-send-cancels-future-preparation-status-c",
+      "state": "declared",
+      "statement": "Leaving Send cancels future preparation-status checks even while preparation is pending.",
+      "status": "proposed",
+      "subject": "drive-leaving-send-cancels-future-prepar",
+      "surface": {
+        "flow": "drive-leaving-send-cancels-future-preparation-status-c"
+      },
+      "updatedAt": 1792997157775
+    },
+    "flow:drive-leaving-send-cancels-future-preparation-status-c-ddbb28": {
+      "declaredAt": 1792997408427,
+      "id": "flow:drive-leaving-send-cancels-future-preparation-status-c-ddbb28",
+      "state": "declared",
+      "statement": "Leaving Send cancels future preparation-status checks even while preparation is pending.",
+      "status": "proposed",
+      "subject": "drive-leaving-send-cancels-future-prepar",
+      "surface": {
+        "flow": "drive-leaving-send-cancels-future-preparation-status-c-ddbb28"
+      },
+      "updatedAt": 1792997408435
+    }
+  },
+  "subject": "drive-leaving-send-cancels-future-prepar",
+  "version": 1
+}

@@ -72,7 +72,7 @@ test('all supported fixed stage tests meter exact requests, preserve immutable r
     assert.ok(report.pipeline.stages.filter(row=>['translation','speech'].includes(row.id)).every(row=>row.verification==='fixed_fixtures_passed'));
     assert.ok(report.pipeline.stages.filter(row=>!['translation','speech'].includes(row.id)).every(row=>row.verification==='not_tested'));
     const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'},options={pipeline,providerVerification:config};
-    const staff=await getLanguageReadiness(f.pool,owner,options);assert.equal(staff.languages.find(row=>row.code==='ar').translation.state,'technical_test_passed');assert.equal(staff.languages.find(row=>row.code==='ur').speech.state,'unavailable');
+    const staff=await getLanguageReadiness(f.pool,owner,options);assert.equal(staff.languages.find(row=>row.code==='ar').translation.state,'technical_test_passed');assert.equal(staff.languages.find(row=>row.code==='ur').speech.state,'not_tested');
     assert.deepEqual((await runLanguageReadiness(f.pool,owner,{},options)).stageTests,staff.stageTests);assert.equal(calls.length,6);
     await assert.rejects(getLanguageReadiness(f.pool,{...owner,principal_id:'missing'},options),/^Error: Forbidden$/);
     assert.doesNotMatch(JSON.stringify([report,staff]),/synthetic-key-never-live|fingerprint|config_hash|session_hash|blue shelf|privateAudio/);

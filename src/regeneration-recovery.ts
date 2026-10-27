@@ -1,5 +1,6 @@
+import {type WorkerLocaleCode} from '../server/languages.mjs';
 import {regenerationInput} from '../server/regeneration-input.mjs';
-export type PendingRegeneration={requestId:string;briefingId:string;body:{revision:number;language:'en'|'ar'|'ur';kind:'translation'|'audio';confirmed:true}};
+export type PendingRegeneration={requestId:string;briefingId:string;body:{revision:number;language:WorkerLocaleCode;kind:'translation'|'audio';confirmed:true}};
 type Store=Pick<Storage,'getItem'|'setItem'|'removeItem'>;
 const key=(scope:string)=>`understood:regeneration:${scope}`;
 export function pendingRegenerationContent(value:PendingRegeneration) {

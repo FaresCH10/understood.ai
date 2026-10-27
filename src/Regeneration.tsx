@@ -1,3 +1,4 @@
+import {WORKER_LOCALES,type WorkerLocaleCode} from '../server/languages.mjs';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {RefreshCw,X} from 'lucide-react';
 import {readPendingReview} from './review-recovery';
@@ -7,7 +8,7 @@ import type {StaffRequestAuthority} from './useStaffRequest';
 import {retainStaffRequest} from './staff-request';
 
 class RegenerationError extends Error {constructor(message:string,public uncertain=false){super(message);}}
-const names={en:'English',ar:'Arabic',ur:'Urdu'};
+const names=Object.fromEntries(WORKER_LOCALES.map(locale=>[locale.code,locale.englishName]));
 
 export function RegenerationRecovery({pending,scope,onResolved,authority}:{pending:PendingRegeneration;scope:string;onResolved:(id:string)=>void;authority:StaffRequestAuthority}) {
   const {request,current:sessionCurrent,complete}=useBriefingRequest(authority);
@@ -30,7 +31,7 @@ export function RegenerationRecovery({pending,scope,onResolved,authority}:{pendi
   return <><h1 ref={heading} tabIndex={-1}>Recover regeneration</h1><section className="panel"><h2>{names[pending.body.language]} {pending.body.kind} · source revision {pending.body.revision}</h2><p role="status">{busy ? 'Checking saved regeneration...' : checked ? 'No saved receipt was found. You can retry the original confirmed request.' : 'The pending request has not been resolved.'}</p>{error && <p role="alert" className="record-error">{error}</p>}<div className="actions"><button className="button outline" disabled={busy} onClick={()=>setRefresh(value=>value+1)}><RefreshCw size={18}/>Check saved request</button>{checked && <button className="button primary" disabled={busy} onClick={()=>void retry()}><RefreshCw size={18}/>Retry original request</button>}</div></section></>;
 }
 
-export function RegenerationControl({id,revision,language,scope,disabled,onChanged,onEditingChange,authority}:{id:string;revision:number;language:'en'|'ar'|'ur';scope?:string|null;disabled:boolean;onChanged:()=>void;onEditingChange:(value:boolean)=>void;authority:StaffRequestAuthority}) {
+export function RegenerationControl({id,revision,language,scope,disabled,onChanged,onEditingChange,authority}:{id:string;revision:number;language:WorkerLocaleCode;scope?:string|null;disabled:boolean;onChanged:()=>void;onEditingChange:(value:boolean)=>void;authority:StaffRequestAuthority}) {
   const {request,current,complete,ensureCompletion}=useBriefingRequest(authority);
   const [kind,setKind]=useState<'translation'|'audio'|null>(null),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[uncertain,setUncertain]=useState(false),[error,setError]=useState('');
   const pending=useRef<PendingRegeneration|null>(null),sending=useRef(false),consent=useRef<HTMLInputElement>(null),trigger=useRef<'translation'|'audio'|null>(null),commands=useRef<Partial<Record<'translation'|'audio',HTMLButtonElement|null>>>({}),focusBack=useRef(false);

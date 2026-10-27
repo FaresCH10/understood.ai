@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "text \"PASS: template is visible in Type mode\"",
+  "observed": "no element matched {\"text\":\"PASS: template is visible in Type mode\"}",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "",
+        "source": {
+          "file": "tests/browser/functional-audit.tsx",
+          "line": 42,
+          "column": 101
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793001635561-click-71cf117e",
+  "createdAt": 1793001635561,
+  "seen": 1,
+  "lastSeenAt": 1793001635561
+}

@@ -7,6 +7,7 @@ import {runMigrations} from '../server/postgres/migrate.mjs';
 import * as sqlite from '../server/pilot.mjs';
 import * as postgres from '../server/postgres/pilot.mjs';
 import {pilotInput,pilotDestination} from '../server/pilot-input.mjs';
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import {createAppServer} from '../server/index.mjs';
 
 const input=()=>({requestId:randomUUID(),receiptToken:randomBytes(32).toString('hex'),company:'Synthetic Works',email:'contact@example.test',teamSize:30,languages:['ar','en'],message:'Synthetic pilot inquiry.',consent:true});
@@ -43,7 +44,9 @@ for(const backend of ['sqlite','postgres'])test(`${backend}: pilot persistence, 
 
 test('pilot input is strict; public HTTP stores without a session and never claims disabled delivery',async()=>{
   const value=input();
-  for(const change of [{consent:false},{teamSize:0},{teamSize:2.5},{languages:['xyz']},{languages:['en','en']},{email:'x\r\n@example.test'},{company:'x\u0000'},{extra:true},{receiptToken:'abc'}])assert.throws(()=>pilotInput({...value,...change}),/Invalid/);
+  for(const change of [{consent:false},{teamSize:0},{teamSize:2.5},{languages:['xyz']},{languages:['en','en']},{languages:[...WORKER_LANGUAGE_CODES,'en']},{email:'x\r\n@example.test'},{company:'x\u0000'},{extra:true},{receiptToken:'abc'}])assert.throws(()=>pilotInput({...value,...change}),/Invalid/);
+  assert.deepEqual(pilotInput({...value,languages:['hi','en']}).content.languages,['en','hi']);
+  assert.equal(pilotInput({...value,languages:[...WORKER_LANGUAGE_CODES]}).content.languages.length,WORKER_LANGUAGE_CODES.length);
   assert.throws(()=>pilotDestination('User@Example.test'),/Invalid/);
   const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',mail:{mode:'disabled'}});
   await new Promise(done=>server.listen(0,'127.0.0.1',done));const origin=`http://127.0.0.1:${server.address().port}`;

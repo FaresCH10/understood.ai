@@ -19,12 +19,24 @@ export const WORKER_LOCALES = Object.freeze([
   Object.freeze({code:'id',base:'id',name:'Bahasa Indonesia',englishName:'Indonesian',direction:'ltr',script:'Latin'}),
 ]);
 export const WORKER_LANGUAGE_CODES = Object.freeze(WORKER_LOCALES.map(locale=>locale.code));
+// Selectable generation targets are separate from the stored demo fixtures and
+// from a particular provider's declared or verified language capabilities.
+export const GENERATION_LANGUAGE_CODES = WORKER_LANGUAGE_CODES;
 export const RTL_LANGUAGE_CODES = Object.freeze(WORKER_LOCALES.filter(locale=>locale.direction==='rtl').map(locale=>locale.code));
 const localeByCode = new Map(WORKER_LOCALES.map(locale=>[locale.code,locale]));
 export function workerLocale(code){ return localeByCode.get(code) ?? null; }
 export function isWorkerLanguage(code){ return localeByCode.has(code); }
 export function languageDirection(code){ return localeByCode.get(code)?.direction ?? null; }
 export function sqlLanguageList(){ return WORKER_LANGUAGE_CODES.map(code=>`'${code.replaceAll("'","''")}'`).join(','); }
+
+const scripts={Arabic:/[\u0600-\u06ff]/u,Devanagari:/[\u0900-\u097f]/u,Bengali:/[\u0980-\u09ff]/u,
+  Malayalam:/[\u0d00-\u0d7f]/u,Tamil:/[\u0b80-\u0bff]/u,Telugu:/[\u0c00-\u0c7f]/u,
+  Sinhala:/[\u0d80-\u0dff]/u,Cyrillic:/[\u0400-\u04ff]/u,Gurmukhi:/[\u0a00-\u0a7f]/u};
+export function languageTextMatches(code,text){
+  const locale=workerLocale(code);
+  return !!locale && typeof text==='string' && !!text.trim()
+    && (locale.script==='Latin' ? /[A-Za-z]/u.test(text) : scripts[locale.script]?.test(text)===true);
+}
 
 // Current runtime evidence, not a wish list. UI is available for every locale; the
 // synthetic bundle fixture stores text for en/ar/ur, speech and transcription exist

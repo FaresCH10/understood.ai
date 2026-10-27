@@ -1,5 +1,5 @@
 import {notificationKinds,notificationId} from '../server/notification-input.mjs';
-export type NotificationItem={id:string;kind:string;label:string;destination:string;occurredAt:string;readAt:string|null};
+export type NotificationItem={id:string;kind:string;label:string;subject:string|null;destination:string;occurredAt:string;readAt:string|null};
 export type NotificationPage={items:NotificationItem[];total:number;unread:number;page:number;pageSize:number;asOf:string;since:string};
 export type PendingNotification={requestId:string;body:Record<string,unknown>;item:NotificationItem};
 type Store=Pick<Storage,'getItem'|'setItem'|'removeItem'>;
@@ -7,11 +7,12 @@ const object=(value:unknown):value is Record<string,unknown>=>!!value && typeof 
 const keys=(value:Record<string,unknown>,expected:string[])=>Object.keys(value).sort().join(',')===expected.sort().join(',');
 const date=(value:unknown)=>typeof value==='string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString()===value;
 export function checkedNotification(value:unknown):NotificationItem {
-  if(!object(value) || !keys(value,['id','kind','label','destination','occurredAt','readAt']))throw Error('Notification metadata cannot be verified.');
+  if(!object(value) || !keys(value,['id','kind','label','subject','destination','occurredAt','readAt']))throw Error('Notification metadata cannot be verified.');
   notificationId(value.id);const kind=typeof value.kind==='string' && Object.hasOwn(notificationKinds,value.kind)?notificationKinds[value.kind]:null;
   if(!kind || value.label!==kind.label || value.destination!==kind.destination || !date(value.occurredAt)
+    || value.subject!==null && (typeof value.subject!=='string' || !value.subject.trim() || value.subject.length>120 || /[\u0000-\u001f]/.test(value.subject))
     || value.readAt!==null && (!date(value.readAt) || Date.parse(value.readAt as string)<Date.parse(value.occurredAt as string)))throw Error('Notification metadata cannot be verified.');
-  return {id:value.id as string,kind:value.kind as string,label:kind.label,destination:kind.destination,occurredAt:value.occurredAt as string,readAt:value.readAt as string|null};
+  return {id:value.id as string,kind:value.kind as string,label:kind.label,subject:(value.subject as string|null) ?? null,destination:kind.destination,occurredAt:value.occurredAt as string,readAt:value.readAt as string|null};
 }
 export function checkedNotificationPage(value:unknown,page:number,status:string):NotificationPage {
   if(!Number.isSafeInteger(page) || page<1 || page>5000 || !['all','unread'].includes(status) || !object(value) || !keys(value,['items','total','unread','page','pageSize','asOf','since']) || !Array.isArray(value.items) || value.items.length>20

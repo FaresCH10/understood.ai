@@ -2,8 +2,12 @@
 
 Migration 059 adds a PostgreSQL durable follow-up queue and private audio journal.
 This is a synthetic local credential-rehearsal capability, not an enabled real-data
-or hosted production pipeline. The preserved SQLite preview still supports text
-conversation only. Gemini Free must never receive real worker content.
+or hosted production pipeline. The local SQLite app queues a checked Gemini
+translation for every worker language the follow-up adapter lists, then stores
+that translation as the message. When that adapter also lists the language for
+speech, the checked text is stored as a private WAV and the conversation can play
+it. A speech failure leaves the follow-up undelivered. Gemini Free
+must never receive real worker content.
 
 ## Delivery
 
@@ -42,7 +46,12 @@ local credential rehearsal can explicitly select `gemini` with
 global and tenant provider quotas must be enabled before dispatch. Requests reserve
 one slot for English speech or three for translation/check/speech, and journal
 each network attempt with renewed authority checks. No live call was made here.
-Current adapter speech capability is EN/AR; Urdu is blocked before dispatch.
+`npm run dev` turns local follow-ups on in demo mode when `GEMINI_API_KEY` is set.
+`npm run dev:credential-test` does the same in credential mode with the synthetic
+data class. It is for test text only: the conversation shows supervisors that
+follow-ups go to the free Gemini tier. Plain `npm run dev` in credential mode keeps
+follow-ups off.
+SQLite follow-ups attach speech when the adapter lists the language and returns a valid WAV. Text is still delivered when the adapter has no speech method. PostgreSQL delivery still requires the adapter to list the language for speech.
 Hosted configuration continues to reject free-tier provider activation.
 
 The conversation has explicit generate/send, receipt check, pending/failure and

@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-the-worker-directory-crew-filter-lists-active-cr": {
+      "declaredAt": 1793104808081,
+      "id": "flow:drive-the-worker-directory-crew-filter-lists-active-cr",
+      "state": "declared",
+      "statement": "The worker directory crew filter lists active crews that are not on the current sidebar page",
+      "status": "proposed",
+      "subject": "drive-the-worker-directory-crew-filter-l",
+      "surface": {
+        "flow": "drive-the-worker-directory-crew-filter-lists-active-cr"
+      },
+      "updatedAt": 1793104808092
+    }
+  },
+  "subject": "drive-the-worker-directory-crew-filter-l",
+  "version": 1
+}

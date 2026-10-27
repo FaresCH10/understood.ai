@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {ArrowLeft,CheckCircle2,ChevronRight,FileText,RefreshCw,Send,Users} from 'lucide-react';
+import {AlertTriangle,ArrowLeft,CheckCircle2,ChevronRight,FileText,Mic,RefreshCw,Send,Users} from 'lucide-react';
 import type {StaffRequestAuthority} from './useStaffRequest';
 import {useStaffRequest} from './useStaffRequest';
 import {StaffRequestError} from './staff-request';
@@ -7,7 +7,7 @@ import {StaffRequestError} from './staff-request';
 type Mode='question'|'acknowledge';
 type Delivery='text'|'voice'|'both';
 type AudienceChoice={type:'all'}|{type:'crew';crewId:string};
-type AudienceOverview={workers:{total:number;byLanguage:Record<string,number>};crews:{id:string;name:string;members:number}[]};
+type AudienceOverview={workers:{total:number;byLanguage:Record<string,number>;notSelected?:number};crews:{id:string;name:string;members:number;byLanguage:Record<string,number>;notSelected:number}[]};
 type UndeliveredReason={reason:string;language?:string;count:number};
 type DeliveryStates={preparing:number;available:number;blocked:number;failed:number;withdrawn:number};
 type SendResult={requestId:string;briefingId:string;state:'preparing'|'published'|'failed';responseMode:Mode;deliveryMode:Delivery;
@@ -27,19 +27,22 @@ function readPending(scope:string|null):PendingSend|null {
   if(!scope)return null;
   try {
     const raw=sessionStorage.getItem(pendingKey(scope));
-    if(!raw || raw.length>12000)return null;
+    if(!raw)return null;
+    if(raw.length>12000)throw Error();
     const value=JSON.parse(raw);
     if(typeof value?.requestId!=='string' || !/^[0-9a-f-]{36}$/i.test(value.requestId)
       || typeof value.source!=='string' || value.source.length>sourceMax || typeof value.title!=='string'
       || !['question','acknowledge'].includes(value.responseMode) || !['text','voice','both'].includes(value.deliveryMode)
-      || !validAudience(value.audience))return null;
+      || !validAudience(value.audience))throw Error();
     return {requestId:value.requestId,title:value.title.slice(0,titleMax),source:value.source,audience:value.audience,
       responseMode:value.responseMode,deliveryMode:value.deliveryMode,savedAt:Number(value.savedAt)||0};
-  }catch{return null;}
+  }catch{throw Error('Send recovery could not be read. Reload after restoring browser storage before sending.');}
 }
 function savePending(scope:string|null,value:PendingSend){
-  if(!scope)return;
-  try{sessionStorage.setItem(pendingKey(scope),JSON.stringify(value));}catch{/* Storage may be unavailable. */}
+  if(!scope)throw Error('Send recovery is unavailable. No instruction was sent.');
+  const key=pendingKey(scope),raw=JSON.stringify(value);
+  try{sessionStorage.setItem(key,raw);if(sessionStorage.getItem(key)!==raw)throw Error();}
+  catch{throw Error('Send recovery could not be saved. No instruction was sent.');}
 }
 function clearPending(scope:string|null){
   if(!scope)return;
@@ -63,7 +66,8 @@ function reasonText(reason:UndeliveredReason){
 
 export default function SendInstruction({authority,scope,navigate,onSent}:{authority:StaffRequestAuthority;scope:string|null;navigate:(path:string)=>void;onSent:()=>void}){
   const {request,current}=useStaffRequest(authority);
-  const [restoredPending]=useState(()=>readPending(scope));
+  const [recovery]=useState(()=>{try{return {pending:readPending(scope),error:''};}catch(error){return {pending:null,error:(error as Error).message};}});
+  const restoredPending=recovery.pending;
   const [pending,setPending]=useState<PendingSend|null>(restoredPending);
   const [source,setSource]=useState(restoredPending?.source || '');
   const [title,setTitle]=useState(restoredPending?.title || '');
@@ -80,12 +84,14 @@ export default function SendInstruction({authority,scope,navigate,onSent}:{autho
   const requestId=useRef(restoredPending?.requestId || crypto.randomUUID());
   const sending=useRef(false);
   const sentNotice=useRef(false);
-  const trimmedSource=source.trim(),derivedTitle=derivedInstructionTitle(trimmedSource);
-  const effectiveTitle=(title.trim() || derivedTitle).slice(0,titleMax);
+  const trimmedSource=source.trim();
+  const effectiveTitle=title.trim().slice(0,titleMax);
   const audienceChoice:AudienceChoice=audienceType==='crew'?{type:'crew',crewId}:{type:'all'};
+  const selectedCrew=audienceType==='crew'?audience?.crews.find(crew=>crew.id===crewId):null;
+  const selectedAudience=audienceType==='all'?audience?.workers:selectedCrew?{total:selectedCrew.members,byLanguage:selectedCrew.byLanguage,notSelected:selectedCrew.notSelected}:null;
   const titleValid=effectiveTitle.length>=3;
   const canSubmit=trimmedSource.length>=sourceMin && trimmedSource.length<=sourceMax && titleValid
-    && (audienceType==='all' || crewId.length>0) && audience!==null && audience.workers.total>0 && !busy && !pending;
+    && !!selectedAudience && selectedAudience.total>0 && !selectedAudience.notSelected && !busy && !pending && !recovery.error;
 
   useEffect(()=>{
     const controller=new AbortController(),live=()=>current() && !controller.signal.aborted;
@@ -98,8 +104,14 @@ export default function SendInstruction({authority,scope,navigate,onSent}:{autho
   useEffect(()=>{
     const waiting=result && (result.state==='preparing' || (result.deliveryStates?.preparing ?? 0)>0);
     if(!waiting || sending.current)return;
-    const timer=window.setTimeout(()=>{void checkStatus(result.requestId);},3000);
-    return()=>window.clearTimeout(timer);
+    let cancelled=false;
+    let timer:ReturnType<typeof setTimeout>;
+    const poll=async()=>{
+      await checkStatus(result.requestId);
+      if(!cancelled && current())timer=setTimeout(()=>void poll(),3000);
+    };
+    timer=setTimeout(()=>void poll(),3000);
+    return()=>{cancelled=true;clearTimeout(timer);};
   },[result?.requestId,result?.state,result?.deliveryStates?.preparing]);
 
   useEffect(()=>{
@@ -127,7 +139,7 @@ export default function SendInstruction({authority,scope,navigate,onSent}:{autho
     }catch(reason){
       if(!current())return;
       if(reason instanceof StaffRequestError && reason.status===404){
-        clearPending(scope);setPending(null);setError('');
+        clearPending(scope);setPending(null);setResult(null);setError('');
         setError('No send was recorded. Review the instruction and send again.');
       }else setError(reason instanceof Error?reason.message:'Send status unavailable.');
     }finally{sending.current=false;setBusy(false);}
@@ -136,7 +148,8 @@ export default function SendInstruction({authority,scope,navigate,onSent}:{autho
   async function submit(){
     if(!canSubmit || sending.current || !current())return;
     const value:PendingSend={requestId:requestId.current,title:effectiveTitle,source:trimmedSource,audience:audienceChoice,responseMode,deliveryMode,savedAt:Date.now()};
-    sending.current=true;setBusy(true);setError('');savePending(scope,value);setPending(value);
+    try{savePending(scope,value);}catch(reason){setError((reason as Error).message);return;}
+    sending.current=true;setBusy(true);setError('');setPending(value);
     try {
       const sent=await request<SendResult>('/api/instructions/send',{
         requestId:value.requestId,title:value.title,source:value.source,audience:value.audience,responseMode:value.responseMode,deliveryMode:value.deliveryMode,
@@ -169,11 +182,11 @@ export default function SendInstruction({authority,scope,navigate,onSent}:{autho
 
   if(result) {
     const partial=result.state==='published' && result.undelivered>0;
-    return <><div className="page-header"><div><h1>{result.state==='failed'?'Instruction not sent':'Instruction sent'}</h1><p>{result.state==='preparing'?'Preparation is still running. This page checks again automatically.':partial?'The ready language versions were delivered. Not every selected worker could receive this instruction.':'The send is recorded. Recipient status is available in the instruction.'}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>Instructions</button></div>
+    return <><div className="page-header"><div><h1>{result.state==='failed'?'Instruction not sent':partial?'Instruction partly sent':'Instruction sent'}</h1><p>{result.state==='preparing'?'Preparation is still running. This page checks again automatically.':partial?'The ready language versions were delivered. Not every selected worker could receive this instruction.':'The send is recorded. Recipient status is available in the instruction.'}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>Instructions</button></div>
       {error && <div className="notice notice-amber" role="alert">{error}</div>}
       {result.state==='published' && <section className="panel send-result" aria-labelledby="send-result-title">
-        <div className="receipt-mark" aria-hidden="true"><CheckCircle2 size={42}/></div>
-        <h2 id="send-result-title">{result.duplicate?'Send already recorded':'Send recorded'}</h2>
+        <div className={`receipt-mark${partial?' receipt-mark-partial':''}`} aria-hidden="true">{partial?<AlertTriangle size={42}/>:<CheckCircle2 size={42}/>}</div>
+        <h2 id="send-result-title">{partial?'Partly sent':result.duplicate?'Send already recorded':'Send recorded'}</h2>
         <dl className="worker-receipt-meta">
           <div><dt>Delivery</dt><dd>{result.responseMode==='acknowledge'?'Acknowledge receipt':'Question and answer'}</dd></div>
           <div><dt>Format</dt><dd>{result.deliveryMode==='both'?'Text and voice':result.deliveryMode==='voice'?'Voice':'Text'}</dd></div>
@@ -193,11 +206,16 @@ export default function SendInstruction({authority,scope,navigate,onSent}:{autho
   }
 
   return <>
-    <div className="page-header"><div><h1>Send an instruction</h1><p>Write the instruction, choose who needs it, and send. Preparation and translation run in the background.</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>Instructions</button></div>
+    <div className="page-header"><div><h1>Send an instruction</h1><p>Write the instruction, choose who needs it, and send. To use your voice, record a source and review its transcript before publishing.</p></div><div className="actions"><button className="button outline" disabled={busy || !!pending} onClick={()=>navigate('briefings/new')}><Mic size={19}/>Record a voice instruction</button><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>Instructions</button></div></div>
+    {recovery.error&&<div className="notice notice-amber" role="alert">{recovery.error}</div>}
     {pending && !error && <div className="notice notice-amber" role="status"><strong>An earlier send was not confirmed.</strong> Check its receipt before sending again. <button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>Check receipt</button></div>}
     {pending && error && <div className="notice notice-amber" role="status"><strong>Send outcome not confirmed.</strong> The original request is retained. Check its receipt rather than repeating it. <div className="actions"><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>Check receipt</button><button className="button outline" disabled={busy} onClick={reset}>Discard request</button></div></div>}
     {error && !pending && <div className="notice notice-amber" role="alert">{error}</div>}
     <section className="panel send-composer" aria-labelledby="send-source-title">
+      <label className="field" htmlFor="send-title"><span>Title <span aria-hidden="true">*</span></span>
+        <input id="send-title" name="title" type="text" required minLength={3} maxLength={titleMax}
+          value={title} disabled={busy || !!pending} onChange={event=>setTitle(event.target.value)} placeholder="Give this instruction a clear title" />
+      </label>
       <label className="field" htmlFor="send-source"><span id="send-source-title">Instruction</span>
         <textarea id="send-source" rows={7} maxLength={sourceMax} value={source} disabled={busy || !!pending} onChange={event=>setSource(event.target.value)} placeholder="Example: Move the red ladder to the north bay before the night shift. Keep the walkway clear." />
       </label>
@@ -212,14 +230,15 @@ export default function SendInstruction({authority,scope,navigate,onSent}:{autho
           {(audience?.crews || []).map(crew=><option key={crew.id} value={`crew:${crew.id}`}>{crew.name} ({crew.members})</option>)}
         </select>
       </label>
-      {audience && <div className="language-chips send-audience-languages" aria-label="Worker languages">{Object.entries(audience.workers.byLanguage).filter(([,count])=>count>0).map(([code,count])=><i key={code}>{code.toUpperCase()} {count}</i>)}</div>}
+      {selectedAudience && <div className="language-chips send-audience-languages" aria-label="Worker languages">{Object.entries(selectedAudience.byLanguage || {}).filter(([,count])=>count>0).map(([code,count])=><i key={code}>{code.toUpperCase()} {count}</i>)}</div>}
+      {!!selectedAudience?.notSelected && <p className="notice notice-amber" role="status">{selectedAudience.notSelected} active workers in this audience still need a language selected in Team before sending.</p>}
       {audienceError && <p className="notice notice-amber" role="alert">{audienceError}</p>}
-      {audience && audience.workers.total===0 && <p className="notice notice-amber" role="status">There are no active workers at this site yet.</p>}
+      {selectedAudience && selectedAudience.total===0 && <p className="notice notice-amber" role="status">There are no workers with a selected language in this audience.</p>}
 
       <div className="send-option-grid">
         <label className="send-toggle">
           <input type="checkbox" checked={responseMode==='question'} disabled={busy || !!pending} onChange={event=>setResponseMode(event.target.checked?'question':'acknowledge')}/>
-          <span><strong>Include a question</strong><small>{responseMode==='question'?'Workers answer in their own words. Answers receive a synthetic keyword check.':'Workers confirm receipt only. No answer or comprehension result is created.'}</small></span>
+          <span><strong>Include a question</strong><small>{responseMode==='question'?'Workers select one instruction-specific answer. Correct answers and answers needing clarification appear in your response report.':'Workers confirm receipt only. No answer or comprehension result is created.'}</small></span>
         </label>
         <fieldset className="send-delivery" disabled={busy || !!pending}>
           <legend>Delivery format</legend>
@@ -231,7 +250,6 @@ export default function SendInstruction({authority,scope,navigate,onSent}:{autho
 
       <details className="send-more">
         <summary>More options</summary>
-        <label className="field">Title (optional)<input type="text" maxLength={titleMax} value={title} disabled={busy || !!pending} onChange={event=>setTitle(event.target.value)} placeholder={derivedTitle || 'A short title from the instruction'} /></label>
         <p className="muted">Recording, upload, templates, scheduling, and the full version history remain available in advanced tools. The durable send is recorded before preparation starts.</p>
         <div className="actions"><button type="button" className="button outline" disabled={busy || !!pending} onClick={()=>navigate('briefings/new')}><FileText size={19}/>Record or upload source</button><button type="button" className="button outline" disabled={busy || !!pending} onClick={()=>navigate('templates')}><FileText size={19}/>Templates</button></div>
       </details>

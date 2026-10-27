@@ -1,3 +1,4 @@
+import {providerDataClass} from '../ai/provider-policy.mjs';
 import {randomUUID} from 'node:crypto';
 import {domainTransaction,domainAudit} from './domain.mjs';
 import {scopedCase} from './case-messages.mjs';
@@ -16,7 +17,7 @@ const author=row=>({org_id:row.org_id,site_id:row.site_id,principal_type:'staff'
 const identity=row=>({orgId:row.org_id,siteId:row.site_id,caseId:row.case_id,assignmentId:row.assignment_id,
   publicationId:row.publication_id,requestId:row.id,language:row.language});
 function available({adapter,dataClass}) {
-  if(dataClass!=='synthetic' || !adapter || adapter.provenance?.dataClass!=='synthetic')throw Error('Follow-up generation unavailable');
+  if(!['synthetic','real'].includes(dataClass) || !providerDataClass(adapter?.provenance) || adapter.provenance.dataClass!==dataClass)throw Error('Follow-up generation unavailable');
 }
 function exact(row,session,caseId) {
   if(!row || row.org_id!==session.org_id || row.site_id!==session.site_id || row.case_id!==caseId || row.actor_id!==session.principal_id)

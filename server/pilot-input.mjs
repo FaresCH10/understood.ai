@@ -1,4 +1,5 @@
 import {tokenHash,normalizeEmail} from './auth-crypto.mjs';
+import {isWorkerLanguage,WORKER_LANGUAGE_CODES} from './languages.mjs';
 
 export const PILOT_SUBJECT='New Understood pilot request';
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -10,11 +11,11 @@ export function pilotInput(input) {
     || !uuid.test(input.requestId || '') || !token.test(input.receiptToken || '') || input.consent!==true
     || !clean(input.company,120) || !clean(input.email,254) || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(input.email.trim())
     || !Number.isInteger(input.teamSize) || input.teamSize<1 || input.teamSize>5000
-    || !Array.isArray(input.languages) || !input.languages.length || input.languages.length>3
-    || new Set(input.languages).size!==input.languages.length || input.languages.some(language=>!['en','ar','ur'].includes(language))
+    || !Array.isArray(input.languages) || !input.languages.length || input.languages.length>WORKER_LANGUAGE_CODES.length
+    || new Set(input.languages).size!==input.languages.length || input.languages.some(language=>!isWorkerLanguage(language))
     || typeof input.message!=='string' || input.message.length>2000 || /[\x00-\x08\x0b-\x1f\x7f]/.test(input.message))throw Error('Invalid pilot request');
   const content={company:input.company.trim(),email:normalizeEmail(input.email),teamSize:input.teamSize,
-    languages:['en','ar','ur'].filter(language=>input.languages.includes(language)),message:input.message.trim(),consent:true};
+    languages:WORKER_LANGUAGE_CODES.filter(language=>input.languages.includes(language)),message:input.message.trim(),consent:true};
   return {id:input.requestId.toLowerCase(),receiptHash:tokenHash(input.receiptToken),requestHash:tokenHash(JSON.stringify(content)),content};
 }
 export function pilotReceiptInput(id,secret) {

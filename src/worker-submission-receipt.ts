@@ -1,10 +1,11 @@
+import {isWorkerLanguage} from '../server/languages.mjs';
 import {sameWorkerSession,validWorkerSession,type PageSession} from './session-state.ts';
 import {checkedWorkerSubmission,WorkerSubmissionsError,type SubmissionScope,type WorkerSubmission} from './worker-submissions.ts';
 
 export type ReceiptSelection=SubmissionScope&{requestId:string;kind:'typed'|'audio'};
 export type WorkerReceiptSnapshot={assignment:{id:string;language:string;version:number;state:string};receipt:WorkerSubmission&{durationSeconds:number|null};clientContext:string};
 const exact=(value:unknown,keys:string[]):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',');
-const validSelection=(value:ReceiptSelection)=>typeof value.assignmentId==='string'&&value.assignmentId.length>0&&value.assignmentId.length<=100&&Number.isSafeInteger(value.version)&&value.version>0&&['en','ar','ur'].includes(value.language)&&['typed','audio'].includes(value.kind)&&/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(value.requestId);
+const validSelection=(value:ReceiptSelection)=>typeof value.assignmentId==='string'&&value.assignmentId.length>0&&value.assignmentId.length<=100&&Number.isSafeInteger(value.version)&&value.version>0&&isWorkerLanguage(value.language)&&['typed','audio'].includes(value.kind)&&/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(value.requestId);
 
 export function checkedWorkerReceiptSnapshot(value:unknown,expected:ReceiptSelection,context:string):WorkerReceiptSnapshot{
   const invalid=()=>{throw new WorkerSubmissionsError('invalid');};

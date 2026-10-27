@@ -1,3 +1,4 @@
+import {generationLanguageCheck,guardGenerationLanguages} from './generation-language-schema.mjs';
 import {randomUUID} from 'node:crypto';
 import {NOW,transaction} from './db.mjs';
 import {settingsInput,settingsRequestId,sameSettingsRequest,generationLanguages,siteContactFilters,siteContactDto} from './settings-input.mjs';
@@ -23,7 +24,8 @@ export function ensureSettingsSchema(db) {
     BEGIN SELECT RAISE(ABORT,'Scope mismatch'); END;`);
   for(const action of ['UPDATE','DELETE']) db.exec(`CREATE TRIGGER IF NOT EXISTS settings_requests_frozen_${action.toLowerCase()} BEFORE ${action} ON settings_requests BEGIN SELECT RAISE(ABORT,'Settings receipt is immutable'); END;`);
   if(!db.prepare('PRAGMA table_info(site_settings)').all().some(row=>row.name==='generation_languages_json'))db.exec(`ALTER TABLE site_settings ADD COLUMN generation_languages_json TEXT NOT NULL DEFAULT '["en","ar","ur"]'
-    CHECK(generation_languages_json IN ('["en"]','["en","ar"]','["en","ur"]','["en","ar","ur"]'));`);
+    CHECK(${generationLanguageCheck});`);
+  guardGenerationLanguages(db,'site_settings');
   for(const field of ['primary_contact_id','deputy_contact_id'])if(!db.prepare('PRAGMA table_info(site_settings)').all().some(row=>row.name===field))db.exec(`ALTER TABLE site_settings ADD COLUMN ${field} TEXT REFERENCES staff(id);`);
   if(!db.prepare('PRAGMA table_info(site_settings)').all().some(row=>row.name==='staff_interface_language'))
     db.exec("ALTER TABLE site_settings ADD COLUMN staff_interface_language TEXT NOT NULL DEFAULT 'en' CHECK(staff_interface_language IN ('en','ar'));");

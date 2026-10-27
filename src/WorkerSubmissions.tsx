@@ -1,3 +1,4 @@
+import {workerChoiceAnswerLabel} from './worker-choice-text';
 import { useEffect,useRef,useState } from 'react';
 import { CheckCircle2,Clock3,TriangleAlert,ChevronLeft,ChevronRight,RefreshCw } from 'lucide-react';
 import {readWorkerSubmissions,workerSubmissionState,WorkerSubmissionsError,type SubmissionScope,type WorkerSubmissionPage} from './worker-submissions';
@@ -39,7 +40,7 @@ const statusCopy={
   'pa-Arab':{received:'موصول ہو گیا',paused:'جانچ رُکی ہوئی اے',unavailable:'ریکارڈنگ ہن دستیاب نہیں',version:'ہدایت',limits:'میل کھاندا جواب سمجھ دا ثبوت یا کم شروع کرن دی اجازت نہیں۔'},
   id:{received:'Diterima',paused:'Pemeriksaan dijeda',unavailable:'Rekaman tidak lagi tersedia',version:'Instruksi',limits:'Jawaban yang cocok bukan bukti pemahaman atau izin untuk mulai bekerja.'},
 };
-export function WorkerSubmissions({assignmentId,version,contentLanguage,session,language,refresh,current,onSessionLost,timezone}:{assignmentId:string;version:number;contentLanguage:SubmissionScope['language'];session:PageSession;language:WorkerUiLanguage;refresh:number;current:()=>boolean;onSessionLost:()=>void;timezone?:string}) {
+export function WorkerSubmissions({choices,assignmentId,version,contentLanguage,session,language,refresh,current,onSessionLost,timezone}:{assignmentId:string;version:number;contentLanguage:SubmissionScope['language'];session:PageSession;language:WorkerUiLanguage;refresh:number;current:()=>boolean;onSessionLost:()=>void;timezone?:string;choices?:{id:string;text:string}[]}) {
   const t=copy[language] || copy.en,direction=workerUiDirection(language);
   const states=statusCopy[language];
   const [page,setPage]=useState(1),[retry,setRetry]=useState(0);
@@ -63,10 +64,10 @@ export function WorkerSubmissions({assignmentId,version,contentLanguage,session,
   return <section className="worker-card worker-submissions"><div className="worker-card-head"><h2>{t.title}</h2><button className="icon-button" aria-label={t.refresh} title={t.refresh} onClick={() => setRetry((value) => value+1)}><RefreshCw size={20} /></button></div>
     <div role={failed ? 'alert' : 'status'}>{failed ? t.failed : data===null ? t.loading : !data.total ? t.empty : null}</div>
     {data?.receipts.map((receipt) => <article className="worker-help-entry" key={receipt.id}>
-      <div className="worker-card-head"><strong>{receipt.kind==='audio' ? t.audio : t.typed}{receipt.isLatest ? ` · ${t.latest}` : ''}</strong><time dateTime={receipt.receivedAt}>{new Date(receipt.receivedAt).toLocaleString(language,{timeZone:timezone})}</time></div>
+      <div className="worker-card-head"><strong>{receipt.kind==='audio' ? t.audio : choices ? workerChoiceAnswerLabel[language] : t.typed}{receipt.isLatest ? ` · ${t.latest}` : ''}</strong><time dateTime={receipt.receivedAt}>{new Date(receipt.receivedAt).toLocaleString(language,{timeZone:timezone})}</time></div>
       <p className="muted">{states.version} v{data.assignment.version} · <bdi>{data.assignment.language.toUpperCase()}</bdi></p>
       <ol className="worker-submission-steps"><li><CheckCircle2 size={20} aria-hidden="true"/><span>{states.received}</span></li><li data-state={workerSubmissionState(receipt)}>{receipt.outcome==='matched'?<CheckCircle2 size={20} aria-hidden="true"/>:workerSubmissionState(receipt)==='pending'||workerSubmissionState(receipt)==='paused'?<Clock3 size={20} aria-hidden="true"/>:<TriangleAlert size={20} aria-hidden="true"/>}<span>{workerSubmissionState(receipt)==='paused'?states.paused:workerSubmissionState(receipt)==='unavailable'?states.unavailable:t[workerSubmissionState(receipt) as 'pending'|'audioFailed'|'matched'|'clarification'|'unassessable']}</span></li></ol>
-      {receipt.answerText!==null && <p dir="auto">{receipt.answerText}</p>}
+      {receipt.answerText!==null && <p dir="auto">{choices?.find(choice=>choice.id===receipt.answerText)?.text || receipt.answerText}</p>}
       {receipt.recordingId && <audio controls preload="none" aria-label={t.audio} src={`/api/recordings/${encodeURIComponent(receipt.recordingId)}/audio`} />}
       {typeof session.language==='string'&&session.language!==contentLanguage&&(receipt.answerText!==null||receipt.kind==='typed')
         &&<WorkerPresentationView compact assignmentId={assignmentId} version={version} sourceKind="answer" sourceId={receipt.id}

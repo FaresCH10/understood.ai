@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-unread-notifications-remain-visible-when-the-wor": {
+      "declaredAt": 1793001465015,
+      "id": "flow:drive-unread-notifications-remain-visible-when-the-wor",
+      "state": "declared",
+      "statement": "Unread notifications remain visible when the worker filters the list.",
+      "status": "proposed",
+      "subject": "drive-unread-notifications-remain-visibl",
+      "surface": {
+        "flow": "drive-unread-notifications-remain-visible-when-the-wor"
+      },
+      "updatedAt": 1793001465026
+    }
+  },
+  "subject": "drive-unread-notifications-remain-visibl",
+  "version": 1
+}

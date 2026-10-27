@@ -1,6 +1,7 @@
 import {sameWorkerSession,validWorkerSession,type PageSession} from './session-state.ts';
+import {isWorkerLanguage,type WorkerLocaleCode} from '../server/languages.mjs';
 
-export type SubmissionScope={assignmentId:string;version:number;language:'en'|'ar'|'ur'};
+export type SubmissionScope={assignmentId:string;version:number;language:WorkerLocaleCode};
 export type WorkerSubmission={id:string;kind:'typed'|'audio';receivedAt:string;isLatest:boolean;answerText:string|null;outcome:'matched'|'clarification'|'unassessable'|null;recordingId:string|null;audioStatus:string|null};
 export type WorkerSubmissionPage={assignment:{id:string;language:string;version:number;state:string};receipts:WorkerSubmission[];total:number;page:number;pageSize:number;clientContext:string};
 export class WorkerSubmissionsError extends Error{
@@ -10,7 +11,7 @@ export class WorkerSubmissionsError extends Error{
 const exact=(value:unknown,keys:string[]):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',');
 const identifier=(value:unknown):value is string=>typeof value==='string'&&value.length>0&&value.length<=100&&!/[\u0000-\u0020\u007f]/.test(value);
 const integer=(value:unknown,min:number,max:number)=>Number.isSafeInteger(value)&&Number(value)>=min&&Number(value)<=max;
-const validRead=(scope:SubmissionScope,page:number,context:string)=>identifier(scope.assignmentId)&&integer(scope.version,1,Number.MAX_SAFE_INTEGER)&&['en','ar','ur'].includes(scope.language)&&integer(page,1,5000)&&/^[a-f0-9]{64}$/.test(context);
+const validRead=(scope:SubmissionScope,page:number,context:string)=>identifier(scope.assignmentId)&&integer(scope.version,1,Number.MAX_SAFE_INTEGER)&&isWorkerLanguage(scope.language)&&integer(page,1,5000)&&/^[a-f0-9]{64}$/.test(context);
 
 export function checkedWorkerSubmission(value:unknown):WorkerSubmission{
   if(!exact(value,['id','kind','receivedAt','isLatest','answerText','outcome','recordingId','audioStatus'])||!identifier(value.id)||!['typed','audio'].includes(value.kind as string)

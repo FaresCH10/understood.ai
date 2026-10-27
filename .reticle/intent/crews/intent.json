@@ -1,0 +1,20 @@
+{
+  "intents": {
+    "inline:the-worker-directory-crew-filter-loads-active-cr-fdbb6b56": {
+      "binding": {
+        "kind": "net",
+        "method": "GET",
+        "urlContains": "/crews?status=active&page=1&pageSize=100"
+      },
+      "declaredAt": 1793094885485,
+      "id": "inline:the-worker-directory-crew-filter-loads-active-cr-fdbb6b56",
+      "state": "bound",
+      "statement": "The worker directory crew filter loads active crews beyond the five shown in the sidebar",
+      "status": "proposed",
+      "subject": "crews",
+      "updatedAt": 1793094885517
+    }
+  },
+  "subject": "crews",
+  "version": 1
+}

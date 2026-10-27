@@ -1,3 +1,4 @@
+import {isWorkerLanguage} from '../server/languages.mjs';
 import React,{useEffect,useId,useRef,useState} from 'react';
 import {CheckCircle2,Play,RotateCcw,Square,TriangleAlert} from 'lucide-react';
 import {artifactField,artifactLanguages,artifactVoiceLanguage,artifactSpeechUrls,languageArtifacts,type PreparedArtifacts} from './language-artifacts';
@@ -36,7 +37,7 @@ export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric
   const known=artifactLanguages.map((item) => item.code as string);
   const unknown=Object.keys(prepared?.languages || {}).filter((code) => !known.includes(code));
   const adapter=artifactField(prepared?.provenance?.adapter,120).value;
-  const savedTranslation=target==='ar' || target==='ur' ? draft.review?.translations?.[target] : null;
+  const savedTranslation=isWorkerLanguage(target) && target!=='en' ? draft.review?.translations?.[target] : null;
   useEffect(() => {
     if(!('speechSynthesis' in window)) return;
     const load=() => setVoices(window.speechSynthesis.getVoices());
@@ -99,7 +100,7 @@ export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric
       </>}
     </div>
     {selection==='draft' && canViewRubric && !draft.archive && draft.targetRegeneration?.language===target && ['queued','processing','failed'].includes(draft.targetRegeneration.status) && <p role="status">{language.name} {draft.targetRegeneration.kind} regeneration: {draft.targetRegeneration.status}. <a className="text-link" href={`#processing/${encodeURIComponent(draft.targetRegeneration.jobId)}`}>View processing job</a></p>}
-    {selection==='draft' && canViewRubric && !draft.archive && draft.id && !reviewEditing && (regenerating || draft.regenerationLanguages?.includes(target)) && (target==='en' || target==='ar' || target==='ur') && <RegenerationControl authority={authority} key={`regeneration-${draft.revision}-${target}`} id={draft.id} revision={draft.revision} language={target} scope={scope} disabled={draft.state==='processing'} onChanged={onChanged} onEditingChange={value=>{setRegenerating(value);onEditingChange(value);}}/>}
-    {selection==='draft' && canViewRubric && !draft.archive && draft.id && !regenerating && (speech || savedTranslation && draft.review?.revision===draft.revision) && (target==='ar' || target==='ur') && <DraftReview authority={authority} key={`${draft.revision}-${target}`} id={draft.id} revision={draft.revision} review={draft.review || null} prepared={null} canWrite scope={scope} disabled={draft.state==='processing'} failed={draft.state==='failed'} target={{code:target,name:language.name,dir:'rtl',title:view.title.value,text:view.text.value,question:view.question.value}} onChanged={onChanged} onEditingChange={value=>{setReviewEditing(value);onEditingChange(value);}}/>}
+    {selection==='draft' && canViewRubric && !draft.archive && draft.id && !reviewEditing && (regenerating || draft.regenerationLanguages?.includes(target)) && isWorkerLanguage(target) && <RegenerationControl authority={authority} key={`regeneration-${draft.revision}-${target}`} id={draft.id} revision={draft.revision} language={target} scope={scope} disabled={draft.state==='processing'} onChanged={onChanged} onEditingChange={value=>{setRegenerating(value);onEditingChange(value);}}/>}
+    {selection==='draft' && canViewRubric && !draft.archive && draft.id && !regenerating && (speech || savedTranslation && draft.review?.revision===draft.revision) && isWorkerLanguage(target) && target!=='en' && <DraftReview authority={authority} key={`${draft.revision}-${target}`} id={draft.id} revision={draft.revision} review={draft.review || null} prepared={null} canWrite scope={scope} disabled={draft.state==='processing'} failed={draft.state==='failed'} target={{code:target,name:language.name,dir:language.dir,title:view.title.value,text:view.text.value,question:view.question.value}} onChanged={onChanged} onEditingChange={value=>{setReviewEditing(value);onEditingChange(value);}}/>}
   </section>;
 }

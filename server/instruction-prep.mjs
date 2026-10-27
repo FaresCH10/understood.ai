@@ -1,3 +1,4 @@
+import {withMultipleChoice} from './multiple-choice.mjs';
 import {CANONICAL_SOURCE,syntheticPrepare} from './domain.mjs';
 
 const STOPWORDS=new Set(`the a an and or but to of in on at for with without your you our we this that these those is are be been being was were
@@ -33,24 +34,31 @@ function instructionFacts(text) {
 
 export function syntheticInstructionPrepare(briefing,send) {
   const text=briefing.source.trim();
+  if(/\p{Script=Arabic}/u.test(text))throw Error('Arabic source requires a configured translation provider.');
   const questionMode=send.response_mode==='question';
   if(text===CANONICAL_SOURCE) {
     const prepared=syntheticPrepare(text);
-    return {...prepared,title:briefing.title,
-      languages:{...prepared.languages,en:{...prepared.languages.en,title:briefing.title}}};
+    return withMultipleChoice({...prepared,responseMode:send.response_mode,title:briefing.title,
+      languages:{...prepared.languages,en:{...prepared.languages.en,title:briefing.title}}});
   }
   let groups=questionMode ? instructionKeywordGroups(text) : [];
   if(questionMode && !groups.length) {
     const fallback=text.toLowerCase().split(/\s+/).find(Boolean)?.slice(0,40);
     groups=[[fallback || 'instruction']];
   }
-  const question='What does this instruction ask you to do? Include the key details.';
-  return {
+  const action=/^(?:please\s+)?(move|put|place|store|take)\s+(.+?)\s+(?:to|on|at|in|before|after)\b/i.exec(text);
+  const timing=/\b(before|after|until|during)\b/i.test(text);
+  const facts=instructionFacts(text);
+  const question=action?`Where must you ${action[1].toLowerCase()} ${action[2]}${timing?', and when':''}?`
+    :/\bkeep\b.*\bclear\b/i.test(text)?'What must you keep clear?'
+    :facts.length>1?'Which actions does this instruction require?':'What action does this instruction require?';
+  return withMultipleChoice({
+    responseMode:send.response_mode,
     title:briefing.title,
     source:text,
     facts:instructionFacts(text),
     ...(questionMode ? {question,rubric:{mode:'keywords',askedFacts:groups.map((group)=>`Mention ${group[0]}`),keywordGroups:groups}} : {}),
     languages:{en:{title:briefing.title,text,...(questionMode ? {question} : {}),speech:'device-synthesis-demo'}},
     provenance:{adapter:'synthetic-instruction-v1',live:false},
-  };
+  });
 }

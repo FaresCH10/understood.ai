@@ -39,6 +39,8 @@ import {listStaffCaseRecordings,staffCaseRecordingReceipt,receiveStaffCaseRecord
 import {handleStaffCaseRecordingRoute} from './staff-case-recording-http.mjs';
 import {audioStore} from './private-storage.mjs';
 import {ensureCaseMessageSchema,listCaseMessages,sendCaseMessage,caseMessageReceiptLookup} from './case-messages.mjs';
+import {queueCaseFollowup,followupReceipt,followupGenerationAvailable,getFollowupAudio} from './case-followups.mjs';
+import {resolveCaseFollowup} from './ai/case-followup-config.mjs';
 import { ensureBriefingSchema,createDraft,editDraft,queuePreparation,copyDraft,archiveBriefing,getPreparationRequestContext,getPreparationRequestReceipt,requestPreparation } from './preparation.mjs';
 import {ensureInstructionSchema} from './instruction-schema.mjs';
 import {startInstructionSend,completeInstructionSend,instructionSendStatus,instructionAudienceOverview,retryInstructionSend,instructionDeliveryContentForAssignment} from './instructions.mjs';
@@ -109,7 +111,7 @@ import {
   sessionCookie,
   verifyMutationOrigin,
 } from "./auth.mjs";
-import {workerCompanyContext,workerCredentialStatus,issueWorkerCredentialSetup,completeWorkerSetup,authenticateWorker} from './worker-credentials.mjs';
+import {workerCompanyContext,workerCredentialStatus,authenticateWorker,assignWorkerPassword} from './worker-credentials.mjs';
 
 function staffOnly(session) {
   if (session.principal_type !== "staff" || !['owner','supervisor','auditor'].includes(session.role)) throw new Error("Forbidden");
@@ -214,6 +216,7 @@ function staffBriefings(db, session,filters) {
 
 export function createAppHandler(db, options = {}) {
   const config = options.config ?? resolveAuthConfig(options);
+  const caseFollowupAdapter = Object.hasOwn(options,'caseFollowupAdapter') ? options.caseFollowupAdapter : resolveCaseFollowup();
   const mail=resolveMailConfig({...options.mail,publicOrigin:config.publicOrigin,allowLocal:true});
   const destination=pilotDestination(options.pilotDestination);
   const pilotMail=config.accessMode==='credential'?mail:{available:false};
@@ -405,7 +408,8 @@ export function createAppHandler(db, options = {}) {
         if (config.accessMode !== "credential")
           return send(res, 404, { error: "Not found" });
         const body = await readJson(req);
-        const session = redeemWorkerGrant(db, body.token);
+        if(!['token','company','workerId','password'].every(key=>typeof body[key]==='string' && body[key].length>0))throw new Error('Invalid credentials');
+        const session = authenticateWorker(db,body,req.socket.remoteAddress);
         return send(
           res,
           200,
@@ -429,8 +433,7 @@ export function createAppHandler(db, options = {}) {
       if (path === "/api/auth/worker/setup" && req.method === "POST") {
         if (config.accessMode !== "credential") return send(res,404,{error:'Not found'});
         if(url.search) throw new Error('Invalid input');
-        const session = completeWorkerSetup(db, await readJson(req), req.socket.remoteAddress);
-        return send(res,200,{ok:true},{'set-cookie':sessionCookie(session.token,session.maxSeconds)});
+        return send(res,410,{error:'Use the worker ID and password assigned by your company.'});
       }
       const session = requireSession(db, req, config);
       if(!archivedWriteAllowed(path,req.method))requireSiteOperational(db,session.org_id,session.site_id);
@@ -610,11 +613,18 @@ export function createAppHandler(db, options = {}) {
         if(url.search)throw Error('Invalid credential request');
         return send(res,200,workerCredentialStatus(db,session,workerCredentials[1]));
       }
+      const workerPasswordAssignment=path.match(/^\/api\/people\/workers\/([^/]+)\/credentials\/password$/);
+      if(workerPasswordAssignment && req.method==='POST'){
+        if(config.accessMode!=='credential')return send(res,404,{error:'Not found'});
+        if(url.search)throw new Error('Invalid input');
+        return send(res,200,assignWorkerPassword(db,session,decodeURIComponent(workerPasswordAssignment[1]),await readJson(req)));
+      }
       const workerCredentialSetup=path.match(/^\/api\/people\/workers\/([^/]+)\/credentials\/setup$/);
       if(workerCredentialSetup && config.accessMode==='credential') {
         if(req.method!=='POST') return send(res,404,{error:'Not found'});
         if(url.search)throw Error('Invalid credential request');
-        return send(res,201,issueWorkerCredentialSetup(db,session,workerCredentialSetup[1],await readJson(req)));
+        workerCredentialStatus(db,session,workerCredentialSetup[1]);
+        return send(res,410,{error:'Assign the worker ID and password from Team.'});
       }
       if (path === '/api/people/crews') {
         if (req.method === 'GET') return send(res, 200, listCrews(db, session,Object.fromEntries(url.searchParams)));
@@ -756,6 +766,7 @@ export function createAppHandler(db, options = {}) {
             review:getDraftReview(db,id,session.org_id,session.site_id),
             generationLanguages:getDraftLanguageSelection(db,session.org_id,session.site_id,id),
             archive:archive ? {reason:JSON.parse(archive.request_json).reason,archived_by:archive.archived_by,occurred_at:archive.occurred_at} : null,
+            ...(()=>{const sendRow=db.prepare('SELECT state,delivered,undelivered,audience_count FROM instruction_sends WHERE briefing_id=? AND org_id=? AND site_id=?').get(id,session.org_id,session.site_id);return sendRow?{sendState:sendRow.state,delivered:sendRow.delivered,undelivered:sendRow.undelivered,audienceCount:sendRow.audience_count}:{};})(),
           });
         }
         if (!action && req.method==='PATCH') return send(res,200,editDraft(db,session,id,await readJson(req)));
@@ -886,7 +897,7 @@ export function createAppHandler(db, options = {}) {
       }
       if(path==='/api/privacy/recording-notice' && ['GET','POST'].includes(req.method)){
         const language=recordingNoticeLanguage(url.searchParams,session,req.method);
-        return send(res,200,req.method==='GET'?getRecordingNotice(db,session,{language}):saveRecordingNotice(db,session,await readJson(req)));
+        return send(res,200,req.method==='GET'?getRecordingNotice(db,session,{language}):saveRecordingNotice(db,session,await readJson(req,100000)));
       }
       const noticeRequest=path.match(/^\/api\/privacy\/recording-notice\/requests\/([^/]+)$/);
       if(noticeRequest && req.method==='GET'){
@@ -926,11 +937,24 @@ export function createAppHandler(db, options = {}) {
         if(url.search)throw Error('Invalid clarification action');
         return send(res,200,{...clarificationActionReceipt(db,session,caseAction[1],caseAction[2]),clientContext:clientSessionContext(session).clientContext});
       }
+      const followup=path.match(/^\/api\/clarifications\/([^/]+)\/followups(?:\/([^/]+))?$/);
+      if(followup) {
+        const [,id,receiptId]=followup;
+        if(url.search)throw Error('Invalid conversation request');
+        if(receiptId && req.method==='GET')return send(res,200,{...followupReceipt(db,session,id,receiptId),clientContext:clientSessionContext(session).clientContext});
+        if(!receiptId && req.method==='POST')return send(res,202,{...queueCaseFollowup(db,session,id,await readJson(req),caseFollowupAdapter),clientContext:clientSessionContext(session).clientContext});
+      }
+      const followupAudio=path.match(/^\/api\/clarifications\/([^/]+)\/messages\/([^/]+)\/audio$/);
+      if(followupAudio && req.method==='GET') {
+        if(url.search)throw Error('Invalid conversation request');
+        const bytes=getFollowupAudio(db,session,followupAudio[1],followupAudio[2]);
+        res.writeHead(200,{'content-type':'audio/wav','content-length':bytes.length,'cache-control':'private, no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'});return res.end(bytes);
+      }
       const conversation=path.match(/^\/api\/clarifications\/([^/]+)\/messages(?:\/([^/]+))?$/);
       if(conversation) {
         const [,id,receiptId]=conversation;
         if(receiptId && req.method==='GET'){if(url.search)throw Error('Invalid conversation request');return send(res,200,{...caseMessageReceiptLookup(db,session,id,receiptId),clientContext:clientSessionContext(session).clientContext});}
-        if(!receiptId && req.method==='GET')return send(res,200,{...listCaseMessages(db,session,id,Object.fromEntries(url.searchParams)),caseId:id,clientContext:clientSessionContext(session).clientContext,canGenerate:false,canVoice:false});
+        if(!receiptId && req.method==='GET'){const page=listCaseMessages(db,session,id,Object.fromEntries(url.searchParams));return send(res,200,{...page,caseId:id,clientContext:clientSessionContext(session).clientContext,canGenerate:session.principal_type==='staff' && followupGenerationAvailable(caseFollowupAdapter,page.language),canVoice:false});}
         if(!receiptId && req.method==='POST'){if(url.search)throw Error('Invalid conversation request');return send(res,200,{...sendCaseMessage(db,session,id,await readJson(req)),clientContext:clientSessionContext(session).clientContext});}
       }
       const caseMatch = path.match(
@@ -1089,7 +1113,7 @@ export function createAppHandler(db, options = {}) {
             content: {
               title: content.title,
               text: content.text,
-              ...(responseMode==='question' ? {question: content.question} : {}),
+              ...(responseMode==='question' ? {question: content.question,...(content.questionType==='multiple-choice'?{questionType:content.questionType,choices:content.choices}:{})} : {}),
               speech: deliveryMode!=='text' && content.speech === 'device-synthesis-demo' ? 'device-synthesis-demo' : null,
             },
             outcome: responseMode==='acknowledge' ? null : currentAudio ? null : row.outcome,
@@ -1146,13 +1170,14 @@ export function createAppHandler(db, options = {}) {
           :message==='Request too large'?413:503;
         return send(res,status,{error:status===503?'Acknowledgment unavailable. Check the receipt before retrying.':message});
       }
-      if(/\/clarifications\/[^/]+\/messages(?:\/|$)/.test(path)) {
+      if(/\/clarifications\/[^/]+\/(?:messages|followups)(?:\/|$)/.test(path)) {
+        const followupUnavailable=['Follow-up translation unavailable','Follow-up generation unavailable','Follow-up language unavailable'].includes(message);
         const status=['Sign in required'].includes(message)?401:['Forbidden','Forbidden origin','Worker access paused','Site archived','Workspace is read-only'].includes(message)?403
-          :['Clarification unavailable','Conversation receipt unavailable'].includes(message)?404
+          :['Clarification unavailable','Conversation receipt unavailable','Follow-up receipt unavailable','Follow-up audio unavailable'].includes(message)?404
           :['Conversation request conflict','Conversation is closed','Session context changed'].includes(message)?409
-          :message==='Follow-up translation unavailable'?503
+          :followupUnavailable?503
           :['Invalid conversation request','Invalid conversation filter','Invalid JSON'].includes(message)?400:message==='Request too large'?413:503;
-        return send(res,status,{error:status===503 && message!=='Follow-up translation unavailable'?'Conversation unavailable. Check the receipt before retrying.':message});
+        return send(res,status,{error:status===503 && !followupUnavailable?'Conversation unavailable. Check the receipt before retrying.':message});
       }
       if(['Worker access paused','Site archived','Workspace is read-only'].includes(message))return send(res,403,{error:message});
       if(path==='/api/onboarding/first-run') {
@@ -1241,7 +1266,7 @@ export function createAppHandler(db, options = {}) {
                 message,
               )
             ? 404
-            : /Worker deletion pending|Staff request conflict|Staff revision changed|Staff access is revoked|Staff access unchanged|Last active site owner must be retained|Glossary request conflict|Glossary revision changed|Glossary term is removed|Glossary term is active|Glossary term already exists|Glossary dependency changed|Template request conflict|Template revision changed|Template is archived|Template is active|Draft review request conflict|Settings request conflict|Settings revision changed|Settings unchanged|Invoice void request conflict|Invoice details changed|Invoice is voided|Only unpaid invoices can be voided|Invoice request conflict|Payment request conflict|Invoice number already exists|Payment exceeds outstanding balance|Briefing archive request conflict|Briefing is archived|Worker code changed|Worker ID already in use|Worker capacity reached|Reactivation request conflict|Crew name changed|Crew is archived|Instruction request conflict|Instruction retry conflict|Instruction retry limit reached|Instruction deadline passed|Instruction audience exceeds limit|Select your language first|Language already selected|Language change already pending|Language request already decided|Language request conflict|Language request changed|Worker language changed|Language selection conflict|unavailable|not technically ready|cannot be processed|Export expired|Export is not ready|Import expired|Fix CSV errors|cannot be retried|ID conflict|Help request conflict|Resolution conflict|Draft request conflict|Draft copy request conflict|Draft revision changed|Publication request conflict|Withdrawal request conflict|Publication is no longer current|Assignment deadline passed/.test(
+            : /Worker deletion pending|Staff request conflict|Staff revision changed|Staff access is revoked|Staff access unchanged|Last active site owner must be retained|Glossary request conflict|Glossary revision changed|Glossary term is removed|Glossary term is active|Glossary term already exists|Glossary dependency changed|Template request conflict|Template revision changed|Template is archived|Template is active|Draft review request conflict|Settings request conflict|Settings revision changed|Settings unchanged|Invoice void request conflict|Invoice details changed|Invoice is voided|Only unpaid invoices can be voided|Invoice request conflict|Payment request conflict|Invoice number already exists|Payment exceeds outstanding balance|Briefing archive request conflict|Briefing is archived|Worker code changed|Worker ID already in use|Worker capacity reached|Reactivation request conflict|Crew name changed|Crew is archived|Instruction request conflict|Instruction retry conflict|Instruction retry limit reached|Instruction deadline passed|Instruction audience exceeds limit|Instruction crew audience exceeds limit|Choose a language for every selected worker in Team before sending.|Select your language first|Language already selected|Language change already pending|Language request already decided|Language request conflict|Language request changed|Worker language changed|Language selection conflict|unavailable|not technically ready|cannot be processed|Export expired|Export is not ready|Import expired|Fix CSV errors|cannot be retried|ID conflict|Help request conflict|Resolution conflict|Draft request conflict|Draft copy request conflict|Draft revision changed|Publication request conflict|Withdrawal request conflict|Publication is no longer current|Assignment deadline passed/.test(
                   message,
                 )
               ? 409

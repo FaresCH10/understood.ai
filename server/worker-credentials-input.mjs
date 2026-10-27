@@ -1,4 +1,4 @@
-const COMPANY_LOCATOR = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/;
+const COMPANY_LOCATOR = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 const WORKER_LOGIN = /^[\p{L}\p{N}][\p{L}\p{N} ._'-]{1,79}$/u;
 const SETUP_CODE = /^[A-Za-z0-9_-]{43}$/;
 
@@ -29,10 +29,11 @@ export function workerPassword(value, { login = '', company = '' } = {}) {
 }
 
 export function workerLoginInput(input) {
-  exactKeys(input, ['company', 'workerId', 'password']);
+  exactKeys(input, ['company', 'workerId', 'password', 'token']);
+  if(input.token!==undefined && (typeof input.token!=='string' || !SETUP_CODE.test(input.token)))throw new Error('Invalid credentials');
   const company = companyLocator(input.company);
   const login = normalizeWorkerLogin(input.workerId);
-  return { company, login, password: workerPassword(input.password, { login, company }) };
+  return { company, login, password: workerPassword(input.password, { login, company }),...(input.token!==undefined?{token:input.token}:{}) };
 }
 
 export function workerSetupClaimInput(input) {
@@ -55,4 +56,11 @@ export function credentialSetupInput(input) {
 export function setupCode(value) {
   if (typeof value !== 'string' || !SETUP_CODE.test(value)) throw new Error('Invalid setup credential');
   return value;
+}
+
+export function assignedCredentialInput(input,company=''){
+  exactKeys(input,['expectedCode','workerId','password','confirmed']);
+  if(input.confirmed!==true)throw new Error('Confirmation required');
+  const expectedCode=normalizeWorkerLogin(input.expectedCode),login=normalizeWorkerLogin(input.workerId);
+  return {expectedCode,login,password:workerPassword(input.password,{login,company})};
 }

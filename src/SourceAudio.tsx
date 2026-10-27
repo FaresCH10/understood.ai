@@ -35,6 +35,7 @@ export default function SourceAudio({disabled,onChange,onActivityChange,mode='re
     try{media.resume();started.current=performance.now();setPaused(false);}catch{setError('Recording could not be resumed.');}
   }
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;generation.current++;decode.current?.abort();release();if(preview.current)URL.revokeObjectURL(preview.current);};},[]);
+  useEffect(()=>{const pause=()=>{if(current.current==='recording')stopRecording.current();else if(current.current==='requesting')cancel();};window.addEventListener('understood:session-verification-pending',pause);return()=>window.removeEventListener('understood:session-verification-pending',pause);},[]);
   useEffect(()=>{onActivityChange(phase!=='idle');return()=>onActivityChange(false);},[phase,onActivityChange]);
   useEffect(()=>{
     if(phase!=='recording' || paused)return;

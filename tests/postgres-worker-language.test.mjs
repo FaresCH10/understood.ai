@@ -1,3 +1,4 @@
+import {assignWorkerPassword} from '../server/postgres/worker-credentials.mjs';
 import test from 'node:test';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
 const fetch=createSessionContextFetch();
@@ -183,10 +184,11 @@ test('PostgreSQL worker language HTTP routes persist selection, fence stale cont
     const password='Synthetic language HTTP password';
     await provisionStaffCredential(pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password},options);
     const created=await createWorker(pool,owner,{code:'HTTP 500',name:'Nadia Fares'},options);
+    await assignWorkerPassword(pool,owner,created.id,{expectedCode:'HTTP 500',workerId:'HTTP 500',password:'Assigned synthetic worker password',confirmed:true},options);
     const grant=await issueWorkerGrant(pool,owner,created.id,30,options);
     await withHttp(f,async({request,base})=>{
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password})));
-      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'HTTP 500',password:'Assigned synthetic worker password'})));
       const before=await (await request('/session',workerCookie)).json();
       assert.equal(before.name,'Nadia Fares');
       assert.equal(before.role,'worker');

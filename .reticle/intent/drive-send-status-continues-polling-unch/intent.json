@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-send-status-continues-polling-unchanged-preparat": {
+      "declaredAt": 1792997115640,
+      "id": "flow:drive-send-status-continues-polling-unchanged-preparat",
+      "state": "declared",
+      "statement": "Send status continues polling unchanged preparation responses until publication completes.",
+      "status": "proposed",
+      "subject": "drive-send-status-continues-polling-unch",
+      "surface": {
+        "flow": "drive-send-status-continues-polling-unchanged-preparat"
+      },
+      "updatedAt": 1792997115646
+    }
+  },
+  "subject": "drive-send-status-continues-polling-unch",
+  "version": 1
+}

@@ -1,5 +1,6 @@
+import {type WorkerLocaleCode} from '../server/languages.mjs';
 import {reviewInput} from '../server/briefing-input.mjs';
-export type TranslationEdits=Partial<Record<'ar'|'ur',{title:string;text:string;question:string}>>;
+export type TranslationEdits=Partial<Record<Exclude<WorkerLocaleCode,'en'>,{title:string;text:string;question:string}>>;
 export type PendingReview={requestId:string;briefingId:string;body:{revision:number;question:string;facts:string[];askedFacts:string[];translations?:TranslationEdits;confirmed:true}};
 type Store=Pick<Storage,'getItem'|'setItem'|'removeItem'>;
 const key=(scope:string)=>`understood:review:${scope}`;

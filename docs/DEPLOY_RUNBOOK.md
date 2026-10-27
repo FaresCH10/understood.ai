@@ -1,5 +1,7 @@
 # Deployment runbook: synthetic staging only
 
+For the separate production code path and contracts, see [PRODUCTION_GEMINI_INTEGRATION.md](PRODUCTION_GEMINI_INTEGRATION.md). The procedures below retain their synthetic staging scope; production still requires its completed external gates and release approval.
+
 This runbook prepares and operates the packaged synthetic staging stack. It is
 not production approval and it does not authorize real worker data, live AI,
 paid resources or public customer use. Nothing in this repository has been

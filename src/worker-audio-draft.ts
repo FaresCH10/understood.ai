@@ -1,3 +1,4 @@
+import {isWorkerLanguage} from '../server/languages.mjs';
 import {validWorkerSession,sameWorkerSession,type PageSession} from './session-state.ts';
 import type {RecordingScope} from './worker-audio-retry.ts';
 import {privateDeviceAllowed} from './worker-device-policy.ts';
@@ -43,7 +44,7 @@ const exact=(value:unknown,keys:string)=>!!value && typeof value==='object' && !
 const iso=(value:unknown):value is string=>typeof value==='string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString()===value;
 function scopeValid(scope:RecordingScope){
   return exact(scope,'assignmentId,language,publicationId,version') && [scope.assignmentId,scope.publicationId].every(value=>typeof value==='string' && value.trim().length>0 && value.length<=100)
-    && Number.isSafeInteger(scope.version) && scope.version>0 && ['en','ar','ur'].includes(scope.language);
+    && Number.isSafeInteger(scope.version) && scope.version>0 && isWorkerLanguage(scope.language);
 }
 const sameScope=(a:RecordingScope,b:RecordingScope)=>a.assignmentId===b.assignmentId && a.publicationId===b.publicationId && a.version===b.version && a.language===b.language;
 function wavValid(bytes:Uint8Array){

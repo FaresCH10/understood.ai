@@ -17,7 +17,7 @@ export function Notifications({refresh,navigate,timezone,authority}:{refresh:num
   const [status,setStatus]=useState('all'),[page,setPage]=useState(1),[tick,setTick]=useState(0);
   const [data,setData]=useState<NotificationPage|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState('');
   const operation=useArtifactMutation(authority,scope,definition,savePendingNotification,notificationRoles.includes(authority.session.staffRole || ''),result=>{
-    setMessage(`Read status verified: ${result.label}.`);setTick(value=>value+1);
+    window.dispatchEvent(new Event('understood:notifications-changed'));setMessage(`Read status verified: ${result.label}.`);setTick(value=>value+1);
   },recovery.pending);
   const {busy}=operation,blocked=busy || !!operation.pending.current || !!recovery.error;
   useEffect(()=>{
@@ -49,7 +49,7 @@ export function Notifications({refresh,navigate,timezone,authority}:{refresh:num
     {operation.pending.current && <section className="notification-recovery" aria-label="Saved notification read"><h2>Recover read status</h2><p>{operation.pending.current.item.label}</p><p><time dateTime={operation.pending.current.item.occurredAt}>{date(operation.pending.current.item.occurredAt)}</time></p><div className="actions"><button className="button outline" disabled={busy} onClick={()=>void operation.check()}><RefreshCw size={18}/>Check read status</button>{operation.checked && <button className="button primary" disabled={busy} onClick={()=>void operation.write(operation.pending.current!)}><Check size={18}/>Retry original mark read</button>}</div></section>}
     <section className="notification-list" aria-label="Site notifications" aria-busy={loading}>
       {loading ? <p role="status">Loading notifications...</p> : data?.items.length ? data.items.map(item=><article className="notification-row" key={item.id}>
-        <Bell size={20} aria-hidden="true"/><div className="item-main"><strong>{item.label}</strong><small><time dateTime={item.occurredAt}>{date(item.occurredAt)}</time> · {item.readAt?'Read':'Unread'}</small>{item.readAt && <small>Marked read <time dateTime={item.readAt}>{date(item.readAt)}</time></small>}</div>
+        <Bell size={20} aria-hidden="true"/><div className="item-main"><strong>{item.label}{item.subject?` · ${item.subject}`:''}</strong><small><time dateTime={item.occurredAt}>{date(item.occurredAt)}</time> · {item.readAt?'Read':'Unread'}</small>{item.readAt && <small>Marked read <time dateTime={item.readAt}>{date(item.readAt)}</time></small>}</div>
         <div className="actions"><button className="icon-button" title={`Open ${item.label}`} aria-label={`Open ${item.label}`} disabled={!!busy} onClick={()=>{if(current() && ['briefings','clarifications','reports','people'].includes(item.destination))navigate(item.destination);}}><ExternalLink size={18}/></button>
           <button className="icon-button" title={`Mark read: ${item.label}`} aria-label={`Mark read: ${item.label}`} disabled={loading || blocked || !!item.readAt} onClick={()=>void markRead(item)}><Check size={18}/></button></div>
       </article>) : !error && <p>{page>pages?'This page is no longer available.':'No notifications match this filter.'}</p>}

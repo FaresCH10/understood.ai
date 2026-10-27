@@ -12,7 +12,7 @@ export function readPreparationFingerprint(pool,{orgId,siteId,briefingId,confirm
   return withTransaction(pool,async client=>{
     await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
     await client.query("SELECT set_config('search_path',quote_ident($1)||',pg_catalog',true),set_config('lock_timeout','5s',true),set_config('statement_timeout','10s',true)",[schema]);
-    const draft=(await client.query(`SELECT source,revision FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3
+    const draft=(await client.query(`SELECT source,title,revision FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3
       AND NOT EXISTS(SELECT 1 FROM briefing_archives a WHERE a.briefing_id=briefings.id)`,[briefingId,orgId,siteId])).rows[0];
     if(!draft || typeof draft.source!=='string' || !draft.source.trim() || draft.source.length>4000)throw Error('Synthetic draft unavailable');
     const review=(await client.query('SELECT content_json FROM draft_reviews WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',[briefingId,orgId,siteId])).rows[0]?.content_json ?? null;
@@ -21,6 +21,6 @@ export function readPreparationFingerprint(pool,{orgId,siteId,briefingId,confirm
       WHERE r.briefing_id=$1 AND r.org_id=$2 AND r.site_id=$3 AND r.accepted_revision=$4`,[briefingId,orgId,siteId,draft.revision])).rows[0];
     const languages=regeneration?.manifest_json.dependencies.languages ?? await readGenerationLanguages(client,orgId,siteId,['en','ar','ur'],briefingId);
     const glossary=await readGlossarySnapshot(client,orgId,siteId);
-    return {revision:draft.revision,languages,fingerprint:preparationInputHash({source:draft.source,revision:draft.revision,languages,review,glossary})};
+    return {revision:draft.revision,languages,fingerprint:preparationInputHash({source:draft.source,title:draft.title,revision:draft.revision,languages,review,glossary})};
   });
 }

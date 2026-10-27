@@ -25,7 +25,8 @@ export function saveDraftLanguages(pool,session,id,input,{schema='public'}={}) {
     const jobId=randomUUID();
     await client.query("INSERT INTO jobs(id,org_id,site_id,briefing_id,revision,kind,status,due_at) VALUES($1,$2,$3,$4,$5,'prepare','queued',clock_timestamp())",[jobId,session.org_id,session.site_id,id,revision]);
     await bindPreparationAuthority(client,session,jobId);
-    await client.query('INSERT INTO briefing_language_requests(request_id,org_id,site_id,briefing_id,accepted_revision,request_json,requested_by) VALUES($1,$2,$3,$4,$5,$6,$7)',[input.requestId,session.org_id,session.site_id,id,revision,JSON.stringify(content),session.principal_id]);
+    try{await client.query('INSERT INTO briefing_language_requests(request_id,org_id,site_id,briefing_id,accepted_revision,request_json,requested_by) VALUES($1,$2,$3,$4,$5,$6,$7)',[input.requestId,session.org_id,session.site_id,id,revision,JSON.stringify(content),session.principal_id]);}
+    catch(error){if(error?.code==='23514')throw Error('Invalid generation languages');throw error;}
     await domainAudit(client,session,'briefing.languages_updated',id);
     return {id,revision,duplicate:false};
   });

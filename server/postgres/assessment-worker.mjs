@@ -1,3 +1,5 @@
+import {providerDataClass} from '../ai/provider-policy.mjs';
+import {assessMultipleChoice} from '../multiple-choice.mjs';
 import { randomUUID } from 'node:crypto';
 import { domainTransaction, domainAudit } from './domain.mjs';
 import {dispatchAllowed,dispatchPredicate} from './operations-gates.mjs';
@@ -33,7 +35,7 @@ export async function processOneAssessment(pool,adapter,{schema='public'}={}) {
       return {...row,exhausted:true};
     }
     const token = randomUUID();
-    await client.query(`UPDATE assessment_jobs SET status='processing',attempts=attempts+1,lease_until=clock_timestamp()+interval '90 seconds',
+    await client.query(`UPDATE assessment_jobs SET status='processing',attempts=attempts+1,lease_until=clock_timestamp()+interval '180 seconds',
       lease_token=$2,error=NULL WHERE id=$1`,[row.id,token]);
     return {...row,attempts:row.attempts+1,token};
   });
@@ -48,21 +50,22 @@ export async function processOneAssessment(pool,adapter,{schema='public'}={}) {
     }
     const evaluation=assessmentInput(input),inputHash=assessmentInputHash(evaluation);
     const {answer,question,askedFacts}=evaluation;
-    if(typeof adapter.permitsAssessment==='function' && !adapter.permitsAssessment(evaluation)) {
+    const multipleChoice=input.snapshot_json?.rubric?.mode==='multiple-choice';
+    if(!multipleChoice && typeof adapter.permitsAssessment==='function' && !adapter.permitsAssessment(evaluation)) {
       await domainTransaction(pool,schema,client=>client.query(`UPDATE assessment_jobs SET status='blocked',lease_until=NULL,lease_token=NULL,error='Synthetic assessment input not allowlisted'
         WHERE id=$1 AND status='processing' AND lease_token=$2 AND lease_until>clock_timestamp()`,[job.id,job.token]));return true;
     }
     let assessor=adapter,operation=null;
-    if(typeof adapter.withJournal==='function') {
-      if(adapter.provenance?.dataClass!=='synthetic' || typeof adapter.permitsAssessment!=='function')throw Error('Assessment provider provenance unavailable');
+    if(!multipleChoice && typeof adapter.withJournal==='function') {
+      if(!providerDataClass(adapter.provenance) || typeof adapter.permitsAssessment!=='function')throw Error('Assessment provider provenance unavailable');
       operation=await domainTransaction(pool,schema,client=>reserveProviderOperation(client,{orgId:job.org_id,kind:'typed-assessment',
-        referenceId:job.id,claimToken:job.token,model:adapter.assessmentModel,dataClass:'synthetic',maxRequests:1,inputHash,provenance:adapter.provenance}));
+        referenceId:job.id,claimToken:job.token,model:adapter.assessmentModel,dataClass:adapter.provenance.dataClass,maxRequests:1,inputHash,provenance:adapter.provenance}));
       assessor=adapter.withJournal(providerRequestJournal(pool,operation,{schema}));
     }
     if(!await domainTransaction(pool,schema,async client=>{
       const current=await currentAssessmentClaim(client,job);return current && assessmentInputHash(assessmentInput(current))===inputHash;
     }))return true;
-    const result = validatedAssessment(await assessor.assess(answer,question,askedFacts),answer,askedFacts);
+    const result = validatedAssessment(multipleChoice?assessMultipleChoice(answer,input.snapshot_json,input.language):await assessor.assess(answer,question,askedFacts),answer,askedFacts);
     await domainTransaction(pool,schema,async (client) => {
       if(!await dispatchAllowed(client,job.org_id,{provider:true}))return;
       // Same worker/assignment lock order as receipt acceptance. Completion cannot revise another attempt.

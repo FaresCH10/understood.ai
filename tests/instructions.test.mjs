@@ -66,8 +66,8 @@ test('instruction send publishes only prepared languages, freezes modes and supp
     assert.ok(item);assert.equal(item.responseMode,'question');assert.equal(item.deliveryMode,'both');
     const detail=await (await call(`/worker/briefings/${item.id}`,worker)).json();
     assert.equal(detail.responseMode,'question');assert.equal(detail.deliveryMode,'both');
-    assert.match(detail.content.question,/key details/);
-    const answer=await call(`/worker/briefings/${item.id}/answers`,worker,{submissionId:randomUUID(),text:'I will move the red ladder to the north bay before the night shift.'});
+    assert.match(detail.content.question,/red ladder.*when/);assert.equal(detail.content.questionType,'multiple-choice');assert.equal(detail.content.choices.length,4);assert.ok(!JSON.stringify(detail).includes('correctChoiceId'));
+    const answer=await call(`/worker/briefings/${item.id}/answers`,worker,{submissionId:randomUUID(),text:detail.content.choices.find(choice=>choice.text===source).id});
     assert.equal(answer.status,201);assert.equal((await answer.json()).outcome,'matched');
     const answered=await (await call(`/reports?publicationId=${result.publicationId}`,maya)).json();
     assert.equal(answered.metrics.responses,1);assert.equal(answered.rows[0][2],'assessed');assert.equal(answered.rows[0][3],'matched');

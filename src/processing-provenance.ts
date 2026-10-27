@@ -1,6 +1,7 @@
+import {isWorkerLanguage} from '../server/languages.mjs';
 import type {ProcessingJob,ProcessingKind} from './processing-state';
 export type ProviderRequest={sequence:number;cleanup:boolean;state:'started'|'accepted'|'rejected'|'uncertain';httpStatus:number|null;startedAt:string;finishedAt:string|null};
-export type ProviderOperation={id:string;kind:string;model:string;dataClass:'synthetic';reservedRequests:number;startedAt:string;runId:string;runStartedAt:string;currentRun:boolean;
+export type ProviderOperation={id:string;kind:string;model:string;dataClass:'synthetic'|'real';reservedRequests:number;startedAt:string;runId:string;runStartedAt:string;currentRun:boolean;
   provenance:{adapter:string;promptVersion:string;schemaVersion:string}|null;stage:{step:number;name:string;language:string;track:string|null}|null;resultReference:'transcription'|'assessment'|'bundle'|null;requests:ProviderRequest[]};
 export type ProviderHistory={jobId:string;kind:ProcessingKind;publicationId:string|null;publicationVersion:number|null;assignmentId:string|null;supported:boolean;items:ProviderOperation[];total:number;page:number;pageSize:number};
 const object=(value:unknown):value is Record<string,unknown>=>!!value && typeof value==='object' && !Array.isArray(value);
@@ -21,14 +22,15 @@ export function checkedProviderHistory(value:unknown,job:Pick<ProcessingJob,'id'
 export function checkedProviderOperation(value:unknown,kind:ProcessingKind):ProviderOperation{
   if(!object(value) || !keys(value,['id','kind','model','dataClass','reservedRequests','startedAt','runId','runStartedAt','currentRun','provenance','stage','resultReference','requests'])
     || !reference(value.id) || !reference(value.runId) || !kinds[kind]?.includes(String(value.kind)) || typeof value.model!=='string' || !/^[a-z0-9][a-z0-9.-]{2,80}$/.test(value.model)
-    || value.dataClass!=='synthetic' || !Number.isInteger(value.reservedRequests) || Number(value.reservedRequests)<1 || Number(value.reservedRequests)>64
+    || !['synthetic','real'].includes(value.dataClass as string) || !Number.isInteger(value.reservedRequests) || Number(value.reservedRequests)<1 || Number(value.reservedRequests)>64
     || !date(value.startedAt) || !date(value.runStartedAt) || value.runStartedAt>value.startedAt || typeof value.currentRun!=='boolean'
     || !Array.isArray(value.requests) || value.requests.length>Number(value.reservedRequests)
     || value.resultReference!==null && !(['preparation'].includes(String(value.kind))?['bundle']:['recording-assessment','typed-assessment'].includes(String(value.kind))?['assessment']:['transcription']).includes(String(value.resultReference)))throw Error('Provider operation cannot be verified.');
   if(value.provenance!==null && (!object(value.provenance) || !keys(value.provenance,['adapter','promptVersion','schemaVersion']) || !Object.values(value.provenance).every(slug)))throw Error('Recorded provider attribution cannot be verified.');
+  if(value.dataClass==='real'&&(!object(value.provenance)||value.provenance.adapter!=='gemini-approved-v1'))throw Error('Production provider attribution cannot be verified.');
   if(value.stage!==null && (value.kind!=='preparation' || value.provenance===null || !object(value.stage) || !keys(value.stage,['step','name','language','track'])
-    || !Number.isInteger(value.stage.step) || Number(value.stage.step)<1 || Number(value.stage.step)>64 || !['preparation','grounding_check','translation','translation_check','speech'].includes(String(value.stage.name))
-    || !['en','ar','ur'].includes(String(value.stage.language)) || (value.stage.name==='speech'?!['body','question'].includes(String(value.stage.track)):value.stage.track!==null)))throw Error('Provider stage cannot be verified.');
+    || !Number.isInteger(value.stage.step) || Number(value.stage.step)<1 || Number(value.stage.step)>68 || !['preparation','grounding_check','translation','translation_check','speech'].includes(String(value.stage.name))
+    || !isWorkerLanguage(value.stage.language) || (value.stage.name==='speech'?!['body','question'].includes(String(value.stage.track)):value.stage.track!==null)))throw Error('Provider stage cannot be verified.');
   if(value.kind==='preparation' && value.provenance!==null && value.stage===null)throw Error('Provider stage cannot be verified.');
   for(const [index,request] of value.requests.entries()){
     if(!object(request) || !keys(request,['sequence','cleanup','state','httpStatus','startedAt','finishedAt']) || request.sequence!==index+1 || typeof request.cleanup!=='boolean'

@@ -59,7 +59,7 @@ test('service factories reject mixed customer/operator roles before any database
   assert.throws(()=>createPostgresHostedServer(pool,{config:{...config,service:'api',runtimeRoleProfile:'application'},publicBuild}),/Invalid hosted synthetic runtime/);
   for(const patch of [{service:'api'},{runtimeRoleProfile:'application'},{operatorAccess:false},{customerOrigin:origin},
     {storageConfig:{}},{providerVerification:{}},{storageChecks:true},{mail:{available:true}},{pilotDestination:'pilot@example.test'},
-    {dataClass:'real'},{tier:'production'},{aiMode:'live'}])assert.throws(()=>createPostgresOperatorServer(pool,{config:{...config,...patch},publicBuild}),/Invalid isolated operator/);
+    {dataClass:'real'},{tier:'production'},{aiMode:'live'}])assert.throws(()=>createPostgresOperatorServer(pool,{config:{...config,...patch},publicBuild}),patch.tier==='production'?/Production release approval/:/Invalid isolated operator/);
   assert.equal(connections,0);
 });
 

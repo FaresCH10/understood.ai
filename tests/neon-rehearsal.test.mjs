@@ -37,7 +37,7 @@ test('Neon rehearsal uses all migrations and scoped synthetic contracts, then re
   const {db,pool,events,commands}=memoryFixture();
   try{
     const result=await rehearseNeonDatabase(env,{makePool:()=>pool,preflight,checkpoint:async value=>events.push(JSON.parse(JSON.stringify(value)))});
-    assert.equal(result.state,'passed',JSON.stringify(result));assert.equal(result.migrationsApplied,108);assert.equal(result.cleanup,'verified-removed');assert.equal(result.outsideCatalogIdentitiesUnchanged,true);assert.equal(result.checks.length,8);assert.equal(result.providerCalls,0);assert.equal(result.productionVerdict,false);
+    assert.equal(result.state,'passed',JSON.stringify(result));assert.equal(result.migrationsApplied,113);assert.equal(result.cleanup,'verified-removed');assert.equal(result.outsideCatalogIdentitiesUnchanged,true);assert.equal(result.checks.length,8);assert.equal(result.providerCalls,0);assert.equal(result.productionVerdict,false);
     assert.equal((await db.query('SELECT 1 FROM pg_namespace WHERE nspname=$1',[result.schema])).rows.length,0);assert.ok(events.some(value=>value.phase==='schema-creation'));assert.ok(events.some(value=>value.phase==='cleanup'));
     const drops=commands.filter(sql=>/^DROP SCHEMA/.test(sql));assert.deepEqual(drops,[`DROP SCHEMA "${result.schema}" CASCADE`]);assert.doesNotMatch(JSON.stringify(events),/PRIVATE_PASSWORD|postgresql:\/\//);
     assert.equal(commands.some(sql=>/^CREATE ROLE/.test(sql)),false);

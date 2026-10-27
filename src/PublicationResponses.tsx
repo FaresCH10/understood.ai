@@ -1,3 +1,4 @@
+import {WORKER_LOCALES,languageDirection} from '../server/languages.mjs';
 import { useEffect,useRef,useState } from 'react';
 import { ChevronLeft,ChevronRight,RefreshCw,Search,X } from 'lucide-react';
 import {PublicationPicker} from './PublicationHistory';
@@ -8,11 +9,11 @@ type Publication={id:string;version:number;state:string};
 type Row={assignmentId:string;worker:string;language:string;status:string;receivedAt:string|null};
 type Page={publication:Publication;items:Row[];total:number;page:number;pageSize:number};
 type Receipt={sequence:string;kind:string;receivedAt:string;isLatest:boolean;answerText:string|null;outcome:string|null;reasons:string[];recordingId:string|null;audioStatus:string|null;evidence:{factIndex:number;quote:string}[]};
-type Detail={publication:Publication;assignment:{id:string;worker:string;language:string;dueAt:string|null};question:string|null;workerQuestion:string|null;facts:string[];receipts:Receipt[];total:number;page:number;pageSize:number;cases:{id:string;status:string;reason:string}[];responseMode?:string;deliveryMode?:string;acknowledgedAt?:string|null};
+type Detail={questionType?:string;choices?:{id:string;text:string}[];publication:Publication;assignment:{id:string;worker:string;language:string;dueAt:string|null};question:string|null;workerQuestion:string|null;facts:string[];receipts:Receipt[];total:number;page:number;pageSize:number;cases:{id:string;status:string;reason:string}[];responseMode?:string;deliveryMode?:string;acknowledgedAt?:string|null};
 type WorkerAssignment=Row & {publicationId:string;title:string;version:number;state:string;dueAt:string|null};
 type WorkerAssignmentPage={worker:{id:string;code:string;active:boolean};items:WorkerAssignment[];total:number;page:number;pageSize:number};
-const labels:Record<string,string>={awaiting_response:'Awaiting response',acknowledged:'Acknowledged',assessment_pending:'Assessment pending',matched:'Matches key facts',clarification:'Needs clarification',unassessable:'Could not assess',failed_audio:'Audio check failed'};
-const languageNames:Record<string,string>={en:'English',ar:'Arabic',ur:'Urdu'};
+const labels:Record<string,string>={correct_answer:'Correct answer',incorrect_answer:'Incorrect answer — needs clarification',awaiting_response:'Awaiting response',acknowledged:'Acknowledged',assessment_pending:'Assessment pending',matched:'Matches key facts',clarification:'Needs clarification',unassessable:'Could not assess',failed_audio:'Audio check failed'};
+const languageNames:Record<string,string>=Object.fromEntries(WORKER_LOCALES.map(locale=>[locale.code,locale.englishName]));
 const date=(value:string|null) => value ? new Date(value).toLocaleString() : 'Not received';
 
 function useResponse<T>(path:string|null,refresh:number,authority:StaffRequestAuthority) {
@@ -94,16 +95,16 @@ export function ResponseDetail({publicationId,assignmentId,refresh,onClose,navig
     {loading ? <p role="status">Loading submission history...</p> : error ? <p role="alert">{error}</p> : data && <>
       <p>v{data.publication.version} · {data.publication.state} · {languageNames[data.assignment.language]}</p>
       {data.assignment.dueAt && <p>Due {date(data.assignment.dueAt)}</p>}
-      {data.responseMode==='acknowledge' ? <><h3>Receipt</h3>{data.acknowledgedAt ? <><Assessment value="acknowledged" /><p>{date(data.acknowledgedAt)}</p></> : <p>Awaiting acknowledgment.</p>}</> : <><h3>Question</h3><p>{data.question}</p>{data.workerQuestion && data.workerQuestion!==data.question && <p lang={data.assignment.language} dir={data.assignment.language==='en' ? 'ltr' : 'rtl'}>{data.workerQuestion}</p>}</>}
+      {data.responseMode==='acknowledge' ? <><h3>Receipt</h3>{data.acknowledgedAt ? <><Assessment value="acknowledged" /><p>{date(data.acknowledgedAt)}</p></> : <p>Awaiting acknowledgment.</p>}</> : <><h3>Question</h3><p>{data.question}</p>{data.workerQuestion && data.workerQuestion!==data.question && <p lang={data.assignment.language} dir={languageDirection(data.assignment.language) || 'ltr'}>{data.workerQuestion}</p>}</>}
       <h3>Published key facts</h3><ul>{data.facts.map((fact,index) => <li key={index}>{fact}</li>)}</ul>
       {data.responseMode!=='acknowledge' && <><h3>Accepted submissions</h3>{!data.receipts.length && <p>No accepted response yet.</p>}
       {data.receipts.map((receipt) => <article className="case-attempt" key={receipt.sequence}>
-        <div className="response-receipt-heading"><strong>{receipt.kind==='audio' ? 'Audio answer' : 'Typed answer'}{receipt.isLatest ? ' · Latest' : ''}</strong><small>{date(receipt.receivedAt)}</small></div>
-        <Assessment value={receipt.outcome || (receipt.audioStatus==='failed' ? 'failed_audio' : 'assessment_pending')} />
-        {receipt.answerText!==null && <p className="response-answer" dir="auto">{receipt.answerText || 'Empty answer'}</p>}
+        <div className="response-receipt-heading"><strong>{data.questionType==='multiple-choice'?'Multiple-choice answer':receipt.kind==='audio' ? 'Audio answer' : 'Typed answer'}{receipt.isLatest ? ' · Latest' : ''}</strong><small>{date(receipt.receivedAt)}</small></div>
+        <Assessment value={(data.questionType==='multiple-choice' && receipt.outcome==='matched'?'correct_answer':data.questionType==='multiple-choice' && receipt.outcome==='clarification'?'incorrect_answer':receipt.outcome) || (receipt.audioStatus==='failed' ? 'failed_audio' : 'assessment_pending')} />
+        {receipt.answerText!==null && <p className="response-answer" dir="auto">{data.choices?.find(choice=>choice.id===receipt.answerText)?.text || receipt.answerText || 'Empty answer'}</p>}
         {receipt.recordingId && canPlayAudio && <audio controls preload="none" aria-label={`Accepted audio answer ${receipt.sequence}`} src={`/api/recordings/${encodeURIComponent(receipt.recordingId)}/audio`} />}
         {receipt.reasons.length>0 && <ul>{receipt.reasons.map((reason,index) => <li key={index}>{reason.replaceAll('_',' ')}</li>)}</ul>}
-        {receipt.evidence.map((item,index) => <blockquote key={index}>Fact {item.factIndex+1}: {item.quote}</blockquote>)}
+        {receipt.evidence.map((item,index) => <blockquote key={index}>{data.questionType==='multiple-choice'?'Selected answer':`Fact ${item.factIndex+1}`}: {data.choices?.find(choice=>choice.id===item.quote)?.text || item.quote}</blockquote>)}
       </article>)}
       <Paging page={page} total={data.total} size={10} onChange={setPage} label="submissions" /></>}
       {data.cases.length>0 && <><h3>Clarification records</h3><div className="row-list">{data.cases.map((item) => <button className="item-row" key={item.id} onClick={() => navigate(`clarifications/${item.id}`)}><span className="item-main"><strong>{item.reason}</strong><small>{item.status}</small></span><ChevronRight size={18} /></button>)}</div></>}

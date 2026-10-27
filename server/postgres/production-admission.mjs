@@ -1,3 +1,5 @@
+import {APPROVED_GEMINI_ADAPTER} from '../ai/provider-policy.mjs';
+import {productionGeminiSettings,productionGeminiAdapters} from '../ai/production-gemini.mjs';
 import {BlockList,isIP} from 'node:net';
 import {isAbsolute} from 'node:path';
 import {resolveMailConfig} from '../auth-mail.mjs';
@@ -5,12 +7,10 @@ import {validateNeonStorageConfig} from '../neon-storage-config.mjs';
 import {resolvePushAdapter} from '../push-adapter.mjs';
 import {WORKER_LANGUAGE_CODES} from '../languages.mjs';
 
-// This registry is deliberately empty. A live provider becomes admissible only through a
-// reviewed code change that implements it and carries provider/privacy evidence; an
-// environment variable alone can never promote a synthetic or free-tier adapter.
+// Production adapters have a separate implementation. Runtime admission still requires the release and provider approvals.
 export const LIVE_PROVIDER_ADAPTERS=Object.freeze({
-  sourceTranscription:Object.freeze([]),preparation:Object.freeze([]),speech:Object.freeze([]),
-  assessment:Object.freeze([]),recording:Object.freeze([]),followup:Object.freeze([]),
+  sourceTranscription:Object.freeze([APPROVED_GEMINI_ADAPTER]),preparation:Object.freeze([APPROVED_GEMINI_ADAPTER]),speech:Object.freeze([APPROVED_GEMINI_ADAPTER]),
+  assessment:Object.freeze([APPROVED_GEMINI_ADAPTER]),recording:Object.freeze([APPROVED_GEMINI_ADAPTER]),followup:Object.freeze([APPROVED_GEMINI_ADAPTER]),
 });
 
 export const PRODUCTION_RELEASE_GATES=Object.freeze(Array.from({length:19},(_,index)=>`G${index}`));
@@ -222,6 +222,9 @@ function reviewProviders(env,service,scope,blockers) {
   return Object.freeze(selected);
 }
 
+const admittedConfigs=new WeakSet();
+export function assertProductionAdmission(config){if(!admittedConfigs.has(config)||Date.parse(config.approvalValidUntil)<=Date.now())throw Error('Production release approval unavailable or expired');}
+
 function review(env,{service='api',approvalManifest=null}={}) {
   if(!['api','worker','operator'].includes(service)) throw Error('Invalid production service');
   const blockers=[];
@@ -258,6 +261,7 @@ function review(env,{service='api',approvalManifest=null}={}) {
   const scope=reviewApprovalManifest(env,approvalManifest,blockers);
   const providers=reviewProviders(env,service,scope,blockers);
   const requestAddress=req=>{
+    assertProductionAdmission(config);
     let remote=req.socket.remoteAddress;
     if(remote?.startsWith('::ffff:')) remote=remote.slice(7);
     const version=isIP(remote ?? '');
@@ -268,20 +272,23 @@ function review(env,{service='api',approvalManifest=null}={}) {
     if(typeof address!=='string' || !isIP(address) || address.length>45) throw Error('Forbidden transport');
     return address;
   };
+  let geminiSettings;
+  if(service!=='operator' && Object.values(providers).some(value=>value===APPROVED_GEMINI_ADAPTER)){try{geminiSettings=productionGeminiSettings(env,scope);}catch{blocker(blockers,'production_gemini_configuration_invalid');}if(service==='worker'&&!env.GEMINI_API_KEY)blocker(blockers,'production_gemini_credentials_missing');}
   const config={
     service,tier:'production',aiMode:'live',accessMode:'credential',dataClass:'real',integrationMode:'live',
     publicOrigin:origin?.origin,schema:env.UNDERSTOOD_POSTGRES_SCHEMA,port,requestAddress,
     runtimePermissionsRequired:true,operatorAccess:service==='operator',
     runtimeRoleProfile:service==='operator'?'operator':service==='worker'?'worker':'application',
     providerFallback:'disabled',freeTierDispatch:env.UNDERSTOOD_FREE_TIER_DISPATCH,
-    providerAdapters:providers,storageAdapter:storage?.adapter,storageConfig:storage?Object.freeze(storage.config):undefined,
+    geminiSettings,providerAdapters:providers,storageAdapter:storage?.adapter,storageConfig:storage?Object.freeze(storage.config):undefined,
     storageChecks:service!=='operator',mail,pushAdapter:push,
     releaseScope:scope?Object.freeze({customer:scope.customer,languages:Object.freeze([...scope.languages]),
       workerCapacity:scope.workerCapacity,dataClass:'real',freeTierDispatch:scope.freeTierDispatch}):null,
     candidateFingerprint:env.UNDERSTOOD_RELEASE_CANDIDATE_FINGERPRINT,approvalValidUntil:approvalManifest?.validUntil ?? null,
   };
   if(service==='operator') Object.assign(config,{customerOrigin:customerOrigin?.origin,pilotDestination:null});
-  return {blockers,config:blockers.length?null:Object.freeze(config)};
+  if(!blockers.length){Object.freeze(config);admittedConfigs.add(config);}
+  return {blockers,config:blockers.length?null:config};
 }
 
 export function productionAdmissionBlockers(env=process.env,options={}) {
@@ -292,4 +299,13 @@ export function productionAdmissionConfig(env=process.env,options={}) {
   const {blockers,config}=review(env,options);
   if(blockers.length) throw Error(`Production admission blocked: ${blockers.join(', ')}`);
   return config;
+}
+
+export function productionServiceConfig(env=process.env,options={},providerOptions={}){
+  const config=productionAdmissionConfig(env,options);
+  const handles=config.service==='worker'?productionGeminiAdapters(env,config,providerOptions):config.service==='api'?{
+    preparationAdapter:Object.freeze({provenance:Object.freeze({adapter:APPROVED_GEMINI_ADAPTER,dataClass:'real'}),capabilities:Object.freeze({textLanguages:config.geminiSettings.textLanguages,speechLanguages:config.geminiSettings.speechLanguages})}),
+    caseFollowupAdapter:Object.freeze({provenance:Object.freeze({adapter:APPROVED_GEMINI_ADAPTER,dataClass:'real'}),capabilities:Object.freeze({speechLanguages:config.geminiSettings.speechLanguages})}),
+  }:{};
+  const runtime=Object.freeze({...config,...handles});admittedConfigs.add(runtime);return runtime;
 }

@@ -273,8 +273,9 @@ export async function decideWorkerLanguageRequest(pool,session,id,input,{schema=
       if (updated.rowCount!==1) throw new Error('Worker language changed');
     }
     await domainAudit(client,session,value.action==='approve' ? 'worker.language_request_approved' : 'worker.language_request_rejected',id);
-    await recordWorkerEvent(client,{orgId:session.org_id,siteId:session.site_id,workerId:row.worker_id,kind:'language.decided',
-      objectType:'language_request',objectId:id,dedupeKey:`language.decided:${id}`});
+    const decisionKind=value.action==='approve'?'language.approved':'language.rejected';
+    await recordWorkerEvent(client,{orgId:session.org_id,siteId:session.site_id,workerId:row.worker_id,kind:decisionKind,
+      objectType:'language_request',objectId:id,dedupeKey:`${decisionKind}:${id}`});
     const saved=(await client.query('SELECT * FROM worker_language_requests WHERE id=$1',[id])).rows[0];
     return {...languageRequestDto(saved),duplicate:false};
   });

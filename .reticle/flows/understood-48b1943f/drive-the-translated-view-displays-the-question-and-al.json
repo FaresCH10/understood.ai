@@ -1,0 +1,66 @@
+{
+  "version": 2,
+  "name": "drive-the-translated-view-displays-the-question-and-al",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793001900433,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Show translation"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerPresentationView.tsx",
+        "line": 70
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "हिंदी विकल्प 4"
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Check translated choices"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 43
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "PASS: translated choices retain all grading IDs"
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "startPath": "/tests/browser/functional-audit.html",
+  "intent": "The translated view displays the question and all four answer options in the approved language.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-the-translated-view-displays-the-question-and-al"
+}

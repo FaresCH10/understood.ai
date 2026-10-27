@@ -18,10 +18,11 @@ async function lockedAssignment(client,session,assignmentId) {
 
 async function acceptingAssignment(client,session,assignment) {
   await requireWritableEntitlement(client,session.org_id);
-  const row = (await client.query(`SELECT state,snapshot_json->>'responseMode' AS response_mode,publication_content_available(id) AS content_available
+  const row = (await client.query(`SELECT state,snapshot_json->'rubric'->>'mode' AS question_type,snapshot_json->>'responseMode' AS response_mode,publication_content_available(id) AS content_available
     FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE`,
   [assignment.publication_id,session.org_id,session.site_id])).rows[0];
   if (row?.state!=='published' || !row.content_available) throw new Error('Assignment unavailable');
+  if(row.question_type==='multiple-choice')throw new Error('Select one of the published choices');
   if (row.response_mode==='acknowledge') throw new Error('This instruction only requires confirmation');
   return acceptingRepeat(client,session,assignment);
 }

@@ -5,7 +5,7 @@ import {checkedWorkerNotificationItem,checkedWorkerNotificationPage,workerNotifi
 import {workerUiLanguages} from '../src/worker-ui-language.ts';
 
 const now='2026-10-24T10:00:00.000Z',since='2026-07-26T10:00:00.000Z';
-const kinds=['instruction.available','clarification.followup','repeat.available','language.decided','deadline.reminder'];
+const kinds=['instruction.available','clarification.followup','repeat.available','language.decided','language.approved','language.rejected','deadline.reminder'];
 const item=(overrides={})=>({id:randomUUID(),kind:'instruction.available',label:'New instruction',destination:'inbox',objectType:'assignment',objectId:randomUUID(),occurredAt:now,readAt:null,...overrides});
 const page=(overrides={})=>({items:[item()],total:1,unread:1,page:1,pageSize:10,asOf:now,since,...overrides});
 

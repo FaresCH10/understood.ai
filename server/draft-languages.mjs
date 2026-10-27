@@ -22,7 +22,8 @@ export function saveDraftLanguages(db,session,id,input) {
     const review=db.prepare('SELECT content_json FROM draft_reviews WHERE briefing_id=? AND org_id=? AND site_id=?').get(id,session.org_id,session.site_id);
     if(review)db.prepare('UPDATE draft_reviews SET content_json=? WHERE briefing_id=? AND org_id=? AND site_id=?').run(JSON.stringify({...JSON.parse(review.content_json),revision}),id,session.org_id,session.site_id);
     db.prepare("INSERT INTO jobs VALUES(?,?,?,?,?,'prepare','queued',0,?,NULL,NULL,?)").run(randomUUID(),session.org_id,session.site_id,id,revision,now,now);
-    db.prepare('INSERT INTO briefing_language_requests VALUES(?,?,?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,id,revision,JSON.stringify(content),session.principal_id,now);
+    try{db.prepare('INSERT INTO briefing_language_requests VALUES(?,?,?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,id,revision,JSON.stringify(content),session.principal_id,now);}
+    catch(error){if(/CHECK constraint failed|Invalid generation languages/.test(String(error?.message||'')))throw Error('Invalid generation languages');throw error;}
     briefingAudit(db,session,'briefing.languages_updated',id);
     return {id,revision,duplicate:false};
   });

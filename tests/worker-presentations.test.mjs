@@ -59,7 +59,7 @@ test('ready instruction and answer artifacts require exact content, provenance a
     artifact({content:{title:'T',text:'B',question:null,extra:'x'}}),artifact({content:{title:' ',text:'B',question:null}}),
     artifact({content:{title:'T',text:'B',question:'Q'.repeat(501)}}),artifact({content:{title:'T',text:'B'.repeat(5001),question:null}}),
     artifact({content:{title:'T\u0000',text:'B',question:null}}),answerArtifact({content:{text:''}}),
-    answerArtifact({content:{text:'T'.repeat(2001)}}),answerArtifact({content:{title:'T',text:'B',question:null}}),
+    answerArtifact({content:{text:'T'.repeat(5001)}}),answerArtifact({content:{title:'T',text:'B',question:null}}),
     artifact({status:'pending',content:null,provider:null,live:false,errorCode:null,readyAt:null}),
     artifact({status:'pending',content:null,provider:null,live:null,errorCode:'translation_failed',readyAt:'2026-10-07T12:01:00.000Z'}),
     artifact({status:'pending',content:{title:'T',text:'B',question:null},provider:null,live:null,errorCode:null,readyAt:null}),
@@ -251,4 +251,11 @@ test('request validation and in-flight authority checks stop before or after the
   const controller=new AbortController();
   await assert.rejects(requestWorkerPresentation(fake(()=>{controller.abort();throw new DOMException('Aborted','AbortError');}).send,session(),'assignment-one',request,controller.signal,()=>true),sessionError);
   await assert.rejects(requestWorkerPresentation(fake(()=>{throw Error('offline');}).send,session(),'assignment-one',request,new AbortController().signal,()=>true),unavailableError);
+});
+
+test('translated multiple-choice artifacts preserve public option identities and reject malformed options',()=>{
+  const choices=Array.from({length:4},(_,i)=>({id:String(i).repeat(32),text:`Translated option ${i}`}));
+  const content={title:'Translated title',text:'Translated instruction',question:'Translated question?',questionType:'multiple-choice',choices};
+  assert.deepEqual(checkedWorkerPresentationArtifact(artifact({content})).content.choices,choices);
+  for(const changed of [{...content,choices:choices.slice(0,3)},{...content,choices:[choices[0],choices[0],...choices.slice(2)]},{...content,choices:choices.map(choice=>({...choice,answer:true}))}])assert.throws(()=>checkedWorkerPresentationArtifact(artifact({content:changed})),invalid);
 });

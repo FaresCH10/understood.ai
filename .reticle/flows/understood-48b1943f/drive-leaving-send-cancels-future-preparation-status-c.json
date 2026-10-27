@@ -1,0 +1,72 @@
+{
+  "version": 2,
+  "name": "drive-leaving-send-cancels-future-preparation-status-c",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1792997157734,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Title"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Title"
+          },
+          "args": {
+            "value": "Pending cancellation"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 208
+          }
+        }
+      ],
+      "page": "/tests/browser/review-bugfixes.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Unmount and check cancellation"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/review-bugfixes.tsx",
+        "line": 21
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "PASS: polling stops on unmount."
+      },
+      "timeoutMs": 6000,
+      "page": "/tests/browser/review-bugfixes.html"
+    }
+  ],
+  "intent": "Leaving Send cancels future preparation-status checks even while preparation is pending.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/review-bugfixes.html"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/review-bugfixes.html"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-leaving-send-cancels-future-preparation-status-c"
+}

@@ -1,8 +1,9 @@
+import {isWorkerLanguage,type WorkerLocaleCode} from '../server/languages.mjs';
 import {sameWorkerSession,validWorkerSession,type PageSession} from './session-state.ts';
 import {checkedWorkerReceipt,readWorkerRequestReceipt} from './worker-request.ts';
 import {workerResponseState} from './worker-state.ts';
 
-export type RecordingScope={assignmentId:string;publicationId:string;version:number;language:'en'|'ar'|'ur'};
+export type RecordingScope={assignmentId:string;publicationId:string;version:number;language:WorkerLocaleCode};
 type Failure='input'|'session'|'unavailable'|'conflict'|'receipt';
 export class WorkerAudioRetryError extends Error {
   readonly code:Failure;
@@ -34,7 +35,7 @@ export async function sendWorkerRecording(
   if(!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(submissionId)
     || presentationId!==null && !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(presentationId)
     || ![captured.assignmentId,captured.publicationId].every(value=>typeof value==='string' && value.trim().length>0 && value.length<=100)
-    || !Number.isSafeInteger(captured.version) || captured.version<1 || !['en','ar','ur'].includes(captured.language)
+    || !Number.isSafeInteger(captured.version) || captured.version<1 || !isWorkerLanguage(captured.language)
     || !(bytes instanceof Uint8Array) || bytes.length<8044 || bytes.length>2880044 || bytes.length%2!==0)throw new WorkerAudioRetryError('input');
   const payload=new Uint8Array(bytes);
   const guard=()=>current() && sameWorkerSession(expected,session) && expected.expiresAt===session.expiresAt;

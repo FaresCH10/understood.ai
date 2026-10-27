@@ -144,7 +144,7 @@ test('SQLite worker deletion revokes push subscriptions and cancels queued deliv
 });
 
 test('lock-screen copy is generic, localized for every worker language, and never carries business content',()=>{
-  for(const kind of ['instruction.available','clarification.followup','repeat.available','language.decided','deadline.reminder'])
+  for(const kind of ['instruction.available','clarification.followup','repeat.available','language.decided','language.approved','language.rejected','deadline.reminder'])
     for(const language of WORKER_LANGUAGE_CODES) {
       const copy=pushCopy(kind,language);assert.ok(copy.title && copy.body);assert.doesNotMatch(`${copy.title} ${copy.body}`,/rubric|shelf|Worker \d|worker-\d|assignment-\d/i,`${kind}/${language}`);
     }

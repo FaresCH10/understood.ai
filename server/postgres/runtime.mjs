@@ -1,3 +1,5 @@
+import {processOnePresentation} from './presentation-jobs.mjs';
+import {assertProductionAdmission} from './production-admission.mjs';
 import { isAbsolute,resolve,relative } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { resolveAuthConfig } from '../auth.mjs';
@@ -81,12 +83,13 @@ export const syntheticAssessmentAdapter={
 };
 
 export function rehearsalTasks(pool,storage,config,{verificationSignal}={}) {
-  const options={schema:config.schema,integrationMode:'synthetic'};
+  const options={schema:config.schema,integrationMode:config.integrationMode??'synthetic'};
   return {
     storageProbe:()=>processStorageProbe(pool,storage,{...options,adapter:config.storageAdapter ?? 'local',enabled:config.storageChecks ?? false}),
     providerVerification:()=>config.runtimeRoleProfile==='application'?false:processOneProviderVerification(pool,config.providerVerification,{...options,signal:verificationSignal}),
     preparation:() => processOnePreparation(pool,{...options,...(config.preparationAdapter ? {adapter:config.preparationAdapter,storage,languages:config.preparationLanguages} : {})}),
-    instructionSend:() => processOneInstructionSend(pool,options),
+    presentation:()=>config.integrationMode==='live'?processOnePresentation(pool,config.preparationAdapter,options):false,
+    instructionSend:() => processOneInstructionSend(pool,{...options,storage}),
     sourceTranscription:() => processOneSourceAudio(pool,config.sourceAdapter,storage,options),
     publicationSchedule:() => processOneSchedule(pool,{...options,storage}),
     assignmentReminder:() => processOneReminder(pool,options),
@@ -97,7 +100,7 @@ export function rehearsalTasks(pool,storage,config,{verificationSignal}={}) {
     caseFollowup:()=>config.caseFollowupAdapter?processOneCaseFollowup(pool,config.caseFollowupAdapter,storage,{...options,dataClass:config.dataClass}):false,
     caseFollowupRetention:()=>processOneCaseFollowupPurge(pool,storage,options),
     caseVoiceRetention:()=>processOneCaseVoicePurge(pool,storage,options),
-    assessment:() => processOneAssessment(pool,config.assessmentAdapter ?? syntheticAssessmentAdapter,options),
+    assessment:() => processOneAssessment(pool,config.assessmentAdapter ?? (config.integrationMode==='live'?{async assess(){throw Error('Production assessment adapter unavailable');}}:syntheticAssessmentAdapter),options),
     recording:() => config.recordingAdapter?processOneRecording(pool,config.recordingAdapter,storage,options):false,
     export:() => processOneExport(pool,options),
     stagedAudio:() => expireStagedRecording(pool,storage,options),
@@ -154,7 +157,7 @@ export async function runRehearsalWorker(pool,storage,config,{signal,intervalMs=
       fault.abort();failed('workerHealth');
     }});
     while (!loopSignal.aborted) {
-      await runWorkerCycle(tasks,{signal:loopSignal,onStage:stage=>{heartbeat.assertHealthy();presence={state:'busy',stage};},onError:failed});
+      await runWorkerCycle(tasks,{signal:loopSignal,onStage:stage=>{if(config.integrationMode==='live')assertProductionAdmission(config);heartbeat.assertHealthy();presence={state:'busy',stage};},onError:failed});
       presence={state:'idle',stage:null};heartbeat.assertHealthy();
       try {await sleep(intervalMs,undefined,{signal:loopSignal});}
       catch(error) {if(error.name!=='AbortError') throw error;}

@@ -1,3 +1,4 @@
+import {assignWorkerPassword} from '../server/worker-credentials.mjs';
 import test from 'node:test';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
 const fetch=createSessionContextFetch();
@@ -91,6 +92,7 @@ test('one-time worker grant is scoped, expires and revokes redeemed sessions', a
     const staffCookie = staffLogin.headers.get('set-cookie').split(';')[0];
     const crossSite = await request('/worker-grants', staffCookie, { method: 'POST', body: JSON.stringify({ workerId: 'harbor-worker' }) });
     assert.equal(crossSite.status, 404);
+    assignWorkerPassword(db,{principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'},'worker-14',{expectedCode:'Worker 014',workerId:'TEAM-014',password:'Assigned synthetic worker password',confirmed:true});
     const issued = await request('/worker-grants', staffCookie, { method: 'POST', body: JSON.stringify({ workerId: 'worker-14', expiresInMinutes: 30 }) });
     assert.equal(issued.status, 201);
     const grant = await issued.json();
@@ -99,7 +101,7 @@ test('one-time worker grant is scoped, expires and revokes redeemed sessions', a
       (token_hash,org_id,site_id,principal_type,principal_id,expires_at,revoked_at,grant_id,access_mode)
       VALUES (?,?,?,?,?,?,?,?,?)`).run('forged-grant-session', 'cedar', 'beirut', 'worker', 'worker-29',
       new Date(Date.now() + 10000).toISOString(), null, grant.id, 'credential'), /Scope mismatch/);
-    const redeem = () => request('/auth/worker/redeem', null, { method: 'POST', body: JSON.stringify({ token: grant.token }) });
+    const redeem = () => request('/auth/worker/redeem', null, { method: 'POST', body: JSON.stringify({ token: grant.token, company:'cedar',workerId:'TEAM-014',password:'Assigned synthetic worker password' }) });
     const workerLogin = await redeem();
     assert.equal(workerLogin.status, 200);
     assert.equal((await redeem()).status, 401);

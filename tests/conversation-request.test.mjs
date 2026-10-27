@@ -15,7 +15,7 @@ const request=(send,operation={kind:'page',page:1},s=session(),current=()=>true,
 
 test('new generated staff follow-ups use 500 while ordinary messages and captured commands retain 1000',()=>{
   const base={worker:false,pendingKind:null,canGenerate:true,language:'ar',includeAudio:false};
-  for(const language of ['ar','ur'])assert.deepEqual(conversationComposerPolicy({...base,language}),{kind:'followup',limit:500});
+  for(const language of ['ar','ur','hi','fil'])assert.deepEqual(conversationComposerPolicy({...base,language}),{kind:'followup',limit:500});
   assert.deepEqual(conversationComposerPolicy({...base,language:'en',includeAudio:true}),{kind:'followup',limit:500});
   for(const options of [{worker:true},{canGenerate:false},{language:'en'}])assert.deepEqual(conversationComposerPolicy({...base,...options}),{kind:'message',limit:1000});
   for(const [pendingKind,kind] of [['message','message'],['followup','followup']])for(const includeAudio of [false,true])assert.deepEqual(conversationComposerPolicy({...base,pendingKind,includeAudio}),{kind,limit:1000});
@@ -23,6 +23,7 @@ test('new generated staff follow-ups use 500 while ordinary messages and capture
 
 test('conversation page validates scoped exact DTO, coherent paging, authors, capabilities and private audio paths',()=>{
   assert.equal(checkedConversationPage(page(),caseId,1,context,true).total,1);
+  assert.equal(checkedConversationPage({...page(),language:'hi',items:[{...message(),language:'hi'}]},caseId,1,context,true).language,'hi');
   const audio={...message(),kind:'voice',audioUrl:`/api/clarifications/${caseId}/messages/${id}/voice`};
   assert.equal(checkedConversationPage({...page(),items:[audio]},caseId,1,context,true).items[0].kind,'voice');
   assert.equal(checkedConversationPage({...page(),items:[],page:2},caseId,2,context,true).total,1);

@@ -1,0 +1,33 @@
+{
+  "intents": {
+    "inline:the-worker-submits-one-selected-option-and-the-s-6769d515": {
+      "binding": {
+        "count": 1,
+        "kind": "net",
+        "method": "POST",
+        "status": 201,
+        "urlContains": "/answers"
+      },
+      "declaredAt": 1793085597608,
+      "id": "inline:the-worker-submits-one-selected-option-and-the-s-6769d515",
+      "provenBy": {
+        "at": 1793085598612,
+        "grade": "net",
+        "runId": "drive-ed558e61bc340b48",
+        "verdictId": "reticle_act_and_wait:1793085598612"
+      },
+      "state": "proved",
+      "statement": "The worker submits one selected option, and the server records the answer once.",
+      "status": "proved",
+      "subject": "answers",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793085598675
+    }
+  },
+  "subject": "answers",
+  "version": 1
+}

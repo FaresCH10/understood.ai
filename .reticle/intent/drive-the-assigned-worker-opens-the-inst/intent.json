@@ -1,0 +1,21 @@
+{
+  "intents": {
+    "flow:drive-the-assigned-worker-opens-the-instruction-in-ara": {
+      "binding": {
+        "flow": "drive-the-assigned-worker-opens-the-instruction-in-ara"
+      },
+      "declaredAt": 1793086200315,
+      "id": "flow:drive-the-assigned-worker-opens-the-instruction-in-ara",
+      "state": "bound",
+      "statement": "The assigned worker opens the instruction in Arabic and sees localized answer options.",
+      "status": "proposed",
+      "subject": "drive-the-assigned-worker-opens-the-inst",
+      "surface": {
+        "flow": "drive-the-assigned-worker-opens-the-instruction-in-ara"
+      },
+      "updatedAt": 1793086200361
+    }
+  },
+  "subject": "drive-the-assigned-worker-opens-the-inst",
+  "version": 1
+}

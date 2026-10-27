@@ -1,3 +1,4 @@
+import {GENERATION_LANGUAGE_CODES,workerLocale} from '../server/languages.mjs';
 import {useEffect,useRef,useState,type RefObject} from 'react';
 import {ArrowLeft,CheckCircle2,ChevronRight,Clock3,FileText,Languages,LayoutTemplate,MapPin,Mic,RefreshCw,Save,Upload} from 'lucide-react';
 import {useBriefingRequest,BriefingRequestError} from './BriefingControls';
@@ -21,7 +22,7 @@ function readLocalDraft(scope?:string|null):LocalDraft|null {
 type ComposeJob={id:string;title:string;kind:string;status:string;created_at:string;updated_at?:string};
 type ComposeTemplate={id:string;title:string;status:string};
 type ComposeMetrics={assigned:number;responses:number;matches:number;clarifications:number;pending:number;publication?:{briefingId:string;title:string;version:number}|null};
-export default function NewBriefing({scope,uploadSession,navigate,navigationGuard,authority,site}:{scope?:string|null;uploadSession:SourceUploadSession;navigate:(path:string)=>void;navigationGuard:RefObject<((next:string,resume?:()=>void)=>boolean)|null>;authority:StaffRequestAuthority;site?:string}) {
+export default function NewBriefing({scope,uploadSession,navigate,navigationGuard,authority,site,audioCapture=true}:{scope?:string|null;uploadSession:SourceUploadSession;navigate:(path:string)=>void;navigationGuard:RefObject<((next:string,resume?:()=>void)=>boolean)|null>;authority:StaffRequestAuthority;site?:string;audioCapture?:boolean}) {
   const {request,current,complete,ensureCompletion,sourceFetch}=useBriefingRequest(authority);
   const [restoredDraft]=useState(()=>readLocalDraft(scope));
   const [autosave,setAutosave]=useState<'idle'|'saving'|'saved'|'error'>(restoredDraft?'saved':'idle'),[autosavedAt,setAutosavedAt]=useState(restoredDraft?.savedAt || 0);
@@ -34,9 +35,9 @@ export default function NewBriefing({scope,uploadSession,navigate,navigationGuar
     try {return {pending:readPendingSourceUpload(sessionStorage,uploadSession),error:''};}catch(reason){return {pending:null,error:(reason as Error).message};}
   });
   const [audioAccepted,setAudioAccepted]=useState(false);
-  const [title,setTitle]=useState(restoredDraft?.title || 'Shelf colour handover'),[source,setSource]=useState(restoredDraft?.source || 'Put finished items on the blue shelf. Put unfinished items on the yellow shelf. Leave the walkway clear.');
+  const [title,setTitle]=useState(restoredDraft?.title || ''),[source,setSource]=useState(restoredDraft?.source || '');
   const [siteDefaults,setSiteDefaults]=useState(true),[languages,setLanguages]=useState(['en','ar','ur']);
-  const [sourceMode,setSourceMode]=useState<'record'|'type'|'upload'>(restoredDraft?.sourceMode==='type'?'type':'record'),[sourceAudio,setSourceAudio]=useState<PreparedSourceAudio|null>(null);
+  const [sourceMode,setSourceMode]=useState<'record'|'type'|'upload'>(!audioCapture || restoredDraft?.sourceMode==='type'?'type':'record'),[sourceAudio,setSourceAudio]=useState<PreparedSourceAudio|null>(null);
   const [audioActive,setAudioActive]=useState(false),approvedRoute=useRef<string|null>(null);
   useEffect(()=>{
     const controller=new AbortController(),live=()=>current() && !controller.signal.aborted;
@@ -69,8 +70,9 @@ export default function NewBriefing({scope,uploadSession,navigate,navigationGuar
       const value=await request<{selected?:{content?:{title?:string;source?:string}}}>(`/templates/${encodeURIComponent(id)}`,'GET');
       const content=value?.selected?.content;
       if(typeof content?.title!=='string' || typeof content.source!=='string')throw Error('Template content is unavailable.');
-      setTitle(content.title);setSource(content.source);requestId.current=crypto.randomUUID();
-      setTemplateStatus(`Applied “${content.title}”. Review the text before saving.`);
+      const templateTitle=content.title,templateSource=content.source;
+      const apply=()=>{setTitle(templateTitle);setSource(templateSource);setSourceMode('type');setSourceAudio(null);setAudioActive(false);requestId.current=crypto.randomUUID();setTemplateStatus(`Applied “${templateTitle}”. Review the text before saving.`);};
+      if(audioActive || sourceAudio)askLeave(apply);else apply();
     }catch(reason){setTemplateStatus((reason as Error).message);}
     finally{setTemplateBusy(false);}
   }
@@ -111,7 +113,7 @@ export default function NewBriefing({scope,uploadSession,navigate,navigationGuar
   if(recovery.pending && scope)return <CreationRecovery authority={authority} pending={recovery.pending} scope={scope} onResolved={id=>{ensureCompletion();clearLocalDraft();setRecovery({pending:null,error:''});navigate(`briefings/${id}`);}} onRejected={()=>{ensureCompletion();const old=recovery.pending!;clearPendingDraftCreation(sessionStorage,scope,old);setTitle(old.title);setSource(old.source);setSiteDefaults(!old.generationLanguages);setLanguages(old.generationLanguages || ['en','ar','ur']);requestId.current=crypto.randomUUID();setRecovery({pending:null,error:''});}}/>;
   async function save() {
     if(sending.current || !current())return;sending.current=true;setBusy(true);setError('');
-    if(sourceMode!=='type') {
+    if(audioCapture && sourceMode!=='type') {
       let pending:PendingSourceUpload|null=null;
       try {
         if(!sourceAudio)throw Error('Choose or record source audio first.');
@@ -139,26 +141,28 @@ export default function NewBriefing({scope,uploadSession,navigate,navigationGuar
     }finally {sending.current=false;if(current())setBusy(false);}
   }
   const switchMode=(next:'record'|'type'|'upload')=>{
+    if(!audioCapture && next!=='type')return;
     if(next===sourceMode)return;
     const change=()=>{if(next==='type'){setSourceAudio(null);setAudioActive(false);}setSourceMode(next);};
     if(next==='type' && (audioActive || sourceAudio))askLeave(change);else change();
   };
   const ago=(value:string)=>{const stamp=Date.parse(value);if(!Number.isFinite(stamp))return '';const minutes=Math.max(0,Math.round((Date.now()-stamp)/60000));return minutes<1?'Just now':minutes<60?`${minutes}m ago`:minutes<1440?`${Math.round(minutes/60)}h ago`:`${Math.round(minutes/1440)}d ago`;};
-  const needsAudio=sourceMode!=='type' && !sourceAudio;
-  return <><button className="back-link" onClick={()=>navigate('briefings')}><ArrowLeft size={18}/>Back to briefings</button><div className="page-header"><div><h1>New briefing</h1><p>Start with what you want your team to hear.</p></div></div><DraftSteps draft={null} active="source"/>
+  const needsAudio=audioCapture && sourceMode!=='type' && !sourceAudio;
+  const typed=!audioCapture || sourceMode==='type';
+  return <><button className="back-link" onClick={()=>navigate('briefings')}><ArrowLeft size={18}/>Back to briefings</button><div className="page-header"><div><h1>{audioCapture?'Record an instruction':'Write an instruction'}</h1><p>{audioCapture?'Record your voice, review the transcript, then publish it to your workers.':'Type the instruction, then save the draft. Voice capture needs a transcription provider.'}</p></div></div><DraftSteps draft={null} active="source"/>
     <form className="briefing-compose" onSubmit={event=>{event.preventDefault();void save();}}>
       <div className="briefing-compose-main">
         <section className="panel"><h2>Title</h2>
           <label className="field sr-only" htmlFor="new-briefing-title">Title</label><input id="new-briefing-title" className="compose-title" value={title} disabled={busy} onChange={event=>{requestId.current=crypto.randomUUID();setTitle(event.target.value);}} required minLength={3} maxLength={120}/>
           <h2>Source</h2>
           <div role="group" aria-label="Source format" className="source-tabs">
-            <button type="button" aria-pressed={sourceMode==='record'} className={sourceMode==='record'?'selected':''} disabled={busy} onClick={()=>switchMode('record')}><Mic size={20}/>Record</button>
+            <button type="button" aria-pressed={sourceMode==='record'} className={sourceMode==='record'?'selected':''} disabled={busy || !audioCapture} onClick={()=>switchMode('record')}><Mic size={20}/>Record</button>
             <button type="button" aria-pressed={sourceMode==='type'} className={sourceMode==='type'?'selected':''} disabled={busy} onClick={()=>switchMode('type')}><FileText size={20}/>Type</button>
-            <button type="button" aria-pressed={sourceMode==='upload'} className={sourceMode==='upload'?'selected':''} disabled={busy} onClick={()=>switchMode('upload')}><Upload size={20}/>Upload</button>
+            <button type="button" aria-pressed={sourceMode==='upload'} className={sourceMode==='upload'?'selected':''} disabled={busy || !audioCapture} onClick={()=>switchMode('upload')}><Upload size={20}/>Upload</button>
           </div>
-          {sourceMode==='type'?<label className="field">Briefing text<textarea value={source} disabled={busy} onChange={event=>{requestId.current=crypto.randomUUID();setSource(event.target.value);}} required minLength={10} maxLength={4000} rows={7}/><span className="muted">{source.length} / 4000 characters</span></label>:<><SourceAudio mode={sourceMode==='upload'?'upload':'record'} disabled={busy} onChange={setSourceAudio} onActivityChange={setAudioActive}/><p role="status" className="compose-audio-state">{sourceAudio?'Source audio is retained in memory until uploaded.':'No source audio has been sent.'} Transcription requires a permitted provider.</p></>}
+          {typed?<label className="field">Briefing text<textarea value={source} disabled={busy} onChange={event=>{requestId.current=crypto.randomUUID();setSource(event.target.value);}} required minLength={10} maxLength={4000} rows={7}/><span className="muted">{source.length} / 4000 characters</span></label>:<><SourceAudio mode={sourceMode==='upload'?'upload':'record'} disabled={busy} onChange={setSourceAudio} onActivityChange={setAudioActive}/><p role="status" className="compose-audio-state">{sourceAudio?'Source audio is retained in memory until uploaded.':'No source audio has been sent.'} Transcription requires a permitted provider. Without one, the recording is kept and then stopped, and no draft is created.</p></>}
           <fieldset className="generation-language-options"><legend>Preparation languages</legend><label className="billing-confirm"><input type="checkbox" disabled={busy} checked={siteDefaults} onChange={event=>{requestId.current=crypto.randomUUID();setSiteDefaults(event.target.checked);}}/><span>Use site generation defaults</span></label>
-            {!siteDefaults && ['en','ar','ur'].map(code=><label className="billing-confirm" key={code}><input type="checkbox" disabled={busy || code==='en'} checked={languages.includes(code)} onChange={event=>{requestId.current=crypto.randomUUID();setLanguages(old=>['en','ar','ur'].filter(language=>language===code?event.target.checked:old.includes(language)));}}/><span>{code==='en'?'English (source)':code==='ar'?'Arabic':'Urdu'}</span></label>)}
+            {!siteDefaults && GENERATION_LANGUAGE_CODES.map(code=><label className="billing-confirm" key={code}><input type="checkbox" disabled={busy || code==='en'} checked={languages.includes(code)} onChange={event=>{requestId.current=crypto.randomUUID();setLanguages(old=>GENERATION_LANGUAGE_CODES.filter(language=>language===code?event.target.checked:old.includes(language)));}}/><span>{code==='en'?'English (source)':workerLocale(code)?.englishName || code}</span></label>)}
           </fieldset>
           {error && <p role="alert" className="record-error">{error}</p>}
         </section>
@@ -204,7 +208,7 @@ function CreationRecovery({pending,scope,onResolved,onRejected,authority}:{pendi
     catch(reason){if(current()){setError((reason as Error).message);if(reason instanceof BriefingRequestError && !reason.fenced && [400,409,413,422].includes(reason.status || 0))setRejected(true);}}
     finally {sending.current=false;if(current())setBusy(false);}
   }
-  return <section className="panel draft-creation-recovery"><h1 ref={heading} tabIndex={-1}>Draft receipt</h1><p>{pending.title}</p><p>Preparation languages: {pending.generationLanguages?.map(code=>code==='en'?'English':code==='ar'?'Arabic':'Urdu').join(', ') || 'Site generation defaults'}</p><p className="staff-recovery-request">Request {pending.requestId}</p>
+  return <section className="panel draft-creation-recovery"><h1 ref={heading} tabIndex={-1}>Draft receipt</h1><p>{pending.title}</p><p>Preparation languages: {pending.generationLanguages?.map(code=>workerLocale(code)?.englishName || code).join(', ') || 'Site generation defaults'}</p><p className="staff-recovery-request">Request {pending.requestId}</p>
     {busy && <p role="status">Checking saved outcome...</p>}{error && <p role="alert" className="record-error">{error}</p>}{absent && <p>No accepted receipt was found. The outcome is not confirmed.</p>}
     <div className="actions"><button className="button outline" disabled={busy} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={18}/>Check receipt</button>
       {absent && <button className="button primary" disabled={busy} onClick={()=>void retry()}><FileText size={18}/>Retry unchanged request</button>}

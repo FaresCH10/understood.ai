@@ -1,0 +1,341 @@
+{
+  "entries": [
+    {
+      "id": "inline:the-worker-submits-one-selected-option-and-the-s-6769d515",
+      "statement": "The worker submits one selected option, and the server records the answ…",
+      "status": "proved",
+      "subject": "answers"
+    },
+    {
+      "id": "inline:a-supervisor-sends-an-instruction-to-the-selecte-d3a475dd",
+      "statement": "A supervisor sends an instruction to the selected crew despite workers…",
+      "status": "proposed",
+      "subject": "api"
+    },
+    {
+      "id": "inline:credential-test-mode-lets-a-supervisor-generate-b0a9e41d",
+      "statement": "Credential test mode lets a supervisor generate a translated follow-up…",
+      "status": "proved",
+      "subject": "api"
+    },
+    {
+      "id": "inline:the-supervisor-sends-a-ready-multilingual-instru-e8eae2c3",
+      "statement": "The supervisor sends a ready multilingual instruction to the selected A…",
+      "status": "proved",
+      "subject": "api"
+    },
+    {
+      "id": "inline:the-worker-directory-crew-filter-lists-active-cr-9be0eaa9",
+      "statement": "The worker directory crew filter lists active crews that are not on the…",
+      "status": "proved",
+      "subject": "api"
+    },
+    {
+      "id": "inline:the-worker-directory-crew-filter-loads-active-cr-fdbb6b56",
+      "statement": "The worker directory crew filter loads active crews beyond the five sho…",
+      "status": "proposed",
+      "subject": "crews"
+    },
+    {
+      "id": "flow:drive-a-supervisor-can-open-the-workspace",
+      "statement": "A supervisor can open the workspace",
+      "status": "proposed",
+      "subject": "drive-a-supervisor-can-open-the-workspac"
+    },
+    {
+      "id": "flow:drive-a-temporary-connection-failure-keeps-the-unsent",
+      "statement": "A temporary connection failure keeps the unsent answer and restores ser…",
+      "status": "proposed",
+      "subject": "drive-a-temporary-connection-failure-kee"
+    },
+    {
+      "id": "flow:drive-credential-test-mode-lets-a-supervisor-generate",
+      "statement": "Credential test mode lets a supervisor generate a translated follow-up…",
+      "status": "proposed",
+      "subject": "drive-credential-test-mode-lets-a-superv"
+    },
+    {
+      "id": "flow:drive-crew-filter-pages",
+      "statement": "crew-filter-pages",
+      "status": "proposed",
+      "subject": "drive-crew-filter-pages"
+    },
+    {
+      "id": "flow:drive-leaving-send-cancels-future-preparation-status-c",
+      "statement": "Leaving Send cancels future preparation-status checks even while prepar…",
+      "status": "proposed",
+      "subject": "drive-leaving-send-cancels-future-prepar"
+    },
+    {
+      "id": "flow:drive-leaving-send-cancels-future-preparation-status-c-ddbb28",
+      "statement": "Leaving Send cancels future preparation-status checks even while prepar…",
+      "status": "proposed",
+      "subject": "drive-leaving-send-cancels-future-prepar"
+    },
+    {
+      "id": "flow:drive-send-status-continues-polling-unchanged-preparat",
+      "statement": "Send status continues polling unchanged preparation responses until pub…",
+      "status": "proposed",
+      "subject": "drive-send-status-continues-polling-unch"
+    },
+    {
+      "id": "flow:drive-the-assigned-worker-opens-the-instruction-in-ara",
+      "statement": "The assigned worker opens the instruction in Arabic and sees localized…",
+      "status": "proposed",
+      "subject": "drive-the-assigned-worker-opens-the-inst"
+    },
+    {
+      "id": "flow:drive-the-supervisor-can-read-the-applied-template-tex",
+      "statement": "The supervisor can read the applied template text in the active source…",
+      "status": "proposed",
+      "subject": "drive-the-supervisor-can-read-the-applie"
+    },
+    {
+      "id": "flow:drive-the-supervisor-sees-an-error-before-any-send-whe",
+      "statement": "The supervisor sees an error before any send when recovery storage cann…",
+      "status": "proposed",
+      "subject": "drive-the-supervisor-sees-an-error-befor"
+    },
+    {
+      "id": "flow:drive-the-supervisor-sends-a-ready-multilingual-instru",
+      "statement": "The supervisor sends a ready multilingual instruction to the selected A…",
+      "status": "proposed",
+      "subject": "drive-the-supervisor-sends-a-ready-multi"
+    },
+    {
+      "id": "flow:drive-the-translated-view-displays-the-question-and-al",
+      "statement": "The translated view displays the question and all four answer options i…",
+      "status": "proposed",
+      "subject": "drive-the-translated-view-displays-the-q"
+    },
+    {
+      "id": "flow:drive-the-worker-directory-crew-filter-lists-active-cr",
+      "statement": "The worker directory crew filter lists active crews that are not on the…",
+      "status": "proposed",
+      "subject": "drive-the-worker-directory-crew-filter-l"
+    },
+    {
+      "id": "flow:drive-unread-notifications-remain-visible-when-the-wor",
+      "statement": "Unread notifications remain visible when the worker filters the list.",
+      "status": "proposed",
+      "subject": "drive-unread-notifications-remain-visibl"
+    },
+    {
+      "id": "inline:a-failed-recovery-storage-write-sends-no-instruc-8d4bab52",
+      "statement": "A failed recovery-storage write sends no instruction request.",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:a-temporary-connection-failure-keeps-the-unsent-19ce49a2",
+      "statement": "A temporary connection failure keeps the unsent answer and restores ser…",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:applying-a-template-fills-the-instruction-source-1121ee23",
+      "statement": "Applying a template fills the instruction source and selects Type mode.",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:leaving-send-cancels-future-preparation-status-c-770ef8b6",
+      "statement": "Leaving Send cancels future preparation-status checks even while prepar…",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:reading-one-unread-notification-refills-the-curr-3d8f5b34",
+      "statement": "Reading one unread notification refills the current page before the wor…",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:send-status-continues-polling-unchanged-preparat-deaf5679",
+      "statement": "Send status continues polling unchanged preparation responses until pub…",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:the-supervisor-can-read-the-applied-template-tex-adaaff33",
+      "statement": "The supervisor can read the applied template text in the active source…",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:the-supervisor-sees-an-error-before-any-send-whe-a0bd626d",
+      "statement": "The supervisor sees an error before any send when recovery storage cann…",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:the-translated-view-displays-the-question-and-al-3f3c0a63",
+      "statement": "The translated view displays the question and all four answer options i…",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:translated-choices-keep-the-frozen-option-ids-us-72118af9",
+      "statement": "Translated choices keep the frozen option IDs used to grade the worker…",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "inline:unread-notification-item-11-is-visible-after-ite-f9ce9e3e",
+      "statement": "Unread notification item 11 is visible after item 1 is read, so paginat…",
+      "status": "proved",
+      "subject": "tests"
+    },
+    {
+      "id": "crew-filter-pages",
+      "statement": "The worker directory crew filter lists every active crew, including cre…",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "followup-audio",
+      "statement": "A local demo follow-up stores checked translated text and plays a priva…",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-correct-multiple-choice-answer-is-recorded-and-92d99898",
+      "statement": "A correct multiple-choice answer is recorded and assessed as matching t…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-submitted-answer-remains-accessible-in-the-wor-421b1d58",
+      "statement": "A submitted answer remains accessible in the worker's Sent answers list.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-supervisor-can-create-a-crew-and-save-worker-m-1c64897e",
+      "statement": "A supervisor can create a crew and save worker membership.",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-supervisor-can-open-a-follow-up-that-is-transl-0931032c",
+      "statement": "A supervisor can open a follow-up that is translated into the worker la…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-supervisor-can-open-the-workspace-0cf69b67",
+      "statement": "A supervisor can open the workspace",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-supervisor-can-request-another-answer-without-4ff94028",
+      "statement": "A supervisor can request another answer without replacing the original…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-supervisor-cannot-send-an-instruction-until-it-15c74728",
+      "statement": "A supervisor cannot send an instruction until its required title is sup…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-supervisor-follow-up-is-delivered-in-the-worke-4855ae93",
+      "statement": "A supervisor follow-up is delivered in the worker language.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-worker-can-sign-in-with-company-assigned-crede-a3be5154",
+      "statement": "A worker can sign in with company-assigned credentials and see only ass…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-worker-sees-the-missing-voice-message-in-the-w-1a43c74a",
+      "statement": "A worker sees the missing-voice message in the worker interface language",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-wrong-arabic-multiple-choice-answer-is-shown-a-44d56513",
+      "statement": "A wrong Arabic multiple-choice answer is shown as needing clarification…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:a-wrong-factual-choice-is-marked-for-clarificati-b8fcad15",
+      "statement": "A wrong factual choice is marked for clarification.",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:ending-a-worker-session-immediately-removes-priv-fc89ee68",
+      "statement": "Ending a worker session immediately removes private instruction content.",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:requesting-another-language-leaves-the-worker-in-2903f9b7",
+      "statement": "Requesting another language leaves the worker interface in the approved…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:selecting-a-crew-shows-only-that-crew-s-worker-l-53a2c0de",
+      "statement": "Selecting a crew shows only that crew's worker languages and ignores wo…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-assigned-worker-opens-the-instruction-in-ara-cd1bde48",
+      "statement": "The assigned worker opens the instruction in Arabic and sees localized…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-selected-arabic-crew-received-one-instructio-abcf70bb",
+      "statement": "The selected Arabic crew received one instruction for its one worker.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-supervisor-dashboard-identifies-a-worker-s-w-fc9ea577",
+      "statement": "The supervisor dashboard identifies a worker's wrong choice for follow-…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-supervisor-sees-the-worker-s-incorrect-choic-97d81670",
+      "statement": "The supervisor sees the worker's incorrect choice as a clarification.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-worker-s-wrong-factual-choice-has-the-clarif-49a9bc4d",
+      "statement": "The worker's wrong factual choice has the clarification outcome.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:unread-notifications-remain-visible-when-the-wor-ffbb6f8b",
+      "statement": "Unread notifications remain visible when the worker filters the list.",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:voice-capture-stays-unavailable-when-the-site-ha-f994030e",
+      "statement": "Voice capture stays unavailable when the site has no transcription prov…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "pilot-languages",
+      "statement": "The public pilot form can request every worker language, while the walk…",
+      "status": "proposed",
+      "subject": "unsorted"
+    }
+  ],
+  "version": 1
+}

@@ -1,6 +1,8 @@
 # Production release gates
 
-Created 25 October 2026 after the seven local implementation phases. This is a release
+Created 25 October 2026 after the seven local implementation phases.
+
+26 October code update: production Gemini integration and the separate guarded launcher are implemented; see PRODUCTION_GEMINI_INTEGRATION.md. The historical test counts/fingerprints below are not current release evidence. Production release gates and deployment authorization remain open. This is a release
 control document, not a readiness percentage or a deployment authorization. The current
 decision is **NO-GO** for production and real worker data. A customer launch requires a
 reviewable release candidate and explicit final authorization.
@@ -63,7 +65,7 @@ suite had no native URL (G3-G5).
 | G3 | Schema, migrations and repository parity | passed-for-specified-scope | 108 migrations on embedded PGlite and on fresh native PostgreSQL 16.15; SQLite/PostgreSQL parity tests pass; production-major native run open |
 | G4 | Native PostgreSQL roles, concurrency and TLS | pending | Native PG16.15 concurrency 2/2 and TLS verification pass; native runtime-role execution and production-version parity open |
 | G5 | Native backup, restore, quarantine and privacy | passed-for-specified-scope | Native PG16.15 encrypted `pg_dump`/`pg_restore` round trip, isolated readback and quarantine pass; scope is local 16.15 only |
-| G6 | Production runtime admission and secret separation | pending | Separate admission review implemented and negative-tested; live-adapter registry empty, production startup still hard-blocked, approvals absent |
+| G6 | Production runtime admission and secret separation | pending | Separate admission review implemented and negative-tested; Gemini production adapter and guarded startup implemented; actual service configuration, external verification and approvals absent |
 | G7 | Approved provider and real-data privacy policy | awaiting-external-approval | Synthetic-only Gemini/OpenRouter paths; no approved real-data processor or policy |
 | G8 | Email verification, invitation and recovery delivery | awaiting-external-approval | Adapter and synthetic tests exist; no verified domain, approved inboxes or real send |
 | G9 | Web push and physical-device acceptance | awaiting-external-approval | Outbox/adapters and service-worker shell verified synthetically; no real push or device acceptance |

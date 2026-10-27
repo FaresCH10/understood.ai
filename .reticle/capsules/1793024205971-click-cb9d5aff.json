@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "text \"Welcome back.\"",
+  "observed": "no element matched {\"text\":\"Welcome back.\"}",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "e52",
+        "source": {
+          "file": "src/main.tsx",
+          "line": 546,
+          "column": 4
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793024205971-click-cb9d5aff",
+  "createdAt": 1793024205971,
+  "seen": 1,
+  "lastSeenAt": 1793024205971
+}

@@ -1,3 +1,5 @@
+import {assertProviderMode,integrationDataClass} from '../ai/provider-policy.mjs';
+import {withMultipleChoice} from '../multiple-choice.mjs';
 import { randomUUID,createHash } from 'node:crypto';
 import {preparationRequestInput,preparationRequestId,preparationReference,preparationRequestReceipt} from '../preparation-request-input.mjs';
 import { syntheticPrepare } from '../domain.mjs';
@@ -176,15 +178,16 @@ export function requestPreparation(pool,session,id,value,{schema='public'}={}) {
   });
 }
 
-export async function processOnePreparation(pool,{schema='public',integrationMode,prepare=syntheticPrepare,adapter,storage,languages=['en','ar','ur']}={}) {
-  if (integrationMode!=='synthetic') throw new Error('Live preparation artifact integration is unavailable');
+export async function processOnePreparation(pool,{schema='public',integrationMode,prepare=syntheticPrepare,adapter,storage,languages}={}) {
+  const dataClass=integrationDataClass(integrationMode);
+  if(integrationMode==='live')assertProviderMode(adapter,integrationMode);
   const job=await domainTransaction(pool,schema,async (client) => {
     const row=(await client.query(`SELECT * FROM jobs WHERE kind='prepare' AND ((status='queued' AND due_at<=clock_timestamp())
       OR (status='processing' AND lease_until<=clock_timestamp())) AND ${dispatchPredicate('jobs',{provider:true})}
       ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1`)).rows[0];
     if (!row || !await dispatchAllowed(client,row.org_id,{provider:true})) return null;
     const token=randomUUID();
-    await client.query(`UPDATE jobs SET status='processing',attempts=attempts+1,lease_token=$2,lease_until=clock_timestamp()+interval '90 seconds',error=NULL WHERE id=$1`,[row.id,token]);
+    await client.query(`UPDATE jobs SET status='processing',attempts=attempts+1,lease_token=$2,lease_until=clock_timestamp()+interval '180 seconds',error=NULL WHERE id=$1`,[row.id,token]);
     await appendPreparationStage(client,{...row,token},systemStage('worker','started'));
     return {...row,attempts:row.attempts+1,token};
   });
@@ -200,22 +203,24 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     if(review && review.revision!==job.revision) throw new Error('Obsolete draft review');
     const glossary=await domainTransaction(pool,schema,client=>readGlossarySnapshot(client,job.org_id,job.site_id));
     const intent=await domainTransaction(pool,schema,client=>loadTargetRegeneration(client,job));
-    const targets=intent ? intent.evidence.manifest.dependencies.languages : await domainTransaction(pool,schema,client=>readGenerationLanguages(client,job.org_id,job.site_id,languages,job.briefing_id));
-    if(intent && !targets.every(language=>languages.includes(language)))throw Error('Regeneration language configuration changed');
+    const targets=intent ? intent.evidence.manifest.dependencies.languages : await domainTransaction(pool,schema,client=>readGenerationLanguages(client,job.org_id,job.site_id,languages ?? ['en','ar','ur'],job.briefing_id));
+    if(intent && languages && !targets.every(language=>languages.includes(language)))throw Error('Regeneration language configuration changed');
     const instruction=briefing?.instruction_request_id ? {response_mode:briefing.response_mode,delivery_mode:briefing.delivery_mode} : null;
-    if(instruction && adapter)throw Error('Instruction sends require the synthetic instruction processor');
+    const recordedSource=!instruction && await domainTransaction(pool,schema,async client=>(await client.query(
+      'SELECT 1 FROM source_audio_requests WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',
+      [job.briefing_id,job.org_id,job.site_id])).rows.length>0);
     if(adapter) {
-      const input={source:briefing.source,revision:job.revision,languages:targets,review:review ?? null,glossary};
+      const input={source:briefing.source,title:briefing.title,revision:job.revision,languages:targets,review:review ?? null,glossary};
       if(typeof adapter.permitsPreparation==='function' && !adapter.permitsPreparation(input))throw Error('Preparation input is not an allowlisted synthetic fixture');
       let generationAdapter=adapter,currentStage=null,providerOperations=null;
       if(typeof adapter.withJournal==='function') {
-        if(adapter.provenance?.dataClass!=='synthetic' || typeof adapter.permitsPreparation!=='function')throw Error('Preparation provider provenance unavailable');
+        if(adapter.provenance?.dataClass!==dataClass || typeof adapter.permitsPreparation!=='function')throw Error('Preparation provider provenance unavailable');
         await domainTransaction(pool,schema,client=>checkPreparationAuthority(client,job,{required:true}));
         generationAdapter={...adapter};providerOperations=[];
         for(const method of ['prepare','checkPreparation','translate','checkTranslation','speech'])generationAdapter[method]=async(...args)=>{
           const evidence=preparationOperationEvidence(job,input,method,args,currentStage,adapter.provenance);
           const operation=await domainTransaction(pool,schema,client=>reserveProviderOperation(client,{orgId:job.org_id,kind:'preparation',referenceId:job.id,
-            claimToken:job.token,model:evidence.provenance.model,dataClass:'synthetic',maxRequests:1,...evidence}));
+            claimToken:job.token,model:evidence.provenance.model,dataClass,maxRequests:1,...evidence}));
           providerOperations.push(operation.id);
           return adapter.withJournal(providerRequestJournal(pool,operation,{schema}))[method](...args);
         };
@@ -230,8 +235,9 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
         regeneration={kind:intent.row.request_json.kind,language:intent.row.request_json.language,
           review:intent.row.baseline_review_json,bundle:{manifest:intent.evidence.manifest,audio}};
       }
-      const bundle=await prepareLanguageBundle({source:briefing.source,revision:job.revision,languages:targets,review:review ?? null,glossary,
-        dataClass:'synthetic',adapter:generationAdapter,regeneration,assertCurrent:()=>checkPreparationClaim(pool,job,{source:briefing.source,review:review ?? null,glossary},{schema}),
+      const bundle=await prepareLanguageBundle({source:briefing.source,title:briefing.title,revision:job.revision,languages:targets,review:review ?? null,glossary,
+        dataClass,adapter:generationAdapter,regeneration,multipleChoice:instruction?instruction.response_mode==='question':true,
+        assertCurrent:()=>checkPreparationClaim(pool,job,{source:briefing.source,review:review ?? null,glossary},{schema}),
         onStage:async event=>{
           await recordPreparationStage(pool,job,{source:briefing.source,review:review ?? null,glossary},event,{schema});
           currentStage=event.state==='started'?{...event}:null;
@@ -242,12 +248,16 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       return true;
     }
     if(intent) throw Error('Generated target regeneration requires its configured adapter');
-    const base=instruction
+    let base=instruction
       ? syntheticInstructionPrepare({source:briefing.source,title:briefing.title},instruction)
       : checkedSyntheticReview(await prepare(briefing.source),review);
-    const prepared=checkedSyntheticGlossary(base,glossary);
-    prepared.languages=Object.fromEntries(targets.map(language=>[language,prepared.languages[language]]));
-    readySnapshot({...briefing,state:'ready',prepared_json:prepared},targets.map((language) => ({language})),integrationMode,
+    if(base.languages?.en)base={...base,title:briefing.title,languages:{...base.languages,en:{...base.languages.en,title:briefing.title}}};
+    let prepared=checkedSyntheticGlossary(base,glossary);
+    if(!instruction)prepared=withMultipleChoice(prepared,{preserveQuestions:true,preserveAskedFacts:true});
+    if(recordedSource)prepared=withMultipleChoice(prepared);
+    const available=targets.filter(language=>prepared.languages[language]);
+    prepared.languages=Object.fromEntries(available.map(language=>[language,prepared.languages[language]]));
+    readySnapshot({...briefing,state:'ready',prepared_json:prepared},available.map((language) => ({language})),integrationMode,
       instruction ? {responseMode:instruction.response_mode,deliveryMode:instruction.delivery_mode} : undefined);
     await domainTransaction(pool,schema,async (client) => {
       if(!await dispatchAllowed(client,job.org_id,{provider:true}))return;

@@ -1,0 +1,93 @@
+{
+  "version": 2,
+  "name": "drive-unread-notifications-remain-visible-when-the-wor",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793001464994,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Unread (20)"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerNotifications.tsx",
+        "line": 69
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Mark read: New instruction",
+        "nth": 0,
+        "of": 10
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerNotifications.tsx",
+        "line": 79
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Page",
+        "satisfies": {
+          "property": "matchesPattern",
+          "pattern": "Page \\d[\\d,.]* / \\d[\\d,.]* · \\d[\\d,.]*"
+        }
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Check first unread page"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 30
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "PASS: unread page refilled with item",
+        "satisfies": {
+          "property": "matchesPattern",
+          "pattern": "PASS: unread page refilled with item \\d[\\d,.]*"
+        }
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "startPath": "/tests/browser/functional-audit.html",
+  "intent": "Unread notifications remain visible when the worker filters the list.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-unread-notifications-remain-visible-when-the-wor"
+}

@@ -101,7 +101,7 @@ export function peopleMessageText(locale:PeopleLocale,message:string) {
 }
 export function peopleCountText(locale:PeopleLocale,count:number,kind:'workers'|'crews'|'activeCrews') {
   if(locale==='ar')return `${count} ${kind==='workers'?'عامل':kind==='activeCrews'?'فريق نشط':'فريق'}`;
-  return `${count} ${kind==='workers'?(count===1?'worker':'workers'):kind==='activeCrews'?'active crews':'crews'}`;
+  return `${count} ${kind==='workers'?(count===1?'worker':'workers'):kind==='activeCrews'?(count===1?'active crew':'active crews'):(count===1?'crew':'crews')}`;
 }
 export function peopleErrorText(locale:PeopleLocale,error:unknown) {
   const message=error instanceof Error?error.message:'',t=peopleText[locale];

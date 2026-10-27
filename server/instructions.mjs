@@ -110,7 +110,15 @@ export function instructionAudienceOverview(db,session) {
     LEFT JOIN workers w ON w.id=cm.worker_id AND w.org_id=cm.org_id AND w.site_id=cm.site_id AND w.active=1
       AND w.language_selection_required=0
     WHERE c.org_id=? AND c.site_id=? AND c.active=1
-    GROUP BY c.id,c.name ORDER BY lower(c.name),c.id LIMIT 100`).all(session.org_id,session.site_id);
+    GROUP BY c.id,c.name ORDER BY lower(c.name),c.id LIMIT 5001`).all(session.org_id,session.site_id);
+  if(crews.length>5000)throw Error('Instruction crew audience exceeds limit');
+  const crewLanguages=db.prepare(`SELECT cm.crew_id,w.language,w.language_selection_required,COUNT(*) AS n
+    FROM crew_memberships cm JOIN crews c ON c.id=cm.crew_id AND c.org_id=cm.org_id AND c.site_id=cm.site_id AND c.active=1
+    JOIN workers w ON w.id=cm.worker_id AND w.org_id=cm.org_id AND w.site_id=cm.site_id AND w.active=1
+    WHERE cm.org_id=? AND cm.site_id=? GROUP BY cm.crew_id,w.language,w.language_selection_required`).all(session.org_id,session.site_id);
+  for(const crew of crews){crew.byLanguage={};crew.notSelected=0;}
+  const crewById=new Map(crews.map(crew=>[crew.id,crew]));
+  for(const row of crewLanguages){const crew=crewById.get(row.crew_id);if(!crew)continue;if(row.language_selection_required)crew.notSelected+=row.n;else crew.byLanguage[row.language]=(crew.byLanguage[row.language]||0)+row.n;}
   return {workers:{total:selected,byLanguage,notSelected},crews,asOf:NOW()};
 }
 
@@ -126,6 +134,8 @@ export function startInstructionSend(db,session,input) {
       return sendView(db,old,true);
     }
     requireWritableEntitlement(db,session.org_id);
+    const pendingLanguage=db.prepare(`SELECT 1 FROM workers w WHERE w.org_id=? AND w.site_id=? AND w.active=1 AND w.language_selection_required=1 ${value.audience.type==='crew'?'AND EXISTS(SELECT 1 FROM crew_memberships cm WHERE cm.worker_id=w.id AND cm.org_id=w.org_id AND cm.site_id=w.site_id AND cm.crew_id=?)':''} LIMIT 1`).get(session.org_id,session.site_id,...(value.audience.type==='crew'?[value.audience.crewId]:[]));
+    if(pendingLanguage)throw Error('Choose a language for every selected worker in Team before sending.');
     const workers=audienceWorkers(db,session,value.audience);
     if(!workers.length) throw new Error('Instruction audience is empty');
     if(workers.length>5000) throw new Error('Instruction audience exceeds limit');

@@ -10,6 +10,12 @@ const MAX_ATTEMPTS = 3;
 
 export async function processOneRecording(db, adapter, root = DEFAULT_AUDIO_ROOT) {
   ensureRecordingSchema(db);
+  if(typeof adapter?.transcribe!=='function' || typeof adapter?.assess!=='function'){
+    const row=db.prepare("SELECT id FROM recordings WHERE status='received' ORDER BY created_at,id LIMIT 1").get();
+    if(!row)return false;
+    db.prepare("UPDATE recordings SET status='blocked',lease_until=NULL,lease_token=NULL,error='Recorded answer checking is unavailable in this local runtime. Use text or the configured PostgreSQL worker.' WHERE id=? AND status='received'").run(row.id);
+    return true;
+  }
   const claimed = transaction(db, () => {
     const now = NOW();
     const row = db.prepare(`SELECT * FROM recordings WHERE

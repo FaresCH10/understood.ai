@@ -1,3 +1,4 @@
+import {providerDataClass} from '../ai/provider-policy.mjs';
 import {createHash,randomUUID} from 'node:crypto';
 import {domainTransaction,domainAudit,requireActiveBriefing,requirePrincipal} from './domain.mjs';
 import {readGlossarySnapshot} from './glossary.mjs';
@@ -36,9 +37,10 @@ async function currentClaim(client,job,manifest) {
   const review=(await client.query('SELECT content_json FROM draft_reviews WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',[job.briefing_id,job.org_id,job.site_id])).rows[0]?.content_json ?? null;
   const glossary=await readGlossarySnapshot(client,job.org_id,job.site_id),dependencies=manifest.dependencies;
   if(dependencies.revision!==job.revision || dependencies.sourceHash!==hash(draft.source)
+    || dependencies.titleHash!==undefined && dependencies.titleHash!==hash(draft.title.trim())
     || dependencies.reviewHash!==hash(reviewContent(review,job.revision)) || dependencies.glossaryHash!==glossary.hash
     || dependencies.glossaryRevision!==glossary.revision) throw Error('Preparation dependencies changed');
-  await client.query("UPDATE jobs SET lease_until=clock_timestamp()+interval '90 seconds' WHERE id=$1",[job.id]);
+  await client.query("UPDATE jobs SET lease_until=clock_timestamp()+interval '180 seconds' WHERE id=$1",[job.id]);
 }
 
 export async function checkPreparationClaim(pool,job,{source,review,glossary},{schema='public'}={}) {
@@ -67,12 +69,14 @@ function verifyReference(row,bytes) {
 }
 
 export function generatedManifest(snapshot) {
-  const {artifactBundle,...manifest}=snapshot || {};
+  const {artifactBundle,responseMode,deliveryMode,...manifest}=snapshot || {};
+  if(responseMode!==undefined && !['question','acknowledge'].includes(responseMode)
+    || deliveryMode!==undefined && !['text','voice','both'].includes(deliveryMode))throw Error('Generated bundle unavailable');
   if(!artifactBundle || Object.keys(artifactBundle).sort().join(',')!=='id,manifestHash'
     || !uuid(artifactBundle.id) || artifactBundle.manifestHash!==bundleHash(manifest)) throw Error('Generated bundle unavailable');
   preparedAudioReferences(manifest);
   // Live/real-data enablement remains a separate rollout gate, never inferred from stored bytes.
-  if(manifest.provenance.dataClass!=='synthetic') throw Error('Generated bundle unavailable');
+  if(!providerDataClass(manifest.provenance)) throw Error('Generated bundle unavailable');
   return manifest;
 }
 
@@ -162,7 +166,7 @@ async function currentDraftManifest(client,scope,draft,manifest,states=['ready']
   if(!states.includes(draft.state) || manifest.source!==draft.source || manifest.dependencies.revision!==draft.revision) throw Error('Artifact audio unavailable');
   const review=(await client.query('SELECT content_json FROM draft_reviews WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',[scope.briefing_id,scope.org_id,scope.site_id])).rows[0]?.content_json ?? null;
   const glossary=await readGlossarySnapshot(client,scope.org_id,scope.site_id);
-  if(manifest.dependencies.sourceHash!==hash(draft.source) || manifest.dependencies.reviewHash!==hash(reviewContent(review,draft.revision))
+  if(manifest.dependencies.titleHash!==undefined && manifest.dependencies.titleHash!==hash(draft.title.trim()) || manifest.dependencies.sourceHash!==hash(draft.source) || manifest.dependencies.reviewHash!==hash(reviewContent(review,draft.revision))
     || manifest.dependencies.glossaryHash!==glossary.hash || manifest.dependencies.glossaryRevision!==glossary.revision) throw Error('Artifact audio unavailable');
 }
 
@@ -196,7 +200,7 @@ export async function getStaffArtifactSpeech(pool,session,briefingId,versionType
     const scope={...session,briefing_id:briefingId};
     let snapshot,draft;
     if(versionType==='draft') {
-      draft=(await client.query('SELECT source,state,revision,prepared_json FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[briefingId,session.org_id,session.site_id])).rows[0];
+      draft=(await client.query('SELECT source,title,state,revision,prepared_json FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[briefingId,session.org_id,session.site_id])).rows[0];
       if(!draft || draft.revision!==Number(version)) throw Error('Artifact audio unavailable');
       snapshot=draft.prepared_json;
     }else {

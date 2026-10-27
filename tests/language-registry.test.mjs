@@ -33,7 +33,8 @@ test('worker locale registry covers fourteen languages with explicit Punjabi scr
   assert.equal(LANGUAGE_CAPABILITIES.hi.ui,true);
   assert.equal(LANGUAGE_CAPABILITIES.hi.translation,false);
   assert.deepEqual(generationLanguages(['en','ar','ur']),['en','ar','ur']);
-  assert.throws(()=>generationLanguages(['en','hi']),/Invalid generation languages/);
+  assert.deepEqual(generationLanguages(['en','hi']),['en','hi']);
+  assert.throws(()=>generationLanguages(['en','pa']),/Invalid generation languages/);
   for(const code of WORKER_LANGUAGE_CODES)assert.deepEqual(validateWorkerInput({code:`Worker ${code}`,language:code}),{code:`Worker ${code}`,language:code});
   assert.throws(()=>validateWorkerInput({code:'Worker',language:'pa'}),/Invalid language/);
 });
@@ -144,7 +145,7 @@ test('PostgreSQL stores every worker locale and rejects the ambiguous bare Punja
   try {
     await db.exec(`CREATE SCHEMA ${schema};SET search_path TO ${schema},pg_catalog`);
     await runMigrations(pool,{schema});
-    assert.deepEqual(await verifyMigrations(pool,{schema}),{schema,migrations:108});
+    assert.deepEqual(await verifyMigrations(pool,{schema}),{schema,migrations:113});
     await db.query("INSERT INTO organizations(id,name) VALUES('org','Organization')");
     await db.query("INSERT INTO sites(id,org_id,name,timezone) VALUES('site','org','Site','UTC')");
     for(const [index,code] of WORKER_LANGUAGE_CODES.entries()){

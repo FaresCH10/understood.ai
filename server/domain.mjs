@@ -1,3 +1,4 @@
+import {assessMultipleChoice} from './multiple-choice.mjs';
 import {requireWorkerSiteAccess} from './site-access.mjs';
 import { randomUUID } from 'node:crypto';
 import {captureReportAudience} from './report-scope.mjs';
@@ -234,7 +235,7 @@ export function submitAnswer(db, session, assignmentId, submissionId, answerText
     if(snapshot.responseMode==='acknowledge') throw new Error('This instruction only requires confirmation');
     const presentation=checkedPresentationBinding(db,session,assignmentId,presentationId);
     const rubric = snapshot.rubric?.askedFacts;
-    const result = snapshot.provenance?.adapter === 'synthetic-local-v1'
+    const result = snapshot.rubric?.mode==='multiple-choice' ? assessMultipleChoice(answerText,snapshot,assignment.language) : snapshot.provenance?.adapter === 'synthetic-local-v1'
       && Array.isArray(rubric) && rubric.join('|') === 'finished -> blue shelf|unfinished -> yellow shelf'
       ? assessAnswer(answerText)
       : snapshot.provenance?.adapter === 'synthetic-instruction-v1' && snapshot.rubric?.mode === 'keywords'

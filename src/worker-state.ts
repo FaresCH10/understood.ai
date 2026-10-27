@@ -12,7 +12,7 @@ export type WorkerResponse = {
 };
 
 export function workerResponseState(item: WorkerResponse, now = Date.now()) {
-  const failedAudio = item.audioStatus === 'failed';
+  const failedAudio = (item.audioStatus === 'failed' || item.audioStatus === 'blocked');
   const repeat=!!item.repeatRequest && Date.parse(item.repeatRequest.dueAt)>now;
   const acknowledged=!!item.acknowledgedAt;
   const pending = !repeat && !item.outcome && !failedAudio && (item.assessmentStatus === 'pending' || !!item.audioStatus);

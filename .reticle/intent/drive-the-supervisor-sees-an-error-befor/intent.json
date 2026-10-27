@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-the-supervisor-sees-an-error-before-any-send-whe": {
+      "declaredAt": 1793001605772,
+      "id": "flow:drive-the-supervisor-sees-an-error-before-any-send-whe",
+      "state": "declared",
+      "statement": "The supervisor sees an error before any send when recovery storage cannot retain the request.",
+      "status": "proposed",
+      "subject": "drive-the-supervisor-sees-an-error-befor",
+      "surface": {
+        "flow": "drive-the-supervisor-sees-an-error-before-any-send-whe"
+      },
+      "updatedAt": 1793001605792
+    }
+  },
+  "subject": "drive-the-supervisor-sees-an-error-befor",
+  "version": 1
+}

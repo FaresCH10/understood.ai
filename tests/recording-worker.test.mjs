@@ -52,7 +52,7 @@ test('provider failure is retried with a lease and cannot produce a false match'
   const root = await mkdtemp(join(tmpdir(), 'understood-voice-retry-'));
   try {
     const receipt = await receiveRecording(db, worker, 'assignment-29', '25741dde-b442-4d06-9e45-48968582e8ba', wav(), root);
-    const adapter = { async transcribe() { throw new Error('Provider unavailable'); } };
+    const adapter = { async transcribe() { throw new Error('Provider unavailable'); },async assess(){throw Error('Assessment must not run after transcription fails');} };
     for (let n = 1; n <= 3; n++) {
       assert.equal(await processOneRecording(db, adapter, root), true);
       const row = db.prepare('SELECT status,attempts FROM recordings WHERE id=?').get(receipt.id);

@@ -48,7 +48,7 @@ export async function runGeminiWorkflow({apiKey,root,fetchImpl=fetch,persist=()=
       if(response.ok && body?.generationConfig?.responseFormat?.text?.schema?.properties?.sourceGrounded) {
         const value=JSON.parse((await response.clone().json()).candidates[0].content.parts.find(part=>typeof part.text==='string').text);
         const candidate=JSON.parse(body.contents[0].parts[0].text).candidate;
-        const allowed=['ungrounded_fact','question_alignment','ambiguous_source','incomplete_translation','wrong_language','terminology_mismatch','unsupported_content'];
+        const allowed=['ungrounded_fact','question_alignment','ambiguous_source','incomplete_translation','wrong_language','terminology_mismatch','unsupported_content','omitted_pairing'];
         report.groundingEnvelope={expectedFacts:candidate.facts.length,expectedAskedFacts:candidate.askedFacts.length,
           evidenceCount:Array.isArray(value.factEvidence)?value.factEvidence.length:null,askedIndexCount:Array.isArray(value.askedFactIndexes)?value.askedFactIndexes.length:null,
           booleansValid:['sourceGrounded','questionAligned','ambiguous'].every(key=>typeof value[key]==='boolean'),
@@ -85,7 +85,7 @@ export async function runGeminiWorkflow({apiKey,root,fetchImpl=fetch,persist=()=
     await check('metered_automatic_preparation_translation_private_speech',async()=>{
       draft=await createDraft(pool,owner,{requestId:randomUUID(),title:'Synthetic shelf handover',source:CANONICAL_SOURCE,generationLanguages:['en','ar']},options);
       const glossary=await readGlossarySnapshot({query:(sql,args)=>db.query(sql,args)},scope.orgId,scope.siteId);
-      const input={source:CANONICAL_SOURCE,revision:1,languages:['en','ar'],review:null,glossary};
+      const input={source:CANONICAL_SOURCE,title:'Synthetic shelf handover',revision:1,languages:['en','ar'],review:null,glossary};
       const preparationAdapter=resolvePreparationAdapter({...env,UNDERSTOOD_PREPARATION_ADAPTER:'gemini-free',UNDERSTOOD_SYNTHETIC_PREPARATION_HASHES:JSON.stringify([preparationInputHash(input)])},{fetchImpl:guardedFetch});
       await queuePreparation(pool,owner,draft.id,1,options);
       assert.equal(await rehearsalTasks(pool,storage,{...config,preparationAdapter}).preparation(),true);
@@ -109,6 +109,19 @@ export async function runGeminiWorkflow({apiKey,root,fetchImpl=fetch,persist=()=
       await editDraft(pool,owner,draft.id,{revision:1,title:'New unpublished draft',source:'Keep boxes at the next bay.'},options);
       assert.equal(bundleHash((await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[pub.id])).rows[0].snapshot_json),bundleHash(snapshot));
       report.publication={version:pub.version,assigned:pub.assigned,snapshotHash:bundleHash(snapshot)};
+      // New publications use frozen MCQ IDs; historical written/voice assessment is exercised separately.
+      for(const [index,worker] of workers.slice(0,2).entries()){
+        const answer=index===0?snapshot.rubric.correctChoiceId:snapshot.languages.en.choices.find(choice=>choice.id!==snapshot.rubric.correctChoiceId).id;
+        await submitAnswer(pool,worker.session,worker.assignment.id,randomUUID(),answer,options);
+      }
+      while(await rehearsalTasks(pool,storage,config).assessment()){}
+      const legacyId=randomUUID(),legacyPub=randomUUID();
+      const legacyLanguages=Object.fromEntries(Object.entries(snapshot.languages).map(([code,item])=>{const {choices,questionType,speech,...content}=item;return [code,content];}));
+      const legacy={source:snapshot.source,title:snapshot.title,question:snapshot.question,facts:snapshot.facts,rubric:{askedFacts:snapshot.rubric.askedFacts},languages:legacyLanguages};
+      await db.query("INSERT INTO briefings(id,org_id,site_id,title,source,state) VALUES($1,$2,$3,'Historical written check-back',$4,'ready')",[legacyId,owner.org_id,owner.site_id,CANONICAL_SOURCE]);
+      await db.query("INSERT INTO publications(id,org_id,site_id,briefing_id,version,snapshot_json,state) VALUES($1,$2,$3,$4,1,$5,'published')",[legacyPub,owner.org_id,owner.site_id,legacyId,JSON.stringify(legacy)]);
+      for(const worker of workers.slice(0,2)){worker.legacyAssignment={id:randomUUID(),publicationId:legacyPub};await db.query("INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES($1,$2,$3,$4,$5,'en')",[worker.legacyAssignment.id,owner.org_id,owner.site_id,legacyPub,worker.id]);}
+
     });
     await check('fixed_synthetic_voice_fixture_generation',async()=>{
       const journal={async beforeRequest(){if(report.fixtureRequests.length)throw Error('Voice fixture budget exhausted');const id=randomUUID();report.fixtureRequests.push({id,state:'started',httpStatus:null});save();return id;},
@@ -118,25 +131,25 @@ export async function runGeminiWorkflow({apiKey,root,fetchImpl=fetch,persist=()=
     });
     await check('metered_voice_upload_transcription_exact_version_assessment',async()=>{
       const worker=workers[0],submissionId=randomUUID();
-      const receipt=await receiveRecording(pool,worker.session,worker.assignment.id,submissionId,voiceBytes,storage,options);
-      assert.equal((await receiveRecording(pool,worker.session,worker.assignment.id,submissionId,voiceBytes,storage,options)).duplicate,true);
+      const receipt=await receiveRecording(pool,worker.session,worker.legacyAssignment.id,submissionId,voiceBytes,storage,options);
+      assert.equal((await receiveRecording(pool,worker.session,worker.legacyAssignment.id,submissionId,voiceBytes,storage,options)).duplicate,true);
       const recordingAdapter=resolveRecordingAdapter({...env,UNDERSTOOD_RECORDING_ADAPTER:'gemini-free',UNDERSTOOD_SYNTHETIC_AUDIO_HASHES:JSON.stringify([inspectWav(voiceBytes).sha256])},{fetchImpl:guardedFetch});
       assert.equal(await rehearsalTasks(pool,storage,{...config,recordingAdapter}).recording(),true);
       const recording=(await db.query('SELECT status,transcript,transcription_operation_id,assessment_operation_id FROM recordings WHERE id=$1',[receipt.id])).rows[0];
       assert.equal(recording.status,'transcribed');assert.ok(recording.transcription_operation_id&&recording.assessment_operation_id);
-      const attempt=(await db.query('SELECT outcome FROM attempts WHERE assignment_id=$1 AND submission_id=$2',[worker.assignment.id,submissionId])).rows[0];
+      const attempt=(await db.query('SELECT outcome FROM attempts WHERE assignment_id=$1 AND submission_id=$2',[worker.legacyAssignment.id,submissionId])).rows[0];
       assert.equal(attempt?.outcome,'matched');
       report.voiceResult={state:recording.status,outcome:attempt.outcome,transcriptHash:bundleHash(recording.transcript)};
     });
     await check('metered_incomplete_typed_answer_creates_clarification',async()=>{
-      const worker=workers[1],submissionId=randomUUID(),receipt=await submitAnswer(pool,worker.session,worker.assignment.id,submissionId,INCOMPLETE_ANSWER,options);
-      const input={answer:INCOMPLETE_ANSWER,question:snapshot.languages.en.question,askedFacts:snapshot.rubric.askedFacts,language:'en',publicationId:pub.id,version:pub.version};
+      const worker=workers[1],submissionId=randomUUID(),receipt=await submitAnswer(pool,worker.session,worker.legacyAssignment.id,submissionId,INCOMPLETE_ANSWER,options);
+      const input={answer:INCOMPLETE_ANSWER,question:snapshot.languages.en.question,askedFacts:snapshot.rubric.askedFacts,language:'en',publicationId:worker.legacyAssignment.publicationId,version:pub.version};
       const assessmentAdapter=resolveAssessmentAdapter({...env,UNDERSTOOD_ASSESSMENT_ADAPTER:'gemini-free',UNDERSTOOD_SYNTHETIC_ASSESSMENT_HASHES:JSON.stringify([assessmentInputHash(input)])},{fetchImpl:guardedFetch});
       assert.equal(await rehearsalTasks(pool,storage,{...config,assessmentAdapter}).assessment(),true);
       const attempt=(await db.query('SELECT outcome,assessment_status FROM attempts WHERE id=$1',[receipt.id])).rows[0];
       assert.deepEqual(attempt,{outcome:'clarification',assessment_status:'complete'});
       assert.equal((await db.query('SELECT count(*)::int n FROM clarifications WHERE attempt_id=$1',[receipt.id])).rows[0].n,1);
-      assert.equal((await submitAnswer(pool,worker.session,worker.assignment.id,submissionId,INCOMPLETE_ANSWER,options)).duplicate,true);
+      assert.equal((await submitAnswer(pool,worker.session,worker.legacyAssignment.id,submissionId,INCOMPLETE_ANSWER,options)).duplicate,true);
       report.incompleteResult=attempt;
     });
     await check('durable_metering_report_and_no_replay_dispatch',async()=>{

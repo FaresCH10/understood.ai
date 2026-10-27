@@ -1,0 +1,192 @@
+{
+  "version": 2,
+  "name": "drive-the-text-qa-shelf-handover-incorrect-choice-appe",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793026171023,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "radio",
+        "name": "ضع المنتجات المكتملة على الرف الأزرق، وغير المكتملة على الرف الأصفر. أبقِ الممر خالياً."
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "radio",
+            "name": "ضع المنتجات المكتملة على الرف الأزرق، وغير المكتملة على الرف الأصفر. أبقِ الممر خالياً."
+          },
+          "args": {},
+          "action": "check",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 1234
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "أرسل الإجابة"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 1238
+          },
+          "expect": {
+            "kind": "net",
+            "method": "POST",
+            "urlContains": "/answers",
+            "status": 201
+          },
+          "writes": true
+        }
+      ],
+      "expect": {
+        "kind": "text",
+        "contains": "QA shelf handover · incorrect choice"
+      },
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "QA001 · EN QA shelf handover · Help requested"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 594
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Follow-up notes"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Follow-up notes"
+          },
+          "args": {
+            "value": "Audit: clarification delivered in conversation; worker submitted the requested repeat. Closing this help request."
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/ClarificationActions.tsx",
+            "line": 70
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Save human resolution"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/ClarificationActions.tsx",
+            "line": 70
+          },
+          "expect": {
+            "kind": "net",
+            "method": "POST",
+            "urlContains": "/resolve",
+            "status": 200
+          },
+          "writes": true
+        }
+      ],
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Today"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 545
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Send instruction"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 592
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Send instruction"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SendInstruction.tsx",
+        "line": 257
+      },
+      "expect": {
+        "kind": "net",
+        "method": "POST",
+        "urlContains": "/api/instructions/send",
+        "status": 201
+      },
+      "page": "/",
+      "writes": true
+    }
+  ],
+  "intent": "The text \"QA shelf handover · incorrect choice\" appears, then a POST request to /api/instructions/send is made",
+  "intentDerived": true,
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  }
+}

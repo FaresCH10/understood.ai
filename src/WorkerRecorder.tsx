@@ -67,10 +67,10 @@ async function decodeRecording(source: Blob): Promise<AudioBuffer> {
 }
 
 export function WorkerRecorder({ language, noticeLanguage, purpose='answer', loadSiteNotice, retryOnly=false, localOnlyNotice, synthetic,disabled,saveAllowed,onSave, onSend,onUnsavedChange }: RecorderProps) {
-  const contentLanguage:RecordingLanguage=noticeLanguage??(language==='ar'||language==='ur'?language:'en');
-  const staffLanguage:RecordingLanguage=language==='ar'||language==='ur'?language:'en';
+  const contentLanguage:RecordingLanguage=noticeLanguage??language;
+  const staffLanguage=language==='ar'||language==='ur'?language:'en';
   const t = {...labels[language],...(purpose==='in_person'?staffRecorderText[staffLanguage]:purpose==='help'||purpose==='reply'?conversationRecorderText[language]:{})};
-  const notice = purpose==='answer'?recordingNotice(language, synthetic):purpose==='in_person'?staffCaseRecordingNotice(contentLanguage):conversationRecordingNotice(language);
+  const notice = purpose==='answer'?recordingNotice(language, synthetic):purpose==='in_person'?staffCaseRecordingNotice(staffLanguage):conversationRecordingNotice(language);
   const title=purpose==='answer'||purpose==='in_person'?t.title:purpose==='help'?helpTitles[language]:replyTitles[language];
   const siteText=siteNoticeText[language];
   const [siteNotice,setSiteNotice]=useState<string|null>(null),[noticeReady,setNoticeReady]=useState(false),[noticeError,setNoticeError]=useState(false),[noticeTick,setNoticeTick]=useState(0);
@@ -152,6 +152,8 @@ export function WorkerRecorder({ language, noticeLanguage, purpose='answer', loa
     }, 1000);
     return () => window.clearInterval(timer);
   }, [phase]);
+
+  useEffect(()=>{const pause=()=>{if(phaseRef.current==='recording')media.current?.stop();else if(phaseRef.current==='requesting'){generation.current++;changePhase(blob.current?'preview':'idle');}};window.addEventListener('understood:session-verification-pending',pause);return()=>window.removeEventListener('understood:session-verification-pending',pause);},[]);
 
   const discard = () => {
     generation.current++;

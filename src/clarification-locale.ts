@@ -1,3 +1,4 @@
+import {workerLocale,type WorkerLocaleCode} from '../server/languages.mjs';
 export type CaseLocale='en'|'ar'|'ur';
 
 // UI copy only. Worker answers, staff notes and published facts are never translated here.
@@ -57,6 +58,9 @@ export const caseTranslations={
   'Listen first. Clarify in person when needed.':['استمع أولاً. وضّح وجهاً لوجه عند الحاجة.','پہلے سنیں۔ ضرورت ہو تو بالمشافہ وضاحت کریں۔'],
   'Review the conversation and add a clarification. If the issue is complex or sensitive, follow up in person.':['راجع المحادثة وأضف توضيحاً. إذا كانت المسألة معقدة أو حساسة، تابعها وجهاً لوجه.','گفتگو دیکھیں اور وضاحت شامل کریں۔ معاملہ پیچیدہ یا حساس ہو تو بالمشافہ رابطہ کریں۔'],
   'Missing fact':['معلومة ناقصة','معلومات نامکمل'],
+  'Incorrect choice':['اختيار غير صحيح','غلط انتخاب'],
+  'Key facts were present':['المعلومات المطلوبة كانت موجودة','مطلوبہ حقائق موجود تھے'],
+  'The worker selected a choice that does not match the instruction.':['اختار العامل إجابة لا تطابق التعليمات.','کارکن نے ایسا انتخاب کیا جو ہدایت سے مماثل نہیں۔'],
   'Important information is missing or incomplete.':['معلومات مهمة ناقصة أو غير مكتملة.','اہم معلومات موجود نہیں یا نامکمل ہیں۔'],
   'Unclear audio':['صوت غير واضح','غیر واضح آڈیو'],
   'Audio is unclear and needs confirmation.':['الصوت غير واضح ويحتاج إلى تأكيد.','آڈیو واضح نہیں اور تصدیق درکار ہے۔'],
@@ -299,9 +303,9 @@ export function caseState(locale:CaseLocale,value:string|null|undefined){
   const names:Record<string,CaseTextKey>={open:'Open',resolved:'Resolved',matched:'Matched',clarification:'Needs clarification',unassessable:'Could not be assessed',pending:'Pending',submitted:'Submitted',cancelled:'Cancelled',deleted:'Deleted',expired:'Expired'};
   return caseText(locale,value?names[value]||'Status unavailable':'Assessment pending');
 }
-export function caseLanguage(locale:CaseLocale,value:'en'|'ar'|'ur'){return caseText(locale,{en:'English',ar:'Arabic',ur:'Urdu'}[value] as CaseTextKey);}
+export function caseLanguage(locale:CaseLocale,value:WorkerLocaleCode){return ['en','ar','ur'].includes(value)?caseText(locale,({en:'English',ar:'Arabic',ur:'Urdu'} as Record<string,string>)[value] as CaseTextKey):workerLocale(value)?.name || value;}
 export function caseReason(locale:CaseLocale,value:string){
-  const codes:Record<string,CaseTextKey>={missing_asked_fact:'Missing fact',missing_fact:'Missing fact',unclear_audio:'Unclear audio','Help requested':'Help requested','Voice help requested':'Help requested','[Deleted]':'Deleted','[Expired]':'Expired'};
+  const codes:Record<string,CaseTextKey>={missing_asked_fact:'Missing fact',missing_fact:'Missing fact',incorrect_choice:'Incorrect choice',asked_facts_present:'Key facts were present',unclear_audio:'Unclear audio','Help requested':'Help requested','Voice help requested':'Help requested','[Deleted]':'Deleted','[Expired]':'Expired'};
   if(codes[value])return caseText(locale,codes[value]);
   return value.startsWith('Staff follow-up: ')?`${caseText(locale,'Staff follow-up')}: ${value.slice(17)}`:value;
 }

@@ -51,7 +51,7 @@ export function CaseVoiceRecorder(props:Props){
   return <VoiceContent key={JSON.stringify([props.session.clientContext,props.session.expiresAt,props.scope])} {...props}/>;
 }
 function VoiceContent({scope,session,language,noticeLanguage:selectedNoticeLanguage,available=true,disabled=false,current=()=>true,canMutate=()=>true,onDirtyChange,onReceived,onSessionLost}:Props){
-  const t=copy[language],clearText=clearCopy[language],dialogId=useId(),noticeLanguage:RecordingLanguage=selectedNoticeLanguage??(language==='ar'||language==='ur'?language:'en');
+  const t=copy[language],clearText=clearCopy[language],dialogId=useId(),noticeLanguage:RecordingLanguage=selectedNoticeLanguage??language;
   const [pending,setPending]=useState<VoicePending|null>(null),[busy,setBusy]=useState(false),[unsaved,setUnsaved]=useState(false),[failure,setFailure]=useState<VoiceFailure|null>(null),[notice,setNotice]=useState<'received'|'failed'|null>(null),[blocked,setBlocked]=useState(false),[generation,setGeneration]=useState(0);
   const mounted=useRef(false),flight=useRef(false),controller=useRef<AbortController|null>(null),callbacks=useRef({current,canMutate,disabled,available,onDirtyChange,onReceived,onSessionLost});callbacks.current={current,canMutate,disabled,available,onDirtyChange,onReceived,onSessionLost};
   const dialog=useRef<HTMLDialogElement>(null),clearTrigger=useRef<HTMLElement|null>(null),checkButton=useRef<HTMLButtonElement>(null),clearIntent=useRef<{id:string;generation:number}|null>(null);

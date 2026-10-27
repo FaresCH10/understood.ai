@@ -1,0 +1,118 @@
+{
+  "version": 2,
+  "name": "drive-the-supervisor-sees-an-error-before-any-send-whe",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793001605748,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Title"
+      },
+      "args": {
+        "value": "Shelf handover"
+      },
+      "action": "fill",
+      "source": {
+        "file": "src/SendInstruction.tsx",
+        "line": 214
+      },
+      "timeoutMs": 1000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Instruction"
+      },
+      "args": {
+        "value": "Move the finished items to the blue shelf."
+      },
+      "action": "fill",
+      "source": {
+        "file": "src/SendInstruction.tsx",
+        "line": 218
+      },
+      "timeoutMs": 1000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Block browser storage"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 31
+      },
+      "timeoutMs": 1000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Send instruction"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SendInstruction.tsx",
+        "line": 257
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Send recovery could not be saved. No instruction was sent."
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Check no send occurred"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "tests/browser/functional-audit.tsx",
+        "line": 31
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "PASS: storage failure prevented the send"
+      },
+      "timeoutMs": 5000,
+      "page": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "startPath": "/tests/browser/functional-audit.html",
+  "intent": "The supervisor sees an error before any send when recovery storage cannot retain the request.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/tests/browser/functional-audit.html"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-the-supervisor-sees-an-error-before-any-send-whe"
+}

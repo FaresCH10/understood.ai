@@ -1,3 +1,4 @@
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createOpenRouterAdapter,OPENROUTER_FREE_MODEL} from '../server/ai/openrouter.mjs';
@@ -62,7 +63,7 @@ test('hybrid preparation uses MiniMax for text and Gemini for speech with exact 
   const input={source:answer,revision:1,languages:['en'],review:null,glossary:{revision:0,hash:'empty',terms:[]}};
   const adapter=resolvePreparationAdapter({...env,UNDERSTOOD_SYNTHETIC_PREPARATION_HASHES:JSON.stringify([preparationInputHash(input)])},{fetchImpl:async()=>assert.fail('No dispatch')});
   assert.equal(adapter.provenance.adapter,'openrouter-gemini-bundle-v1');assert.equal(adapter.provenance.textModel,OPENROUTER_FREE_MODEL);
-  assert.equal(adapter.provenance.speechModel,GEMINI_MODELS.speech);assert.deepEqual(adapter.capabilities.speechLanguages,['en','ar']);
+  assert.equal(adapter.provenance.speechModel,GEMINI_MODELS.speech);assert.deepEqual(adapter.capabilities.speechLanguages,WORKER_LANGUAGE_CODES);
   assert.equal(adapter.permitsPreparation(input),true);assert.equal(adapter.permitsPreparation({...input,revision:2}),false);
   for(const key of ['prepare','checkPreparation','translate','checkTranslation','speech'])assert.equal(typeof adapter[key],'function');
   assert.equal(JSON.stringify(adapter).includes('test-only'),false);

@@ -1,0 +1,822 @@
+{
+  "version": 2,
+  "name": "drive-the-text-matched-key-facts-appears-then-the-text",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793025252661,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "radio",
+        "name": "Put finished items on the blue shelf. Put unfinished items on the yellow shelf. Leave the walkway clear."
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "radio",
+            "name": "Put finished items on the blue shelf. Put unfinished items on the yellow shelf. Leave the walkway clear."
+          },
+          "args": {},
+          "action": "check",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 1234
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Send answer"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 1238
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "match"
+          }
+        }
+      ],
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Refresh this answer"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerSubmissionReceipt.tsx",
+        "line": 54
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Language settings"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 846
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Matched key facts"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Reason (optional)"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Reason (optional)"
+          },
+          "args": {
+            "value": "Audit: please change my interface to Arabic."
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 853
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Send change request"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 855
+          }
+        }
+      ],
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "text",
+            "contains": "Waiting for supervisor review:"
+          },
+          {
+            "kind": "text",
+            "contains": "Current language:"
+          },
+          {
+            "kind": "text",
+            "contains": "English"
+          }
+        ]
+      },
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Close language settings"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Close language settings"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 848
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Notifications (1)"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/NotificationBell.tsx",
+            "line": 42
+          }
+        }
+      ],
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Mark read: New instruction"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerNotifications.tsx",
+        "line": 79
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "button",
+          "name": "Notifications"
+        }
+      },
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Help"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1292
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Ask about this briefing"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerHelpHub.tsx",
+        "line": 16
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "textbox",
+          "name": "What do you need help with?"
+        }
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "What do you need help with?"
+      },
+      "args": {
+        "value": "Audit draft retained: which shelf should I use when the blue shelf is full?"
+      },
+      "action": "fill",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1268
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "I need help",
+        "nth": 1,
+        "of": 2
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1269
+      },
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Open conversation"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerHelpHistory.tsx",
+        "line": 62
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Message"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Message"
+          },
+          "args": {
+            "value": "Audit follow-up: I will wait for your clarification before moving items."
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/CaseConversation.tsx",
+            "line": 148
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Send message"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/CaseConversation.tsx",
+            "line": 154
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Audit follow-up: I will wait for your clarification before moving items."
+          }
+        }
+      ],
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "This device"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1128
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "switch",
+        "name": "Shared phone mode"
+      },
+      "args": {},
+      "action": "uncheck",
+      "source": {
+        "file": "src/WorkerDevice.tsx",
+        "line": 89
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Confirm"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerDevice.tsx",
+        "line": 92
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Briefings"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Briefings"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 1291
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Sent answers"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/main.tsx",
+            "line": 1145
+          }
+        }
+      ],
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Open briefing"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1169
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Read the instruction"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "checkbox",
+        "name": "This is my private device. Save this briefing here."
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "checkbox",
+            "name": "This is my private device. Save this briefing here."
+          },
+          "args": {},
+          "action": "check",
+          "source": {
+            "file": "src/WorkerOffline.tsx",
+            "line": 43
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Save briefing for offline access"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/WorkerOffline.tsx",
+            "line": 43
+          }
+        }
+      ],
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "End session"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1130
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Team"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 545
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Approve change",
+        "nth": 1,
+        "of": 2
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/People.tsx",
+        "line": 121
+      },
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Today"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 545
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Needs your attention (",
+        "satisfies": {
+          "property": "matchesPattern",
+          "pattern": "Needs your attention \\(\\d[\\d,.]*\\)"
+        }
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "QA001 · EN QA shelf handover · Help requested"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 594
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "Audit follow-up: I will wait"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Message"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Message"
+          },
+          "args": {
+            "value": "Audit supervisor: stop and contact me if the blue shelf is full."
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/CaseConversation.tsx",
+            "line": 148
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Send message"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/CaseConversation.tsx",
+            "line": 154
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Audit supervisor: stop and contact me if the blue shelf is full."
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Answer deadline ( Asia/Beirut )"
+          },
+          "args": {
+            "value": "2026-10-27T18:00"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/CaseDeadlineInput.tsx",
+            "line": 11
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Request another answer"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/CaseRepeats.tsx",
+            "line": 62
+          }
+        }
+      ],
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Reports"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 545
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Export CSV"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/Reports.tsx",
+        "line": 132
+      },
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Refresh exports"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/Reports.tsx",
+        "line": 179
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Settings"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 545
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Plan & usage"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 568
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Privacy & retention"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 568
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Team"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 545
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Manage access links"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerAccess.tsx",
+        "line": 56
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Issue new link"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerAccess.tsx",
+        "line": 62
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Sign in"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerAccessEntry.tsx",
+        "line": 47
+      },
+      "expect": {
+        "kind": "net",
+        "method": "POST",
+        "urlContains": "/api/auth/worker/login",
+        "status": 200
+      },
+      "page": "/",
+      "writes": true
+    }
+  ],
+  "intent": "The text \"Matched key facts\" appears, then the text \"Waiting for supervisor review:\" appears and the text \"Current language:\" appears and the text \"English\" appears",
+  "intentDerived": true,
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  }
+}

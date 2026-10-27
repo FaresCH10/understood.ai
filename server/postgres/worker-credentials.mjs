@@ -4,7 +4,7 @@ import {tokenHash,passwordRecord,passwordMatches} from '../auth-crypto.mjs';
 import {consumeAuthBudget} from './auth-budget.mjs';
 import {requireTenantActive,lockOperationsGate} from './operations-gates.mjs';
 import {requireWorkerSiteAccess} from './site-access.mjs';
-import {companyLocator,normalizeWorkerLogin,workerLoginInput,workerSetupClaimInput,credentialSetupInput} from '../worker-credentials-input.mjs';
+import {companyLocator,normalizeWorkerLogin,workerLoginInput,workerSetupClaimInput,credentialSetupInput,assignedCredentialInput} from '../worker-credentials-input.mjs';
 
 const WORKER_AUTH_LIMIT=8;
 
@@ -221,7 +221,14 @@ export async function authenticateWorker(pool,input,remoteAddress='',{schema='pu
     if(!current || current.credential_revision!==row.credential_revision || current.password_hash!==row.password_hash)
       return null;
     const worker={id:row.worker_id,org_id:row.org_id,site_id:row.site_id};
-    const result=await insertSession(client,worker,'worker',null,8*3600,current.credential_revision);
+    let grantId=null,maxSeconds=8*3600;
+    if(value.token){
+      const grant=(await client.query(`SELECT id,floor(EXTRACT(EPOCH FROM expires_at-clock_timestamp()))::int AS seconds FROM worker_grants WHERE token_hash=$1 AND worker_id=$2 AND org_id=$3 AND site_id=$4 AND redeemed_at IS NULL AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR UPDATE`,[tokenHash(value.token),row.worker_id,row.org_id,row.site_id])).rows[0];
+      if(!grant || grant.seconds<1){await recordFailures(client,[keys.accountKey,keys.ipKey]);return null;}
+      await client.query('UPDATE worker_grants SET redeemed_at=clock_timestamp() WHERE id=$1',[grant.id]);
+      grantId=grant.id;maxSeconds=Math.min(2*3600,grant.seconds);
+    }
+    const result=await insertSession(client,worker,'worker',grantId,maxSeconds,grantId?null:current.credential_revision);
     await client.query(`INSERT INTO audit(id,org_id,site_id,actor_type,actor_id,action,object_id)
       VALUES($1,$2,$3,'worker',$4,'worker.signed_in',$4)`,
     [randomUUID(),row.org_id,row.site_id,row.worker_id]);
@@ -233,3 +240,20 @@ export async function authenticateWorker(pool,input,remoteAddress='',{schema='pu
 }
 
 export {companyLocator,normalizeWorkerLogin};
+
+export async function assignWorkerPassword(pool,session,workerId,input,{schema='public'}={}){
+  const value=assignedCredentialInput(input,session?.org_id || ''),record=await passwordRecord(value.password);
+  return inSchema(pool,schema,async client=>{
+    await requireCredentialStaff(client,session);await requireWorkerSiteAccess(client,session.org_id,session.site_id);
+    const worker=await workerRow(client,session,workerId,true);
+    if(!worker.active)throw new Error('Worker unavailable');
+    if(normalizeWorkerLogin(worker.code)!==value.expectedCode)throw new Error('Worker code changed');
+    if((await client.query('SELECT worker_id FROM worker_credentials WHERE org_id=$1 AND login_id=$2 AND worker_id<>$3',[session.org_id,value.login,worker.id])).rows.length)throw new Error('Worker ID already in use');
+    await revokeWorkerAccess(client,worker);
+    await client.query("UPDATE worker_credentials SET state='setup',password_salt=NULL,password_hash=NULL,password_changed_at=NULL,credential_revision=credential_revision+1,updated_at=clock_timestamp() WHERE worker_id=$1",[worker.id]);
+    await client.query(`INSERT INTO worker_credentials(worker_id,org_id,site_id,login_id,state,password_salt,password_hash,credential_revision,setup_issued_at,password_changed_at,created_at,updated_at)
+      VALUES($1,$2,$3,$4,'active',$5,$6,1,NULL,clock_timestamp(),clock_timestamp(),clock_timestamp()) ON CONFLICT(worker_id) DO UPDATE SET login_id=excluded.login_id,state='active',password_salt=excluded.password_salt,password_hash=excluded.password_hash,credential_revision=worker_credentials.credential_revision+1,setup_issued_at=NULL,password_changed_at=excluded.password_changed_at,updated_at=excluded.updated_at`,[worker.id,worker.org_id,worker.site_id,value.login,record.salt,record.derived]);
+    await audit(client,session,'worker.password_assigned',worker.id);
+    return {workerId:worker.id,companyId:worker.org_id,loginId:value.login,state:'active'};
+  });
+}

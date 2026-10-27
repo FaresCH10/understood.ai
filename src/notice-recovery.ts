@@ -1,3 +1,4 @@
+import type {WorkerLocaleCode} from '../server/languages.mjs';
 import {recordingNoticeInput,sameNoticeRequest} from '../server/recording-notice-input.mjs';
 import type {RecordingLanguage} from './recording-notice';
 export type NoticeChange={requestId:string;revision:number;notices:Record<RecordingLanguage,string>;confirmed:true;scope:string};
@@ -5,7 +6,7 @@ type Storage=Pick<globalThis.Storage,'getItem'|'setItem'|'removeItem'>;
 const key=(scope:string)=>`understood:recording-notice:${scope}`;
 export function readPendingNotice(storage:Storage,scope:string):NoticeChange|null{
   const raw=storage.getItem(key(scope));if(raw===null)return null;
-  try{if(raw.length>13500)throw Error();const value=JSON.parse(raw);recordingNoticeInput(value);if(value.scope!==scope)throw Error();return value;}
+  try{if(raw.length>65000)throw Error();const value=JSON.parse(raw);recordingNoticeInput(value);if(value.scope!==scope)throw Error();return value;}
   catch{throw Error('Pending recording notice cannot be verified.');}
 }
 export function storePendingNotice(storage:Storage,scope:string,value:NoticeChange){
@@ -27,7 +28,7 @@ export function verifyNoticeReceipt(value:unknown,pending:NoticeChange){
     || row.requestId!==pending.requestId || row.revision!==pending.revision+1 || !row.request
     || Object.keys(row.request).sort().join(',')!=='notices,revision,scope' || !sameNoticeRequest(row.request,request))throw Error('Recording notice receipt cannot be verified.');
 }
-export function workerRecordingNotice(value:unknown,language:RecordingLanguage){
+export function workerRecordingNotice(value:unknown,language:WorkerLocaleCode){
   const row=value as {revision?:number;configured?:boolean;language?:string;notice?:unknown};
   if(!row || !Number.isSafeInteger(row.revision) || row.revision!<0 || typeof row.configured!=='boolean' || row.language!==language
     || (row.configured ? typeof row.notice!=='string' || row.notice.length<20 || row.notice.length>2000 : row.notice!==null))throw Error('Recording notice cannot be verified.');

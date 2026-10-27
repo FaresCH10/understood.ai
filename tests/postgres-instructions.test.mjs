@@ -1,3 +1,5 @@
+import {processOneAssessment} from '../server/postgres/assessment-worker.mjs';
+import {assignWorkerPassword} from '../server/postgres/worker-credentials.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -35,6 +37,7 @@ async function fixture() {
   await db.query("INSERT INTO workers(id,org_id,site_id,code,language) VALUES ('w1','a','a','001','en'),('w2','a','a','002','ur'),('w3','a','c','003','ar'),('wb','b','b','001','en')");
   await db.query("INSERT INTO workers(id,org_id,site_id,code,language) VALUES ('wh','a','a','004','hi')");
   await db.query("INSERT INTO crews(id,org_id,site_id,name) VALUES ('empty','a','a','Empty crew')");
+  await assignWorkerPassword(pool,owner,'w1',{expectedCode:'001',workerId:'001',password:'Assigned synthetic worker password',confirmed:true},scope);
   return {db,pool,queries};
 }
 
@@ -301,8 +304,8 @@ test('PostgreSQL a passed deadline blocks late release and leaves reminders for 
   }finally{await db.close();}
 });
 
-async function withHttp(f,run) {
-  const server=createPostgresRehearsalServer(f.pool,{tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin,dataClass:'synthetic',schema:options.schema});
+async function withHttp(f,run,serverOptions={}) {
+  const server=createPostgresRehearsalServer(f.pool,{tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin,dataClass:'synthetic',schema:options.schema,...serverOptions});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}`;
   const request=async(path,cookie,init={})=>fetch(`${base}/api${path}`,{...init,headers:{origin,'content-type':'application/json',...(cookie?{cookie}:{}),...init.headers}});
@@ -310,6 +313,36 @@ async function withHttp(f,run) {
 }
 const cookieOf=(response)=>response.headers.get('set-cookie').split(';')[0];
 const post=(body)=>({method:'POST',body:JSON.stringify(body)});
+
+test('configured provider sends stay queued during HTTP reads and publish generated speech through the worker',async()=>{
+  const {db,pool}=await fixture(),objects=new Map();
+  const storage={async save(row,bytes){objects.set(row.id,Buffer.from(bytes));},async read(row){return objects.get(row.id);},async remove(row){objects.delete(row.id);}};
+  const source='Move the red ladder to the north bay before the night shift.';
+  const adapter={provenance:{adapter:'synthetic-http-fixture',dataClass:'synthetic',textModel:'fixture',speechModel:'fixture',voice:'fixture',promptVersion:'v1',schemaVersion:'v1'},
+    capabilities:{textLanguages:['en','hi','ur'],speechLanguages:['en','hi','ur']},
+    async prepare(){return {title:'Ladder handover',facts:[source],askedFacts:[source],question:'What should happen to the red ladder before the night shift?'};},
+    async checkPreparation(){return {sourceGrounded:true,questionAligned:true,ambiguous:false,factEvidence:[{factIndex:0,quote:source}],askedFactIndexes:[0],reasons:[]};},
+    async translate(_,language){const text=language==='hi'?'लाल सीढ़ी':'سرخ سیڑھی';return {title:text,text,question:text+'?'};},
+    async checkTranslation(){return {faithful:true,complete:true,languageCorrect:true,terminologyApplied:true,reasons:[]};},async speech(){return wav();}};
+  try{
+    await provisionStaffCredential(pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password:'Synthetic HTTP staff password'},scope);
+    await withHttp({pool},async({request})=>{
+      const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'Synthetic HTTP staff password'})));
+      const context=(await (await request('/session',staff)).json()).clientContext,headers={'x-client-session-context':context};
+      const payload={...instruction(),source,deliveryMode:'both',responseMode:'question'};
+      const response=await request('/instructions/send',staff,{...post(payload),headers});
+      assert.equal(response.status,201);assert.equal((await response.json()).state,'preparing');
+      const status=await request('/instructions/sends/'+payload.requestId,staff,{headers});
+      assert.equal(status.status,200);assert.equal((await status.json()).state,'preparing');
+      assert.equal((await db.query('SELECT attempts FROM jobs WHERE briefing_id=$1',[payload.requestId])).rows[0].attempts,0);
+      assert.equal(await processOnePreparation(pool,{...options,adapter,storage}),true);
+      const complete=await request('/instructions/sends/'+payload.requestId,staff,{headers});
+      assert.equal(complete.status,200);const result=await complete.json();assert.equal(result.state,'published');assert.equal(result.delivered,3);
+      const snapshot=(await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[result.publicationId])).rows[0].snapshot_json;
+      assert.ok(snapshot.artifactBundle);assert.equal(snapshot.rubric.mode,'multiple-choice');assert.equal(objects.size,6);
+    },{preparationAdapter:adapter,storage});
+  }finally{await db.close();}
+});
 
 test('PostgreSQL instruction and acknowledgment HTTP routes enforce session context, scopes and idempotent replay',async()=>{
   const f=await fixture(),{db,pool}=f;
@@ -357,7 +390,7 @@ test('PostgreSQL instruction and acknowledgment HTTP routes enforce session cont
       assert.equal(afterRetry.delivered,3);assert.equal(afterRetry.undelivered,0);assert.equal(afterRetry.retryable,false);
 
       const grant=await issueWorkerGrant(pool,owner,'w1',30,scope);
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
       const workerContext=(await (await request('/session',member)).json()).clientContext;
       assert.equal((await request('/instructions/send',member,{...post({...payload,requestId:randomUUID()}),headers:{'x-client-session-context':workerContext}})).status,403);
       assert.equal((await request('/instructions/audience',member,{headers:{'x-client-session-context':workerContext}})).status,403);
@@ -382,4 +415,44 @@ test('PostgreSQL instruction and acknowledgment HTTP routes enforce session cont
     });
     assert.equal((await db.query('SELECT COUNT(*)::int n FROM publications WHERE briefing_id=$1',[httpRequestId])).rows[0].n,1);
   }finally{await db.close();}
+});
+
+
+test('PostgreSQL multiple-choice assessment uses the frozen key and routes incorrect answers to the supervisor',async()=>{
+  const f=await fixture(),{db,pool}=f;
+  try{
+    const payload={...instruction(),responseMode:'question',deliveryMode:'text'};
+    await startInstructionSend(pool,owner,payload,scope);await prepare(pool);
+    const sent=await completeInstructionSend(pool,owner,payload.requestId,scope);
+    const snapshot=(await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[sent.publicationId])).rows[0].snapshot_json;
+    const assignment=(await db.query("SELECT id FROM assignments WHERE publication_id=$1 AND worker_id='w1'",[sent.publicationId])).rows[0].id;
+    const detail=await workerBriefing(pool,worker,assignment,scope);
+    assert.equal(detail.content.questionType,'multiple-choice');assert.equal(detail.content.choices.length,4);
+    assert.ok(!JSON.stringify(detail).includes('correctChoiceId'));
+    await assert.rejects(submitAnswer(pool,worker,assignment,randomUUID(),'invented-choice',scope),/published choices/);
+    const wrong=snapshot.languages.en.choices.find(choice=>choice.id!==snapshot.rubric.correctChoiceId).id;
+    let providerCalls=0;const adapter={permitsAssessment:()=>false,assess:async()=>{providerCalls++;throw Error('A published choice does not need a provider guess');}};
+    const first=await submitAnswer(pool,worker,assignment,randomUUID(),wrong,scope);
+    assert.equal(await processOneAssessment(pool,adapter,scope),true);
+    assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[first.id])).rows[0].outcome,'clarification');
+    assert.equal((await db.query('SELECT count(*)::int n FROM clarifications WHERE assignment_id=$1',[assignment])).rows[0].n,1);
+    const second=await submitAnswer(pool,worker,assignment,randomUUID(),snapshot.rubric.correctChoiceId,scope);
+    assert.equal(await processOneAssessment(pool,adapter,scope),true);
+    assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[second.id])).rows[0].outcome,'matched');
+    assert.equal(providerCalls,0);
+    const staff=await getPublicationResponse(pool,owner,sent.publicationId,assignment,{},scope);
+    assert.equal(staff.questionType,'multiple-choice');assert.equal(staff.choices.length,4);
+  }finally{await db.close();}
+});
+
+test('PostgreSQL sends expose every crew and reject selected workers whose language is still unassigned',async()=>{
+  const f=await fixture();try{
+    await f.db.query("INSERT INTO workers(id,org_id,site_id,code,language,language_selection_required) VALUES('new-worker','a','a','Pending','en',true)");
+    const input=instruction();await assert.rejects(startInstructionSend(f.pool,owner,input,scope),/Choose a language/);
+    assert.equal((await f.db.query('SELECT count(*)::int n FROM instruction_sends WHERE request_id=$1',[input.requestId])).rows[0].n,0);
+    for(let i=0;i<101;i++)await f.db.query("INSERT INTO crews(id,org_id,site_id,name) VALUES($1,'a','a',$2)",[`crew-${i}`,`Crew ${i}`]);
+    const overview=await instructionAudienceOverview(f.pool,owner,scope);assert.equal(overview.crews.length,102);assert.equal(overview.workers.notSelected,1);
+    await f.db.query("UPDATE workers SET language_selection_required=false WHERE id='new-worker'");
+    assert.equal((await startInstructionSend(f.pool,owner,input,scope)).audience.count,4);
+  }finally{await f.db.close();}
 });

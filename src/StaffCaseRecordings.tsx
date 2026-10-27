@@ -39,7 +39,7 @@ function RecordingTools({scope,authority,available,canWrite,language,onLanguageC
     }).catch(reason=>{if(!alive||!current())return;if(reason instanceof StaffRecordingError&&reason.code==='session'){callbacks.current.authority.onSessionLost();return;}setRead({key,data:null,loading:false,failed:true});});
     return()=>{alive=false;command.abort();};
   },[key,api]);
-  const loadNotice=useCallback(async(selected:RecordingLanguage,signal:AbortSignal)=>checkedStaffRecordingNotice(await api.request<unknown>('/api/privacy/recording-notice',undefined,signal),authority.session,selected),[api,authority.session]);
+  const loadNotice=useCallback(async(selected:import('./recording-notice').RecordingLanguage,signal:AbortSignal)=>{if(selected!=='en'&&selected!=='ar'&&selected!=='ur')throw new StaffRecordingError('blocked');return checkedStaffRecordingNotice(await api.request<unknown>('/api/privacy/recording-notice',undefined,signal),authority.session,selected);},[api,authority.session]);
   function report(reason:unknown){if(!current())return;setError(true);if(reason instanceof StaffRecordingError&&reason.code==='session')callbacks.current.authority.onSessionLost();}
   function accept(value:StaffRecordingReceipt,retained:StaffRecordingPending){
     if(!current())throw new StaffRecordingError('session');if(value.status==='storing')throw new StaffRecordingError('conflict');

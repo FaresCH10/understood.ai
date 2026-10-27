@@ -1,5 +1,11 @@
 # Worker Interface Language
 
+## Current behavior — 26 October 2026
+
+The approved server session language now controls the worker interface in all 15 supported locales. Device settings submit a supervisor-approval request; the interface stays in its approved language while the request is pending. Tab preferences cannot override the approved session language. First-use identity language selection remains a separate flow. See [requested fixes](REQUESTED_BUG_FIXES.md) for current checks and service limitations.
+
+## Historical checkpoint (superseded language-selection policy)
+
 2026-10-08 18:31 UTC checkpoint. Local synthetic evidence, not production acceptance.
 
 Device settings now select English, Arabic or Urdu for worker controls. This is a tab/session-scoped interface preference, not an update to worker identity or assignment language. The original server session is never mutated: request context, frozen content, answer/audio language, draft scope and stored site notice remain unchanged. Content and site notice carry their own language/direction attributes inside the localized interface.

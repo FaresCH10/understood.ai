@@ -15,6 +15,7 @@ test('conversation recovery retains only scoped metadata and never silently chan
   assert.throws(()=>clearPendingMessage(storage,session,caseId,randomUUID()),/changed/);
   const receipt={id:pending.id,caseId,language:'en',createdAt:new Date().toISOString()};
   assert.equal(checkedMessageReceipt(receipt,caseId,pending.id),receipt);
+  assert.equal(checkedMessageReceipt({...receipt,language:'hi'},caseId,pending.id).language,'hi');
   for(const invalid of [null,{}, {...receipt,caseId:randomUUID()}, {...receipt,id:randomUUID()}, {...receipt,language:'xx'}, {...receipt,createdAt:'invalid'}])assert.throws(()=>checkedMessageReceipt(invalid,caseId,pending.id));
   clearPendingMessage(storage,session,caseId,pending.id);assert.equal(readPendingMessage(storage,session,caseId),null);
   const generated=await retainMessage(storage,session,caseId,text,'followup');assert.equal(generated.kind,'followup');

@@ -44,6 +44,9 @@ export function WorkerNotifications({session,language,navigate,refresh,current,o
     setBusy(true);setActionFailed(false);
     try {
       const saved=checkedWorkerNotificationItem(await request(`/api/notifications/${encodeURIComponent(item.id)}/read`,{method:'POST',body:'{}'}));
+      if(!latest.current.current())return;
+      window.dispatchEvent(new Event('understood:notifications-changed'));
+      if(status==='unread'){setLoading(true);setTick(value=>value+1);}
       setData(currentData=>{
         if(!currentData)return currentData;
         if(status==='unread')return {...currentData,items:currentData.items.filter(row=>row.id!==saved.id),total:Math.max(0,currentData.total-1),unread:Math.max(0,currentData.unread-1)};
@@ -78,8 +81,8 @@ export function WorkerNotifications({session,language,navigate,refresh,current,o
       }) : !failed && <p className="empty-state">{status==='unread'?text.emptyUnread:text.empty}</p>}
     </section>
     {data && !loading && <div className="worker-inbox-pagination"><span role="status">{text.page} {page} / {pages} · {data.total}</span><div className="actions">
-      <button type="button" className="icon-button" aria-label={text.previous} title={text.previous} disabled={busy || page<=1} onClick={()=>setPage(value=>value-1)}><Back size={20}/></button>
-      <button type="button" className="icon-button" aria-label={text.next} title={text.next} disabled={busy || page>=pages} onClick={()=>setPage(value=>Math.min(value+1,pages))}><Forward size={20}/></button>
+      <button type="button" className="icon-button" aria-label={text.previous} title={text.previous} disabled={loading || busy || page<=1} onClick={()=>setPage(value=>value-1)}><Back size={20}/></button>
+      <button type="button" className="icon-button" aria-label={text.next} title={text.next} disabled={loading || busy || page>=pages} onClick={()=>setPage(value=>Math.min(value+1,pages))}><Forward size={20}/></button>
     </div></div>}
     <details className="worker-card worker-push-setup">
       <summary><BellRing size={20} aria-hidden="true"/>{text.pushTitle}</summary>

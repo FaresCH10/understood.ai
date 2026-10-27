@@ -1,8 +1,13 @@
+import {validateMultipleChoice} from './multiple-choice-input.mjs';
 import {translationEdits} from './translation-input.mjs';
 import {generationLanguages} from './settings-input.mjs';
 const uuid=(value) => typeof value==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const id=(value) => typeof value==='string' && value.length>0 && value.length<=100;
 const nonempty=(value,max) => typeof value==='string' && value.trim().length>0 && value.length<=max;
+export function unavailableRecipientLanguage(languages){
+  const shown=[...new Set(languages)].filter(code=>typeof code==='string' && /^[a-z]{2}(?:-[A-Za-z]+)?$/.test(code)).map(code=>code.toUpperCase()).sort();
+  return `Recipient language is unavailable: ${shown.join(', ') || 'unknown'}`;
+}
 export function reviewRequestId(value) {if(!uuid(value)) throw new Error('Invalid draft review request');return value;}
 
 export function briefingFilters(filters={}) {
@@ -74,19 +79,21 @@ export function readySnapshot(briefing,workers,integrationMode,modes={}) {
   // A device-speech demo marker is not a verified live private audio artifact.
   if (integrationMode!=='synthetic' || !['synthetic-local-v1','synthetic-instruction-v1'].includes(value.provenance?.adapter) || value.provenance.live!==false)
     throw new Error('Live publication artifact verification is unavailable');
-  if(value.provenance.adapter==='synthetic-instruction-v1' && questionMode) {
+  if(value.provenance.adapter==='synthetic-instruction-v1' && questionMode && value.rubric?.mode!=='multiple-choice') {
     const groups=value.rubric?.keywordGroups;
     if(value.rubric.mode!=='keywords' || !Array.isArray(groups) || !groups.length || groups.length>6
       || groups.some((group)=>!Array.isArray(group) || !group.length || group.length>3 || !group.every((word)=>nonempty(word,60))))
       throw new Error('Briefing is not technically ready');
   }
-  if (workers.some((worker) => {
+  const missingLanguages=workers.filter((worker) => {
     const language=value.languages?.[worker.language];
     return !language || !nonempty(language.title,120) || !nonempty(language.text,5000)
       || (questionMode && !nonempty(language.question,500))
       || (deliveryMode!=='text' && language.speech!=='device-synthesis-demo');
-  })) throw new Error('Recipient language is unavailable');
+  }).map(worker=>worker.language);
+  if(missingLanguages.length) throw new Error(unavailableRecipientLanguage(missingLanguages));
   if (Buffer.byteLength(JSON.stringify(value))>100000) throw new Error('Prepared content exceeds limit');
+  if(value.rubric?.mode==='multiple-choice' && !validateMultipleChoice({...value,languages:Object.fromEntries(workers.map(worker=>[worker.language,value.languages?.[worker.language]]))}))throw new Error('Briefing is not technically ready');
   return {...value,responseMode,deliveryMode};
 }
 

@@ -12,6 +12,20 @@ const encoded=seconds=>Buffer.from(wav(seconds)).toString('base64');
 function item(overrides={}){return {scope:{...scope},title:'Private title',text:'Private instructions, not a rubric.',question:'Private question?',savedAt:new Date(time).toISOString(),expiresAt:new Date(time+86400000).toISOString(),answerUntil:new Date(time+3600000).toISOString(),canRecord:true,notice:{...notice},audio:{body:encoded(1),question:null},...overrides};}
 function memory(){let value=null;return {get value(){return value;},set value(next){value=next;},async read(){return structuredClone(value);},async replace(revision,next,allowed){if(!allowed() || (value?.revision ?? null)!==revision)return false;value=structuredClone(next);return true;},async clear(){value=null;}};}
 const fails=code=>error=>error instanceof OfflineError && error.code===code;
+
+test('acknowledgment-only instructions save offline without a question, consent fetch or answer recording',async()=>{
+  const calls=[],send=async path=>{
+    calls.push(path);if(path==='/api/session')return Response.json(session);
+    assert.equal(path,`/api/worker/briefings/${scope.assignmentId}`);
+    return Response.json({id:scope.assignmentId,publicationId:scope.publicationId,version:scope.version,language:scope.language,state:'published',responseMode:'acknowledge',content:{title:'Notice',text:'Keep the walkway clear.'}});
+  };
+  const value=await fetchOfflineBriefing(send,session,scope,()=>true,now);
+  assert.equal(value.question,null);assert.equal(value.canRecord,false);assert.equal(value.responseMode,'acknowledge');
+  assert.ok(!calls.some(path=>path.includes('recording-notice')));
+  const store=memory();await saveOfflineBriefing(session,value,true,()=>true,store,now);
+  assert.deepEqual((await readOfflineBundle(store,()=>true,now)).briefings,[value]);
+  for(const patch of [{question:'A question?'},{canRecord:true},{audio:{body:null,question:encoded(1)}}])await assert.rejects(saveOfflineBriefing(session,{...value,...patch},true,()=>true,memory(),now),fails('invalid'));
+});
 test('private briefing storage is opt-in, nonextractable and strictly whitelisted with exact text/audio readback',async()=>{
   const store=memory(),value=item();await assert.rejects(saveOfflineBriefing(session,value,false,()=>true,store,now),fails('invalid'));assert.equal(store.value,null);
   await saveOfflineBriefing(session,value,true,()=>true,store,now);assert.equal(store.value.key.extractable,false);await assert.rejects(crypto.subtle.exportKey('raw',store.value.key));

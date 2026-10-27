@@ -3,8 +3,9 @@ import {domainAudit,domainTransaction,publishInTransaction,requirePrincipal} fro
 import {createDraftInTransaction,queuePreparationInTransaction} from './preparation.mjs';
 import {instructionInput} from '../instructions.mjs';
 import {generationLanguages} from '../settings-input.mjs';
-import {CONTENT_LANGUAGE_CODES} from '../languages.mjs';
-import {CANONICAL_SOURCE} from '../domain.mjs';
+import {WORKER_LANGUAGE_CODES} from '../languages.mjs';
+import {generatedBundleEvidence,verifyGeneratedAudio} from './generated-audio.mjs';
+import {bundleHash} from '../ai/prepared-bundle.mjs';
 import {groupedUndelivered,recipientDeliveryReadiness} from '../delivery-readiness.mjs';
 import {deliveryContent,deliveryContentHash,deliveryStateCounts,instructionRetryInput} from '../instruction-deliveries.mjs';
 import {queuePublicationReminders} from './reminders.mjs';
@@ -138,12 +139,27 @@ async function actorSession(client,row,principalId=row.requested_by) {
   return {principal_type:'staff',principal_id:principalId,org_id:row.org_id,site_id:row.site_id,role:staff.role};
 }
 
-async function publishSend(client,session,row,briefing,request,deliverable) {
+// Private object reads must happen outside row-lock transactions. Publication
+// subsequently rechecks the exact snapshot, principal and generated journal.
+async function instructionAudioPreflight(pool,session,requestId,{schema='public',storage,integrationMode='synthetic'}={}) {
+  const loaded=await domainTransaction(pool,schema,async client=>{
+    await requirePrincipal(client,session,'staff');
+    const row=(await client.query(`SELECT b.id,b.state,b.prepared_json FROM instruction_sends s JOIN briefings b
+      ON b.id=s.briefing_id AND b.org_id=s.org_id AND b.site_id=s.site_id
+      WHERE s.request_id=$1 AND s.org_id=$2 AND s.site_id=$3`,[requestId,session.org_id,session.site_id])).rows[0];
+    if(!row || row.state!=='ready' || !row.prepared_json?.artifactBundle)return null;
+    return {snapshotHash:bundleHash(row.prepared_json),evidence:await generatedBundleEvidence(client,{...session,briefing_id:row.id},row.prepared_json)};
+  });
+  if(loaded)await verifyGeneratedAudio(loaded.evidence,storage);
+  return loaded;
+}
+
+async function publishSend(client,session,row,briefing,request,deliverable,preflight,integrationMode) {
   const published=await publishInTransaction(client,session,row.briefing_id,{
     requestId:row.publication_request_id,revision:briefing.revision,nextVersion:briefing.next_version,
     workerIds:deliverable.map((worker)=>worker.id),
     ...(request.dueAt?{dueAt:request.dueAt}:{}),...(request.reminderMinutes?{reminderMinutes:request.reminderMinutes}:{}),
-  },{integrationMode:'synthetic',modes:{responseMode:row.response_mode,deliveryMode:row.delivery_mode}});
+  },{integrationMode,preflight,modes:{responseMode:row.response_mode,deliveryMode:row.delivery_mode}});
   const assignments=(await client.query('SELECT id,worker_id FROM assignments WHERE publication_id=$1 AND org_id=$2 AND site_id=$3',
     [published.id,session.org_id,session.site_id])).rows;
   const assignmentByWorker=new Map(assignments.map((assignment)=>[assignment.worker_id,assignment.id]));
@@ -159,7 +175,7 @@ async function publishSend(client,session,row,briefing,request,deliverable) {
   return published;
 }
 
-async function completeSend(client,session,row) {
+async function completeSend(client,session,row,preflight=null,integrationMode='synthetic') {
   if(await briefingContentExpired(client,row.briefing_id)) return {updated:await settleExpired(client,row),released:0};
   const briefing=(await client.query('SELECT * FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3',
     [row.briefing_id,session.org_id,session.site_id])).rows[0];
@@ -205,7 +221,7 @@ async function completeSend(client,session,row) {
       error:'No recipient has prepared content in their language yet.',now:await nowOf(client)});
     return {updated,released:0};
   }
-  const published=await publishSend(client,session,row,briefing,request,deliverable);
+  const published=await publishSend(client,session,row,briefing,request,deliverable,preflight,integrationMode);
   const updated=await syncSendCounts(client,row,{state:'published',publicationId:published.id,now:await nowOf(client)});
   await domainAudit(client,session,'instruction.send_published',row.request_id);
   if(updated.undelivered>0) await staffAuditOnce(client,{orgId:session.org_id,siteId:session.site_id,action:'instruction.send_incomplete',objectId:row.request_id});
@@ -249,9 +265,11 @@ async function reconcilePublished(client,session,row) {
     if(worker.language!==delivery.language) {await settle(client,row.request_id,delivery.worker_id,'blocked','language_changed',now);continue;}
     if(request.dueAt && Date.parse(request.dueAt)<=Date.now()) {await settle(client,row.request_id,delivery.worker_id,'blocked','deadline_passed',now);continue;}
     const snapshotContent=snapshot.languages?.[delivery.language];
-    const lateContent=prepared?.languages?.[delivery.language];
+    // Generated speech belongs to the exact frozen publication bundle. A later
+    // bundle cannot lend audio or a different answer key to that publication.
+    const lateContent=snapshot.artifactBundle?null:prepared?.languages?.[delivery.language];
     const content=snapshotContent || lateContent;
-    const readiness=recipientDeliveryReadiness(snapshotContent ? snapshot : prepared,{...worker,language:delivery.language},
+    const readiness=recipientDeliveryReadiness(snapshotContent || snapshot.artifactBundle ? snapshot : prepared,{...worker,language:delivery.language},
       {responseMode:row.response_mode,deliveryMode:row.delivery_mode});
     if(!readiness.delivery) {
       if(!proceeding) await settle(client,row.request_id,delivery.worker_id,'failed',readiness.reason,now);
@@ -302,7 +320,15 @@ export async function instructionAudienceOverview(pool,session,{schema='public'}
       LEFT JOIN workers w ON w.id=cm.worker_id AND w.org_id=cm.org_id AND w.site_id=cm.site_id AND w.active=true
         AND w.language_selection_required=false
       WHERE c.org_id=$1 AND c.site_id=$2 AND c.active=true
-      GROUP BY c.id,c.name ORDER BY lower(c.name),c.id LIMIT 100`,[session.org_id,session.site_id])).rows;
+      GROUP BY c.id,c.name ORDER BY lower(c.name),c.id LIMIT 5001`,[session.org_id,session.site_id])).rows;
+    if(crews.length>5000)throw Error('Instruction crew audience exceeds limit');
+    const crewLanguages=(await client.query(`SELECT cm.crew_id,w.language,w.language_selection_required,COUNT(*)::int AS n
+      FROM crew_memberships cm JOIN crews c ON c.id=cm.crew_id AND c.org_id=cm.org_id AND c.site_id=cm.site_id AND c.active=true
+      JOIN workers w ON w.id=cm.worker_id AND w.org_id=cm.org_id AND w.site_id=cm.site_id AND w.active=true
+      WHERE cm.org_id=$1 AND cm.site_id=$2 GROUP BY cm.crew_id,w.language,w.language_selection_required`,[session.org_id,session.site_id])).rows;
+    for(const crew of crews){crew.byLanguage={};crew.notSelected=0;}
+    const crewById=new Map(crews.map(crew=>[crew.id,crew]));
+    for(const row of crewLanguages){const crew=crewById.get(row.crew_id);if(!crew)continue;if(row.language_selection_required)crew.notSelected+=row.n;else crew.byLanguage[row.language]=(crew.byLanguage[row.language]||0)+row.n;}
     return {workers:{total:selected,byLanguage,notSelected},crews,asOf:iso(await nowOf(client))};
   });
 }
@@ -319,12 +345,13 @@ export async function startInstructionSend(pool,session,input,{schema='public'}=
       return sendView(client,old,true);
     }
     await requireWritableEntitlement(client,session.org_id);
+    const pendingLanguage=(await client.query(`SELECT 1 FROM workers w WHERE w.org_id=$1 AND w.site_id=$2 AND w.active=true AND w.language_selection_required=true AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM crew_memberships cm WHERE cm.worker_id=w.id AND cm.org_id=w.org_id AND cm.site_id=w.site_id AND cm.crew_id=$3)) LIMIT 1`,[session.org_id,session.site_id,value.audience.type==='crew'?value.audience.crewId:null])).rows.length>0;
+    if(pendingLanguage)throw Error('Choose a language for every selected worker in Team before sending.');
     const workers=await audienceWorkers(client,session,value.audience);
     if(!workers.length) throw new Error('Instruction audience is empty');
     if(workers.length>5000) throw new Error('Instruction audience exceeds limit');
-    const supported=[...new Set(['en',...workers.map(worker=>worker.language)])]
-      .filter(language=>CONTENT_LANGUAGE_CODES.includes(language));
-    const generation=value.request.source.trim()===CANONICAL_SOURCE ? generationLanguages(supported) : ['en'];
+    const supported=WORKER_LANGUAGE_CODES.filter(language=>language==='en' || workers.some(worker=>worker.language===language));
+    const generation=generationLanguages(supported);
     await createDraftInTransaction(client,session,{requestId:value.requestId,title:value.request.title,source:value.request.source,generationLanguages:generation},schema);
     await queuePreparationInTransaction(client,session,value.requestId,1);
     const audience={type:value.audience.type,workers,...(value.audience.crewId?{crewId:value.audience.crewId}:{})};
@@ -353,8 +380,9 @@ export async function instructionSendStatus(pool,session,requestId,{schema='publ
   });
 }
 
-export async function completeInstructionSend(pool,session,requestId,{schema='public'}={}) {
+export async function completeInstructionSend(pool,session,requestId,{schema='public',storage,integrationMode='synthetic'}={}) {
   if(!uuid(requestId)) throw new Error('Invalid instruction request');
+  const preflight=await instructionAudioPreflight(pool,session,requestId,{schema,storage});
   return domainTransaction(pool,schema,async client=>{
     await requirePrincipal(client,session,'staff');
     const row=(await client.query('SELECT * FROM instruction_sends WHERE request_id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',
@@ -362,7 +390,7 @@ export async function completeInstructionSend(pool,session,requestId,{schema='pu
     if(!row) throw new Error('Instruction unavailable');
     if(row.state==='published' || row.state==='failed') return sendView(client,row,true);
     await backfillDeliveries(client,row,await nowOf(client));
-    const result=await completeSend(client,session,row);
+    const result=await completeSend(client,session,row,preflight,integrationMode);
     return sendView(client,result.updated,false);
   });
 }
@@ -380,9 +408,10 @@ export async function reconcileInstructionSend(pool,session,requestId,{schema='p
   });
 }
 
-export async function retryInstructionSend(pool,session,requestId,input,{schema='public'}={}) {
+export async function retryInstructionSend(pool,session,requestId,input,{schema='public',storage,integrationMode='synthetic'}={}) {
   if(!uuid(requestId)) throw new Error('Invalid instruction request');
   const retry=instructionRetryInput(input);
+  const preflight=await instructionAudioPreflight(pool,session,requestId,{schema,storage});
   return domainTransaction(pool,schema,async client=>{
     await requirePrincipal(client,session,'staff');
     const retryRow=(await client.query('SELECT * FROM instruction_sends WHERE request_id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',
@@ -437,7 +466,7 @@ export async function retryInstructionSend(pool,session,requestId,input,{schema=
         }
       }
       if(row.publication_id) ({updated,released}=await reconcilePublished(client,session,row));
-      else ({updated,released}=await completeSend(client,session,row));
+      else ({updated,released}=await completeSend(client,session,row,preflight,integrationMode));
     }
     await client.query('INSERT INTO instruction_retries VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
       [retry.requestId,requestId,session.org_id,session.site_id,session.principal_id,generation,
@@ -448,14 +477,27 @@ export async function retryInstructionSend(pool,session,requestId,input,{schema=
   });
 }
 
-export async function processOneInstructionSend(pool,{schema='public'}={}) {
-  return domainTransaction(pool,schema,async client=>{
+export async function processOneInstructionSend(pool,{schema='public',storage,integrationMode='synthetic'}={}) {
+  const candidate=await domainTransaction(pool,schema,async client=>{
     const row=(await client.query(`SELECT s.* FROM instruction_sends s JOIN briefings b
       ON b.id=s.briefing_id AND b.org_id=s.org_id AND b.site_id=s.site_id
       WHERE (s.state='preparing' AND b.state IN ('ready','failed'))
         OR (s.state='published' AND b.state IN ('ready','failed')
           AND EXISTS(SELECT 1 FROM instruction_deliveries d WHERE d.request_id=s.request_id AND d.state='preparing'))
-      ORDER BY s.created_at,s.request_id LIMIT 1 FOR UPDATE OF s SKIP LOCKED`)).rows[0];
+      ORDER BY s.created_at,s.request_id LIMIT 1`)).rows[0];
+    if(!row)return null;
+    const retry=(await client.query('SELECT requested_by FROM instruction_retries WHERE send_request_id=$1 ORDER BY generation DESC LIMIT 1',[row.request_id])).rows[0];
+    return {id:row.request_id,actor:await actorSession(client,row,retry?.requested_by ?? row.requested_by)};
+  });
+  if(!candidate)return false;
+  const preflight=candidate.actor?await instructionAudioPreflight(pool,candidate.actor,candidate.id,{schema,storage}):null;
+  return domainTransaction(pool,schema,async client=>{
+    const row=(await client.query(`SELECT s.* FROM instruction_sends s JOIN briefings b
+      ON b.id=s.briefing_id AND b.org_id=s.org_id AND b.site_id=s.site_id
+      WHERE s.request_id=$1 AND ((s.state='preparing' AND b.state IN ('ready','failed'))
+        OR (s.state='published' AND b.state IN ('ready','failed')
+          AND EXISTS(SELECT 1 FROM instruction_deliveries d WHERE d.request_id=s.request_id AND d.state='preparing')))
+      ORDER BY s.created_at,s.request_id LIMIT 1 FOR UPDATE OF s SKIP LOCKED`,[candidate.id])).rows[0];
     if(!row) return false;
     const retry=(await client.query('SELECT requested_by FROM instruction_retries WHERE send_request_id=$1 ORDER BY generation DESC LIMIT 1',
       [row.request_id])).rows[0];
@@ -470,7 +512,7 @@ export async function processOneInstructionSend(pool,{schema='public'}={}) {
       return true;
     }
     await backfillDeliveries(client,row,await nowOf(client));
-    if(row.state==='preparing') await completeSend(client,actor,row);
+    if(row.state==='preparing') await completeSend(client,actor,row,preflight,integrationMode);
     else if(row.state==='published') await reconcilePublished(client,actor,row);
     return true;
   });

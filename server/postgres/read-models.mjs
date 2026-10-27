@@ -161,7 +161,7 @@ function workerContent(row,detail=false) {
       : currentAudio || (row.attempt_at && !row.outcome) ? 'pending' : row.outcome ? 'complete' : null,
     ...(acknowledgedAt?{acknowledgedAt}:{}),
     audioStatus:currentAudio ? row.audio_status : null,...(detail ? {recordingId:currentAudio ? row.recording_id : null,
-      content:expired?null:{title:lang.title,text:lang.text,...(responseMode==='question'?{question:lang.question}:{}),speech:speechOffered ? lang.speech : null},
+      content:expired?null:{title:lang.title,text:lang.text,...(responseMode==='question'?{question:lang.question,...(lang.questionType==='multiple-choice'?{questionType:lang.questionType,choices:lang.choices}:{})}:{}),speech:speechOffered ? lang.speech : null},
       ...(!expired && row.speech_active===true && generatedSpeech && lang.speech?.body && lang.speech?.question ? {speechUrls:{body:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/body`,question:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/question`}} : {}),
       speechAvailable:speechOffered ? 'speechSynthesis' : null} : {})};
 }

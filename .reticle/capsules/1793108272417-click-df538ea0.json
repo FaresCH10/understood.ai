@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "a /followups/ → 200 AND element \"Follow-up audio\" AND text \"الممر\"",
+  "observed": "no 'generic' named 'Follow-up audio'; saw: ",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "",
+        "source": {
+          "file": "src/CaseConversation.tsx",
+          "line": 162,
+          "column": 165
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793108272417-click-df538ea0",
+  "createdAt": 1793108272420,
+  "seen": 1,
+  "lastSeenAt": 1793108272420
+}

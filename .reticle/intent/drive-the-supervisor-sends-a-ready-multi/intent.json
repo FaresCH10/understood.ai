@@ -1,0 +1,21 @@
+{
+  "intents": {
+    "flow:drive-the-supervisor-sends-a-ready-multilingual-instru": {
+      "binding": {
+        "flow": "drive-the-supervisor-sends-a-ready-multilingual-instru"
+      },
+      "declaredAt": 1793085518735,
+      "id": "flow:drive-the-supervisor-sends-a-ready-multilingual-instru",
+      "state": "bound",
+      "statement": "The supervisor sends a ready multilingual instruction to the selected Arabic crew.",
+      "status": "proposed",
+      "subject": "drive-the-supervisor-sends-a-ready-multi",
+      "surface": {
+        "flow": "drive-the-supervisor-sends-a-ready-multilingual-instru"
+      },
+      "updatedAt": 1793085518832
+    }
+  },
+  "subject": "drive-the-supervisor-sends-a-ready-multi",
+  "version": 1
+}

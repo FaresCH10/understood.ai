@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
-import {provisionStaffCredential,requireSession} from '../server/postgres/auth.mjs';
+import {provisionStaffCredential,requireSession,issueWorkerGrant} from '../server/postgres/auth.mjs';
 import {createWorker} from '../server/postgres/people.mjs';
-import {workerCompanyContext,workerCredentialStatus,issueWorkerCredentialSetup,completeWorkerSetup,authenticateWorker} from '../server/postgres/worker-credentials.mjs';
+import {workerCompanyContext,workerCredentialStatus,issueWorkerCredentialSetup,completeWorkerSetup,authenticateWorker,assignWorkerPassword} from '../server/postgres/worker-credentials.mjs';
 import {tokenHash} from '../server/auth-crypto.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
 
@@ -167,7 +167,7 @@ test('PostgreSQL paused site and disabled worker fail closed for password and se
   }finally{await db.close();}
 });
 
-test('PostgreSQL worker credential HTTP routes issue codes once, set cookies and fence resets',async()=>{
+test('PostgreSQL worker credential HTTP routes enforce company assignment, set cookies and fence resets',async()=>{
   const f=await fixture(),{pool}=f;
   try{
     const staffPassword='a long synthetic staff password';
@@ -182,14 +182,12 @@ test('PostgreSQL worker credential HTTP routes issue codes once, set cookies and
       assert.equal((await request('/auth/worker/login?x=1',null,post({company:'alder',workerId:'worker 040',password:PASSWORD}))).status,400);
       assert.equal((await request(`/people/workers/${created.id}/credentials`)).status,401);
       assert.equal((await request('/people/workers/wb/credentials',staff)).status,404);
-      assert.equal((await request(`/people/workers/${created.id}/credentials/setup`,staff,post({expectedCode:'Worker 040',confirmed:false}))).status,400);
-      const createdResponse=await request(`/people/workers/${created.id}/credentials/setup`,staff,post({expectedCode:'Worker 040',confirmed:true,expiresInMinutes:30}));
-      assert.equal(createdResponse.status,201);
-      const issued=await createdResponse.json();
-      assert.match(issued.setupCode,/^[A-Za-z0-9_-]{43}$/);
-      const wrong=await request('/auth/worker/setup',null,post({company:'alder',workerId:'worker 040',code:'b'.repeat(43),password:PASSWORD}));
-      assert.equal(wrong.status,401);assert.deepEqual(await wrong.json(),{error:'Invalid or expired setup code'});
-      const claimed=await request('/auth/worker/setup',null,post({company:'alder',workerId:'worker 040',code:issued.setupCode,password:PASSWORD}));
+      assert.equal((await request(`/people/workers/${created.id}/credentials/setup`,staff,post({expectedCode:'Worker 040',confirmed:true}))).status,410);
+      const legacy=await request('/auth/worker/setup',null,post({company:'alder',workerId:'worker 040',code:'b'.repeat(43),password:PASSWORD}));
+      assert.equal(legacy.status,410);assert.equal(legacy.headers.get('set-cookie'),null);
+      const createdResponse=await request(`/people/workers/${created.id}/credentials/password`,staff,post({expectedCode:'Worker 040',workerId:'worker 040',password:PASSWORD,confirmed:true}));
+      assert.equal(createdResponse.status,200);assert.ok(!JSON.stringify(await createdResponse.json()).includes(PASSWORD));
+      const claimed=await request('/auth/worker/login',null,post({company:'alder',workerId:'worker 040',password:PASSWORD}));
       assert.equal(claimed.status,200);assert.match(claimed.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);
       const workerCookie=cookieOf(claimed);
       assert.equal((await request('/worker/briefings',workerCookie)).status,200);
@@ -198,13 +196,39 @@ test('PostgreSQL worker credential HTTP routes issue codes once, set cookies and
       assert.equal(session.authenticated,true);assert.equal(session.role,'worker');assert.match(session.clientContext,/^[a-f0-9]{64}$/);
       assert.equal((await request('/auth/worker/login',null,post({company:'alder',workerId:'worker 040',password:PASSWORD}))).status,200);
       assert.equal((await request('/auth/worker/login',null,post({company:'alder',workerId:'worker 040',password:'wrong synthetic password'}))).status,401);
-      const reset=await request(`/people/workers/${created.id}/credentials/setup`,staff,post({expectedCode:'Worker 040',confirmed:true}));
-      assert.equal(reset.status,201);
+      const reset=await request(`/people/workers/${created.id}/credentials/password`,staff,post({expectedCode:'Worker 040',workerId:'worker 040',password:'new company assigned password',confirmed:true}));
+      assert.equal(reset.status,200);
       assert.equal((await request('/worker/briefings',workerCookie)).status,401);
       const status=await (await request(`/people/workers/${created.id}/credentials`,staff)).json();
-      assert.equal(status.state,'setup');assert.equal(status.setupAvailable,true);
-      assert.ok(!JSON.stringify(status).includes(issued.setupCode));
+      assert.equal(status.state,'active');assert.equal(status.setupAvailable,false);
       assert.equal((await request('/people/workers/wb/credentials/setup',staff,post({expectedCode:'001',confirmed:true}))).status,404);
     });
   }finally{await f.db.close();}
+});
+
+
+test('PostgreSQL company-assigned credentials protect invitations, reset access and enforce expiry',async()=>{
+  const f=await fixture(),{db,pool}=f;
+  const value={expectedCode:'001',workerId:'TEAM-001',password:PASSWORD,confirmed:true};
+  const login={company:'alder',workerId:'TEAM-001',password:PASSWORD};
+  try{
+    await assert.rejects(assignWorkerPassword(pool,auditor,'w1',value,options),/Forbidden/);
+    await assert.rejects(assignWorkerPassword(pool,owner,'wb',value,options),/Worker unavailable/);
+    assert.equal((await assignWorkerPassword(pool,owner,'w1',value,options)).state,'active');
+    const grant=await issueWorkerGrant(pool,owner,'w1',30,options);
+    await assert.rejects(authenticateWorker(pool,{...login,password:'wrong password',token:grant.token},'10.2.0.1',options),/Invalid credentials/);
+    const signed=await authenticateWorker(pool,{...login,token:grant.token},'10.2.0.2',options);
+    assert.equal((await requireSession(pool,request(signed.token),options)).principal_id,'w1');
+    await assert.rejects(authenticateWorker(pool,{...login,token:grant.token},'10.2.0.3',options),/Invalid credentials/);
+    await db.query('UPDATE worker_grants SET expires_at=clock_timestamp() WHERE id=$1',[grant.id]);
+    await assert.rejects(requireSession(pool,request(signed.token),options),/Sign in required/);
+    const expired=await issueWorkerGrant(pool,owner,'w1',5,options);
+    await db.query('UPDATE worker_grants SET expires_at=clock_timestamp() WHERE id=$1',[expired.id]);
+    await assert.rejects(authenticateWorker(pool,{...login,token:expired.token},'10.2.0.4',options),/Invalid credentials/);
+    const normal=await authenticateWorker(pool,login,'10.2.0.5',options);
+    await assignWorkerPassword(pool,owner,'w1',{...value,password:'New assigned company password'},options);
+    await assert.rejects(requireSession(pool,request(normal.token),options),/Sign in required/);
+    await assert.rejects(authenticateWorker(pool,login,'10.2.0.6',options),/Invalid credentials/);
+    assert.equal((await authenticateWorker(pool,{...login,password:'New assigned company password'},'10.2.0.7',options)).workerId,'w1');
+  }finally{await db.close();}
 });

@@ -33,7 +33,7 @@ function poolFor(db){let failure='',snapshots=0;return {async connect(){return {
   if(sql==='SELECT pg_export_snapshot() AS id'){snapshots++;return {rows:[{id:'00000001-00000001-1'}]};}
   return args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)||{rows:[]};
 },release(){}};},fail(value){failure=value;},get snapshots(){return snapshots;}};}
-async function fixture({retiredPublication=false,staffVoice=false}={}){
+async function fixture({retiredPublication=false,staffVoice=false,voiceLanguage='ur'}={}){
   const db=new PGlite(),pool=poolFor(db),root=await mkdtemp(join(tmpdir(),'understood-privacy-ledger-'));
   await db.exec(`CREATE SCHEMA ${schema};SET search_path TO ${schema},pg_catalog`);await runMigrations(pool,{schema});
   await db.exec(`INSERT INTO organizations VALUES('org','SECRET_ORGANIZATION_LABEL');INSERT INTO sites VALUES('site','org','SECRET_SITE_LABEL','UTC');
@@ -54,7 +54,7 @@ async function fixture({retiredPublication=false,staffVoice=false}={}){
   if(staffVoice){
     await db.exec("INSERT INTO clarifications(id,org_id,site_id,assignment_id,reason,status) VALUES('staff-case','org','site','assignment','Staff follow-up','open')");
     await db.query(`INSERT INTO case_voice(id,request_id,org_id,site_id,assignment_id,worker_id,kind,requested_case_id,language,sha256,bytes,duration_seconds,status,lease_token,lease_until,actor_type,actor_id,actor_role)
-      VALUES($1,$2,'org','site','assignment','worker','in_person','staff-case','ur',$3,32044,1,'storing',$4,clock_timestamp()+interval '120 seconds','staff','owner','owner')`,[randomUUID(),randomUUID(),'d'.repeat(64),randomUUID()]);
+      VALUES($1,$2,'org','site','assignment','worker','in_person','staff-case','${voiceLanguage}',$3,32044,1,'storing',$4,clock_timestamp()+interval '120 seconds','staff','owner','owner')`,[randomUUID(),randomUUID(),'d'.repeat(64),randomUUID()]);
     await db.exec("UPDATE case_voice SET status='received',case_id=requested_case_id,received_at=clock_timestamp(),lease_token=NULL,lease_until=NULL");
   }
   if(retiredPublication)await db.exec(`INSERT INTO publications(id,org_id,site_id,briefing_id,version,snapshot_json,state)
@@ -615,4 +615,14 @@ test('accounted replay forces deferred side effects and rolls back unexpected ta
       targetIdentitySha256:state.targetIdentitySha256,prepareState:async()=>{throw Error('Injected encryption failure');}}),/encryption failure/);
     assert.deepEqual(await inventory({pool:g.targetPool}),before);
   }finally{key2.fill(0);await g.close();}
+});
+
+test('privacy exports validate case voice authorship in every registered locale',async()=>{
+  const f=await fixture({staffVoice:true,voiceLanguage:'hi'});try{
+    const ledger=await exportPrivacyLedger(f.pool,f.baseline,f.options);
+    assert.equal(ledger.tables.case_voice[0].language,'hi');
+    const {WORKER_LANGUAGE_CODES}=await import('../server/languages.mjs');
+    for(const language of WORKER_LANGUAGE_CODES){const copy=structuredClone(ledger);copy.tables.case_voice[0].language=language;validatePrivacyLedger(copy,f.baseline);}
+    const invalid=structuredClone(ledger);invalid.tables.case_voice[0].language='invalid';assert.throws(()=>validatePrivacyLedger(invalid,f.baseline),/authorship/);
+  }finally{await f.close();}
 });

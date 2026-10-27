@@ -45,7 +45,8 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} notif
     await event(f,'secret-event','private.credential',now);
     const result=await f.list(owner,{pageSize:1});assert.equal(result.total,2);assert.equal(result.unread,2);assert.equal(result.items[0].id,'notice-b');
     assert.equal((await f.list(owner,{pageSize:1,page:2})).items[0].id,'notice-a');
-    assert.deepEqual(Object.keys(result.items[0]),['id','kind','label','destination','occurredAt','readAt']);
+    assert.deepEqual(Object.keys(result.items[0]),['id','kind','label','subject','destination','occurredAt','readAt']);
+    assert.equal(result.items[0].subject,null);
     assert.doesNotMatch(JSON.stringify(result),/private-worker|pipeline|credential|token|rubric|transcript|actor/);
     assert.equal((await f.sql('SELECT * FROM notification_reads')).length,0);
     const receipt=await f.read(owner,'notice-b');assert.ok(receipt.readAt);assert.deepEqual(await f.read(owner,'notice-b'),receipt);

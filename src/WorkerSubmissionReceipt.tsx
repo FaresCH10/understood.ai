@@ -7,8 +7,8 @@ import {workerSubmissionState,WorkerSubmissionsError} from './worker-submissions
 import {validWorkerSession,type PageSession} from './session-state';
 import {type WorkerUiLanguage,workerUiDirection} from './worker-ui-language';
 
-type Props={session:PageSession;selection:ReceiptSelection;acknowledgedContext:string;language:WorkerUiLanguage;timezone?:string;disabled:boolean;canHelp:boolean;current:()=>boolean;onSessionLost:()=>void;onBack:()=>void;onHelp:()=>void;onChecked?:()=>void};
-export function WorkerSubmissionReceipt({session,selection,acknowledgedContext,language,timezone,disabled,canHelp,current,onSessionLost,onBack,onHelp,onChecked}:Props){
+type Props={choices?:{id:string;text:string}[];session:PageSession;selection:ReceiptSelection;acknowledgedContext:string;language:WorkerUiLanguage;timezone?:string;disabled:boolean;canHelp:boolean;current:()=>boolean;onSessionLost:()=>void;onBack:()=>void;onHelp:()=>void;onChecked?:()=>void};
+export function WorkerSubmissionReceipt({choices,session,selection,acknowledgedContext,language,timezone,disabled,canHelp,current,onSessionLost,onBack,onHelp,onChecked}:Props){
   const t=workerReceiptText[language],key=JSON.stringify([session.clientContext,session.expiresAt,selection.assignmentId,selection.version,selection.language,selection.requestId,selection.kind]);
   const selected=useRef(key);selected.current=key;
   const [retry,setRetry]=useState(0),[read,setRead]=useState<{key:string;data:WorkerReceiptSnapshot|null;failed:boolean;loading:boolean}>({key:'',data:null,failed:false,loading:true});
@@ -55,7 +55,7 @@ export function WorkerSubmissionReceipt({session,selection,acknowledgedContext,l
     {data&&<section className="worker-card worker-receipt-answer" aria-label={t.answer}>
       <div className="worker-card-head"><h2>{t.answer}</h2>{data.receipt.durationSeconds!==null&&<span dir="ltr">{playbackTime(data.receipt.durationSeconds)}</span>}</div>{!data.receipt.isLatest&&<p className="notice notice-amber">{t.earlier}</p>}
       {data.receipt.recordingId&&<WorkerAudioPlayer key={data.receipt.recordingId} src={`/api/recordings/${encodeURIComponent(data.receipt.recordingId)}/audio`} label={t.answer} language={language}/>}
-      {data.receipt.answerText!==null&&<p className="briefing-text" dir="auto">{data.receipt.answerText}</p>}
+      {data.receipt.answerText!==null&&<p className="briefing-text" dir="auto">{choices?.find(choice=>choice.id===data.receipt.answerText)?.text || data.receipt.answerText}</p>}
       <dl className="worker-receipt-meta"><div><dt>{t.submitted}</dt><dd><time dateTime={data.receipt.receivedAt}>{new Date(data.receipt.receivedAt).toLocaleString(language,{timeZone:timezone,dateStyle:'medium',timeStyle:'short'})}</time></dd></div><div><dt>{t.version}</dt><dd>v{data.assignment.version} · <bdi>{data.assignment.language.toUpperCase()}</bdi></dd></div></dl>
     </section>}
     {session.mode?.startsWith('synthetic-')&&<p className="muted">{t.synthetic}</p>}

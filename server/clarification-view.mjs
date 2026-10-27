@@ -16,11 +16,13 @@ export function clarificationPageView(page,context){
   return {rows:page.rows.map(summary),total:page.total,page:page.page,pageSize:page.pageSize,ownerOptions:page.ownerOptions.map(({id,name})=>({id,name})),clientContext:context};
 }
 export function clarificationDetailView(row,context){
+  const choices=row.snapshot.languages?.[row.language]?.choices ?? [];
+  const answerText=value=>choices.find(choice=>choice.id===value)?.text ?? value;
   return {...summary(row),...(row.staffCreation?{staffCreation:row.staffCreation}:{}),notes:row.notes??'',clientContext:context,
     snapshot:{source:row.snapshot.source??null,question:row.snapshot.question??null,facts:row.snapshot.facts??[],askedFacts:row.snapshot.rubric?.askedFacts??[]},
-    answer_text:row.answer_text??null,outcome:row.outcome??null,recording_id:row.recording_id??null,
+    answer_text:answerText(row.answer_text)??null,outcome:row.outcome??null,recording_id:row.recording_id??null,
     ...assessment(row),
-    attempts:row.attempts.map(attempt=>({id:attempt.id,answer_text:attempt.answer_text,outcome:attempt.outcome??null,
+    attempts:row.attempts.map(attempt=>({id:attempt.id,answer_text:answerText(attempt.answer_text),outcome:attempt.outcome??null,
       received_at:iso(attempt.received_at),recording_id:attempt.recording_id??null,
       ...assessment(attempt)})),
     owners:row.owners.map(({id,name})=>({id,name})),helpRequest:row.helpRequest,

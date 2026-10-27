@@ -1,0 +1,89 @@
+{
+  "version": 2,
+  "name": "drive-the-assigned-worker-opens-the-instruction-in-ara",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793086200277,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "استمع وأجب"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1169
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "الأزرق"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "أرسل الإجابة"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 1238
+      },
+      "expect": {
+        "kind": "net",
+        "method": "POST",
+        "urlContains": "/answers",
+        "status": 201,
+        "count": 1
+      },
+      "timeoutMs": 15000,
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "تحديث هذه الإجابة"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerSubmissionReceipt.tsx",
+        "line": 54
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "تحتاج إلى توضيح"
+      },
+      "timeoutMs": 15000,
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "The assigned worker opens the instruction in Arabic and sees localized answer options.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-the-assigned-worker-opens-the-instruction-in-ara"
+}

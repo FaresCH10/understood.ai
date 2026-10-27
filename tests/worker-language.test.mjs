@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {openDatabase} from '../server/db.mjs';
 import {createSession,requireSession} from '../server/auth.mjs';
 import {clientSessionContext} from '../server/session-context.mjs';
-import {ensurePeopleSchema,createWorker,updateWorker,listWorkers,disableWorker,
+import {ensurePeopleSchema,createWorker,updateWorker,listWorkers,disableWorker,createCrew,moveWorkerToCrew,
   workerLanguageState,selectWorkerLanguage,requestWorkerLanguage,workerLanguageHistory,
   listLanguageRequests,decideWorkerLanguageRequest} from '../server/people.mjs';
 import {instructionAudienceOverview,startInstructionSend} from '../server/instructions.mjs';
@@ -140,7 +140,10 @@ test('SQLite unselected workers are excluded from instruction audiences and cann
     const pending=createWorker(db,owner,{code:'Worker 041',name:'Pending Worker'});
     assert.deepEqual(instructionAudienceOverview(db,owner).workers,{total:1,byLanguage:{en:1,ar:0,ur:0},notSelected:1});
     const requestId=randomUUID();
-    const send=startInstructionSend(db,owner,{requestId,title:'Ladder move',source:'Move the red ladder to the north bay before the night shift.',audience:{type:'all'}});
+    assert.throws(()=>startInstructionSend(db,owner,{requestId,title:'Ladder move',source:'Move the red ladder to the north bay before the night shift.',audience:{type:'all'}}),/Choose a language/);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM briefings').get().n,0);
+    const crew=createCrew(db,owner,{name:'Language-ready crew'});moveWorkerToCrew(db,owner,ready.id,crew.id);
+    const send=startInstructionSend(db,owner,{requestId,title:'Ladder move',source:'Move the red ladder to the north bay before the night shift.',audience:{type:'crew',crewId:crew.id}});
     assert.equal(send.audience.count,1);
     const audience=JSON.parse(db.prepare('SELECT audience_json FROM instruction_sends WHERE request_id=?').get(requestId).audience_json);
     assert.deepEqual(audience.workers.map(worker=>worker.id),[ready.id]);

@@ -20,7 +20,7 @@ test('worker receipt state separates pending, failed capture and completed asses
   assert.deepEqual(workerResponseState(base),{received:false,pending:false,closed:false,canRespond:true,canHelp:true});
   const typed=workerResponseState({...base,assessmentStatus:'pending'});
   assert.equal(typed.received,true); assert.equal(typed.pending,true); assert.equal(typed.canRespond,false);
-  for (const audioStatus of ['received','processing','blocked','transcribed']) {
+  for (const audioStatus of ['received','processing','transcribed']) {
     const result=workerResponseState({...base,audioStatus,assessmentStatus:'pending'});
     assert.equal(result.received,true); assert.equal(result.pending,true); assert.equal(result.canRespond,false);
   }
@@ -51,4 +51,9 @@ test('acknowledge-only instructions close response controls once receipt is reco
   assert.equal(acknowledged.received,true);assert.equal(acknowledged.pending,false);assert.equal(acknowledged.canRespond,false);
   const expired=workerResponseState({...base,acknowledgedAt:'2026-10-23T08:00:00.000Z',contentExpired:true});
   assert.equal(expired.received,true);assert.equal(expired.canRespond,false);assert.equal(expired.canHelp,false);
+});
+
+test('unavailable recording processing permits a typed replacement while preserving its receipt',()=>{
+  const state=workerResponseState({state:'published',audioStatus:'blocked'});
+  assert.equal(state.received,true);assert.equal(state.pending,false);assert.equal(state.canRespond,true);
 });

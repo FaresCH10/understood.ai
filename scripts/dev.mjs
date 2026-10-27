@@ -1,11 +1,26 @@
 import { spawn } from 'node:child_process';
+import {existsSync} from 'node:fs';
 
+// Share the same private service configuration with the API and worker.
+// A provider key never changes preparation or real-data adapters. Local
+// follow-ups are the one exception: the existing Gemini key translates them in
+// demo mode, and in credential mode only with --credential-test (test text only).
+if(existsSync('.env'))process.loadEnvFile('.env');
+
+const credentialTest = process.argv.includes('--credential-test');
 const env = {
   ...process.env,
   UNDERSTOOD_TIER: 'local',
   UNDERSTOOD_AI_MODE: 'synthetic',
-  UNDERSTOOD_ACCESS_MODE: 'demo',
+  UNDERSTOOD_ACCESS_MODE: credentialTest ? 'credential' : process.env.UNDERSTOOD_ACCESS_MODE ?? 'demo',
 };
+if((env.UNDERSTOOD_ACCESS_MODE==='demo' || credentialTest) && env.GEMINI_API_KEY && !env.UNDERSTOOD_CASE_FOLLOWUP_ADAPTER && (env.UNDERSTOOD_DATA_CLASS ?? 'synthetic')==='synthetic') {
+  env.UNDERSTOOD_CASE_FOLLOWUP_ADAPTER='gemini';
+  env.UNDERSTOOD_DATA_CLASS='synthetic';
+}
+if(credentialTest)console.warn(env.UNDERSTOOD_CASE_FOLLOWUP_ADAPTER==='gemini'
+  ? 'Credential test mode: follow-ups go to the free Gemini tier. Type test text only, never real worker details.'
+  : 'Credential test mode: follow-ups stay off (no GEMINI_API_KEY, or a non-synthetic data class is set).');
 const children = [];
 
 function stop() {

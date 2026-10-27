@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "text \"Private device\"",
+  "observed": "no element matched {\"text\":\"Private device\"}",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "e757",
+        "source": {
+          "file": "src/WorkerDevice.tsx",
+          "line": 89,
+          "column": 74
+        }
+      },
+      "action": "uncheck"
+    }
+  ],
+  "id": "1793024580404-uncheck-6f20d666",
+  "createdAt": 1793024580404,
+  "seen": 1,
+  "lastSeenAt": 1793024580404
+}

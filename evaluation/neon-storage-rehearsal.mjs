@@ -106,7 +106,7 @@ export async function rehearseNeonApplicationStorage(env,{confirmed=false,runId=
         }
       },
     });
-    assert.equal(result.workflow.checks.length,10);assert.ok(result.workflow.checks.every(row=>row.status==='passed'));
+    assert.equal(result.workflow.checks.length,11);assert.ok(result.workflow.checks.every(row=>row.status==='passed'));
     assert.equal(result.workflow.providerEvidence.externalRequests,0);assert.equal(ledger.size,9);assert.equal(result.checkpointUnavailable,undefined);
     assert.ok([...ledger.values()].every(row=>row.authenticatedReadVerified&&row.anonymousReadDenied&&row.conditionalOverwriteRejected&&row.originalBytesPreserved));
     result.applicationCloudStorageVerified=true;result.state='passed';

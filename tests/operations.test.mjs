@@ -9,6 +9,7 @@ import {provisionStaffCredential,authenticateStaff,requireSession,issueWorkerGra
 import {domainTransaction,requirePrincipal,publish,submitAnswer} from '../server/postgres/domain.mjs';
 import {requestExport} from '../server/postgres/exports.mjs';
 import {processOnePreparation} from '../server/postgres/preparation.mjs';
+import {legacyWrittenQuestion} from './helpers/legacy-written-question.mjs';
 import {dispatchAllowed} from '../server/postgres/operations-gates.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
@@ -111,6 +112,7 @@ test('operator retries preserve job identity, receipts and publications without 
     await assert.rejects(retryOperationsJob(pool,identity,{...input,requestId:randomUUID()},options),/not retryable/);
     assert.equal((await operatorReceipt(pool,identity,input.requestId,options)).result.jobId,'failed-job');
     await processOnePreparation(pool,{...options,integrationMode:'synthetic'});
+    await legacyWrittenQuestion(pool,'shelf',options);
     const publication=await publish(pool,owner,'shelf',{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['worker-1'],dueAt:null},{...options,integrationMode:'synthetic'});
     assert.equal((await retryOperationsJob(pool,identity,input,options)).duplicate,true);
     assert.equal((await run(client=>client.query("SELECT status FROM jobs WHERE id='failed-job'"))).rows[0].status,'ready');

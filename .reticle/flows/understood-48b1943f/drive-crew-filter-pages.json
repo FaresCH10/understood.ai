@@ -1,0 +1,114 @@
+{
+  "version": 2,
+  "name": "drive-crew-filter-pages",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793108158218,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "checkbox",
+        "name": "हिन्दी"
+      },
+      "args": {},
+      "action": "check",
+      "source": {
+        "file": "src/PublicProduct.tsx",
+        "line": 56
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "checkbox",
+          "name": "हिन्दी"
+        },
+        "state": "checked"
+      },
+      "timeoutMs": 8000,
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Continue as Maya, supervisor"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 495
+      },
+      "expect": {
+        "kind": "not",
+        "predicate": {
+          "kind": "route",
+          "contains": "#sign-in"
+        }
+      },
+      "timeoutMs": 15000,
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Team"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 545
+      },
+      "timeoutMs": 20000,
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "combobox",
+        "name": "Membership All crews No crew Page crew 001 Page crew 002 Page crew 003 Page crew 004 Page crew 005 Page crew 006 Page crew 007 Page crew 008 Page crew 009 Page crew 010 Page crew 011 Page crew 012 Page crew 013 Page crew 014 Page crew 015 Page crew 016 Page crew 017 Page crew 018 Page crew 019 Page crew 020 Page crew 021 Page crew 022 Page crew 023 Page crew 024 Page crew 025 Page crew 026 Page crew 027 Page crew 028 Page crew 029 Page crew 030 Page crew 031 Page crew 032 Page crew 033 Page crew 034 Page crew 035 Page crew 036 Page crew 037 Page crew 038 Page crew 039 Page crew 040 Page crew 041 Page crew 042 Page crew 043 Page crew 044 Page crew 045 Page crew 046 Page crew 047 Page crew 048 Page crew 049 Page crew 050 Page crew 051 Page crew 052 Page crew 053 Page crew 054 Page crew 055 Page crew 056 Page crew 057 Page crew 058 Page crew 059 Page crew 060 Page crew 061 Page crew 062 Page crew 063 Page crew 064 Page crew 065 Page crew 066 Page crew 067 Page crew 068 Page crew 069 Page crew 070 Page crew 071 Page crew 072 Page crew 073 Page crew 074 Page crew 075 Page crew 076 Page crew 077 Page crew 078 Page crew 079 Page crew 080 Page crew 081 Page crew 082 Page crew 083 Page crew 084 Page crew 085 Page crew 086 Page crew 087 Page crew 088 Page crew 089 Page crew 090 Page crew 091 Page crew 092 Page crew 093 Page crew 094 Page crew 095 Page crew 096 Page crew 097 Page crew 098 Page crew 099 Page crew 100 Page crew 101 Page crew 102 Page crew 103 Page crew 104 Page crew 105"
+      },
+      "args": {
+        "value": "ca17397e-8d68-41b7-b7f1-47e1ae1ce1b0"
+      },
+      "action": "select",
+      "source": {
+        "file": "src/People.tsx",
+        "line": 323
+      },
+      "expect": {
+        "kind": "net",
+        "method": "GET",
+        "urlContains": "crewId=ca17397e-8d68-41b7-b7f1-47e1ae1ce1b0",
+        "status": 200
+      },
+      "timeoutMs": 10000,
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "crew-filter-pages",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "Cursor"
+  },
+  "intentId": "flow:drive-crew-filter-pages"
+}

@@ -1,3 +1,4 @@
+import {briefingLanguageRequestCheck,generationLanguageCheck,guardBriefingLanguageRequest,guardGenerationLanguages} from './generation-language-schema.mjs';
 import { randomUUID,createHash } from 'node:crypto';
 import { NOW,transaction } from './db.mjs';
 import { draftInput,expectedRevision,copyDraftInput,checkDraftCopyReplay,archiveBriefingInput } from './briefing-input.mjs';
@@ -33,7 +34,7 @@ export function ensureBriefingSchema(db) {
     request_id TEXT NOT NULL,org_id TEXT NOT NULL REFERENCES organizations(id),site_id TEXT NOT NULL REFERENCES sites(id),
     briefing_id TEXT NOT NULL REFERENCES briefings(id),accepted_revision INTEGER NOT NULL CHECK(accepted_revision>1),request_json TEXT NOT NULL,
     requested_by TEXT NOT NULL REFERENCES staff(id),occurred_at TEXT NOT NULL,PRIMARY KEY(org_id,site_id,request_id),UNIQUE(briefing_id,accepted_revision),
-    CHECK(json_extract(request_json,'$.generationLanguages') IS NULL OR json_extract(request_json,'$.generationLanguages') IN ('["en"]','["en","ar"]','["en","ur"]','["en","ar","ur"]'))
+    CHECK(${briefingLanguageRequestCheck})
   ) STRICT;
   CREATE TRIGGER IF NOT EXISTS briefing_language_request_scope BEFORE INSERT ON briefing_language_requests
     WHEN NOT EXISTS(SELECT 1 FROM briefings WHERE id=NEW.briefing_id AND org_id=NEW.org_id AND site_id=NEW.site_id)
@@ -41,6 +42,7 @@ export function ensureBriefingSchema(db) {
     BEGIN SELECT RAISE(ABORT,'Scope mismatch'); END;
   CREATE TRIGGER IF NOT EXISTS briefing_language_request_update BEFORE UPDATE ON briefing_language_requests BEGIN SELECT RAISE(ABORT,'Draft languages receipt is immutable'); END;
   CREATE TRIGGER IF NOT EXISTS briefing_language_request_delete BEFORE DELETE ON briefing_language_requests BEGIN SELECT RAISE(ABORT,'Draft languages receipt is immutable'); END;`);
+  guardBriefingLanguageRequest(db);
   db.exec(`CREATE TABLE IF NOT EXISTS draft_creations (
     request_id TEXT NOT NULL,org_id TEXT NOT NULL REFERENCES organizations(id),site_id TEXT NOT NULL REFERENCES sites(id),
     briefing_id TEXT NOT NULL UNIQUE REFERENCES briefings(id),request_hash TEXT NOT NULL CHECK(length(request_hash)=64 AND request_hash NOT GLOB '*[^0-9a-f]*'),
@@ -54,7 +56,8 @@ export function ensureBriefingSchema(db) {
   CREATE TRIGGER IF NOT EXISTS draft_creation_frozen_update BEFORE UPDATE ON draft_creations BEGIN SELECT RAISE(ABORT,'Draft creation is immutable'); END;
   CREATE TRIGGER IF NOT EXISTS draft_creation_frozen_delete BEFORE DELETE ON draft_creations BEGIN SELECT RAISE(ABORT,'Draft creation is immutable'); END;`);
   if(!db.prepare('PRAGMA table_info(draft_creations)').all().some(row=>row.name==='generation_languages_json'))db.exec(`ALTER TABLE draft_creations ADD COLUMN generation_languages_json TEXT
-    CHECK(generation_languages_json IS NULL OR generation_languages_json IN ('["en"]','["en","ar"]','["en","ur"]','["en","ar","ur"]'));`);
+    CHECK(${generationLanguageCheck});`);
+  guardGenerationLanguages(db,'draft_creations');
   db.exec(`CREATE TABLE IF NOT EXISTS briefing_archives (
     request_id TEXT NOT NULL,org_id TEXT NOT NULL REFERENCES organizations(id),site_id TEXT NOT NULL REFERENCES sites(id),
     briefing_id TEXT NOT NULL UNIQUE REFERENCES briefings(id),request_json TEXT NOT NULL,publication_ids_json TEXT NOT NULL,

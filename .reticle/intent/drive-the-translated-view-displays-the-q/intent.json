@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-the-translated-view-displays-the-question-and-al": {
+      "declaredAt": 1793001900471,
+      "id": "flow:drive-the-translated-view-displays-the-question-and-al",
+      "state": "declared",
+      "statement": "The translated view displays the question and all four answer options in the approved language.",
+      "status": "proposed",
+      "subject": "drive-the-translated-view-displays-the-q",
+      "surface": {
+        "flow": "drive-the-translated-view-displays-the-question-and-al"
+      },
+      "updatedAt": 1793001900484
+    }
+  },
+  "subject": "drive-the-translated-view-displays-the-q",
+  "version": 1
+}

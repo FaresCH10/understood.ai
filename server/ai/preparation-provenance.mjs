@@ -1,3 +1,5 @@
+import {providerDataClass} from './provider-policy.mjs';
+import {WORKER_LANGUAGE_CODES,isWorkerLanguage} from '../languages.mjs';
 import {bundleHash} from './prepared-bundle.mjs';
 import {preparationInputHash} from './preparation-config.mjs';
 
@@ -7,10 +9,10 @@ const id=value=>typeof value==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 const keys=(value,names)=>value && typeof value==='object' && !Array.isArray(value) && Object.keys(value).sort().join(',')===[...names].sort().join(',');
 
 export function preparationStageProvenance(provider,stage) {
-  if(!keys(provider,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion']) || provider.dataClass!=='synthetic'
+  if(!keys(provider,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion']) || !providerDataClass(provider)
     || !Object.values(stages).includes(stage)
     || !['adapter','textModel','speechModel','voice','promptVersion','schemaVersion'].every(key=>typeof provider[key]==='string' && /^[A-Za-z0-9._:/-]{1,100}$/.test(provider[key])))throw Error('Preparation provenance unavailable');
-  return Object.freeze({adapter:provider.adapter,dataClass:'synthetic',model:provider[stage==='speech'?'speechModel':'textModel'],
+  return Object.freeze({adapter:provider.adapter,dataClass:provider.dataClass,model:provider[stage==='speech'?'speechModel':'textModel'],
     promptVersion:`${provider.promptVersion}-${stage.replaceAll('_','-')}`,schemaVersion:provider.schemaVersion});
 }
 
@@ -32,14 +34,14 @@ export function checkedPreparationOperation(context,provenance,{orgId,referenceI
   if(!keys(context,['schema','orgId','siteId','briefingId','jobId','revision','runId','rootHash','argumentsHash','providerHash','languages','step','stage','language','track'])
     || context.schema!=='preparation-stage-input-v1' || !['orgId','siteId','briefingId','jobId'].every(key=>id(context[key]))
     || context.orgId!==orgId || context.jobId!==referenceId || context.runId!==claimToken
-    || !Number.isSafeInteger(context.revision) || context.revision<1 || !Number.isInteger(context.step) || context.step<1 || context.step>64
-    || !Object.values(stages).includes(context.stage) || !['en','ar','ur'].includes(context.language)
+    || !Number.isSafeInteger(context.revision) || context.revision<1 || !Number.isInteger(context.step) || context.step<1 || context.step>68
+    || !Object.values(stages).includes(context.stage) || !isWorkerLanguage(context.language)
     || (context.stage==='speech'?!['body','question'].includes(context.track):context.track!==null)
     || !['rootHash','argumentsHash','providerHash'].every(key=>hash(context[key]))
-    || !Array.isArray(context.languages) || context.languages.length<1 || context.languages.length>3 || context.languages[0]!=='en'
-    || new Set(context.languages).size!==context.languages.length || !context.languages.every(language=>['en','ar','ur'].includes(language))
+    || !Array.isArray(context.languages) || context.languages.length<1 || context.languages.length>WORKER_LANGUAGE_CODES.length || context.languages[0]!=='en'
+    || new Set(context.languages).size!==context.languages.length || !context.languages.every(isWorkerLanguage)
     || !context.languages.includes(context.language) || !hash(inputHash) || bundleHash(context)!==inputHash
-    || !keys(provenance,['adapter','dataClass','model','promptVersion','schemaVersion']) || provenance.dataClass!=='synthetic' || provenance.model!==model
+    || !keys(provenance,['adapter','dataClass','model','promptVersion','schemaVersion']) || !providerDataClass(provenance) || provenance.model!==model
     || !['adapter','promptVersion','schemaVersion'].every(key=>typeof provenance[key]==='string' && /^[a-z0-9-]{1,80}$/.test(provenance[key])))throw Error('Invalid preparation input evidence');
   return context;
 }

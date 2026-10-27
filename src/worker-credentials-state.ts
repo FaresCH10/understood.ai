@@ -14,7 +14,7 @@ const setupCode=(value:unknown)=>typeof value==='string' && /^[A-Za-z0-9_-]{43}$
 export function checkedWorkerCredentialStatus(value:unknown,workerId:string):WorkerCredentialStatus {
   const invalid=()=>Error('Worker sign-in status cannot be verified.');
   if(!object(value,['workerId','workerCode','workerName','workerActive','companyId','state','loginId','credentialRevision','setupExpiresAt','setupAvailable','passwordChangedAt','updatedAt'])
-    || value.workerId!==workerId || !identifier(value.workerCode,2,80) || !identifier(value.companyId,2,100)
+    || value.workerId!==workerId || !identifier(value.workerCode,2,80) || !identifier(value.companyId,1,100)
     || (value.workerName!==null && !identifier(value.workerName,1,100)) || typeof value.workerActive!=='boolean'
     || !['none','setup','active'].includes(String(value.state)) || (value.loginId!==null && !identifier(value.loginId,2,80))
     || !Number.isSafeInteger(value.credentialRevision) || Number(value.credentialRevision)<0 || typeof value.setupAvailable!=='boolean'
