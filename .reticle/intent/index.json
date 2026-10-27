@@ -271,6 +271,12 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:credential-is-the-production-access-mode-so-the-c5dfb270",
+      "statement": "Credential is the production access mode, so the sign-in screen asks fo…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:ending-a-worker-session-immediately-removes-priv-fc89ee68",
       "statement": "Ending a worker session immediately removes private instruction content.",
       "status": "proposed",

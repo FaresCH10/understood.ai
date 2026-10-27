@@ -303,6 +303,49 @@
       "subject": "unsorted",
       "updatedAt": 1793085609044
     },
+    "inline:credential-is-the-production-access-mode-so-the-c5dfb270": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "Sign in to your Understood account.",
+            "kind": "text"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Sign in",
+              "role": "button"
+            }
+          },
+          {
+            "kind": "not",
+            "predicate": {
+              "contains": "Continue as Maya",
+              "kind": "text"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793111043901,
+      "id": "inline:credential-is-the-production-access-mode-so-the-c5dfb270",
+      "provenBy": {
+        "at": 1793111167152,
+        "grade": "presence",
+        "runId": "drive-65f38137ffacad6a",
+        "verdictId": "reticle_act_and_wait:1793111167152"
+      },
+      "state": "proved",
+      "statement": "Credential is the production access mode, so the sign-in screen asks for a work email and password and does not offer the synthetic demo profiles.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/PublicProduct.tsx"
+        ]
+      },
+      "updatedAt": 1793111167237
+    },
     "inline:ending-a-worker-session-immediately-removes-priv-fc89ee68": {
       "binding": {
         "contains": "This worker session is locked",
