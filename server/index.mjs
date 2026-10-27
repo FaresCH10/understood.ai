@@ -401,7 +401,7 @@ export function createAppHandler(db, options = {}) {
           res,
           200,
           { ok: true },
-          { "set-cookie": sessionCookie(session.token, session.maxSeconds) },
+          { "set-cookie": sessionCookie(session.token, session.maxSeconds, config.cookieOptions) },
         );
       }
       if (path === "/api/auth/worker/redeem" && req.method === "POST") {
@@ -414,7 +414,7 @@ export function createAppHandler(db, options = {}) {
           res,
           200,
           { ok: true },
-          { "set-cookie": sessionCookie(session.token, session.maxSeconds) },
+          { "set-cookie": sessionCookie(session.token, session.maxSeconds, config.cookieOptions) },
         );
       }
       if (path === "/api/auth/worker/context" && req.method === "GET") {
@@ -428,7 +428,7 @@ export function createAppHandler(db, options = {}) {
         if (config.accessMode !== "credential") return send(res,404,{error:'Not found'});
         if(url.search) throw new Error('Invalid input');
         const session = authenticateWorker(db, await readJson(req), req.socket.remoteAddress);
-        return send(res,200,{ok:true},{'set-cookie':sessionCookie(session.token,session.maxSeconds)});
+        return send(res,200,{ok:true},{'set-cookie':sessionCookie(session.token,session.maxSeconds,config.cookieOptions)});
       }
       if (path === "/api/auth/worker/setup" && req.method === "POST") {
         if (config.accessMode !== "credential") return send(res,404,{error:'Not found'});
@@ -455,7 +455,7 @@ export function createAppHandler(db, options = {}) {
       if(path==='/api/account/site' && req.method==='POST') {
         if(url.search) throw new Error('Invalid account site request');
         const next=switchAccountSite(db,req,config,await readJson(req));
-        return send(res,200,{ok:true},{'set-cookie':sessionCookie(next.token,next.maxSeconds)});
+        return send(res,200,{ok:true},{'set-cookie':sessionCookie(next.token,next.maxSeconds,config.cookieOptions)});
       }
       if (path === "/api/logout" && req.method === "POST") {
         revokeSession(db, req);
