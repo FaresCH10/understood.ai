@@ -29,6 +29,8 @@ import {retrySourceAudio,getSourceRetryReceipt} from '../server/source-audio-ret
 import {getSourceRetryReceipt as pgSourceRetryReceipt} from '../server/postgres/source-audio-retry.mjs';
 import {createGeminiAdapter} from '../server/ai/gemini.mjs';
 import {inspectWav} from '../server/audio.mjs';
+import {principalLoginBody,seedCredentials} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const input=()=>({requestId:randomUUID(),title:'Synthetic audio source',originalType:'audio/webm;codecs=opus',generationLanguages:['en','ar']});
@@ -50,7 +52,7 @@ function memoryStore() {
 async function fixture(pg,{empty=false}={}) {
   let clock;
   if(!pg) {
-    const db=openDatabase(':memory:');seed(db);
+    const db=openDatabase(':memory:');seedCredentials(db);
     db.prepare('INSERT INTO staff VALUES(?,?,?,?,?,1)').run('rami','cedar','beirut','Rami','supervisor');
     const journal=sourceAudioJournal(db);
     return {db,journal,setClock:value=>{clock=value;},cleanupJournal:()=>sourceAudioCleanupJournal(db,{now:clock}),policy:()=>saveRetention(db,owner,{requestId:randomUUID(),revision:0,audioDays:7,confirmed:true}),list:(s,filters)=>listSourceAudio(db,s,filters),process:(adapter,st)=>processOneSourceAudio(db,adapter,st),processingJournal:()=>sourceAudioProcessingJournal(db),receive:(s,i,o,w,st)=>receiveSourceAudio(db,s,i,o,w,st),receipt:(s,id)=>getSourceAudioReceipt(db,s,id),
@@ -248,14 +250,14 @@ for(const pg of [false,true]) {
   });
   test(`${name} source HTTP requires the exact staff session, origin and bounded envelope; private playback is no-store`,async()=>{
     const f=await fixture(pg),st=memoryStore(),value=input();
-    const config={tier:'local',aiMode:'synthetic',accessMode:pg?'credential':'demo',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',
+    const config={tier:'local',aiMode:'synthetic',accessMode:'credential',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',
       ...(pg?{schema:f.options.schema,storage:st}:{audioRoot:st})};
     if(pg)await provisionStaffCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'synthetic@example.test',password:'Synthetic-only-password-123'},f.options);
     const server=pg?createPostgresRehearsalServer(f.pool,config):createAppServer(f.db,config);
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
     try {
-      const login=await fetch(base+(pg?'/auth/staff/login':'/demo/session'),{method:'POST',headers:{origin:config.publicOrigin,'content-type':'application/json'},
-        body:JSON.stringify(pg?{email:'synthetic@example.test',password:'Synthetic-only-password-123'}:{principal:'maya'})});
+      const login=await fetch(base+('/auth/staff/login'),{method:'POST',headers:{origin:config.publicOrigin,'content-type':'application/json'},
+        body:JSON.stringify(pg?{email:'synthetic@example.test',password:'Synthetic-only-password-123'}:principalLoginBody('maya'))});
       assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0];
       const session=await (await fetch(base+'/session',{headers:{cookie}})).json();
       const capturedHeaders={cookie,'x-client-session-context':session.clientContext};
@@ -283,7 +285,7 @@ for(const pg of [false,true]) {
       assert.equal((await retry({'x-client-session-context':''})).status,409);
       assert.equal((await retry({origin:'https://foreign.example'})).status,403);
       assert.equal((await retry({}, {...retryBody,confirmed:false})).status,400);
-      const changedLogin=await fetch(base+(pg?'/auth/staff/login':'/demo/session'),{method:'POST',headers:{origin:config.publicOrigin,'content-type':'application/json'},body:JSON.stringify(pg?{email:'synthetic@example.test',password:'Synthetic-only-password-123'}:{principal:'maya'})});
+      const changedLogin=await fetch(base+('/auth/staff/login'),{method:'POST',headers:{origin:config.publicOrigin,'content-type':'application/json'},body:JSON.stringify(pg?{email:'synthetic@example.test',password:'Synthetic-only-password-123'}:principalLoginBody('maya'))});
       assert.equal(changedLogin.status,200);const changedCookie=changedLogin.headers.get('set-cookie').split(';')[0];
       const snapshot=async()=>({sources:(await f.raw('SELECT * FROM source_audio_requests ORDER BY request_id')).rows,
         retries:pg || f.db.prepare("SELECT name FROM sqlite_master WHERE name='source_audio_retries'").get()?(await f.raw('SELECT * FROM source_audio_retries ORDER BY retry_id')).rows:null,

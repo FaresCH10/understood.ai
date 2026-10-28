@@ -7,7 +7,7 @@ const path='/api/processing/answer_check:job/provenance?page=1&pageSize=10';
 test('artifact read display belongs to exact authority, request path and refresh before effects run',()=>{
   const key=artifactReadKey(staffRequestBinding(session),path,1),data={private:'synthetic selection one'},state={key,data,loading:false,error:''};
   assert.deepEqual(artifactReadView(state,key,true),{data,loading:false,error:''});
-  const changes=[{clientContext:'b'.repeat(64)},{staffScope:'site-two'},{staffRole:'auditor'},{siteState:'archived'},{mode:'synthetic-demo'},{expiresAt:'2099-01-02T00:00:00.000Z'},{authenticated:false},{role:'worker'}];
+  const changes=[{clientContext:'b'.repeat(64)},{staffScope:'site-two'},{staffRole:'auditor'},{siteState:'archived'},{mode:'synthetic-credential'},{expiresAt:'2099-01-02T00:00:00.000Z'},{authenticated:false},{role:'worker'}];
   for(const change of changes)assert.deepEqual(artifactReadView(state,artifactReadKey(staffRequestBinding({...session,...change}),path,1),true),{data:null,loading:true,error:''});
   for(const next of [path.replace('page=1','page=2'),path.replace('job','another-job'),path+'&language=ar'])assert.equal(artifactReadView(state,artifactReadKey(staffRequestBinding(session),next,1),true).data,null);
   assert.equal(artifactReadView(state,artifactReadKey(staffRequestBinding(session),path,2),true).data,null);

@@ -1,12 +1,13 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {ArrowLeft,ArrowRight,Check,CheckCircle2,Clock3,Globe2,KeyRound,LogIn,Mail,RefreshCw,ShieldCheck} from 'lucide-react';
 import {countryOptions} from './country-options';
-import {clearRegistrationReceipt,checkedVerification,readRegistrationReceipt,requestAccount,resendAccount,RegistrationError,saveRegistrationReceipt,verifyAccount,type RegistrationReceipt} from './registration';
+import {clearRegistrationReceipt,checkedVerification,readRegistrationReceipt,requestAccount,resendAccount,RegistrationError,saveRegistrationReceipt,verifyAccount,verifyAccountCode,normalizeVerificationCode,registrationOptions,type RegistrationReceipt} from './registration';
 
 export type RegistrationLanguage='en'|'ar';
 type AccountBody={requestId:string;ownerName:string;email:string;password:string;companyName:string;country:string;phone?:string;acceptTerms:boolean;acceptPrivacy:boolean};
 
 const en={
+  codeLabel:'Verification code',codeHint:'Enter the six-digit code from your email. Codes expire; use the latest code or request another.',codeSent:'If this registration is eligible, a verification code has been requested for',codeResend:'Request another code',codeResent:'If this registration is still pending, a new code has been requested.',codeError:'The code could not be verified. Check the latest code and try again.',codeUnavailable:'Email verification is not configured or could not be checked. Please try again later.',codeNote:'We email a verification code before your trial starts.',checkingVerification:'Checking email verification…',retryVerification:'Check again',
   kicker:'Free trial',title:'Start using Understood',
   lead:'Create your company workspace. Verify your work email to start a 14-day trial for up to 25 workers. No card required.',
   trial:['14 days from verified activation','Up to 25 active workers','No card or automatic charge'],
@@ -30,6 +31,7 @@ const en={
   uncertainTitle:'Verification not confirmed',uncertainBody:'The result could not be confirmed. Retry this same link before signing in.',retryVerify:'Retry verification',signInShort:'Sign in',
 };
 const ar={
+  codeLabel:'رمز التحقق',codeHint:'أدخل الرمز المكوّن من ستة أرقام من بريدك. تنتهي صلاحية الرموز؛ استخدم أحدث رمز أو اطلب رمزاً آخر.',codeSent:'إذا كان التسجيل مؤهلاً، فقد طُلب إرسال رمز تحقق إلى',codeResend:'طلب رمز آخر',codeResent:'إذا كان التسجيل ما زال معلقاً، فقد طُلب رمز جديد.',codeError:'تعذّر التحقق من الرمز. راجع أحدث رمز وحاول مجدداً.',codeUnavailable:'التحقق من البريد غير مضبوط أو تعذّر فحصه. حاول لاحقاً.',codeNote:'نرسل رمز تحقق إلى بريدك قبل بدء تجربتك.',checkingVerification:'جارٍ فحص التحقق من البريد…',retryVerification:'إعادة الفحص',
   kicker:'تجربة مجانية',title:'ابدأ استخدام Understood',
   lead:'أنشئ مساحة عمل شركتك. تحقق من بريد العمل لبدء تجربة مجانية لمدة 14 يوماً لما يصل إلى 25 عاملاً. لا حاجة لبطاقة.',
   trial:['14 يوماً من التفعيل الموثّق','حتى 25 عاملاً نشطاً','بدون بطاقة أو خصم تلقائي'],
@@ -70,15 +72,18 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   const [ownerName,setOwnerName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');
   const [company,setCompany]=useState(''),[country,setCountry]=useState(''),[phone,setPhone]=useState(''),[terms,setTerms]=useState(false);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[storageError,setStorageError]=useState(false);
+  const [verificationCheck,setVerificationCheck]=useState(0);
+  const [method,setMethod]=useState<'link'|'neon-code'>('link'),[verificationReady,setVerificationReady]=useState<boolean|null>(null),[code,setCode]=useState(''),[codeComplete,setCodeComplete]=useState(false);
+  useEffect(()=>{setVerificationReady(null);const controller=new AbortController();void registrationOptions(controller.signal).then(value=>{setMethod(value.verification);setVerificationReady(value.available);}).catch(()=>{if(!controller.signal.aborted)setVerificationReady(false);});return()=>controller.abort();},[verificationCheck]);
   useEffect(()=>{try{const saved=readRegistrationReceipt(sessionStorage);if(saved)setReceipt(saved);}catch{setStorageError(true);}},[]);
-  useEffect(()=>{if(receipt)heading.current?.focus();},[receipt]);
+  useEffect(()=>{if(receipt||codeComplete)heading.current?.focus();},[receipt,codeComplete]);
   async function send(body:AccountBody,value:RegistrationReceipt) {
     sending.current=true;setBusy(true);setError('');setNotice('');
     try {
       try {saveRegistrationReceipt(sessionStorage,{...value,state:'pending'});} catch {setStorageError(true);}
       const result=await requestAccount(body);
       if(result.accepted!==true) throw new RegistrationError('Account creation could not be confirmed. Retry the same registration.',null,true);
-      const accepted:RegistrationReceipt={...value,state:'accepted'};
+      const accepted:RegistrationReceipt={...value,state:'accepted',verification:result.verification==='neon-code'?'neon-code':'link'};
       try {saveRegistrationReceipt(sessionStorage,accepted);} catch {setStorageError(true);}
       setReceipt(accepted);setPending(null);setPassword('');setConfirmPassword('');
       heading.current?.focus();
@@ -109,13 +114,20 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   async function resend() {
     if(!receipt || sending.current) return;
     sending.current=true;setBusy(true);setError('');setNotice('');
-    try {await resendAccount({requestId:receipt.requestId,email:receipt.email});setNotice(t.resent);}
+    try {const result=await resendAccount({requestId:receipt.requestId,email:receipt.email});const updated:RegistrationReceipt={...receipt,verification:result.verification==='neon-code'?'neon-code':'link'};setReceipt(updated);try{saveRegistrationReceipt(sessionStorage,updated);}catch{setStorageError(true);}setCode('');setNotice(updated.verification==='neon-code'?t.codeResent:t.resent);}
     catch(caught) {setError((caught as Error).message);}
     finally {sending.current=false;setBusy(false);}
   }
+  async function verifyCode(event:FormEvent){
+    event.preventDefault();if(!receipt||sending.current||code.length!==6)return;
+    sending.current=true;setBusy(true);setError('');setNotice('');
+    try{checkedVerification(await verifyAccountCode(receipt,code));try{clearRegistrationReceipt(sessionStorage);}catch{setStorageError(true);}setCode('');setCodeComplete(true);}
+    catch{setError(t.codeError);}
+    finally{sending.current=false;setBusy(false);}
+  }
   function startOver() {
     try {clearRegistrationReceipt(sessionStorage);} catch {setStorageError(true);}
-    setReceipt(null);setPending(null);setError('');setNotice('');setPassword('');setConfirmPassword('');setTerms(false);
+    setReceipt(null);setPending(null);setCode('');setCodeComplete(false);setError('');setNotice('');setPassword('');setConfirmPassword('');setTerms(false);
   }
   if(authenticated) return <section className="registration-page" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     <div className="registration-top"><button type="button" className="button subtle" onClick={onBack}><ArrowLeft size={18}/>{t.back}</button><LanguageSwitch language={language} onLanguage={onLanguage}/></div>
@@ -128,19 +140,20 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   </section>;
   return <section className="registration-page" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     <div className="registration-top"><button type="button" className="button subtle" onClick={onBack}><ArrowLeft size={18}/>{t.back}</button><LanguageSwitch language={language} onLanguage={onLanguage} disabled={busy}/></div>
-    {receipt ? <div className="registration-sent">
+    {codeComplete?<div className="registration-sent"><div className="registration-icon"><CheckCircle2 size={30}/></div><h1 ref={heading} tabIndex={-1}>{t.verifiedTitle}</h1><p role="status">{t.verifiedLead}</p><p>{t.verifiedTrial}</p><button type="button" className="button primary" onClick={onSignIn}>{t.openSignIn}</button></div>:receipt ? <div className="registration-sent">
       <div className="registration-icon">{receipt.state==='accepted'?<Mail size={30}/>:<RefreshCw size={30}/>}</div>
       <h1 ref={heading} tabIndex={-1}>{receipt.state==='accepted'?t.sentTitle:t.uncertainTitle}</h1>
       {receipt.state==='accepted'?
-        <><p>{t.sentBody} <bdi dir="ltr">{receipt.email}</bdi>.</p><p className="muted">{t.sentPrivacy}</p><p className="registration-note"><Clock3 size={18}/>{t.sentNote}</p></>:
+        <><p>{receipt.verification==='neon-code'?t.codeSent:t.sentBody} <bdi dir="ltr">{receipt.email}</bdi>.</p><p className="muted">{t.sentPrivacy}</p><p className="registration-note"><Clock3 size={18}/>{receipt.verification==='neon-code'?t.codeHint:t.sentNote}</p></>:
         <><p>{pending?t.unconfirmed:language==='ar'?'تعذّر تأكيد نتيجة التسجيل. إذا لم تصلك رسالة، ابدأ تسجيلاً جديداً بالبيانات نفسها.':'The registration result could not be confirmed. If no email arrives, start a new registration with the same details.'}</p>{pending && <p className="muted">{t.storage}</p>}</>}
+      {receipt.state==='accepted'&&receipt.verification==='neon-code'&&<form className="registration-code-form" onSubmit={verifyCode}><label className="field">{t.codeLabel}<input required inputMode="numeric" autoComplete="one-time-code" dir="ltr" minLength={6} maxLength={6} pattern="[0-9]{6}" value={code} disabled={busy} onChange={event=>setCode(normalizeVerificationCode(event.target.value))}/></label><button type="submit" className="button primary full" disabled={busy||code.length!==6}>{busy?t.verifying:t.verify}</button></form>}
       <TrialPoints text={t.trial}/>
       {notice && <p role="status" className="registration-notice">{notice}</p>}
       {error && <p role="alert" className="public-error">{error}</p>}
       {storageError && <p className="muted">{t.storage}</p>}
       <div className="actions registration-actions">
         {pending && <button type="button" className="button primary" disabled={busy} onClick={()=>void send(pending.body,pending.receipt)}><RefreshCw size={18}/>{t.retry}</button>}
-        <button type="button" className="button outline" disabled={busy} onClick={()=>void resend()}><Mail size={18}/>{busy?t.resending:t.resend}</button>
+        <button type="button" className="button outline" disabled={busy} onClick={()=>void resend()}><Mail size={18}/>{busy?t.resending:receipt.verification==='neon-code'?t.codeResend:t.resend}</button>
         <button type="button" className="button subtle" disabled={busy} onClick={startOver}>{t.startOver}</button>
       </div>
       <button type="button" className="text-link" disabled={busy} onClick={onSignIn}>{t.signIn}<ArrowRight size={16}/></button>
@@ -158,9 +171,11 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
         <p className="field-hint">{t.phoneHint}</p>
         <label className="billing-confirm registration-terms"><input type="checkbox" required checked={terms} disabled={busy} onChange={event=>setTerms(event.target.checked)}/><span>{t.terms}</span></label>
         {error && <p role="alert" className="public-error">{error}</p>}
-        <button className="button primary full" type="submit" disabled={busy || !terms}><KeyRound size={18}/>{busy?t.submitting:t.submit}</button>
+        <button className="button primary full" type="submit" disabled={busy || !terms || verificationReady!==true}><KeyRound size={18}/>{busy?t.submitting:t.submit}</button>
         <button type="button" className="text-link" disabled={busy} onClick={onSignIn}><LogIn size={16}/>{t.signIn}</button>
-        <p className="registration-environment"><Mail size={16}/>{t.deliveryNote}</p>
+        {verificationReady===true&&<p className="registration-environment"><Mail size={16}/>{method==='neon-code'?t.codeNote:t.deliveryNote}</p>}
+        {verificationReady===null&&<p role="status" className="registration-environment">{t.checkingVerification}</p>}
+        {verificationReady===false&&<div><p role="status" className="public-error">{t.codeUnavailable}</p><button type="button" className="text-link" onClick={()=>setVerificationCheck(value=>value+1)}><RefreshCw size={16}/>{t.retryVerification}</button></div>}
       </form>
     </div>}
   </section>;

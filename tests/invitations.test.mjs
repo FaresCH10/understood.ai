@@ -12,6 +12,7 @@ import {invitationIssueInput,invitationChangeInput,invitationFilters,invitationT
 import {createAppServer} from '../server/index.mjs';
 import {ensureRecoverySchema,requestRecovery} from '../server/account-recovery.mjs';
 import {AUTH_MAIL_QUEUE_LIMIT} from '../server/auth-mail-budget.mjs';
+
 const password='Disposable-synthetic-password-123';
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner',access_mode:'credential'};
 const auth={accessMode:'credential'};
@@ -260,7 +261,7 @@ test('invitation HTTP requires origin and credentials, redacts failures and neve
   }finally {await new Promise(resolve=>server.close(resolve));db.close();}
 });
 
-test('disabled invitation email and demo mode do not pretend to onboard staff',async()=>{
+test('disabled invitation email does not pretend to onboard staff',async()=>{
   const db=fixture(),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:mail.publicOrigin,mail:{mode:'disabled'}});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const url=`http://127.0.0.1:${server.address().port}`;
   const signed=createSession(db,{id:'maya',org_id:'cedar',site_id:'beirut'},'staff','credential');
@@ -269,9 +270,4 @@ test('disabled invitation email and demo mode do not pretend to onboard staff',a
     assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'Email delivery unavailable'});
     assert.equal(db.prepare('SELECT count(*) n FROM staff_invitation_mail').get().n,0);
   }finally {await new Promise(resolve=>server.close(resolve));db.close();}
-  const demoDb=openDatabase(':memory:'),demo=createAppServer(demoDb,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:mail.publicOrigin});
-  await new Promise(resolve=>demo.listen(0,'127.0.0.1',resolve));
-  try {
-    const response=await fetch(`http://127.0.0.1:${demo.address().port}/api/auth/invitations/preview`,{method:'POST',headers:{'content-type':'application/json',origin:mail.publicOrigin},body:JSON.stringify({token:'a'.repeat(43)})});assert.equal(response.status,404);
-  }finally {await new Promise(resolve=>demo.close(resolve));demoDb.close();}
 });

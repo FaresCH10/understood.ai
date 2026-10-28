@@ -1,13 +1,14 @@
+import {registrationAcceptance,sendRegistrationVerification,checkRegistrationCode} from '../registration-verification.mjs';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {inSchema} from './auth.mjs';
 import {tokenHash,passwordRecord} from '../auth-crypto.mjs';
 import {sealMail,openMail,sendAuthMail} from '../auth-mail.mjs';
 import {consumeAuthBudget} from './auth-budget.mjs';
 import {authMailCapacity} from './auth-mail-budget.mjs';
-import {registrationRequestInput,registrationResendInput,registrationVerifyInput,registrationEmailHash,
+import {registrationRequestInput,registrationResendInput,registrationVerifyInput,registrationCodeInput,registrationEmailHash,
   REGISTRATION_TERMS_VERSION,REGISTRATION_PRIVACY_VERSION,REGISTRATION_TRIAL_HOURS,REGISTRATION_TRIAL_WORKER_LIMIT} from '../registration-input.mjs';
 
-const generic={accepted:true,delivery:'queued'};
+
 const unavailable=()=>new Error('Registration verification unavailable');
 
 async function revokeTokens(client,registrationId,now,keep=null) {
@@ -47,7 +48,7 @@ async function queueMail(client,config,registrationId,email,registrationExpiresA
   return id;
 }
 export async function requestRegistration(pool,input,remoteAddress,config,{schema='public'}={}) {
-  const value=registrationRequestInput(input,remoteAddress);
+  const value=registrationRequestInput(input,remoteAddress),generic=registrationAcceptance(config);
   if(!config.available) throw new Error('Email delivery unavailable');
   const record=await passwordRecord(value.password);
   return inSchema(pool,schema,async client=>{
@@ -85,7 +86,7 @@ export async function requestRegistration(pool,input,remoteAddress,config,{schem
   });
 }
 export function resendRegistration(pool,input,remoteAddress,config,{schema='public'}={}) {
-  const value=registrationResendInput(input,remoteAddress);
+  const value=registrationResendInput(input,remoteAddress),generic=registrationAcceptance(config);
   if(!config.available) throw new Error('Email delivery unavailable');
   return inSchema(pool,schema,async client=>{
     if(!await consumeAuthBudget(client,[tokenHash(`registration-resend-email:${value.email}`),
@@ -173,7 +174,36 @@ export async function verifyRegistration(pool,input,remoteAddress,config,{schema
     return {completed:true,signInRequired:true,duplicate:false};
   });
 }
-export async function processOneRegistration(pool,config,{schema='public',send=sendAuthMail}={}) {
+export async function verifyRegistrationCode(pool,input,remoteAddress,config,{schema='public',checkCode=checkRegistrationCode}={}){
+  const value=registrationCodeInput(input,remoteAddress);
+  if(config.provider!=='neon'||!config.available)throw unavailable();
+  if(!await inSchema(pool,schema,client=>consumeAuthBudget(client,[tokenHash(`registration-code:${value.requestId}`),tokenHash(`registration-code-ip:${remoteAddress}`)],10)))throw unavailable();
+  const snapshot=await inSchema(pool,schema,async client=>{
+    await expire(client);
+    const now=(await client.query('SELECT clock_timestamp() AS now')).rows[0].now;
+    const row=(await client.query('SELECT * FROM organization_registrations WHERE id=$1 AND email_hash=$2',[value.requestId,tokenHash(registrationEmailHash(value.email))])).rows[0];
+    if(row?.state==='verified')return {duplicate:true};
+    if(!row||row.state!=='pending'||row.expires_at<=now||!row.payload)throw unavailable();
+    registrationScope(row,openMail(config,row.id,row.payload));return {payload:row.payload};
+  });
+  if(snapshot.duplicate)return {completed:true,signInRequired:true,duplicate:true};
+  if(await checkCode(config,value.email,value.code)!==true)throw unavailable();
+  return inSchema(pool,schema,async client=>{
+    await expire(client);
+    const now=(await client.query('SELECT clock_timestamp() AS now')).rows[0].now;
+    const row=(await client.query('SELECT * FROM organization_registrations WHERE id=$1 AND email_hash=$2 FOR UPDATE',[value.requestId,tokenHash(registrationEmailHash(value.email))])).rows[0];
+    if(row?.state==='verified')return {completed:true,signInRequired:true,duplicate:true};
+    if(!row||row.state!=='pending'||row.expires_at<=now||row.payload!==snapshot.payload)throw unavailable();
+    const message=registrationScope(row,openMail(config,row.id,row.payload));
+    if((await client.query('SELECT 1 FROM staff_credentials WHERE email=$1',[message.email])).rows[0])throw unavailable();
+    const result=await verified(client,{...row,...message},now);
+    const changed=await client.query("UPDATE organization_registrations SET state='verified',org_id=$1,site_id=$2,owner_id=$3,verified_at=$4,payload=NULL WHERE id=$5 AND state='pending'",[result.orgId,result.siteId,result.ownerId,now,row.id]);
+    if(changed.rowCount!==1)throw unavailable();
+    await revokeTokens(client,row.id,now);await ignoreMail(client,row.id);
+    return {completed:true,signInRequired:true,duplicate:false};
+  });
+}
+export async function processOneRegistration(pool,config,{schema='public',send=sendRegistrationVerification}={}) {
   if(!config.available) return false;
   await expireRegistrations(pool,{schema});
   const job=await inSchema(pool,schema,async client=>{
@@ -205,7 +235,8 @@ export async function processOneRegistration(pool,config,{schema='public',send=s
       return terminal('ignored');
     }
     let token=(await client.query('SELECT * FROM registration_tokens WHERE mail_id=$1',[row.id])).rows[0];
-    if(!token) {
+    if(config.provider==='neon')message={email:message.email,subject:'Verify your Understood account',text:''};
+    else if(!token) {
       const secret=randomBytes(32).toString('base64url');
       token={token_hash:tokenHash(secret)};
       await client.query('INSERT INTO registration_tokens(token_hash,registration_id,mail_id,expires_at) VALUES($1,$2,$3,$4)',

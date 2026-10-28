@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-the-arabic-hero-trial-cta-opens-company-registra": {
+      "declaredAt": 1793183790701,
+      "id": "flow:drive-the-arabic-hero-trial-cta-opens-company-registra",
+      "state": "declared",
+      "statement": "The Arabic hero trial CTA opens company registration",
+      "status": "proposed",
+      "subject": "drive-the-arabic-hero-trial-cta-opens-co",
+      "surface": {
+        "flow": "drive-the-arabic-hero-trial-cta-opens-company-registra"
+      },
+      "updatedAt": 1793183790735
+    }
+  },
+  "subject": "drive-the-arabic-hero-trial-cta-opens-co",
+  "version": 1
+}

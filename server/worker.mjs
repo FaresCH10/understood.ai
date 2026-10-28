@@ -1,3 +1,4 @@
+import {resolveRegistrationVerification} from './registration-verification.mjs';
 import {processOneRecording} from './recording-worker.mjs';
 import {withMultipleChoice} from './multiple-choice.mjs';
 import { randomUUID } from 'node:crypto';
@@ -91,6 +92,7 @@ if (process.argv[1]?.endsWith('worker.mjs')) {
   const followupAdapter=resolveCaseFollowup();
   const pushAdapter=resolvePushAdapter();
   const mail=config.accessMode==='credential' ? resolveMailConfig({publicOrigin:config.publicOrigin,allowLocal:true}) : {available:false};
+  const registrationVerification=resolveRegistrationVerification(process.env,mail,config.publicOrigin);
   const db = openDatabase();
   ensureStaffCaseRecordingSchema(db);
   const privateAudio=audioStore(DEFAULT_AUDIO_ROOT);
@@ -114,7 +116,7 @@ if (process.argv[1]?.endsWith('worker.mjs')) {
       if(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='staff_invitations'").get()) expireInvitations(db);
       for(let i=0;i<5 && await processOneInvitation(db,mail);i++) {}
       expireRegistrations(db);
-      for(let i=0;i<5 && await processOneRegistration(db,mail);i++) {}
+      for(let i=0;i<5 && await processOneRegistration(db,registrationVerification);i++) {}
       for(let i=0;i<5 && processOnePilot(db,mail,{destination});i++) {}
       sweepOverdueAssignments(db);
       expirePushSubscriptions(db);

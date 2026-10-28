@@ -5,7 +5,7 @@ import {encodeWav} from '../src/audio.ts';
 import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 const time=Date.parse('2026-10-07T12:00:00.000Z'),now=()=>time;
-const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2026-10-07T20:00:00.000Z'};
+const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-credential',clientContext:'a'.repeat(64),expiresAt:'2026-10-07T20:00:00.000Z'};
 const scope={assignmentId:'one',publicationId:'published-v3',version:3,language:'en'};
 const samples=Float32Array.from({length:16000},(_,i)=>Math.sin(i/10)*.5);
 const bytes=encodeWav({duration:1,sampleRate:16000,numberOfChannels:1,getChannelData:()=>samples});

@@ -16,6 +16,8 @@ import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
+import {principalLoginBody,seedCredentials} from './helpers/sqlite-app.mjs';
+
 const fetch=createSessionContextFetch();
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const content={title:'Shelf handover template',description:'Shelf handover',source:CANONICAL_SOURCE,question:'',facts:[],askedFacts:[]};
@@ -85,13 +87,14 @@ for(const pg of [false,true]) test(`${pg ? 'PostgreSQL' : 'SQLite'} template lif
     await assert.rejects(async()=>f.change(foreign,'use',id,input({revision:5,title:'Foreign use denied'})),/unavailable/);
     // A forged site is denied rather than used to widen the owner's scope.
     await assert.rejects(async()=>f.get({...owner,site_id:'foreign'},id),/Forbidden/);
-    const config={tier:'local',aiMode:'synthetic',accessMode:pg ? 'credential' : 'demo',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg ? f.options : {})};
+    const config={tier:'local',aiMode:'synthetic',accessMode:'credential',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg ? f.options : {})};
     if(pg) await provisionStaffCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'templates@example.test',password:'Synthetic-templates-password-123'},f.options);
+    else seedCredentials(f.db);
     const server=pg ? createPostgresRehearsalServer(f.pool,config) : createAppServer(f.db,config);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
     const call=(path,cookie,body)=>fetch(base+path,{method:body ? 'POST' : 'GET',headers:{origin:config.publicOrigin,'content-type':'application/json',...(cookie ? {cookie} : {})},body:body ? JSON.stringify(body) : undefined});
     try {
       assert.equal((await call('/templates')).status,401);
-      const login=await call(pg ? '/auth/staff/login' : '/demo/session',null,pg ? {email:'templates@example.test',password:'Synthetic-templates-password-123'} : {principal:'maya'}),cookie=login.headers.get('set-cookie').split(';')[0];
+      const login=await call('/auth/staff/login',null,pg ? {email:'templates@example.test',password:'Synthetic-templates-password-123'} :principalLoginBody('maya')),cookie=login.headers.get('set-cookie').split(';')[0];
       const list=await call('/templates?page=2&pageSize=20',cookie);assert.equal(list.status,200);assert.match(list.headers.get('cache-control'),/no-store/);
       const saved=await call('/templates/receipts/'+id,cookie);assert.equal(saved.status,200);assert.match(saved.headers.get('cache-control'),/no-store/);assert.equal((await saved.json()).result.revision,1);
       assert.equal((await call('/templates/receipts/bad',cookie)).status,400);assert.equal((await call('/templates/receipts/'+id+'?scope=foreign',cookie)).status,400);

@@ -1,0 +1,94 @@
+{
+  "version": 2,
+  "name": "drive-visitors-can-pause-the-decorative-gsap-animation",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793177662768,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "component",
+        "component": "App",
+        "source": {
+          "file": "src/AuthLayout.tsx",
+          "line": 62,
+          "column": 312
+        }
+      },
+      "args": {},
+      "action": "click",
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "text",
+            "contains": "Resume motion"
+          },
+          {
+            "kind": "allOf",
+            "predicates": [
+              {
+                "kind": "element",
+                "query": {
+                  "role": "button",
+                  "name": "Resume motion"
+                },
+                "state": "hidden"
+              },
+              {
+                "kind": "element",
+                "query": {
+                  "role": "textbox",
+                  "name": "Work email"
+                },
+                "state": "visible"
+              }
+            ]
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "link",
+        "name": "Worker"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 471
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "textbox",
+          "name": "Company ID"
+        },
+        "state": "visible"
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "Visitors can pause the decorative GSAP animation without hiding or disabling the sign-in form.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-visitors-can-pause-the-decorative-gsap-animation"
+}

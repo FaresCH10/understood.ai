@@ -11,6 +11,8 @@ import {notificationFilters,notificationId,notificationKinds} from '../server/no
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 const fetch=createSessionContextFetch();
 
 const owner={principal_type:'staff',principal_id:'maya',role:'owner',org_id:'cedar',site_id:'beirut'};
@@ -117,9 +119,9 @@ test('PostgreSQL credential notification HTTP scopes metadata and read receipts,
   }finally {await new Promise(resolve=>server.close(resolve));await f.close();}
 });
 test('SQLite notification HTTP reauthorizes, requires local origin, keeps reads no-store and rejects forged writes',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:origin});
+  const db=openDatabase(':memory:'),server=sqliteApp(db,{publicOrigin:origin});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
-  const login=async principal=>(await fetch(`${base}/demo/session`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({principal})})).headers.get('set-cookie').split(';')[0];
+  const login=async principal=>(await loginPrincipal(base, principal, origin)).headers.get('set-cookie').split(';')[0];
   const request=(cookie,path,body,headers={})=>fetch(base+path,{headers:{...(cookie?{cookie}:{}),...headers,...(body===undefined?{}:{origin,'content-type':'application/json'})},...(body===undefined?{}:{method:'POST',body:JSON.stringify(body)})});
   try {
     db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run('http-notice','cedar','beirut','system','pipeline','export.ready','private',new Date(Date.now()-1000).toISOString());

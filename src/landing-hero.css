@@ -1,0 +1,39 @@
+.marketing-site .hero-intro{position:relative;background:#fff;overflow:clip;isolation:isolate}
+.marketing-site .hero-intro-inner{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:24px;align-items:center;min-height:644px}
+.hero-intro-background{position:absolute;inset:0 0 0 38%;z-index:-1;overflow:hidden;mask-image:linear-gradient(to right,transparent,#000 35%);-webkit-mask-image:linear-gradient(to right,transparent,#000 35%)}
+.hero-intro-background img{display:block;width:100%;height:100%;object-fit:cover;object-position:55% 58%;opacity:.8}
+.hero-intro-copy{padding-block:52px 48px;position:relative;z-index:3;min-width:0}
+.marketing-site .hero-intro-kicker{font-size:12px;line-height:1.5;font-weight:700;letter-spacing:.11em;color:#315f50;margin:0 0 21px;text-transform:uppercase}
+.marketing-site .hero-intro h1{font-size:clamp(44px,4.05vw,61px);line-height:1.1;letter-spacing:-.035em;font-weight:750;max-width:none;margin:0 0 24px;text-wrap:initial}
+.hero-heading-line{display:block;overflow:hidden;padding-bottom:.09em;margin-bottom:-.09em}
+.hero-heading-line>span{display:block;transform-origin:0 100%}
+.hero-heading-line:last-child{color:#11634e}
+.marketing-site .hero-intro-description{font-size:18px;line-height:1.75;max-width:43ch;margin:0;color:#354d44;text-wrap:pretty}
+.hero-intro-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:28px}
+.marketing-site .hero-intro-actions .landing-button{min-height:48px;padding:12px 20px;font-size:15px}
+.hero-intro-assurances{display:flex;gap:12px 23px;flex-wrap:wrap;list-style:none;padding:0;margin:23px 0 0;max-width:600px}
+.hero-intro-assurances li{display:flex;align-items:center;gap:6px;font-size:12px;color:#486154;line-height:1.6}
+.hero-intro-assurances svg{color:#1a775a;flex:none}
+.hero-intro-scene{position:relative;direction:ltr;min-width:0;height:644px;margin:0;align-self:end}
+.hero-worker-parallax{position:absolute;inset:0;pointer-events:none}
+.hero-worker-slide{position:absolute;bottom:-2px;left:20%;height:96%;aspect-ratio:1122/1402}
+.hero-intro-worker{height:100%;width:100%;max-width:none;display:block;object-fit:contain}
+.hero-messages{position:absolute;left:-20px;top:48px;width:245px;z-index:2;display:grid;gap:22px}
+.hero-message{position:relative;background:#fff;border:1px solid #dbe6e4;border-radius:12px;padding:16px 17px;box-shadow:0 6px 20px #173e2f0a}
+.hero-message::after{content:'';position:absolute;right:24px;bottom:-8px;width:14px;height:14px;background:#fff;border-right:1px solid #dbe6e4;border-bottom:1px solid #dbe6e4;transform:rotate(45deg);border-bottom-right-radius:3px}
+.hero-message-language{display:inline-block;background:#e7f0ff;border-radius:5px;color:#244d87;padding:3px 8px;font-size:12px;line-height:1.4;font-weight:650}
+.hero-message-content{display:flex;align-items:flex-start;gap:9px;margin-top:11px}
+.marketing-site .hero-message-content p{font-family:'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.6;color:#203930;margin:0;flex:1;min-width:0;text-wrap:pretty}
+.marketing-site .hero-message-content p[lang=hi]{font-size:17px;line-height:1.6}
+.hero-message-speaker{flex:none;color:#315b4c;margin-top:4px}
+.marketing-site .hero-message-content p[lang=hi]{font-family:'Nirmala UI','Segoe UI',sans-serif}
+.hero-intro-scene>figcaption{position:absolute;bottom:12px;right:0;max-width:330px;font-size:11px;line-height:1.5;color:#304f41;background:#fffffff2;padding:6px 10px;border-radius:4px;z-index:2}
+.marketing-site[dir=rtl] .hero-intro-background{inset:0 38% 0 0;mask-image:linear-gradient(to left,transparent,#000 35%);-webkit-mask-image:linear-gradient(to left,transparent,#000 35%)}
+.marketing-site[lang=ar] .hero-intro h1{font-size:clamp(42px,3.75vw,57px);letter-spacing:0;line-height:1.45}
+.marketing-site[lang=ar] .hero-intro-kicker{letter-spacing:0}
+@media(min-width:1550px){.marketing-site .hero-intro-inner,.hero-intro-scene{min-height:680px;height:680px}.hero-worker-slide{height:98%}.hero-messages{top:65px;left:-8px}}
+@media(max-width:1250px){.marketing-site .hero-intro-inner{gap:20px;min-height:600px}.hero-intro-scene{height:600px}.hero-worker-slide{height:94%;left:14%}.hero-messages{width:222px;left:-8px;top:42px;gap:20px}.hero-message{padding:14px}.marketing-site .hero-intro h1{font-size:clamp(42px,4.1vw,52px)}.marketing-site .hero-intro-description{font-size:17px;max-width:39ch}.hero-intro-assurances{gap:8px 16px}.hero-intro-assurances li{font-size:11px}.marketing-site .hero-message-content p{font-size:14px}.marketing-site .hero-message-content p[lang=hi]{font-size:16px}}
+@media(max-width:1000px) and (min-width:801px){.marketing-site .hero-intro-inner{grid-template-columns:1fr 1fr;gap:10px}.marketing-site .hero-intro h1{font-size:40px}.hero-messages{width:190px;left:-2px;top:44px}.hero-message-content{gap:2px}.hero-worker-slide{height:85%;left:8%}.marketing-site .hero-intro-description{font-size:16px}.marketing-site .hero-intro-actions .landing-button{padding-inline:14px;font-size:13px}.hero-intro-scene>figcaption{font-size:10px;max-width:250px}.marketing-site[lang=ar] .hero-intro h1{font-size:38px}}
+@media(max-width:800px){.marketing-site .hero-intro-inner{grid-template-columns:minmax(0,1fr);gap:0;min-height:0}.hero-intro-copy{padding-block:44px 18px;max-width:650px}.marketing-site .hero-intro h1{font-size:52px;line-height:1.12}.marketing-site .hero-intro-description{max-width:48ch;font-size:18px}.hero-intro-scene{height:520px;width:100%;max-width:650px;justify-self:center}.hero-intro-background,.marketing-site[dir=rtl] .hero-intro-background{inset:auto 0 0;height:550px;mask-image:linear-gradient(to bottom,transparent,#000 22%);-webkit-mask-image:linear-gradient(to bottom,transparent,#000 22%)}.hero-worker-slide{height:98%;left:28%}.hero-messages{left:4%;top:42px;width:236px;gap:25px}.hero-intro-assurances li{font-size:12px}.hero-intro-assurances{gap:9px 22px}.hero-intro-scene>figcaption{right:0;bottom:14px}.marketing-site[lang=ar] .hero-intro h1{font-size:48px}}
+@media(max-width:540px){.hero-intro-copy{padding-block:34px 17px}.marketing-site .hero-intro-kicker{font-size:11px;margin-bottom:17px}.marketing-site .hero-intro h1{font-size:37px;line-height:1.15;letter-spacing:-.032em;margin-bottom:19px}.marketing-site .hero-intro-description{font-size:16px;line-height:1.7;max-width:38ch}.hero-intro-actions{margin-top:23px;gap:9px}.marketing-site .hero-intro-actions .landing-button{flex:1;min-height:46px;font-size:13px;padding:11px 10px;gap:7px}.hero-intro-assurances{gap:9px 16px;margin-top:19px}.hero-intro-assurances li{font-size:11px;gap:4px}.hero-intro-assurances svg{width:13px;height:13px}.hero-intro-scene{height:460px}.hero-intro-background,.marketing-site[dir=rtl] .hero-intro-background{height:490px}.hero-worker-slide{height:94%;left:18%}.hero-messages{left:0;top:30px;width:177px;gap:22px}.hero-message{padding:12px 12px 13px;border-radius:9px}.hero-message-language{font-size:11px;padding:3px 7px}.hero-message-content{margin-top:9px;gap:3px}.marketing-site .hero-message-content p{font-size:13px;line-height:1.55}.marketing-site .hero-message-content p[lang=hi]{font-size:15px}.hero-message-speaker{width:19px;height:19px}.hero-intro-scene>figcaption{font-size:10px;max-width:270px;right:0;bottom:10px;padding:5px 8px}.marketing-site[lang=ar] .hero-intro h1{font-size:36px;line-height:1.45;letter-spacing:0}.marketing-site[lang=ar] .hero-intro-description{font-size:16px}}
+@media(max-width:370px){.marketing-site .hero-intro h1{font-size:33px}.hero-intro-assurances{column-gap:12px}.hero-messages{width:164px}.hero-worker-slide{left:13%}.marketing-site .hero-intro-actions .landing-button{font-size:12px}}

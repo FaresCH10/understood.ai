@@ -30,6 +30,8 @@ import {saveTextRetention,processOneTextPurge} from '../server/postgres/text-ret
 import {requestWorkerDeletion} from '../server/deletions.mjs';
 import {requestWorkerDeletion as pgDeletion} from '../server/postgres/deletions.mjs';
 import {configureRuntimePermissions} from '../server/postgres/runtime-permissions.mjs';
+import {principalLoginBody,seedCredentials} from './helpers/sqlite-app.mjs';
+
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'},other={...owner,principal_id:'other',role:'supervisor'};
 async function fixture(pg,kind='response_transcription',schema='public'){
   const raw=pg?new PGlite():openDatabase(':memory:');
@@ -46,7 +48,7 @@ async function fixture(pg,kind='response_transcription',schema='public'){
     await queuePreparation(pool,owner,draft.id,1,{schema});await processOnePreparation(pool,{schema,integrationMode:'synthetic'});
     await legacyWrittenQuestion(pool,draft.id,{schema});
     await publish(pool,owner,draft.id,{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['worker']},{schema,integrationMode:'synthetic'});workerId='worker';
-  }else {seed(raw);workerId='worker-30';raw.exec("INSERT INTO staff VALUES('other','cedar','beirut','Other','supervisor',1),('auditor','cedar','beirut','Auditor','auditor',1)");}
+  }else {seedCredentials(raw);workerId='worker-30';raw.exec("INSERT INTO staff VALUES('other','cedar','beirut','Other','supervisor',1),('auditor','cedar','beirut','Auditor','auditor',1)");}
   const assignment=(await query('SELECT * FROM assignments WHERE worker_id=$1',[workerId]))[0],worker={...owner,principal_type:'worker',principal_id:workerId};
   let row;
   if(kind==='answer_check'){
@@ -185,10 +187,10 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} retry HTTP requir
   const f=await fixture(pg,'response_transcription',pg?'understood_test_processing_retry_http':'public');let server;
   try{
     if(pg)await pgCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'maya@retry.example.test',password:'Synthetic-only-retry-password'},{schema:f.schema});
-    const origin='http://127.0.0.1:3031',config={tier:'local',aiMode:'synthetic',accessMode:pg?'credential':'demo',dataClass:'synthetic',publicOrigin:origin,storage:f.storage,schema:f.schema};
+    const origin='http://127.0.0.1:3031',config={tier:'local',aiMode:'synthetic',accessMode:'credential',dataClass:'synthetic',publicOrigin:origin,storage:f.storage,schema:f.schema};
     server=pg?createPostgresRehearsalServer(f.pool,config):createAppServer(f.raw,config);await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
     const base=`http://127.0.0.1:${server.address().port}/api`,contextual=createSessionContextFetch();
-    const login=await contextual(base+(pg?'/auth/staff/login':'/demo/session'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(pg?{email:'maya@retry.example.test',password:'Synthetic-only-retry-password'}:{principal:'maya'})});assert.equal(login.status,200);
+    const login=await contextual(base+('/auth/staff/login'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(pg?{email:'maya@retry.example.test',password:'Synthetic-only-retry-password'}:principalLoginBody('maya'))});assert.equal(login.status,200);
     const cookie=login.headers.get('set-cookie').split(';')[0],session=await (await contextual(base+'/session',{headers:{cookie}})).json(),url=base+'/processing/'+encodeURIComponent(f.jobId)+'/retries';
     const context=await f.api.getProcessingRetryContext(f.db,owner,f.jobId),input=intent(context);
     for(const header of [undefined,'invalid','0'.repeat(64)]){
@@ -198,7 +200,7 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} retry HTTP requir
     }
     assert.equal((await f.query('SELECT * FROM processing_retries')).length,0);
     const headers={cookie,origin,'content-type':'application/json','x-client-session-context':session.clientContext};
-    const changedLogin=await contextual(base+(pg?'/auth/staff/login':'/demo/session'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(pg?{email:'maya@retry.example.test',password:'Synthetic-only-retry-password'}:{principal:'maya'})});assert.equal(changedLogin.status,200);
+    const changedLogin=await contextual(base+('/auth/staff/login'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(pg?{email:'maya@retry.example.test',password:'Synthetic-only-retry-password'}:principalLoginBody('maya'))});assert.equal(changedLogin.status,200);
     const changedCookie=changedLogin.headers.get('set-cookie').split(';')[0];
     for(const path of [url,url+'/'+input.requestId])assert.equal((await fetch(path,{headers:{...headers,cookie:changedCookie}})).status,409);
     assert.equal((await fetch(url,{method:'POST',headers:{...headers,cookie:changedCookie},body:JSON.stringify(input)})).status,409);assert.equal((await f.query('SELECT * FROM processing_retries')).length,0);

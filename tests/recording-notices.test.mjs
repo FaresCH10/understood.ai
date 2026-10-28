@@ -15,6 +15,8 @@ import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential,issueWorkerGrant,redeemWorkerGrant} from '../server/postgres/auth.mjs';
 import {readWorkerRecordingNotice} from '../src/worker-recording-notice.ts';
 import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
+import {loginRoute,principalLoginBody,seedCredentials} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const admin={...owner,principal_id:'admin',role:'administrator'};
@@ -37,7 +39,7 @@ test('site notice input bounds all languages, explicit confirmation and immutabl
 });
 async function fixture(pg){
   if(!pg){
-    const db=openDatabase(':memory:');seed(db);db.prepare("INSERT INTO staff VALUES('admin','cedar','beirut','Synthetic admin','administrator',1)").run();
+    const db=openDatabase(':memory:');seedCredentials(db);db.prepare("INSERT INTO staff VALUES('admin','cedar','beirut','Synthetic admin','administrator',1)").run();
     return {db,get:(s,options)=>getRecordingNotice(db,s,options),save:(s,v)=>saveRecordingNotice(db,s,v),receipt:(s,id)=>recordingNoticeReceipt(db,s,id),
       raw:async(sql,values=[])=>({rows:db.prepare(sql).all(...values)}),fail(){db.exec("CREATE TRIGGER reject_notice_audit BEFORE INSERT ON audit WHEN NEW.action='recording.notice.updated' BEGIN SELECT RAISE(ABORT,'Injected audit'); END");},
       reset(){db.exec('DROP TRIGGER reject_notice_audit');},close:async()=>db.close()};
@@ -81,11 +83,11 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} site notices are 
     await assert.rejects(f.raw('UPDATE recording_notice_requests SET revision=99'),/immutable/);await assert.rejects(f.raw('DELETE FROM recording_notice_requests'),/immutable/);
     const clear={...input(),revision:1,scope:JSON.stringify(['cedar','beirut','admin']),notices:{en:'',ar:'',ur:''}};await f.save(admin,clear);assert.equal((await f.get(worker)).configured,false);
     assert.equal((await f.save(owner,change)).duplicate,true);assert.equal((await f.get(owner)).revision,2);
-    const config={tier:'local',aiMode:'synthetic',accessMode:pg?'credential':'demo',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg?{schema:f.options.schema}:{})};
+    const config={tier:'local',aiMode:'synthetic',accessMode:'credential',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg?{schema:f.options.schema}:{})};
     if(pg)await provisionStaffCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'synthetic@example.test',password:'Synthetic-only-password-123'},f.options);
     server=pg?createPostgresRehearsalServer(f.pool,config):createAppServer(f.db,config);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
     const base=`http://127.0.0.1:${server.address().port}/api`,call=(path,cookie,body,origin=config.publicOrigin)=>fetch(base+path,{method:body?'POST':'GET',headers:{origin,'content-type':'application/json',...(cookie?{cookie}:{})},body:body?JSON.stringify(body):undefined});
-    const login=await call(pg?'/auth/staff/login':'/demo/session',null,pg?{email:'synthetic@example.test',password:'Synthetic-only-password-123'}:{principal:'maya'}),cookie=login.headers.get('set-cookie').split(';')[0];
+    const login=await call('/auth/staff/login',null,pg?{email:'synthetic@example.test',password:'Synthetic-only-password-123'}:principalLoginBody('maya')),cookie=login.headers.get('set-cookie').split(';')[0];
     const read=await call('/privacy/recording-notice',cookie);assert.equal(read.status,200);assert.match(read.headers.get('cache-control'),/no-store/);assert.equal((await read.json()).revision,2);
     assert.equal((await call('/privacy/recording-notice',null)).status,401);assert.equal((await call('/privacy/recording-notice?site=harbor',cookie)).status,400);
     assert.equal((await call('/privacy/recording-notice',cookie,{...input(),revision:2},'http://foreign.test')).status,403);
@@ -99,7 +101,7 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} site notices are 
     assert.equal((await (await call(`/privacy/recording-notice/requests/${httpChange.requestId}`,cookie)).json()).revision,3);
     let workerCookie;
     if(pg){const grant=await issueWorkerGrant(f.pool,owner,'worker-14',30,f.options),identity=await redeemWorkerGrant(f.pool,grant.token,f.options);workerCookie=`understood_pg_rehearsal=${identity.token}`;}
-    else workerCookie=(await call('/demo/session',null,{principal:'worker-14'})).headers.get('set-cookie').split(';')[0];
+    else workerCookie=(await call(loginRoute('worker-14'),null,principalLoginBody('worker-14'))).headers.get('set-cookie').split(';')[0];
     const workerSession=await (await globalThis.fetch(base+'/session',{headers:{cookie:workerCookie}})).json();
     const workerRead=(query='',context=workerSession.clientContext)=>globalThis.fetch(base+'/privacy/recording-notice'+query,{headers:{cookie:workerCookie,origin:config.publicOrigin,...(context===null?{}:{'x-client-session-context':context})}});
     assert.equal((await workerRead('',null)).status,409);assert.equal((await workerRead('?language=en','0'.repeat(64))).status,409);

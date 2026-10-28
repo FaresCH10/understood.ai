@@ -6,11 +6,13 @@ import {createAppServer} from '../server/index.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {processOne} from '../server/worker.mjs';
 import {ensureTemplateSchema,changeTemplate} from '../server/templates.mjs';
+import {sqliteApp} from '../tests/helpers/sqlite-app.mjs';
+
 const db=openDatabase(':memory:');seed(db);ensureTemplateSchema(db);
 db.prepare("UPDATE organizations SET name='Disposable Template QA' WHERE id='cedar'").run();
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 for(let n=1;n<=25;n++) changeTemplate(db,owner,'create',null,{requestId:randomUUID(),confirmed:true,title:`Shelf template ${String(n).padStart(2,'0')}`,description:'Synthetic shelf handover',source:CANONICAL_SOURCE,question:'',facts:[],askedFacts:[]});
-const api=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:'http://127.0.0.1:3030'});
+const api=sqliteApp(db,{publicOrigin:'http://127.0.0.1:3030'});
 let lose=true,loseUse=true;const handler=api.listeners('request')[0];api.removeAllListeners('request');
 api.on('request',(req,res)=>{
   if(req.url.startsWith('/api/templates')) res.once('finish',()=>console.log(req.method,req.url,res.statusCode,'templates',db.prepare('SELECT COUNT(*) n FROM templates').get().n,'versions',db.prepare('SELECT COUNT(*) n FROM template_versions').get().n,'receipts',db.prepare('SELECT COUNT(*) n FROM template_requests').get().n));

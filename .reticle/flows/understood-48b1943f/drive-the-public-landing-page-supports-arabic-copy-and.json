@@ -1,0 +1,444 @@
+{
+  "version": 2,
+  "name": "drive-the-public-landing-page-supports-arabic-copy-and",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793180949106,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "link",
+        "name": "Try the example"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "Try the example"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/LandingPage.tsx",
+            "line": 54
+          },
+          "expect": {
+            "kind": "route",
+            "contains": "#how-it-works"
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "radio",
+            "name": "Yellow shelf"
+          },
+          "args": {},
+          "action": "check",
+          "source": {
+            "file": "src/LandingDemo.tsx",
+            "line": 48
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Check example"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/LandingDemo.tsx",
+            "line": 49
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "This answer needs follow-up in the example.",
+            "visible": true
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Try again"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/LandingDemo.tsx",
+            "line": 51
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "radio",
+            "name": "Blue shelf"
+          },
+          "args": {},
+          "action": "check",
+          "source": {
+            "file": "src/LandingDemo.tsx",
+            "line": 48
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Check example"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/LandingDemo.tsx",
+            "line": 49
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "This answer matches the example.",
+            "visible": true
+          }
+        }
+      ],
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "combobox",
+        "name": "Example language"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "combobox",
+            "name": "Example language"
+          },
+          "args": {
+            "value": "ur"
+          },
+          "action": "select",
+          "source": {
+            "file": "src/LandingDemo.tsx",
+            "line": 41
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "مکمل اشیا کس شیلف پر رکھنی ہیں؟",
+            "visible": true
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "radio",
+            "name": "نیلا شیلف"
+          },
+          "args": {},
+          "action": "check",
+          "source": {
+            "file": "src/LandingDemo.tsx",
+            "line": 48
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Check example"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/LandingDemo.tsx",
+            "line": 49
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "This answer matches the example.",
+            "visible": true
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "combobox",
+            "name": "Example language"
+          },
+          "args": {
+            "value": "ar"
+          },
+          "action": "select",
+          "source": {
+            "file": "src/LandingDemo.tsx",
+            "line": 41
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "أي رف مخصص للمنتجات المكتملة؟",
+            "visible": true
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Platform"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/PublicHeader.tsx",
+            "line": 24
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "Worker experience"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/PublicHeader.tsx",
+            "line": 24
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Read. Listen. Choose a response.",
+            "visible": true
+          }
+        }
+      ],
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "link",
+        "name": "Languages"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "Languages"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/PublicHeader.tsx",
+            "line": 24
+          },
+          "expect": {
+            "kind": "route",
+            "contains": "#languages"
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "For companies"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/PublicHeader.tsx",
+            "line": 24
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "Industry examples"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/PublicHeader.tsx",
+            "line": 24
+          },
+          "expect": {
+            "kind": "route",
+            "contains": "#companies"
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Retail"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/LandingPage.tsx",
+            "line": 70
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Place the new display signs beside the front entrance before opening.",
+            "visible": true
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "Plans"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/PublicHeader.tsx",
+            "line": 24
+          },
+          "expect": {
+            "kind": "route",
+            "contains": "#plans"
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "Does every language have translated content and audio?"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/LandingPage.tsx",
+            "line": 72
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "Availability is checked per instruction.",
+            "visible": true
+          }
+        }
+      ],
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "combobox",
+        "name": "Page language"
+      },
+      "args": {
+        "value": "ar"
+      },
+      "action": "select",
+      "source": {
+        "file": "src/PublicHeader.tsx",
+        "line": 26
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "ابدأ بفريق تعرفه.",
+        "visible": true
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "تقليل الحركة"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "button",
+            "name": "تقليل الحركة"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/LandingPage.tsx",
+            "line": 73
+          },
+          "expect": {
+            "kind": "element",
+            "query": {
+              "role": "button",
+              "name": "تفعيل الحركة"
+            },
+            "state": "visible"
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "الصفحة الرئيسية لـ Understood"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/PublicHeader.tsx",
+            "line": 21
+          },
+          "expect": {
+            "kind": "text",
+            "contains": "تعليمات واضحة.",
+            "visible": true
+          }
+        }
+      ],
+      "page": "/"
+    }
+  ],
+  "intent": "The public landing page supports Arabic copy and navigation",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-the-public-landing-page-supports-arabic-copy-and"
+}

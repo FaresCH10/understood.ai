@@ -53,6 +53,7 @@ test('startup requires explicit local modes and never exposes synthetic workflow
     assert.throws(() => createAppServer(db), /UNDERSTOOD_TIER=local/);
     assert.throws(() => createAppServer(db, { tier: 'production', aiMode: 'live', accessMode: 'credential', publicOrigin: 'https://example.test' }), /Production startup blocked/);
     assert.throws(() => createAppServer(db, { tier: 'local', aiMode: 'live', accessMode: 'credential' }), /UNDERSTOOD_TIER=local/);
+    assert.throws(() => createAppServer(db, { tier: 'local', aiMode: 'synthetic', accessMode: 'demo' }), /UNDERSTOOD_ACCESS_MODE=credential/);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM organizations').get().n, 0);
   } finally { db.close(); }
 });
@@ -67,7 +68,7 @@ test('credential mode denies demo profile, checks origin and uses generic thrott
     const wrong = await login(request, 'maya@example.test', 'wrong password');
     assert.equal(missing.status, 401);
     assert.deepEqual(await missing.json(), await wrong.json());
-    const noOrigin = await fetch(`http://127.0.0.1:${new URL(wrong.url).port}/api/auth/staff/login`, {
+    const noOrigin = await globalThis.fetch(`http://127.0.0.1:${new URL(wrong.url).port}/api/auth/staff/login`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: 'maya@example.test', password: 'a long local test password' }),
     });

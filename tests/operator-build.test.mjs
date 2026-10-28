@@ -37,7 +37,7 @@ test('operator build serves only its entry graph, without customer PWA, micropho
     assert.match(result.headers.get('cache-control'),/immutable/);
     assert.equal((await fetch(base+'/assets/'+name,{headers:{'if-none-match':result.headers.get('etag')}})).status,304);
   }
-  for(const path of ['/assets/customer-abcdefgh.js','/sw.js','/manifest.webmanifest','/worker-import-template.csv','/product-workspace.jpg','/.vite/manifest.json','/.env','/src/operator-entry.tsx'])assert.equal((await fetch(base+path)).status,404,path);
+  for(const path of ['/assets/customer-abcdefgh.js','/sw.js','/manifest.webmanifest','/worker-import-template.csv','/product-workspace.jpg','/auth/gulf-workplace.jpg','/auth/worker-tablet.png','/landing/gulf-site.jpg','/landing/site-worker.png','/landing/journey/retail.png','/landing/journey/retail-place.jpg','/landing/journey/site.png','/landing/journey/site-place.jpg','/landing/journey/hospitality.png','/landing/journey/hospitality-place.jpg','/landing/journey/food.png','/landing/journey/food-place.jpg','/.vite/manifest.json','/.env','/src/operator-entry.tsx'])assert.equal((await fetch(base+path)).status,404,path);
   assert.equal((await fetch(base+'/',{method:'POST',body:'synthetic'})).status,405);
   const head=await fetch(base+'/',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
 });

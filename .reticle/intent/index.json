@@ -31,10 +31,28 @@
       "subject": "api"
     },
     {
+      "id": "inline:a-valid-email-code-activates-the-workspace-and-a-0d01095d",
+      "statement": "A valid email code activates the workspace and asks the owner to sign i…",
+      "status": "proved",
+      "subject": "auth"
+    },
+    {
+      "id": "inline:an-invalid-email-code-leaves-company-registratio-9f660b1e",
+      "statement": "An invalid email code leaves company registration unverified.",
+      "status": "proved",
+      "subject": "auth"
+    },
+    {
       "id": "inline:the-worker-directory-crew-filter-loads-active-cr-fdbb6b56",
       "statement": "The worker directory crew filter loads active crews beyond the five sho…",
       "status": "proposed",
       "subject": "crews"
+    },
+    {
+      "id": "flow:drive-a-credential-deployment-shows-work-email-sign-in",
+      "statement": "A credential deployment shows work-email sign-in on the public page and…",
+      "status": "proposed",
+      "subject": "drive-a-credential-deployment-shows-work"
     },
     {
       "id": "flow:drive-a-supervisor-can-open-the-workspace",
@@ -49,6 +67,12 @@
       "subject": "drive-a-temporary-connection-failure-kee"
     },
     {
+      "id": "flow:drive-an-invalid-email-code-leaves-company-registratio",
+      "statement": "An invalid email code leaves company registration unverified.",
+      "status": "proposed",
+      "subject": "drive-an-invalid-email-code-leaves-compa"
+    },
+    {
       "id": "flow:drive-credential-test-mode-lets-a-supervisor-generate",
       "statement": "Credential test mode lets a supervisor generate a translated follow-up…",
       "status": "proposed",
@@ -59,6 +83,12 @@
       "statement": "crew-filter-pages",
       "status": "proposed",
       "subject": "drive-crew-filter-pages"
+    },
+    {
+      "id": "flow:drive-first-time-setup-opens-the-existing-company-regi",
+      "statement": "First-time setup opens the existing company registration flow.",
+      "status": "proposed",
+      "subject": "drive-first-time-setup-opens-the-existin"
     },
     {
       "id": "flow:drive-leaving-send-cancels-future-preparation-status-c",
@@ -79,10 +109,28 @@
       "subject": "drive-send-status-continues-polling-unch"
     },
     {
+      "id": "flow:drive-the-arabic-hero-trial-cta-opens-company-registra",
+      "statement": "The Arabic hero trial CTA opens company registration",
+      "status": "proposed",
+      "subject": "drive-the-arabic-hero-trial-cta-opens-co"
+    },
+    {
       "id": "flow:drive-the-assigned-worker-opens-the-instruction-in-ara",
       "statement": "The assigned worker opens the instruction in Arabic and sees localized…",
       "status": "proposed",
       "subject": "drive-the-assigned-worker-opens-the-inst"
+    },
+    {
+      "id": "flow:drive-the-landing-navigation-dropdown-closes-with-esca",
+      "statement": "The landing navigation dropdown closes with Escape",
+      "status": "proposed",
+      "subject": "drive-the-landing-navigation-dropdown-cl"
+    },
+    {
+      "id": "flow:drive-the-public-landing-page-supports-arabic-copy-and",
+      "statement": "The public landing page supports Arabic copy and navigation",
+      "status": "proposed",
+      "subject": "drive-the-public-landing-page-supports-a"
     },
     {
       "id": "flow:drive-the-supervisor-can-read-the-applied-template-tex",
@@ -119,6 +167,18 @@
       "statement": "Unread notifications remain visible when the worker filters the list.",
       "status": "proposed",
       "subject": "drive-unread-notifications-remain-visibl"
+    },
+    {
+      "id": "flow:drive-visitors-can-pause-the-decorative-gsap-animation",
+      "statement": "Visitors can pause the decorative GSAP animation without hiding or disa…",
+      "status": "proposed",
+      "subject": "drive-visitors-can-pause-the-decorative"
+    },
+    {
+      "id": "flow:drive-worker-sign-in-keeps-the-full-language-picker-av",
+      "statement": "Worker sign-in keeps the full language picker available in the redesign…",
+      "status": "proposed",
+      "subject": "drive-worker-sign-in-keeps-the-full-lang"
     },
     {
       "id": "inline:a-failed-recovery-storage-write-sends-no-instruc-8d4bab52",
@@ -205,6 +265,12 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:a-credential-deployment-shows-work-email-sign-in-56c3ba3f",
+      "statement": "A credential deployment shows work-email sign-in on the public page and…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:a-submitted-answer-remains-accessible-in-the-wor-421b1d58",
       "statement": "A submitted answer remains accessible in the worker's Sent answers list.",
       "status": "proved",
@@ -271,6 +337,18 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:arabic-readers-can-read-each-workplace-scene-in-b2da9e79",
+      "statement": "Arabic readers can read each workplace scene in the expanded hero",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:company-registration-switches-to-arabic-while-ke-69e28176",
+      "statement": "Company registration switches to Arabic while keeping the original regi…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:credential-is-the-production-access-mode-so-the-c5dfb270",
       "statement": "Credential is the production access mode, so the sign-in screen asks fo…",
       "status": "proved",
@@ -279,6 +357,30 @@
     {
       "id": "inline:ending-a-worker-session-immediately-removes-priv-fc89ee68",
       "statement": "Ending a worker session immediately removes private instruction content.",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:first-time-setup-opens-the-existing-company-regi-d2264744",
+      "statement": "First-time setup opens the existing company registration flow.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:reduced-motion-authentication-stays-static-while-24976d17",
+      "statement": "Reduced-motion authentication stays static while the email form remains…",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:reduced-motion-mode-hides-the-animation-control-3e6466a3",
+      "statement": "Reduced-motion mode hides the animation control and keeps the email for…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:reduced-motion-visitors-see-a-static-authenticat-fcf22ee0",
+      "statement": "Reduced-motion visitors see a static authentication scene and retain ac…",
       "status": "proposed",
       "subject": "unsorted"
     },
@@ -295,8 +397,56 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:the-arabic-hero-trial-cta-opens-company-registra-cd3c30f2",
+      "statement": "The Arabic hero trial CTA opens company registration",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:the-assigned-worker-opens-the-instruction-in-ara-cd1bde48",
       "statement": "The assigned worker opens the instruction in Arabic and sees localized…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-expanded-hero-shows-all-four-workplace-instr-40e0b42d",
+      "statement": "The expanded hero shows all four workplace instruction scenes with redu…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-hero-text-and-instruction-examples-remain-av-805967fc",
+      "statement": "The hero text and instruction examples remain available with reduced mo…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-landing-navigation-dropdown-closes-with-esca-104f6a2d",
+      "statement": "The landing navigation dropdown closes with Escape",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-landing-page-remains-readable-with-reduced-m-a3fd65a1",
+      "statement": "The landing page remains readable with reduced motion enabled",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-public-landing-page-supports-arabic-copy-and-9709629b",
+      "statement": "The public landing page supports Arabic copy and navigation",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-redesigned-supervisor-sign-in-exposes-the-ex-3a8a12ac",
+      "statement": "The redesigned supervisor sign-in exposes the existing email form and b…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-running-local-signup-page-displays-email-cod-df66b009",
+      "statement": "The running local signup page displays email-code verification when Neo…",
       "status": "proved",
       "subject": "unsorted"
     },
@@ -319,8 +469,26 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:the-worker-language-picker-can-close-while-prese-9e1cd367",
+      "statement": "The worker language picker can close while preserving the chosen Arabic…",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-worker-language-picker-closes-without-changi-b28b7285",
+      "statement": "The worker language picker closes without changing the selected Arabic…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:the-worker-s-wrong-factual-choice-has-the-clarif-49a9bc4d",
       "statement": "The worker's wrong factual choice has the clarification outcome.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-worker-tab-opens-the-existing-company-id-wor-c1d541cb",
+      "statement": "The worker tab opens the existing company ID, worker ID and password lo…",
       "status": "proved",
       "subject": "unsorted"
     },
@@ -331,8 +499,26 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:visitors-can-pause-the-decorative-gsap-animation-2a57dd7e",
+      "statement": "Visitors can pause the decorative GSAP animation without hiding or disa…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:voice-capture-stays-unavailable-when-the-site-ha-f994030e",
       "statement": "Voice capture stays unavailable when the site has no transcription prov…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:worker-sign-in-keeps-the-full-language-picker-av-8fe63def",
+      "statement": "Worker sign-in keeps the full language picker available in the redesign…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:worker-sign-in-switches-its-credential-labels-an-d096a5e8",
+      "statement": "Worker sign-in switches its credential labels and navigation to Arabic.",
       "status": "proved",
       "subject": "unsorted"
     },

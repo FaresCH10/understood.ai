@@ -50,3 +50,10 @@ export function registrationVerifyInput(input) {
   return {token:input.token};
 }
 export const registrationEmailHash=email=>`registration-email:${email}`;
+
+export function registrationCodeInput(input,remoteAddress){
+  keys(input,['requestId','email','code']);
+  const value=registrationResendInput({requestId:input.requestId,email:input.email},remoteAddress);
+  if(typeof input.code!=='string'||!/^\d{6}$/.test(input.code))throw invalid();
+  return {...value,code:input.code};
+}

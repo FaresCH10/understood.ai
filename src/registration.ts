@@ -1,4 +1,4 @@
-export type RegistrationReceipt={requestId:string;email:string;createdAt:string;state:'pending'|'accepted'};
+export type RegistrationReceipt={requestId:string;email:string;createdAt:string;state:'pending'|'accepted';verification?:'link'|'neon-code'};
 export type VerificationResult={completed:true;signInRequired:true;duplicate:boolean};
 const RECEIPT_KEY='understood:registration-receipt';
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -20,7 +20,8 @@ export function readRegistrationReceipt(storage:Storage):RegistrationReceipt|nul
   if(!row || typeof row.requestId!=='string' || !uuid.test(row.requestId) || typeof row.email!=='string'
     || row.email.length>254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email) || typeof row.createdAt!=='string'
     || !Number.isFinite(Date.parse(row.createdAt)) || !['pending','accepted'].includes(row.state))return null;
-  return {requestId:row.requestId,email:row.email,createdAt:row.createdAt,state:row.state};
+  if(row.verification!==undefined&&!['link','neon-code'].includes(row.verification))return null;
+  return {requestId:row.requestId,email:row.email,createdAt:row.createdAt,state:row.state,...(row.verification?{verification:row.verification}:{})};
 }
 export function saveRegistrationReceipt(storage:Storage,receipt:RegistrationReceipt) {
   storage.setItem(RECEIPT_KEY,JSON.stringify(receipt));
@@ -57,4 +58,17 @@ export function resendAccount(body:{requestId:string;email:string}) {
 }
 export function verifyAccount(token:string) {
   return post('/auth/registrations/verify',{token});
+}
+export function verifyAccountCode(receipt:RegistrationReceipt,code:string){
+  return post('/auth/registrations/verify-code',{requestId:receipt.requestId,email:receipt.email,code});
+}
+export function normalizeVerificationCode(value:string){
+  return value.replace(/[٠-٩]/g,char=>String(char.charCodeAt(0)-0x660)).replace(/[۰-۹]/g,char=>String(char.charCodeAt(0)-0x6f0)).replace(/\D/g,'').slice(0,6);
+}
+export async function registrationOptions(signal:AbortSignal){
+  const response=await fetch('/api/auth/registrations/options',{signal:AbortSignal.any([signal,AbortSignal.timeout(10000)]),credentials:'include',cache:'no-store'});
+  if(!response.ok)throw new RegistrationError('Registration options unavailable.');
+  const value=await response.json();
+  if(typeof value?.available!=='boolean'||!['link','neon-code'].includes(value.verification))throw new RegistrationError('Registration options unavailable.');
+  return value as {available:boolean;verification:'link'|'neon-code'};
 }

@@ -13,6 +13,8 @@ import { receiveRecording } from '../server/recordings.mjs';
 import { responseFilters,responseRequest,listPublicationResponses,getPublicationResponse,workerSubmissions,staffWorkerAssignments,workerBriefings,workerInboxFilters,workerRequestReceipt } from '../server/responses.mjs';
 import {requestHelp} from '../server/clarifications.mjs';
 import {checkedWorkerReceipt} from '../src/worker-request.ts';
+import {sqliteApp,loginRoute,principalLoginBody,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const staff={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const worker={principal_type:'worker',principal_id:'worker-30',org_id:'cedar',site_id:'beirut'};
@@ -33,9 +35,9 @@ test('response filters and detail requests reject unknown fields and unsafe boun
 
 test('SQLite exact worker receipt lookup is private, read-only, scoped and accepts history but not staging',async()=>{
   const db=openDatabase(':memory:'),root=await mkdtemp(join(tmpdir(),'understood-receipt-lookup-'));
-  const server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',audioRoot:root});
+  const server=sqliteApp(db,{audioRoot:root});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
-  const login=async principal=>(await fetch(base+'/demo/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal})})).headers.get('set-cookie').split(';')[0];
+  const login=async principal=>(await loginPrincipal(base, principal)).headers.get('set-cookie').split(';')[0];
   try{
     const typedId=randomUUID(),helpId=randomUUID(),audioId=randomUUID();
     const typed=submitAnswer(db,worker,'assignment-30',typedId,'Finished blue; unfinished yellow.');
@@ -73,7 +75,7 @@ test('SQLite exact worker receipt lookup is private, read-only, scoped and accep
 });
 
 test('SQLite worker inbox pages all assigned versions with exact scoped todo/sent totals',async () => {
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   const root=await mkdtemp(join(tmpdir(),'understood-inbox-test-'));
   await new Promise((resolve) => server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
@@ -101,7 +103,7 @@ test('SQLite worker inbox pages all assigned versions with exact scoped todo/sen
     assert.equal(workerBriefings(db,worker).total,5);
     assert.equal(staffWorkerAssignments(db,staff,'worker-30',{page:7,pageSize:20}).total,126);
     for(const session of [staff,{...worker,principal_id:'worker-14',site_id:'tripoli'},{...worker,principal_id:'missing'},{...worker,access_mode:'credential',grant_id:'revoked'}]) assert.throws(() => workerBriefings(db,session),/Forbidden/);
-    const login=await fetch(`${base}/demo/session`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal:'worker-30'})}),cookie=login.headers.get('set-cookie').split(';')[0];
+    const login=await loginPrincipal(base, 'worker-30'),cookie=login.headers.get('set-cookie').split(';')[0];
     for(const query of ['?view=unknown','?pageSize=51','?worker_id=worker-14','?history=true']) assert.equal((await fetch(`${base}/worker/history${query}`,{headers:{cookie}})).status,400);
     const http=await (await fetch(`${base}/worker/history?page=7&pageSize=20`,{headers:{cookie}})).json();assert.equal(http.total,126);assert.equal(http.items.length,6);
     assert.equal((await (await fetch(`${base}/worker/briefings?view=sent`,{headers:{cookie}})).json()).total,2);
@@ -111,12 +113,12 @@ test('SQLite worker inbox pages all assigned versions with exact scoped todo/sen
 });
 
 test('SQLite response history is scoped, receipt-ordered, paged and read-only across withdrawal',async () => {
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   const root=await mkdtemp(join(tmpdir(),'understood-response-test-'));
   await new Promise((resolve) => server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}`;
   const request=(path,cookie,body) => fetch(`${base}/api${path}`,{method:body ? 'POST' : 'GET',headers:{...(cookie ? {cookie} : {}),'content-type':'application/json'},...(body ? {body:JSON.stringify(body)} : {})});
-  const login=async (principal) => (await request('/demo/session',null,{principal})).headers.get('set-cookie').split(';')[0];
+  const login=async (principal) => (await request(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
   try {
     const maya=await login('maya'),workerCookie=await login('worker-30'),foreign=await login('harbor-owner');
     const path='/publications/shelf-v3/responses';

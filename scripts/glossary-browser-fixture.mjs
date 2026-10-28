@@ -6,6 +6,8 @@ import {createAppServer} from '../server/index.mjs';
 import {processOne} from '../server/worker.mjs';
 import {changeGlossary} from '../server/glossary.mjs';
 import {CANONICAL_SOURCE,syntheticPrepare} from '../server/domain.mjs';
+import {sqliteApp} from '../tests/helpers/sqlite-app.mjs';
+
 const db=openDatabase(':memory:');seed(db);
 db.prepare("UPDATE organizations SET name='Disposable Glossary QA' WHERE id='cedar'").run();
 db.prepare("UPDATE briefings SET state='ready',prepared_json=? WHERE id='shelf'").run(JSON.stringify(syntheticPrepare(CANONICAL_SOURCE)));
@@ -14,7 +16,7 @@ for(const [term,targetLanguage] of [['blue shelf','ar'],['yellow shelf','ar'],['
 for(let n=1;n<=23;n++) changeGlossary(db,owner,'create',null,{requestId:randomUUID(),confirmed:true,term:`QA terminology ${String(n).padStart(2,'0')}`,sourceLanguage:'en',targetLanguage:'ar',override:'Synthetic company terminology'});
 while(processOne(db)) {}
 const publication=db.prepare("SELECT snapshot_json FROM publications WHERE id='shelf-v3'").get().snapshot_json;
-const api=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:'http://127.0.0.1:3030'});
+const api=sqliteApp(db,{publicOrigin:'http://127.0.0.1:3030'});
 let lose=true,loseCreate=true;const handler=api.listeners('request')[0];api.removeAllListeners('request');
 api.on('request',(req,res)=>{
   if(req.url.startsWith('/api/glossary')) res.once('finish',()=>console.log(req.method,req.url,res.statusCode,'terms',db.prepare('SELECT COUNT(*) n FROM glossary_terms').get().n,'receipts',db.prepare('SELECT COUNT(*) n FROM glossary_requests').get().n,'shelf',JSON.stringify(db.prepare("SELECT revision,state FROM briefings WHERE id='shelf'").get()),'published unchanged',publication===db.prepare("SELECT snapshot_json FROM publications WHERE id='shelf-v3'").get().snapshot_json));

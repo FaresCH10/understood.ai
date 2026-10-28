@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "origin": "failed-assert",
+  "expected": "a /auth/registrations/verify-code → 200 AND text \"تم تأكيد بريدك\"",
+  "observed": "no element matched {\"text\":\"تم تأكيد بريدك\"}",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "e28",
+        "source": {
+          "file": "src/Register.tsx",
+          "line": 148,
+          "column": 405
+        }
+      },
+      "action": "click"
+    }
+  ],
+  "id": "1793197916224-click-047b2e5f",
+  "createdAt": 1793197916224,
+  "seen": 1,
+  "lastSeenAt": 1793197916224
+}

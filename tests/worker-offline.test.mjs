@@ -4,7 +4,7 @@ import {bindOfflineSession,BootstrapSessionError,clearOfflineBriefings,fetchBoot
 import {encodeWav} from '../src/audio.ts';
 
 const time=Date.parse('2026-10-10T12:00:00.000Z'),now=()=>time;
-const session={authenticated:true,role:'worker',workerId:'private-worker',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2026-10-12T12:00:00.000Z'};
+const session={authenticated:true,role:'worker',workerId:'private-worker',language:'en',mode:'synthetic-credential',clientContext:'a'.repeat(64),expiresAt:'2026-10-12T12:00:00.000Z'};
 const scope={assignmentId:'private-assignment',publicationId:'private-publication',version:3,language:'en'};
 const notice={revision:1,configured:true,language:'en',notice:'Private site notice before recording.'};
 function wav(seconds=1){const samples=Float32Array.from({length:16000*seconds},(_,i)=>Math.sin(i/10)*.5);return encodeWav({duration:seconds,sampleRate:16000,numberOfChannels:1,getChannelData:()=>samples});}

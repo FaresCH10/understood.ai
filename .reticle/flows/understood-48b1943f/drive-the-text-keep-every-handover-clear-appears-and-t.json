@@ -1,0 +1,81 @@
+{
+  "version": 2,
+  "name": "drive-the-text-keep-every-handover-clear-appears-and-t",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793186273153,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "listitem",
+        "name": "Retail & warehousing Keep every handover clear. Share stockroom and shift instructions in the languages your team uses. Urdu براہ کرم سامان کی گنتی کریں اور نظام میں تصدیق کریں۔ English Please count the items and confirm in the system. Illustrative instruction"
+      },
+      "args": {},
+      "action": "scrollIntoView",
+      "source": {
+        "file": "src/HeroJourney.tsx",
+        "line": 58
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "text",
+            "contains": "Keep every handover clear.",
+            "visible": true
+          },
+          {
+            "kind": "text",
+            "contains": "One update, across the site.",
+            "visible": true
+          },
+          {
+            "kind": "text",
+            "contains": "A clearer start to every shift.",
+            "visible": true
+          },
+          {
+            "kind": "text",
+            "contains": "Make the next instruction clear.",
+            "visible": true
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "heading",
+        "name": "Make the next instruction clear."
+      },
+      "args": {},
+      "action": "scrollIntoView",
+      "source": {
+        "file": "src/HeroJourney.tsx",
+        "line": 66
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "The text \"Keep every handover clear.\" appears and the text \"One update, across the site.\" appears and the text \"A clearer start to every shift.\" appears and the text \"Make the next instruction clear.\" appears",
+  "intentDerived": true,
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  }
+}

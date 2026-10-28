@@ -19,6 +19,8 @@ import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
+import {principalLoginBody,seedCredentials} from './helpers/sqlite-app.mjs';
+
 const fetch=createSessionContextFetch();
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const input=patch=>({requestId:randomUUID(),confirmed:true,...patch});
@@ -85,12 +87,13 @@ for(const pg of [false,true]) test(`${pg ? 'PostgreSQL' : 'SQLite'} glossary ver
     const foreign={...owner,principal_id:pg ? 'foreign' : 'harbor-owner',org_id:pg ? 'foreign' : 'harbor',site_id:pg ? 'foreign' : 'harbor-yard'};
     assert.equal((await f.list(foreign)).total,0);assert.deepEqual(await f.receipt(foreign,id),{found:false});await assert.rejects(async()=>f.get(foreign,id),/unavailable/);assert.equal((await f.list(auditor)).total,23);await assert.rejects(async()=>f.receipt(auditor,id),/Forbidden/);
     assert.equal(JSON.stringify((await f.raw('SELECT * FROM publications ORDER BY id')).rows),before);
-    const config={tier:'local',aiMode:'synthetic',accessMode:pg ? 'credential' : 'demo',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg ? f.options : {})};
+    const config={tier:'local',aiMode:'synthetic',accessMode:'credential',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg ? f.options : {})};
     if(pg) await provisionStaffCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'glossary@example.test',password:'Synthetic-glossary-password-123'},f.options);
+    else seedCredentials(f.db);
     const server=pg ? createPostgresRehearsalServer(f.pool,config) : createAppServer(f.db,config);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
     const call=(path,cookie,body)=>fetch(base+path,{method:body ? 'POST' : 'GET',headers:{origin:config.publicOrigin,'content-type':'application/json',...(cookie ? {cookie} : {})},body:body ? JSON.stringify(body) : undefined});
     try {
-      assert.equal((await call('/glossary')).status,401);const login=await call(pg ? '/auth/staff/login' : '/demo/session',null,pg ? {email:'glossary@example.test',password:'Synthetic-glossary-password-123'} : {principal:'maya'}),cookie=login.headers.get('set-cookie').split(';')[0];
+      assert.equal((await call('/glossary')).status,401);const login=await call('/auth/staff/login',null,pg ? {email:'glossary@example.test',password:'Synthetic-glossary-password-123'} :principalLoginBody('maya')),cookie=login.headers.get('set-cookie').split(';')[0];
       const list=await call('/glossary?page=2&pageSize=20',cookie);assert.equal(list.status,200);assert.match(list.headers.get('cache-control'),/no-store/);
       assert.equal((await call('/glossary?scope=foreign',cookie)).status,400);assert.equal((await call('/glossary/receipts/bad',cookie)).status,400);assert.equal((await call('/glossary/'+id+'?version=1',cookie)).status,200);
       assert.equal((await call('/glossary/'+id+'/edit',cookie,input({revision:1,override:''}))).status,409);assert.equal((await call('/glossary/missing',cookie)).status,404);

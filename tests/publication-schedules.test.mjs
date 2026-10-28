@@ -15,6 +15,8 @@ import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {createSession} from '../server/auth.mjs';
+import {openPrincipalSession} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'owner',role:'owner',org_id:'a',site_id:'a'},origin='http://127.0.0.1:3020';
 async function fixture(postgres) {
@@ -51,7 +53,7 @@ const waitUntil=async date=>{await new Promise(resolve=>setTimeout(resolve,Math.
 for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} briefing library filters the current schedule independently of publication and minimizes scoped history`,async t=>{
   const f=await fixture(postgres),now=Date.now();t.mock.timers.enable({apis:['Date'],now});f.setClock(now);
   const advance=ms=>{t.mock.timers.setTime(ms);f.setClock(ms);};
-  const config={tier:'local',aiMode:'synthetic',accessMode:postgres?'credential':'demo',publicOrigin:origin,schema:f.options.schema,dataClass:'synthetic'};
+  const config={tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin,schema:f.options.schema,dataClass:'synthetic'};
   const password='Disposable library password only';
   for(const staffId of ['owner','reader']) {
     if(postgres)await provisionStaffCredential(f.pool,{staffId,orgId:'a',siteId:'a',email:`${staffId}@example.test`,password},{schema:f.options.schema});
@@ -59,7 +61,7 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} brief
   const server=postgres?createPostgresRehearsalServer(f.pool,config):createAppServer(f.db,config);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
   const login=async staffId=> {
-    if(!postgres)return `understood_session=${createSession(f.db,f.db.prepare('SELECT * FROM staff WHERE id=?').get(staffId),'staff','demo').token}`;
+    if(!postgres)return `understood_session=${openPrincipalSession(f.db,f.db.prepare('SELECT * FROM staff WHERE id=?').get(staffId)).token}`;
     const response=await fetch(`${base}/auth/staff/login`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({email:`${staffId}@example.test`,password})});assert.equal(response.status,200);return response.headers.get('set-cookie').split(';')[0];
   };
   try {
@@ -152,12 +154,13 @@ test('schedule boundary validation rejects impossible/ambiguous dates, extra sco
 for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} schedule HTTP uses scoped credentials/no-store, denies query overrides and preserves cancellation replay`,async()=>{
   const f=await fixture(postgres);await f.createBrief('brief');const password='Disposable scheduler password only';
   if(postgres)await provisionStaffCredential(f.pool,{staffId:'owner',orgId:'a',siteId:'a',email:'schedule@example.test',password},{schema:f.options.schema});
-  const config={tier:'local',aiMode:'synthetic',accessMode:postgres?'credential':'demo',publicOrigin:origin,schema:f.options.schema,dataClass:'synthetic'};
+  const config={tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin,schema:f.options.schema,dataClass:'synthetic'};
   const server=postgres?createPostgresRehearsalServer(f.pool,config):createAppServer(f.db,config);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`,url=`${base}/briefings/${postgres?'brief':'shelf'}/schedules`;
   try {
-    const login=await fetch(`${base}/${postgres?'auth/staff/login':'demo/session'}`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(postgres?{email:'schedule@example.test',password}:{principal:'maya'})});assert.equal(login.status,200);
-    const cookie=login.headers.get('set-cookie').split(';')[0],headers={cookie,origin,'content-type':'application/json'};
+    const login=postgres?await fetch(`${base}/auth/staff/login`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({email:'schedule@example.test',password})}):null;
+    if(postgres)assert.equal(login.status,200);
+    const cookie=postgres?login.headers.get('set-cookie').split(';')[0]:`understood_session=${openPrincipalSession(f.db,f.db.prepare("SELECT * FROM staff WHERE id='maya'").get()).token}`,headers={cookie,origin,'content-type':'application/json'};
     assert.equal((await fetch(url)).status,401);const response=await fetch(url,{headers});assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.status,200);
     assert.equal((await fetch(`${url}?org_id=b`,{headers})).status,400);
     const request=input({publishAt:new Date(Date.now()+60000).toISOString(),...(postgres?{}:{revision:1,nextVersion:4,workerIds:['worker-29']})});

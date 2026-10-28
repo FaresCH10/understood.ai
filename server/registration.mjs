@@ -1,3 +1,4 @@
+import {registrationAcceptance,sendRegistrationVerification,checkRegistrationCode} from './registration-verification.mjs';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {NOW,transaction} from './db.mjs';
 import {tokenHash,passwordRecord} from './auth-crypto.mjs';
@@ -6,10 +7,10 @@ import {consumeAuthBudget} from './auth-budget.mjs';
 import {authMailCapacity} from './auth-mail-budget.mjs';
 import {ensureSettingsSchema} from './settings.mjs';
 import {ensureEntitlementSchema} from './entitlement-schema.mjs';
-import {registrationRequestInput,registrationResendInput,registrationVerifyInput,registrationEmailHash,
+import {registrationRequestInput,registrationResendInput,registrationVerifyInput,registrationCodeInput,registrationEmailHash,
   REGISTRATION_TERMS_VERSION,REGISTRATION_PRIVACY_VERSION,REGISTRATION_TRIAL_HOURS,REGISTRATION_TRIAL_WORKER_LIMIT} from './registration-input.mjs';
 
-const generic={accepted:true,delivery:'queued'};
+
 const unavailable=()=>new Error('Registration verification unavailable');
 const registrationLifetime=7*24*3600000,mailLifetime=24*3600000;
 const date=milliseconds=>new Date(Date.now()+milliseconds).toISOString();
@@ -114,7 +115,7 @@ function queueMail(db,config,registrationId,email,registrationExpiresAt,now) {
   return id;
 }
 export async function requestRegistration(db,input,remoteAddress,config) {
-  const value=registrationRequestInput(input,remoteAddress);
+  const value=registrationRequestInput(input,remoteAddress),generic=registrationAcceptance(config);
   if(!config.available) throw new Error('Email delivery unavailable');
   ensureRegistrationSchema(db);
   const record=await passwordRecord(value.password);
@@ -147,7 +148,7 @@ export async function requestRegistration(db,input,remoteAddress,config) {
   });
 }
 export function resendRegistration(db,input,remoteAddress,config) {
-  const value=registrationResendInput(input,remoteAddress);
+  const value=registrationResendInput(input,remoteAddress),generic=registrationAcceptance(config);
   if(!config.available) throw new Error('Email delivery unavailable');
   ensureRegistrationSchema(db);
   return transaction(db,()=>{
@@ -235,7 +236,37 @@ export function verifyRegistration(db,input,remoteAddress,config) {
     return {completed:true,signInRequired:true,duplicate:false};
   });
 }
-export async function processOneRegistration(db,config,{send=sendAuthMail}={}) {
+export async function verifyRegistrationCode(db,input,remoteAddress,config,{checkCode=checkRegistrationCode}={}){
+  const value=registrationCodeInput(input,remoteAddress);
+  if(config.provider!=='neon'||!config.available)throw unavailable();
+  ensureRegistrationSchema(db);
+  if(!transaction(db,()=>consumeAuthBudget(db,[tokenHash(`registration-code:${value.requestId}`),tokenHash(`registration-code-ip:${remoteAddress}`)],10,{now:NOW()})))throw unavailable();
+  const snapshot=transaction(db,()=>{
+    const now=NOW();expire(db,now);
+    const row=db.prepare('SELECT * FROM organization_registrations WHERE id=? AND email_hash=?').get(value.requestId,tokenHash(registrationEmailHash(value.email)));
+    if(row?.state==='verified')return {duplicate:true};
+    if(!row||row.state!=='pending'||row.expires_at<=now||!row.payload)throw unavailable();
+    registrationScope(row,openMail(config,row.id,row.payload));
+    return {payload:row.payload};
+  });
+  if(snapshot.duplicate)return {completed:true,signInRequired:true,duplicate:true};
+  if(await checkCode(config,value.email,value.code)!==true)throw unavailable();
+  return transaction(db,()=>{
+    const now=NOW();expire(db,now);
+    const row=db.prepare('SELECT * FROM organization_registrations WHERE id=? AND email_hash=?').get(value.requestId,tokenHash(registrationEmailHash(value.email)));
+    if(row?.state==='verified')return {completed:true,signInRequired:true,duplicate:true};
+    if(!row||row.state!=='pending'||row.expires_at<=now||row.payload!==snapshot.payload)throw unavailable();
+    const message=registrationScope(row,openMail(config,row.id,row.payload));
+    if(db.prepare('SELECT 1 FROM staff_credentials WHERE lower(email)=?').get(message.email))throw unavailable();
+    const result=verified(db,{...row,...message},now);
+    const changed=db.prepare("UPDATE organization_registrations SET state='verified',org_id=?,site_id=?,owner_id=?,verified_at=?,payload=NULL WHERE id=? AND state='pending'")
+      .run(result.orgId,result.siteId,result.ownerId,now,row.id);
+    if(changed.changes!==1)throw unavailable();
+    revokeTokens(db,row.id,now);ignoreMail(db,row.id,now);
+    return {completed:true,signInRequired:true,duplicate:false};
+  });
+}
+export async function processOneRegistration(db,config,{send=sendRegistrationVerification}={}) {
   if(!config.available) return false;
   ensureRegistrationSchema(db);expireRegistrations(db);
   const job=transaction(db,()=>{
@@ -264,7 +295,8 @@ export async function processOneRegistration(db,config,{send=sendAuthMail}={}) {
       return terminal('ignored');
     }
     let token=db.prepare('SELECT * FROM registration_tokens WHERE mail_id=?').get(row.id);
-    if(!token) {
+    if(config.provider==='neon')message={email:message.email,subject:'Verify your Understood account',text:''};
+    else if(!token) {
       const secret=randomBytes(32).toString('base64url');
       token={token_hash:tokenHash(secret)};
       db.prepare('INSERT INTO registration_tokens(token_hash,registration_id,mail_id,expires_at) VALUES(?,?,?,?)')

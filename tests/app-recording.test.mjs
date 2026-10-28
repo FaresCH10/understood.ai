@@ -11,6 +11,8 @@ import { createAppServer } from '../server/index.mjs';
 import {checkedWorkerReceipt} from '../src/worker-request.ts';
 import {createRecordingSubmission} from '../src/audio.ts';
 import {sendWorkerRecording,WorkerAudioRetryError} from '../src/worker-audio-retry.ts';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 function wav() {
   const bytes = Buffer.alloc(32044);
@@ -25,11 +27,11 @@ function wav() {
 test('session middleware binds voice upload and private playback to the assignment', async () => {
   const db = openDatabase(':memory:');
   const audioRoot = await mkdtemp(join(tmpdir(), 'understood-app-recording-'));
-  const server = createAppServer(db, { tier: 'local', aiMode: 'synthetic', accessMode: 'demo', audioRoot });
+  const server = sqliteApp(db,{audioRoot });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}/api`;
   const signIn = async (principal) => {
-    const response = await fetch(`${base}/demo/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ principal }) });
+    const response = await loginPrincipal(base, principal);
     assert.equal(response.status, 200);
     return response.headers.get('set-cookie').split(';')[0];
   };
@@ -74,11 +76,11 @@ test('session middleware binds voice upload and private playback to the assignme
 
 test('worker cookie rotation fences stale answers, help, reads and logout before side effects',async()=>{
   const db=openDatabase(':memory:');
-  const server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
   const login=async principal=>{
-    const response=await fetch(base+'/demo/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal})});
+    const response=await loginPrincipal(base, principal);
     assert.equal(response.status,200);const cookie=response.headers.get('set-cookie').split(';')[0];
     const dto=await (await fetch(base+'/session',{headers:{cookie}})).json();return {cookie,context:dto.clientContext};
   };
@@ -108,11 +110,11 @@ test('worker cookie rotation fences stale answers, help, reads and logout before
 test('prepared audio reconciles a real lost acceptance acknowledgement without reposting after withdrawal',async()=>{
   const db=openDatabase(':memory:');
   const audioRoot=await mkdtemp(join(tmpdir(),'understood-audio-retry-'));
-  const server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',audioRoot});
+  const server=sqliteApp(db,{audioRoot});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}`;
   try {
-    const login=await fetch(base+'/api/demo/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal:'worker-30'})});
+    const login=await loginPrincipal(base, 'worker-30');
     const cookie=login.headers.get('set-cookie').split(';')[0];
     db.prepare("UPDATE workers SET language='en' WHERE id='worker-30'").run();
     const session=await (await fetch(base+'/api/session',{headers:{cookie}})).json();

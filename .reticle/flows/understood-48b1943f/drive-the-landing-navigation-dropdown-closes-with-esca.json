@@ -1,0 +1,91 @@
+{
+  "version": 2,
+  "name": "drive-the-landing-navigation-dropdown-closes-with-esca",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793181324387,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Platform"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/PublicHeader.tsx",
+        "line": 25
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "link",
+          "name": "Worker experience"
+        },
+        "state": "visible"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "document"
+      },
+      "args": {
+        "text": "Escape"
+      },
+      "action": "press",
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "link",
+          "name": "Worker experience"
+        },
+        "state": "hidden"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "combobox",
+        "name": "Page language"
+      },
+      "args": {
+        "value": "ar"
+      },
+      "action": "select",
+      "source": {
+        "file": "src/PublicHeader.tsx",
+        "line": 27
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "تعليمات واضحة.",
+        "visible": true
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "The landing navigation dropdown closes with Escape",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-the-landing-navigation-dropdown-closes-with-esca"
+}

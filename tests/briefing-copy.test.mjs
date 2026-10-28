@@ -8,6 +8,8 @@ import {seed} from '../server/seed.mjs';
 import {copyDraft,editDraft,createDraft} from '../server/preparation.mjs';
 import {createAppServer} from '../server/index.mjs';
 import {ensureRecordingSchema} from '../server/recordings.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const maya={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const input=()=>({requestId:randomUUID(),revision:1,title:'Copied shelf handover',confirmed:true});
@@ -54,9 +56,9 @@ test('SQLite draft copy has immutable replay, no inherited readiness and preserv
 });
 
 test('SQLite draft copy HTTP rejects forged input and returns scoped no-store replay',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
-  const login=async principal=>(await fetch(base+'/demo/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal})})).headers.get('set-cookie').split(';')[0];
+  const login=async principal=>(await loginPrincipal(base, principal)).headers.get('set-cookie').split(';')[0];
   const call=(cookie,id,body)=>fetch(`${base}/briefings/${id}/copy`,{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify(body)});
   try {
     const owner=await login('maya'),worker=await login('worker-29'),foreign=await login('harbor-owner'),request=input();

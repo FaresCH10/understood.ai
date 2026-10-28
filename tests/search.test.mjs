@@ -16,6 +16,8 @@ import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {searchFilters,searchQuery} from '../server/search-input.mjs';
 import {checkedSearchPage,searchDestination,searchRoute,searchRouteQuery} from '../src/staff-search.ts';
+import {sqliteApp,principalLoginBody} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'maya',role:'owner',org_id:'cedar',site_id:'beirut'},origin='http://127.0.0.1:3020';
 async function fixture(postgres){
@@ -95,11 +97,11 @@ test('search parsing and client receipts reject ambiguous, malformed and unbound
 for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} search HTTP requires current credentials and scopes deep-link reads without writes`,async()=>{
   const f=await fixture(postgres),password='Synthetic search test password only';
   const server=postgres?createPostgresRehearsalServer(f.pool,{schema:f.schema,dataClass:'synthetic',tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin}):
-    createAppServer(f.db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:origin});
+    sqliteApp(f.db,{publicOrigin:origin});
   if(postgres)await provisionStaffCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'search@example.test',password},{schema:f.schema});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
   try{
-    const login=await fetch(base+(postgres?'/auth/staff/login':'/demo/session'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(postgres?{email:'search@example.test',password}:{principal:'maya'})});
+    const login=await fetch(base+('/auth/staff/login'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(postgres?{email:'search@example.test',password}:principalLoginBody('maya'))});
     assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0],headers={cookie};
     const session=await (await fetch(base+'/session',{headers})).json();
     assert.equal((await fetch(base+'/search?query=Match')).status,401);

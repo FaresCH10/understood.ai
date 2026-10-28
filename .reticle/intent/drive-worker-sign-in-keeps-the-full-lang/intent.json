@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-worker-sign-in-keeps-the-full-language-picker-av": {
+      "declaredAt": 1793177896726,
+      "id": "flow:drive-worker-sign-in-keeps-the-full-language-picker-av",
+      "state": "declared",
+      "statement": "Worker sign-in keeps the full language picker available in the redesigned form.",
+      "status": "proposed",
+      "subject": "drive-worker-sign-in-keeps-the-full-lang",
+      "surface": {
+        "flow": "drive-worker-sign-in-keeps-the-full-language-picker-av"
+      },
+      "updatedAt": 1793177896756
+    }
+  },
+  "subject": "drive-worker-sign-in-keeps-the-full-lang",
+  "version": 1
+}

@@ -1,3 +1,4 @@
+import {resolveRegistrationVerification} from '../registration-verification.mjs';
 import {processOnePresentation} from './presentation-jobs.mjs';
 import {assertProductionAdmission} from './production-admission.mjs';
 import { isAbsolute,resolve,relative } from 'node:path';
@@ -68,7 +69,8 @@ export function rehearsalConfig(env=process.env) {
     from:env.UNDERSTOOD_EMAIL_FROM,key:env.UNDERSTOOD_AUTH_MAIL_KEY,publicOrigin:config.publicOrigin,allowLocal:true});
   if(env.UNDERSTOOD_OPERATOR_ACCESS!==undefined && !['true','false'].includes(env.UNDERSTOOD_OPERATOR_ACCESS))throw Error('Invalid operator access setting');
   if(env.UNDERSTOOD_STORAGE_CHECKS!==undefined && !['true','false'].includes(env.UNDERSTOOD_STORAGE_CHECKS))throw Error('Invalid storage health setting');
-  return {...config,schema,port,audioRoot,dataClass:'synthetic',integrationMode:'synthetic',mail,storageChecks:env.UNDERSTOOD_STORAGE_CHECKS==='true',operatorAccess:env.UNDERSTOOD_OPERATOR_ACCESS==='true',sourceAdapter:resolveSourceTranscription(env),caseFollowupAdapter:resolveCaseFollowup(env),recordingAdapter:resolveRecordingAdapter(env),preparationAdapter:resolvePreparationAdapter(env),assessmentAdapter:resolveAssessmentAdapter(env),providerVerification:resolveProviderVerification(env)};
+  const registrationVerification=resolveRegistrationVerification(env,mail,config.publicOrigin);
+  return {...config,registrationVerification,schema,port,audioRoot,dataClass:'synthetic',integrationMode:'synthetic',mail,storageChecks:env.UNDERSTOOD_STORAGE_CHECKS==='true',operatorAccess:env.UNDERSTOOD_OPERATOR_ACCESS==='true',sourceAdapter:resolveSourceTranscription(env),caseFollowupAdapter:resolveCaseFollowup(env),recordingAdapter:resolveRecordingAdapter(env),preparationAdapter:resolvePreparationAdapter(env),assessmentAdapter:resolveAssessmentAdapter(env),providerVerification:resolveProviderVerification(env)};
 }
 
 export const syntheticAssessmentAdapter={
@@ -123,7 +125,7 @@ export function rehearsalTasks(pool,storage,config,{verificationSignal}={}) {
     invitationExpiry:() => expireInvitations(pool,options),
     invitationMail:() => processOneInvitation(pool,config.mail ?? {available:false},options),
     registrationExpiry:() => expireRegistrations(pool,options),
-    registrationMail:() => processOneRegistration(pool,config.mail ?? {available:false},options),
+    registrationMail:() => processOneRegistration(pool,config.registrationVerification ?? config.mail ?? {available:false},options),
     pilotMail:() => processOnePilot(pool,config.mail ?? {available:false},{...options,destination:pilotDestination(config.pilotDestination)}),
   };
 }

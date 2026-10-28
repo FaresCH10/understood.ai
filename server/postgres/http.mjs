@@ -26,7 +26,7 @@ import { authenticateStaff,redeemWorkerGrant,requireSession,revokeSession,issueW
 import {workerCompanyContext,workerCredentialStatus,authenticateWorker,assignWorkerPassword} from './worker-credentials.mjs';
 import { grantIssueInput } from '../auth.mjs';
 import {requestRecovery,resetPassword} from './account-recovery.mjs';
-import {requestRegistration,resendRegistration,verifyRegistration} from './registration.mjs';
+import {requestRegistration,resendRegistration,verifyRegistration,verifyRegistrationCode} from './registration.mjs';
 import {listAccountSites,switchAccountSite} from './accounts.mjs';
 import {issueInvitation,changeInvitation,listInvitations,invitationReceipt,previewInvitation,acceptInvitation} from './invitations.mjs';
 import { sessionContext,listBriefings,getBriefing,workerBriefings,workerBriefing,staffOverview,listProcessing,getProcessing } from './read-models.mjs';
@@ -233,6 +233,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
   const pipeline=pipelineStatus(options);
   const repository={schema,integrationMode:config.integrationMode??'synthetic',cookieName,pipeline,providerVerification:options.providerVerification,storage};
   const mail=options.mail ?? {available:false};
+  const registrationVerification=options.registrationVerification ?? mail;
   const destination=pilotDestination(options.pilotDestination);
   const advanceInstructionPreparation=async(started,session)=>{
     const state=()=>domainTransaction(pool,repository.schema,async client=>(await client.query(
@@ -277,17 +278,22 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
         return send(res,200,await resetPassword(pool,await readJson(req),address,mail,repository),
           {'set-cookie':clearSessionCookie(cookieOptions)});
       }
+      if(path==='/api/auth/registrations/options' && req.method==='GET')return send(res,200,{available:registrationVerification.available===true,verification:registrationVerification.provider==='neon'?'neon-code':'link'});
+      if(path==='/api/auth/registrations/verify-code' && req.method==='POST'){
+        if(url.search)throw Error('Invalid registration input');
+        return send(res,200,await verifyRegistrationCode(pool,await readJson(req),address,registrationVerification,repository));
+      }
       if(path==='/api/auth/registrations' && req.method==='POST') {
         if(url.search) throw new Error('Invalid registration input');
-        return send(res,202,await requestRegistration(pool,await readJson(req),address,mail,repository));
+        return send(res,202,await requestRegistration(pool,await readJson(req),address,registrationVerification,repository));
       }
       if(path==='/api/auth/registrations/resend' && req.method==='POST') {
         if(url.search) throw new Error('Invalid registration input');
-        return send(res,202,await resendRegistration(pool,await readJson(req),address,mail,repository));
+        return send(res,202,await resendRegistration(pool,await readJson(req),address,registrationVerification,repository));
       }
       if(path==='/api/auth/registrations/verify' && req.method==='POST') {
         if(url.search) throw new Error('Invalid registration input');
-        return send(res,200,await verifyRegistration(pool,await readJson(req),address,mail,repository));
+        return send(res,200,await verifyRegistration(pool,await readJson(req),address,registrationVerification,repository));
       }
       const invitationAcceptMatch=path.match(/^\/api\/auth\/invitations\/(preview|signup|accept)$/);
       if(invitationAcceptMatch && req.method==='POST') {

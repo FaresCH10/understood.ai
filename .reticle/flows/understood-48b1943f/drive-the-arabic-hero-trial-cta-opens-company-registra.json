@@ -1,0 +1,103 @@
+{
+  "version": 2,
+  "name": "drive-the-arabic-hero-trial-cta-opens-company-registra",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793183790421,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "link",
+        "name": "جرّب المثال"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "جرّب المثال"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/LandingHero.tsx",
+            "line": 46
+          },
+          "expect": {
+            "kind": "route",
+            "contains": "#how-it-works"
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "link",
+            "name": "الصفحة الرئيسية لـ Understood"
+          },
+          "args": {},
+          "action": "click",
+          "source": {
+            "file": "src/PublicHeader.tsx",
+            "line": 22
+          },
+          "expect": {
+            "kind": "route",
+            "contains": "#home"
+          }
+        }
+      ],
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "link",
+        "name": "ابدأ تجربة مجانية",
+        "nth": 1,
+        "of": 3
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/LandingHero.tsx",
+        "line": 46
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "route",
+            "contains": "#register"
+          },
+          {
+            "kind": "text",
+            "contains": "Start using Understood",
+            "visible": true
+          }
+        ]
+      },
+      "page": "/"
+    }
+  ],
+  "intent": "The Arabic hero trial CTA opens company registration",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-the-arabic-hero-trial-cta-opens-company-registra"
+}

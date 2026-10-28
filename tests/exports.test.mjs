@@ -9,6 +9,8 @@ import { createAppServer } from '../server/index.mjs';
 import { submitAnswer } from '../server/domain.mjs';
 import { activityRows, languageBreakdown } from '../server/reports.mjs';
 import { requestExport, processOneExport, listExports, downloadExport, retryExport } from '../server/exports.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const maya = { principal_type: 'staff', principal_id: 'maya', org_id: 'cedar', site_id: 'beirut', role: 'owner' };
 const harbor = { ...maya, principal_id: 'harbor-owner', org_id: 'harbor', site_id: 'harbor-yard' };
@@ -84,11 +86,10 @@ test('language completion uses assigned denominators from persisted latest evide
 
 test('export HTTP routes deny worker and forged tenant identifiers, then download only ready output', async () => {
   const db = openDatabase(':memory:');
-  const server = createAppServer(db, { tier: 'local', aiMode: 'synthetic', accessMode: 'demo' });
+  const server = sqliteApp(db);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}/api`;
-  const login = async (principal) => (await fetch(`${base}/demo/session`, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ principal }) })).headers.get('set-cookie').split(';')[0];
+  const login = async (principal) => (await loginPrincipal(base, principal)).headers.get('set-cookie').split(';')[0];
   const req = (path, cookie, body) => fetch(`${base}${path}`, { method: body ? 'POST' : 'GET',
     headers: { cookie, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
   try {

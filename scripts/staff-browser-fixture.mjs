@@ -2,12 +2,14 @@ import {spawn} from 'node:child_process';
 import {openDatabase} from '../server/db.mjs';
 import {seed} from '../server/seed.mjs';
 import {createAppServer} from '../server/index.mjs';
+import {sqliteApp} from '../tests/helpers/sqlite-app.mjs';
+
 const db=openDatabase(':memory:');seed(db);
 db.prepare("UPDATE organizations SET name='Disposable Staff QA' WHERE id='cedar'").run();
 for(const [id,name,role] of [['rami','Rami Synthetic','supervisor'],['lina','Lina Synthetic','administrator'],['aamir','Aamir Synthetic','auditor']]) db.prepare('INSERT INTO staff VALUES(?,?,?,?,?,1)').run(id,'cedar','beirut',name,role);
 for(let n=0;n<9;n++) db.prepare('INSERT INTO staff VALUES(?,?,?,?,?,1)').run(`extra-${n}`,'cedar','beirut',`Synthetic staff ${n}`,'supervisor');
 const original=db.prepare("SELECT snapshot_json FROM publications WHERE id='shelf-v3'").get().snapshot_json;
-const api=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:'http://127.0.0.1:3030'});
+const api=sqliteApp(db,{publicOrigin:'http://127.0.0.1:3030'});
 let lose=true,hideReceipt=false;const handler=api.listeners('request')[0];api.removeAllListeners('request');
 api.on('request',(req,res)=>{
   if(req.url.startsWith('/api/settings/staff')) res.once('finish',()=>console.log(req.method,req.url,res.statusCode,'receipts',db.prepare('SELECT COUNT(*) n FROM staff_access_requests').get().n,'rami',JSON.stringify(db.prepare("SELECT role,active FROM staff WHERE id='rami'").get()),'published unchanged',original===db.prepare("SELECT snapshot_json FROM publications WHERE id='shelf-v3'").get().snapshot_json));

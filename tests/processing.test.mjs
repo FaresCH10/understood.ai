@@ -10,6 +10,8 @@ import {createDraft,editDraft,queuePreparation,archiveBriefing} from '../server/
 import {processOne} from '../server/worker.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {createAppServer} from '../server/index.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 test('processing filters are bounded and reject unknown scope or invalid options',()=>{
@@ -54,10 +56,10 @@ test('SQLite processing pages and details are scoped, redact internal errors and
 test('SQLite processing HTTP lists and details are private and unavailable to workers',async()=>{
   const db=openDatabase(':memory:');seed(db);
   const draft=createDraft(db,owner,{requestId:randomUUID(),title:'HTTP processing fixture',source:CANONICAL_SOURCE});
-  const job=queuePreparation(db,owner,draft.id,1),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const job=queuePreparation(db,owner,draft.id,1),server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${server.address().port}`;
   const cookieOf=response=>response.headers.get('set-cookie').split(';')[0];
-  const session=async principal=>cookieOf(await fetch(`${origin}/api/demo/session`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal})}));
+  const session=async principal=>cookieOf(await loginPrincipal(origin, principal));
   try {
     const staff=await session('maya'),worker=await session('worker-30');
     const read=(path,cookie)=>fetch(`${origin}/api${path}`,{headers:cookie ? {cookie} : {}});

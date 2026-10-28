@@ -1,0 +1,66 @@
+{
+  "version": 2,
+  "name": "drive-the-text-keep-every-handover-clear-appears-and-t-a7b4fb",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793186724768,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "hero-journey",
+        "source": {
+          "file": "src/HeroJourney.tsx",
+          "line": 62,
+          "column": 9
+        }
+      },
+      "args": {},
+      "action": "scrollIntoView",
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "text",
+            "contains": "Keep every handover clear.",
+            "visible": true
+          },
+          {
+            "kind": "text",
+            "contains": "One update, across the site.",
+            "visible": true
+          },
+          {
+            "kind": "text",
+            "contains": "A clearer start to every shift.",
+            "visible": true
+          },
+          {
+            "kind": "text",
+            "contains": "Make the next instruction clear.",
+            "visible": true
+          }
+        ]
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "The text \"Keep every handover clear.\" appears and the text \"One update, across the site.\" appears and the text \"A clearer start to every shift.\" appears and the text \"Make the next instruction clear.\" appears",
+  "intentDerived": true,
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  }
+}

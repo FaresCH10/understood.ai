@@ -26,7 +26,7 @@ test('page context is non-credential, stable and changes on cookie, identity, si
 });
 test('worker verification fails closed for expiry, changed identity, malformed response and supported-language changes',()=>{
   const now=Date.parse('2026-10-07T00:00:00Z');
-  const session={authenticated:true,role:'worker',workerId:'worker',mode:'synthetic-demo',language:'en',...clientSessionContext(serverSession)};
+  const session={authenticated:true,role:'worker',workerId:'worker',mode:'synthetic-credential',language:'en',...clientSessionContext(serverSession)};
   assert.equal(validWorkerSession(session,now),true);assert.equal(sameWorkerSession(session,{...session},now),true);
   for(const change of [{authenticated:false},{role:'staff'},{workerId:'other'},{workerId:' '},{language:'ar'},{language:'xyz'},{mode:'other'},{mode:undefined},{mode:42},{clientContext:'b'.repeat(64)},{expiresAt:'bad'},{expiresAt:'2027-01-01'},{expiresAt:new Date(now).toISOString()}])
     assert.equal(sameWorkerSession(session,{...session,...change},now),false);

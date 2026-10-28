@@ -17,10 +17,12 @@ import {issueWorkerGrant,redeemWorkerGrant} from '../server/postgres/auth.mjs';
 import {receiveRecording as receivePgRecording} from '../server/postgres/recordings.mjs';
 import {syntheticPrepare,CANONICAL_SOURCE} from '../server/domain.mjs';
 import {assertWorkerDictionary,assertWorkerStrings} from './helpers/worker-locales.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const context='a'.repeat(64),requestId='741c20ac-955a-4eee-aa09-94d915578cf9';
 const selection={assignmentId:'assignment-30',version:3,language:'ur',requestId,kind:'typed'};
-const session=()=>({authenticated:true,role:'worker',workerId:'worker-30',mode:'synthetic-demo',language:'ur',clientContext:context,expiresAt:'2099-01-01T00:00:00.000Z'});
+const session=()=>({authenticated:true,role:'worker',workerId:'worker-30',mode:'synthetic-credential',language:'ur',clientContext:context,expiresAt:'2099-01-01T00:00:00.000Z'});
 const snapshot=()=>({assignment:{id:'assignment-30',version:3,language:'ur',state:'published'},receipt:{id:requestId,kind:'typed',receivedAt:'2026-10-16T09:18:00.000Z',isLatest:false,answerText:'Synthetic original answer',outcome:'matched',recordingId:null,audioStatus:null,durationSeconds:null},clientContext:context});
 function wav(){const bytes=Buffer.alloc(32044);bytes.write('RIFF');bytes.writeUInt32LE(bytes.length-8,4);bytes.write('WAVEfmt ',8);bytes.writeUInt32LE(16,16);bytes.writeUInt16LE(1,20);bytes.writeUInt16LE(1,22);bytes.writeUInt32LE(16000,24);bytes.writeUInt32LE(32000,28);bytes.writeUInt16LE(2,32);bytes.writeUInt16LE(16,34);bytes.write('data',36);bytes.writeUInt32LE(32000,40);bytes.writeInt16LE(1000,44);return bytes;}
 
@@ -55,7 +57,7 @@ test('all immediate receipt states, safety limits and direct Help are localized 
 });
 test('SQLite exact receipt stays original after later answer, returns server metadata and denies foreign/staff/staging/invalid reads',async()=>{
   const db=openDatabase(':memory:'),root=await mkdtemp(join(tmpdir(),'understood-exact-receipt-'));
-  const server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',audioRoot:root});
+  const server=sqliteApp(db,{audioRoot:root});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${server.address().port}`;
   const principal={principal_type:'worker',principal_id:'worker-30',org_id:'cedar',site_id:'beirut'};
   try{
@@ -63,7 +65,7 @@ test('SQLite exact receipt stays original after later answer, returns server met
     submitAnswer(db,principal,'assignment-30',typedId,'Finished blue; unfinished yellow.');
     submitAnswer(db,principal,'assignment-30',laterId,'Finished yellow; unfinished blue.');
     const audio=await receiveRecording(db,principal,'assignment-30',audioId,wav(),root);
-    const login=async principal=>(await fetch(origin+'/api/demo/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal})})).headers.get('set-cookie').split(';')[0];
+    const login=async principal=>(await loginPrincipal(origin, principal)).headers.get('set-cookie').split(';')[0];
     const own=await login('worker-30'),other=await login('worker-14'),staff=await login('maya');
     const identity=await(await fetch(origin+'/api/session',{headers:{cookie:own}})).json();
     const send=(path,options={})=>fetch(origin+path,{...options,headers:{...options.headers,cookie:own}});

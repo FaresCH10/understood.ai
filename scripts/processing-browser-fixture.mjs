@@ -6,6 +6,8 @@ import {createAppServer} from '../server/index.mjs';
 import {createDraft,queuePreparation} from '../server/preparation.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {processOne} from '../server/worker.mjs';
+import {sqliteApp} from '../tests/helpers/sqlite-app.mjs';
+
 
 const db=openDatabase(':memory:');seed(db);
 db.prepare("UPDATE organizations SET name='Disposable Processing QA' WHERE id='cedar'").run();
@@ -19,7 +21,7 @@ const draft=createDraft(db,owner,{requestId:randomUUID(),title:'Retry shelf prep
 const job=queuePreparation(db,owner,draft.id,1);
 db.prepare("UPDATE jobs SET status='failed',attempts=1,error='Disposable provider-secret failure' WHERE id=?").run(job.id);
 db.prepare("UPDATE briefings SET state='failed' WHERE id=?").run(draft.id);
-const api=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:'http://127.0.0.1:3030'});
+const api=sqliteApp(db,{publicOrigin:'http://127.0.0.1:3030'});
 await new Promise(resolve=>api.listen(3031,'127.0.0.1',resolve));
 const vite=spawn(process.execPath,['node_modules/vite/bin/vite.js'],{stdio:'inherit',env:{...process.env,UNDERSTOOD_WEB_PORT:'3030',UNDERSTOOD_API_PORT:'3031'}});
 const worker=setInterval(()=>{while(processOne(db)) {}},750);

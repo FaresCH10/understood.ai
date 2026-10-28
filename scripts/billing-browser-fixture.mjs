@@ -4,6 +4,8 @@ import {openDatabase} from '../server/db.mjs';
 import {seed} from '../server/seed.mjs';
 import {createAppServer} from '../server/index.mjs';
 import {ensureBillingSchema,createInvoice,recordPayment} from '../server/billing.mjs';
+import {sqliteApp} from '../tests/helpers/sqlite-app.mjs';
+
 const db=openDatabase(':memory:');seed(db);ensureBillingSchema(db);
 db.prepare("UPDATE organizations SET name='Disposable Billing QA' WHERE id='cedar'").run();
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
@@ -11,7 +13,7 @@ for(let i=0;i<25;i++) {
   const invoice=createInvoice(db,owner,{requestId:randomUUID(),number:`QA-${String(i+1).padStart(3,'0')}`,description:'Synthetic pilot service - disposable record only',issueDate:'2026-10-01',dueDate:'2026-10-10',amount:'25',confirmed:true});
   if(i<5) recordPayment(db,owner,invoice.id,{requestId:randomUUID(),reference:'Synthetic transfer',note:'Not a real payment',date:'2026-10-01',amount:'25',confirmed:true});
 }
-const api=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:'http://127.0.0.1:3030'});
+const api=sqliteApp(db,{publicOrigin:'http://127.0.0.1:3030'});
 let loseAcknowledgment=true;
 const handler=api.listeners('request')[0];api.removeAllListeners('request');
 api.on('request',(req,res)=>{

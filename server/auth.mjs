@@ -16,8 +16,8 @@ export function resolveAuthConfig(options = {}) {
   const aiMode = options.aiMode ?? process.env.UNDERSTOOD_AI_MODE;
   const accessMode = options.accessMode ?? process.env.UNDERSTOOD_ACCESS_MODE;
   if (tier === 'production') throw new Error('Production startup blocked: database/storage/live AI integration and release gates are incomplete');
-  if (tier !== 'local' || aiMode !== 'synthetic' || !['demo', 'credential'].includes(accessMode)) {
-    throw new Error('Set UNDERSTOOD_TIER=local, UNDERSTOOD_AI_MODE=synthetic and UNDERSTOOD_ACCESS_MODE=demo or credential');
+  if (tier !== 'local' || aiMode !== 'synthetic' || accessMode !== 'credential') {
+    throw new Error('Set UNDERSTOOD_TIER=local, UNDERSTOOD_AI_MODE=synthetic and UNDERSTOOD_ACCESS_MODE=credential');
   }
   const publicOrigin = options.publicOrigin ?? process.env.UNDERSTOOD_PUBLIC_ORIGIN ?? 'http://127.0.0.1:3020';
   let origin;

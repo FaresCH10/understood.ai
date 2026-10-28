@@ -9,7 +9,7 @@ import SendInstruction from '../../src/SendInstruction';
 import type {PageSession} from '../../src/session-state';
 import '../../src/styles.css';
 const mode=new URLSearchParams(location.search).get('mode')||'session';
-const session:PageSession={authenticated:true,role:'worker',workerId:'fixture',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:new Date(Date.now()+3600000).toISOString()};
+const session:PageSession={authenticated:true,role:'worker',workerId:'fixture',language:'en',mode:'synthetic-credential',clientContext:'a'.repeat(64),expiresAt:new Date(Date.now()+3600000).toISOString()};
 const staff={...session,role:'staff',staffRole:'owner',staffScope:JSON.stringify(['fixture','site','owner']),siteState:'active'};
 let offline=false,sends=0;
 const ids=Array.from({length:20},(_,i)=>`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`);

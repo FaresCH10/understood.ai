@@ -1,0 +1,95 @@
+{
+  "version": 2,
+  "name": "drive-worker-sign-in-keeps-the-full-language-picker-av",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793177896549,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Interface language English"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerAccessEntry.tsx",
+        "line": 44
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "radio",
+          "name": "العربية"
+        },
+        "state": "visible"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "radio",
+        "name": "العربية"
+      },
+      "args": {},
+      "action": "check",
+      "source": {
+        "file": "src/WorkerAccessEntry.tsx",
+        "line": 44
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "textbox",
+          "name": "رقم العامل"
+        },
+        "state": "visible"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "لغة الواجهة العربية"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/WorkerAccessEntry.tsx",
+        "line": 44
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "radio",
+          "name": "العربية"
+        },
+        "state": "hidden"
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "Worker sign-in keeps the full language picker available in the redesigned form.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-worker-sign-in-keeps-the-full-language-picker-av"
+}

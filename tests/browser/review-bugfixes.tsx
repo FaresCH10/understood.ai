@@ -14,7 +14,7 @@ window.fetch=async(input,options)=>{
   if(path.startsWith('/api/instructions/sends/')){checks++;return Response.json(result(!cancelled&&checks>=3?'published':'preparing'));}
   return originalFetch(input,options);
 };
-const authority={session:{authenticated:true,role:'staff',staffRole:'owner',staffScope:JSON.stringify(['fixture','site','owner']),siteState:'active',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:new Date(Date.now()+3600000).toISOString()},isCurrent:()=>true,canMutate:()=>true,onSessionLost:()=>{throw Error('Unexpected session loss');}};
+const authority={session:{authenticated:true,role:'staff',staffRole:'owner',staffScope:JSON.stringify(['fixture','site','owner']),siteState:'active',mode:'synthetic-credential',clientContext:'a'.repeat(64),expiresAt:new Date(Date.now()+3600000).toISOString()},isCurrent:()=>true,canMutate:()=>true,onSessionLost:()=>{throw Error('Unexpected session loss');}};
 function Fixture(){
   const [mounted,setMounted]=useState(true),[verdict,setVerdict]=useState('Waiting for an instruction to send.');
   function stop(){if(!sentId){setVerdict('FAIL: no pending send to cancel.');return;}cancelled=true;setMounted(false);const previous=checks;setVerdict('Checking cancellation...');setTimeout(()=>setVerdict(checks===previous?'PASS: polling stops on unmount.':'FAIL: polling continued after unmount.'),3500);}

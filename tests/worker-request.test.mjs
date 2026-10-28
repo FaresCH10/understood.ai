@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {workerRequestId,WorkerRequestError,workerRequestText,checkedWorkerReceipt,readWorkerRequestReceipt,workerReceiptCheckText} from '../src/worker-request.ts';
 import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 const now=()=>Date.parse('2026-10-07T12:00:00.000Z');
-const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2026-10-07T20:00:00.000Z'};
+const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-credential',clientContext:'a'.repeat(64),expiresAt:'2026-10-07T20:00:00.000Z'};
 const key='understood:worker-requests:v1';
 function storage(){const map=new Map();return {map,getItem:key=>map.get(key)??null,setItem:(key,value)=>map.set(key,value)};}
 test('same answer under a deliberate repeat has its own stable request ID without retaining its content',async()=>{

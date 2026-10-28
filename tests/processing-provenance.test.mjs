@@ -15,6 +15,8 @@ import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
+import {principalLoginBody,seedCredentials} from './helpers/sqlite-app.mjs';
+
 const owner={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'};
 const job={id:'answer_check:job',kind:'answer_check',publication_id:'publication',publication_version:3,assignment_id:'assignment'};
 const started='2026-10-14T00:00:00.000Z',finished='2026-10-14T00:00:01.000Z';
@@ -85,12 +87,12 @@ test('PostgreSQL provider pages are scoped, bounded, repeatable and metadata-onl
 for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} provider history HTTP requires captured context and rejects duplicate or foreign filters`,async()=>{
   const f=pg?await fixture():null,db=pg?f.db:openDatabase(':memory:');let server;
   try{
-    let id=job.id;if(!pg){seed(db);const draft=createDraft(db,{...owner,org_id:'cedar',site_id:'beirut',principal_id:'maya'},{requestId:randomUUID(),title:'HTTP synthetic',source:CANONICAL_SOURCE});id=queuePreparation(db,{...owner,org_id:'cedar',site_id:'beirut',principal_id:'maya'},draft.id,1).id;}
-    const origin='http://127.0.0.1:3032',config={tier:'local',aiMode:'synthetic',dataClass:'synthetic',accessMode:pg?'credential':'demo',publicOrigin:origin,schema:f?.schema};
+    let id=job.id;if(!pg){seedCredentials(db);const draft=createDraft(db,{...owner,org_id:'cedar',site_id:'beirut',principal_id:'maya'},{requestId:randomUUID(),title:'HTTP synthetic',source:CANONICAL_SOURCE});id=queuePreparation(db,{...owner,org_id:'cedar',site_id:'beirut',principal_id:'maya'},draft.id,1).id;}
+    const origin='http://127.0.0.1:3032',config={tier:'local',aiMode:'synthetic',dataClass:'synthetic',accessMode:'credential',publicOrigin:origin,schema:f?.schema};
     if(pg)await provisionStaffCredential(f.pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@history.example.test',password:'Synthetic-provider-history-password'},f.options);
     server=pg?createPostgresRehearsalServer(f.pool,config):createAppServer(db,config);await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
-    const base=`http://127.0.0.1:${server.address().port}/api`,contextual=createSessionContextFetch(),input=pg?{email:'owner@history.example.test',password:'Synthetic-provider-history-password'}:{principal:'maya'};
-    const login=await contextual(base+(pg?'/auth/staff/login':'/demo/session'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(input)});assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0],url=base+'/processing/'+encodeURIComponent(id)+'/provenance';
+    const base=`http://127.0.0.1:${server.address().port}/api`,contextual=createSessionContextFetch(),input=pg?{email:'owner@history.example.test',password:'Synthetic-provider-history-password'}:principalLoginBody('maya');
+    const login=await contextual(base+('/auth/staff/login'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(input)});assert.equal(login.status,200);const cookie=login.headers.get('set-cookie').split(';')[0],url=base+'/processing/'+encodeURIComponent(id)+'/provenance';
     for(const context of [undefined,'invalid','0'.repeat(64)])assert.equal((await fetch(url,{headers:{cookie,...(context===undefined?{}:{'x-client-session-context':context})}})).status,409);
     for(const query of ['page=1&page=2','site=foreign','pageSize=21'])assert.equal((await contextual(url+'?'+query,{headers:{cookie}})).status,400);
     const response=await contextual(url+'?page=1',{headers:{cookie}});assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-store/);

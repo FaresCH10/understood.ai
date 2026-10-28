@@ -9,6 +9,8 @@ import * as postgres from '../server/postgres/pilot.mjs';
 import {pilotInput,pilotDestination} from '../server/pilot-input.mjs';
 import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import {createAppServer} from '../server/index.mjs';
+import {sqliteApp} from './helpers/sqlite-app.mjs';
+
 
 const input=()=>({requestId:randomUUID(),receiptToken:randomBytes(32).toString('hex'),company:'Synthetic Works',email:'contact@example.test',teamSize:30,languages:['ar','en'],message:'Synthetic pilot inquiry.',consent:true});
 const mail={available:true,apiKey:'re_synthetic',from:'sender@example.test'};
@@ -48,7 +50,7 @@ test('pilot input is strict; public HTTP stores without a session and never clai
   assert.deepEqual(pilotInput({...value,languages:['hi','en']}).content.languages,['en','hi']);
   assert.equal(pilotInput({...value,languages:[...WORKER_LANGUAGE_CODES]}).content.languages.length,WORKER_LANGUAGE_CODES.length);
   assert.throws(()=>pilotDestination('User@Example.test'),/Invalid/);
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',mail:{mode:'disabled'}});
+  const db=openDatabase(':memory:'),server=sqliteApp(db,{mail:{mode:'disabled'}});
   await new Promise(done=>server.listen(0,'127.0.0.1',done));const origin=`http://127.0.0.1:${server.address().port}`;
   try {
     const response=await fetch(`${origin}/api/public/pilot`,{method:'POST',headers:{origin:'http://127.0.0.1:3020','content-type':'application/json'},body:JSON.stringify(value)});

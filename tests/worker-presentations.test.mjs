@@ -8,7 +8,7 @@ import {workerPresentationText} from '../src/worker-presentation-text.ts';
 import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 const context='a'.repeat(64),now=new Date(Date.now()+86400000*365).toISOString();
-const session=()=>({authenticated:true,role:'worker',workerId:'qa-one',language:'ar',mode:'synthetic-demo',clientContext:context,expiresAt:now});
+const session=()=>({authenticated:true,role:'worker',workerId:'qa-one',language:'ar',mode:'synthetic-credential',clientContext:context,expiresAt:now});
 const artifact=overrides=>({
   id:crypto.randomUUID(),sourceKind:'instruction',sourceId:'',publicationId:'publication-one',publicationVersion:3,
   originalLanguage:'en',targetLanguage:'ar',status:'ready',content:{title:'عنوان',text:'نص',question:null},

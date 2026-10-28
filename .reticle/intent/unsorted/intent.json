@@ -47,6 +47,30 @@
       },
       "updatedAt": 1793024341132
     },
+    "inline:a-credential-deployment-shows-work-email-sign-in-56c3ba3f": {
+      "binding": {
+        "contains": "Work email sign-in. Live AI is not production-verified.",
+        "kind": "text"
+      },
+      "declaredAt": 1793112937497,
+      "id": "inline:a-credential-deployment-shows-work-email-sign-in-56c3ba3f",
+      "provenBy": {
+        "at": 1793112960104,
+        "grade": "presence",
+        "runId": "drive-65f38137ffacad6a",
+        "verdictId": "reticle_act_and_wait:1793112960104"
+      },
+      "state": "proved",
+      "statement": "A credential deployment shows work-email sign-in on the public page and does not offer the synthetic demo profiles.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793112960213
+    },
     "inline:a-submitted-answer-remains-accessible-in-the-wor-421b1d58": {
       "binding": {
         "contains": "QA shelf handover",
@@ -303,6 +327,70 @@
       "subject": "unsorted",
       "updatedAt": 1793085609044
     },
+    "inline:arabic-readers-can-read-each-workplace-scene-in-b2da9e79": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "تسليم واضح بين الورديات.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "تحديث واحد لأفراد الموقع.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "بداية أوضح لكل وردية.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "تعليمات واضحة للخطوة التالية.",
+            "kind": "text",
+            "visible": true
+          }
+        ]
+      },
+      "declaredAt": 1793186383541,
+      "id": "inline:arabic-readers-can-read-each-workplace-scene-in-b2da9e79",
+      "provenBy": {
+        "at": 1793186383657,
+        "grade": "presence",
+        "runId": "drive-eba55e79acbe1a34",
+        "verdictId": "reticle_assert:1793186383657"
+      },
+      "state": "proved",
+      "statement": "Arabic readers can read each workplace scene in the expanded hero",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793186383681
+    },
+    "inline:company-registration-switches-to-arabic-while-ke-69e28176": {
+      "binding": {
+        "contains": "الاسم الكامل",
+        "kind": "text"
+      },
+      "declaredAt": 1793177175524,
+      "id": "inline:company-registration-switches-to-arabic-while-ke-69e28176",
+      "provenBy": {
+        "at": 1793177177674,
+        "grade": "presence",
+        "runId": "drive-ef1e506632ca5e7a",
+        "verdictId": "reticle_act_and_wait:1793177177674"
+      },
+      "state": "proved",
+      "statement": "Company registration switches to Arabic while keeping the original registration fields and validation.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/Register.tsx"
+        ]
+      },
+      "updatedAt": 1793177177795
+    },
     "inline:credential-is-the-production-access-mode-so-the-c5dfb270": {
       "binding": {
         "kind": "allOf",
@@ -358,6 +446,112 @@
       "status": "proposed",
       "subject": "unsorted",
       "updatedAt": 1793024648155
+    },
+    "inline:first-time-setup-opens-the-existing-company-regi-d2264744": {
+      "binding": {
+        "contains": "#register",
+        "kind": "route"
+      },
+      "declaredAt": 1793177031430,
+      "id": "inline:first-time-setup-opens-the-existing-company-regi-d2264744",
+      "provenBy": {
+        "at": 1793177032820,
+        "grade": "presence",
+        "runId": "drive-ef1e506632ca5e7a",
+        "verdictId": "reticle_act_and_wait:1793177032820"
+      },
+      "state": "proved",
+      "statement": "First-time setup opens the existing company registration flow.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793177032939
+    },
+    "inline:reduced-motion-authentication-stays-static-while-24976d17": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "absent": true,
+            "contains": "Resume motion",
+            "kind": "text"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Work email",
+              "role": "textbox"
+            },
+            "state": "visible"
+          }
+        ]
+      },
+      "declaredAt": 1793177433775,
+      "id": "inline:reduced-motion-authentication-stays-static-while-24976d17",
+      "state": "bound",
+      "statement": "Reduced-motion authentication stays static while the email form remains usable.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "updatedAt": 1793177433932
+    },
+    "inline:reduced-motion-mode-hides-the-animation-control-3e6466a3": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "element",
+            "query": {
+              "name": "Resume motion",
+              "role": "button"
+            },
+            "state": "hidden"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Work email",
+              "role": "textbox"
+            },
+            "state": "visible"
+          }
+        ]
+      },
+      "declaredAt": 1793177479637,
+      "id": "inline:reduced-motion-mode-hides-the-animation-control-3e6466a3",
+      "provenBy": {
+        "at": 1793177479718,
+        "grade": "presence",
+        "runId": "drive-c9f9c7de11ea6ebc",
+        "verdictId": "reticle_assert:1793177479718"
+      },
+      "state": "proved",
+      "statement": "Reduced-motion mode hides the animation control and keeps the email form visible.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/AuthLayout.tsx"
+        ]
+      },
+      "updatedAt": 1793177479776
+    },
+    "inline:reduced-motion-visitors-see-a-static-authenticat-fcf22ee0": {
+      "binding": {
+        "absent": true,
+        "contains": "Resume motion",
+        "kind": "text"
+      },
+      "declaredAt": 1793177425263,
+      "id": "inline:reduced-motion-visitors-see-a-static-authenticat-fcf22ee0",
+      "state": "bound",
+      "statement": "Reduced-motion visitors see a static authentication scene and retain access to the sign-in form.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "updatedAt": 1793177425353
     },
     "inline:requesting-another-language-leaves-the-worker-in-2903f9b7": {
       "binding": {
@@ -438,6 +632,40 @@
       },
       "updatedAt": 1793085325926
     },
+    "inline:the-arabic-hero-trial-cta-opens-company-registra-cd3c30f2": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#register",
+            "kind": "route"
+          },
+          {
+            "contains": "Start using Understood",
+            "kind": "text",
+            "visible": true
+          }
+        ]
+      },
+      "declaredAt": 1793183789747,
+      "id": "inline:the-arabic-hero-trial-cta-opens-company-registra-cd3c30f2",
+      "provenBy": {
+        "at": 1793183790139,
+        "grade": "presence",
+        "runId": "drive-6044620ef72cd226",
+        "verdictId": "reticle_act_and_wait:1793183790139"
+      },
+      "state": "proved",
+      "statement": "The Arabic hero trial CTA opens company registration",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/LandingHero.tsx"
+        ]
+      },
+      "updatedAt": 1793183790196
+    },
     "inline:the-assigned-worker-opens-the-instruction-in-ara-cd1bde48": {
       "binding": {
         "contains": "الأزرق",
@@ -461,6 +689,239 @@
         ]
       },
       "updatedAt": 1793085577201
+    },
+    "inline:the-expanded-hero-shows-all-four-workplace-instr-40e0b42d": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "Keep every handover clear.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "One update, across the site.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "A clearer start to every shift.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "Make the next instruction clear.",
+            "kind": "text",
+            "visible": true
+          }
+        ]
+      },
+      "declaredAt": 1793186026050,
+      "id": "inline:the-expanded-hero-shows-all-four-workplace-instr-40e0b42d",
+      "provenBy": {
+        "at": 1793186026147,
+        "grade": "presence",
+        "runId": "drive-e182eae2a4b4ae6b",
+        "verdictId": "reticle_assert:1793186026147"
+      },
+      "state": "proved",
+      "statement": "The expanded hero shows all four workplace instruction scenes with reduced motion",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793186026174
+    },
+    "inline:the-hero-text-and-instruction-examples-remain-av-805967fc": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "Clear instructions.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "Stronger operations.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "तैयार सामान नीले शेल्फ़ पर रखें। रास्ता खाली रखें।",
+            "kind": "text",
+            "visible": true
+          }
+        ]
+      },
+      "declaredAt": 1793183734323,
+      "id": "inline:the-hero-text-and-instruction-examples-remain-av-805967fc",
+      "provenBy": {
+        "at": 1793183734599,
+        "grade": "presence",
+        "runId": "drive-097345449474b2e0",
+        "verdictId": "reticle_assert:1793183734599"
+      },
+      "state": "proved",
+      "statement": "The hero text and instruction examples remain available with reduced motion",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793183734626
+    },
+    "inline:the-landing-navigation-dropdown-closes-with-esca-104f6a2d": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Worker experience",
+          "role": "link"
+        },
+        "state": "hidden"
+      },
+      "declaredAt": 1793181230985,
+      "id": "inline:the-landing-navigation-dropdown-closes-with-esca-104f6a2d",
+      "provenBy": {
+        "at": 1793181231059,
+        "grade": "presence",
+        "runId": "drive-80a93c193a83f6fb",
+        "verdictId": "reticle_act_and_wait:1793181231059"
+      },
+      "state": "proved",
+      "statement": "The landing navigation dropdown closes with Escape",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793181231079
+    },
+    "inline:the-landing-page-remains-readable-with-reduced-m-a3fd65a1": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "Clear instructions.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "Fixed sample, not a live AI assessment.",
+            "kind": "text",
+            "visible": true
+          },
+          {
+            "contains": "15",
+            "kind": "text",
+            "visible": true
+          }
+        ]
+      },
+      "declaredAt": 1793181067644,
+      "id": "inline:the-landing-page-remains-readable-with-reduced-m-a3fd65a1",
+      "provenBy": {
+        "at": 1793181067718,
+        "grade": "presence",
+        "runId": "drive-05d6b55e4819f212",
+        "verdictId": "reticle_assert:1793181067718"
+      },
+      "state": "proved",
+      "statement": "The landing page remains readable with reduced motion enabled",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793181067741
+    },
+    "inline:the-public-landing-page-supports-arabic-copy-and-9709629b": {
+      "binding": {
+        "contains": "ابدأ بفريق تعرفه.",
+        "kind": "text",
+        "visible": true
+      },
+      "declaredAt": 1793180934722,
+      "id": "inline:the-public-landing-page-supports-arabic-copy-and-9709629b",
+      "provenBy": {
+        "at": 1793180935139,
+        "grade": "presence",
+        "runId": "drive-cf79214a69aa0cf6",
+        "verdictId": "reticle_act_and_wait:1793180935139"
+      },
+      "state": "proved",
+      "statement": "The public landing page supports Arabic copy and navigation",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/PublicHeader.tsx"
+        ]
+      },
+      "updatedAt": 1793180935215
+    },
+    "inline:the-redesigned-supervisor-sign-in-exposes-the-ex-3a8a12ac": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "element",
+            "query": {
+              "name": "Work email",
+              "role": "textbox"
+            },
+            "state": "visible"
+          },
+          {
+            "contains": "Fast first-time setup",
+            "kind": "text"
+          },
+          {
+            "contains": "Arabic and English",
+            "kind": "text"
+          },
+          {
+            "absent": true,
+            "kind": "console",
+            "level": "error"
+          }
+        ]
+      },
+      "declaredAt": 1793176932291,
+      "id": "inline:the-redesigned-supervisor-sign-in-exposes-the-ex-3a8a12ac",
+      "provenBy": {
+        "at": 1793176932704,
+        "grade": "presence",
+        "runId": "drive-ef1e506632ca5e7a",
+        "verdictId": "reticle_assert:1793176932704"
+      },
+      "state": "proved",
+      "statement": "The redesigned supervisor sign-in exposes the existing email form and bilingual callouts without console errors.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793176932791
+    },
+    "inline:the-running-local-signup-page-displays-email-cod-df66b009": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "We email a verification code before your trial starts.",
+            "kind": "text"
+          },
+          {
+            "absent": true,
+            "contains": "Email verification is not configured",
+            "kind": "text"
+          },
+          {
+            "absent": true,
+            "contains": "We email a one-use verification link",
+            "kind": "text"
+          }
+        ]
+      },
+      "declaredAt": 1793198362638,
+      "id": "inline:the-running-local-signup-page-displays-email-cod-df66b009",
+      "provenBy": {
+        "at": 1793198362799,
+        "grade": "presence",
+        "runId": "drive-9437d960451b256a",
+        "verdictId": "reticle_assert:1793198362799"
+      },
+      "state": "proved",
+      "statement": "The running local signup page displays email-code verification when Neon is available, without a link fallback or unavailable error.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793198362815
     },
     "inline:the-selected-arabic-crew-received-one-instructio-abcf70bb": {
       "binding": {
@@ -540,6 +1001,51 @@
       },
       "updatedAt": 1793085726291
     },
+    "inline:the-worker-language-picker-can-close-while-prese-9e1cd367": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "العربية",
+          "role": "radio"
+        },
+        "state": "hidden"
+      },
+      "declaredAt": 1793177801706,
+      "id": "inline:the-worker-language-picker-can-close-while-prese-9e1cd367",
+      "state": "bound",
+      "statement": "The worker language picker can close while preserving the chosen Arabic interface.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "updatedAt": 1793177801772
+    },
+    "inline:the-worker-language-picker-closes-without-changi-b28b7285": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "العربية",
+          "role": "radio"
+        },
+        "state": "hidden"
+      },
+      "declaredAt": 1793177837696,
+      "id": "inline:the-worker-language-picker-closes-without-changi-b28b7285",
+      "provenBy": {
+        "at": 1793177838746,
+        "grade": "presence",
+        "runId": "drive-f171a3a5a52445aa",
+        "verdictId": "reticle_act_and_wait:1793177838746"
+      },
+      "state": "proved",
+      "statement": "The worker language picker closes without changing the selected Arabic language.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/WorkerAccessEntry.tsx"
+        ]
+      },
+      "updatedAt": 1793177838866
+    },
     "inline:the-worker-s-wrong-factual-choice-has-the-clarif-49a9bc4d": {
       "binding": {
         "contains": "تحتاج إلى توضيح",
@@ -564,6 +1070,34 @@
       },
       "updatedAt": 1793085618420
     },
+    "inline:the-worker-tab-opens-the-existing-company-id-wor-c1d541cb": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Company ID",
+          "role": "textbox"
+        },
+        "state": "visible"
+      },
+      "declaredAt": 1793177487487,
+      "id": "inline:the-worker-tab-opens-the-existing-company-id-wor-c1d541cb",
+      "provenBy": {
+        "at": 1793177487698,
+        "grade": "presence",
+        "runId": "drive-c9f9c7de11ea6ebc",
+        "verdictId": "reticle_act_and_wait:1793177487698"
+      },
+      "state": "proved",
+      "statement": "The worker tab opens the existing company ID, worker ID and password login flow.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793177487752
+    },
     "inline:unread-notifications-remain-visible-when-the-wor-ffbb6f8b": {
       "binding": {
         "contains": "Unread (20)",
@@ -576,6 +1110,30 @@
       "status": "proposed",
       "subject": "unsorted",
       "updatedAt": 1793001431435
+    },
+    "inline:visitors-can-pause-the-decorative-gsap-animation-2a57dd7e": {
+      "binding": {
+        "contains": "Resume motion",
+        "kind": "text"
+      },
+      "declaredAt": 1793177272660,
+      "id": "inline:visitors-can-pause-the-decorative-gsap-animation-2a57dd7e",
+      "provenBy": {
+        "at": 1793177273051,
+        "grade": "presence",
+        "runId": "drive-c9f9c7de11ea6ebc",
+        "verdictId": "reticle_act_and_wait:1793177273051"
+      },
+      "state": "proved",
+      "statement": "Visitors can pause the decorative GSAP animation without hiding or disabling the sign-in form.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/AuthLayout.tsx"
+        ]
+      },
+      "updatedAt": 1793177273104
     },
     "inline:voice-capture-stays-unavailable-when-the-site-ha-f994030e": {
       "binding": {
@@ -637,6 +1195,62 @@
         ]
       },
       "updatedAt": 1793094868505
+    },
+    "inline:worker-sign-in-keeps-the-full-language-picker-av-8fe63def": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "العربية",
+          "role": "radio"
+        },
+        "state": "visible"
+      },
+      "declaredAt": 1793177755325,
+      "id": "inline:worker-sign-in-keeps-the-full-language-picker-av-8fe63def",
+      "provenBy": {
+        "at": 1793177756015,
+        "grade": "presence",
+        "runId": "drive-f171a3a5a52445aa",
+        "verdictId": "reticle_act_and_wait:1793177756015"
+      },
+      "state": "proved",
+      "statement": "Worker sign-in keeps the full language picker available in the redesigned form.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/WorkerAccessEntry.tsx"
+        ]
+      },
+      "updatedAt": 1793177756084
+    },
+    "inline:worker-sign-in-switches-its-credential-labels-an-d096a5e8": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "رقم العامل",
+          "role": "textbox"
+        },
+        "state": "visible"
+      },
+      "declaredAt": 1793177756376,
+      "id": "inline:worker-sign-in-switches-its-credential-labels-an-d096a5e8",
+      "provenBy": {
+        "at": 1793177756632,
+        "grade": "presence",
+        "runId": "drive-f171a3a5a52445aa",
+        "verdictId": "reticle_act_and_wait:1793177756632"
+      },
+      "state": "proved",
+      "statement": "Worker sign-in switches its credential labels and navigation to Arabic.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/WorkerAccessEntry.tsx"
+        ]
+      },
+      "updatedAt": 1793177756713
     },
     "pilot-languages": {
       "declaredAt": 1793107273971,

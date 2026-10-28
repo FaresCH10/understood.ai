@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-the-public-landing-page-supports-arabic-copy-and": {
+      "declaredAt": 1793180949199,
+      "id": "flow:drive-the-public-landing-page-supports-arabic-copy-and",
+      "state": "declared",
+      "statement": "The public landing page supports Arabic copy and navigation",
+      "status": "proposed",
+      "subject": "drive-the-public-landing-page-supports-a",
+      "surface": {
+        "flow": "drive-the-public-landing-page-supports-arabic-copy-and"
+      },
+      "updatedAt": 1793180949244
+    }
+  },
+  "subject": "drive-the-public-landing-page-supports-a",
+  "version": 1
+}

@@ -28,6 +28,8 @@ import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {syntheticPushAdapter} from '../server/push-adapter.mjs';
 import {requestWorkerDeletion} from '../server/postgres/deletions.mjs';
 import {requestWorkerDeletion as requestLocalWorkerDeletion} from '../server/deletions.mjs';
+import {sqliteApp,loginRoute,principalLoginBody} from './helpers/sqlite-app.mjs';
+
 
 const rawTokenA='A'.repeat(43),rawTokenB='B'.repeat(43);
 const tokenA=createHash('sha256').update(rawTokenA).digest('hex');
@@ -228,14 +230,14 @@ test('SQLite push delivery records acceptance, endpoint expiry, bounded retries 
 
 test('SQLite push HTTP requires a session, labels synthetic delivery, fences origin and unbinds on sign-out',async()=>{
   const db=openDatabase(':memory:'),origin='http://127.0.0.1:3027';
-  const server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:origin,pushAdapter:syntheticPushAdapter});
+  const server=sqliteApp(db,{publicOrigin:origin,pushAdapter:syntheticPushAdapter});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
   const post=(path,body,cookie,headers={})=>fetch(base+path,{method:'POST',headers:{origin,'content-type':'application/json',...(cookie?{cookie}:{}),...headers},body:JSON.stringify(body)});
   try {
     assert.equal((await fetch(`${base}/push/status`)).status,401);
     assert.equal((await post('/push/subscriptions',subscription('anonymous'))).status,401);
-    const login=await post('/demo/session',{principal:'worker-29'});assert.equal(login.status,200);
+    const login=await post(loginRoute('worker-29'),principalLoginBody('worker-29'));assert.equal(login.status,200);
     const cookie=login.headers.get('set-cookie').split(';')[0];
     assert.equal((await fetch(`${base}/push/status?extra=1`,{headers:{cookie}})).status,400);
     assert.deepEqual(await (await fetch(`${base}/push/status`,{headers:{cookie}})).json(),

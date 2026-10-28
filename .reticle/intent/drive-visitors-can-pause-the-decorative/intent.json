@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-visitors-can-pause-the-decorative-gsap-animation": {
+      "declaredAt": 1793177662844,
+      "id": "flow:drive-visitors-can-pause-the-decorative-gsap-animation",
+      "state": "declared",
+      "statement": "Visitors can pause the decorative GSAP animation without hiding or disabling the sign-in form.",
+      "status": "proposed",
+      "subject": "drive-visitors-can-pause-the-decorative",
+      "surface": {
+        "flow": "drive-visitors-can-pause-the-decorative-gsap-animation"
+      },
+      "updatedAt": 1793177662886
+    }
+  },
+  "subject": "drive-visitors-can-pause-the-decorative",
+  "version": 1
+}

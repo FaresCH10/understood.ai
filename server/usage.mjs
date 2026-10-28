@@ -24,7 +24,7 @@ export function usageEntitlement(summary, activeWorkers = 0) {
   };
 }
 
-export function usageModel({ mode = 'synthetic-demo', metrics = null, latestPublication = null,providerAllowance=null,entitlement=null } = {}) {
+export function usageModel({ mode = 'synthetic-credential', metrics = null, latestPublication = null,providerAllowance=null,entitlement=null } = {}) {
   const values = metrics || { assigned: 0, responses: 0, matches: 0, clarifications: 0, pending: 0 };
   const synthetic = String(mode).startsWith('synthetic');
   const units = [

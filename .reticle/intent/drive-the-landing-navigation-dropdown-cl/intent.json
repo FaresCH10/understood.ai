@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-the-landing-navigation-dropdown-closes-with-esca": {
+      "declaredAt": 1793181324494,
+      "id": "flow:drive-the-landing-navigation-dropdown-closes-with-esca",
+      "state": "declared",
+      "statement": "The landing navigation dropdown closes with Escape",
+      "status": "proposed",
+      "subject": "drive-the-landing-navigation-dropdown-cl",
+      "surface": {
+        "flow": "drive-the-landing-navigation-dropdown-closes-with-esca"
+      },
+      "updatedAt": 1793181324540
+    }
+  },
+  "subject": "drive-the-landing-navigation-dropdown-cl",
+  "version": 1
+}

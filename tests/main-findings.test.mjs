@@ -19,7 +19,7 @@ import {backupLocal} from '../scripts/local-backup.mjs';
 import {importSqliteBackup} from '../server/postgres/import-sqlite.mjs';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {createAppServer} from '../server/index.mjs';
-const localConfig={tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:'http://127.0.0.1:3030'};
+const localConfig={tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:'http://127.0.0.1:3030'};
 const poolFor=db=>({async connect(){return {query:async(sql,args)=>args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)??{rows:[]},release(){}};}});
 for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} crew language totals exclude inactive and other-crew workers and retain pending selections`,async()=>{
   const db=postgres?new PGlite():openDatabase(':memory:'),pool=postgres?poolFor(db):db;

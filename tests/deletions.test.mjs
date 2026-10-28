@@ -21,6 +21,8 @@ import {requestExport,processOneExport,downloadExport,expireExports} from '../se
 import {requestExport as pgExport,processOneExport as pgProcessExport,downloadExport as pgDownload,expireExports as pgExpire} from '../server/postgres/exports.mjs';
 import {previewWorkerImport,getWorkerImport,confirmWorkerImport,expireWorkerImports} from '../server/worker-import.mjs';
 import {previewWorkerImport as pgPreview,getWorkerImport as pgImport,confirmWorkerImport as pgConfirm,expireWorkerImports as pgImportExpiry} from '../server/postgres/worker-import.mjs';
+import {openPrincipalSession} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const input=()=>({requestId:randomUUID(),expectedCode:'Worker 030',reason:'worker_request',confirmed:true});
@@ -72,7 +74,7 @@ test('SQLite deletion acceptance is scoped, confirmed, audit-atomic, revokes acc
     db.prepare(`INSERT INTO recordings(id,org_id,site_id,assignment_id,submission_id,sha256,duration_seconds,bytes,status,created_at,received_at)
       VALUES(?,'cedar','beirut','assignment-30',?,'synthetic',1,100,'received',?,?)`).run(audioId,randomUUID(),now,now);
     issueWorkerGrant(db,owner,'worker-30');
-    createSession(db,db.prepare("SELECT * FROM workers WHERE id='worker-30'").get(),'worker','demo');
+    openPrincipalSession(db,db.prepare("SELECT * FROM workers WHERE id='worker-30'").get());
     const change=input();
     const oldReactivation={requestId:randomUUID(),expectedCode:'Worker 030',confirmed:true};
     reenableWorker(db,owner,'worker-30',oldReactivation);

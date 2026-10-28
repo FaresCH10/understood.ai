@@ -6,6 +6,8 @@ import { openDatabase } from '../server/db.mjs';
 import { seed } from '../server/seed.mjs';
 import { listAuditEvents, getAuditEvent, exportAuditEvents } from '../server/audit.mjs';
 import { createAppServer } from '../server/index.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const session = { principal_type: 'staff', principal_id: 'maya', org_id: 'cedar', site_id: 'beirut', role: 'owner' };
 function event(db, id, actorType, actorId, action, object, time, org = 'cedar', site = 'beirut') {
@@ -67,10 +69,10 @@ test('activity download uses filtered metadata only, neutralizes formulas and lo
 
 test('activity HTTP denies anonymous, worker, foreign event, forged filters and revoked staff', async () => {
   const db = openDatabase(':memory:');
-  const server = createAppServer(db,{ tier:'local',aiMode:'synthetic',accessMode:'demo' });
+  const server = sqliteApp(db);
   await new Promise((resolve) => server.listen(0,'127.0.0.1',resolve));
   const base = `http://127.0.0.1:${server.address().port}/api`;
-  const login = async (principal) => (await fetch(`${base}/demo/session`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal})})).headers.get('set-cookie').split(';')[0];
+  const login = async (principal) => (await loginPrincipal(base, principal)).headers.get('set-cookie').split(';')[0];
   const request = (cookie,path) => fetch(base+path,{headers:cookie ? {cookie} : {}});
   try {
     event(db,'http-event','staff','maya','test.created','item','2026-10-04T12:00:00.000Z');

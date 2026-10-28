@@ -10,18 +10,20 @@ import { createAppServer } from '../server/index.mjs';
 import { activityRows } from '../server/reports.mjs';
 import { listClarifications } from '../server/clarifications.mjs';
 import { publish } from '../server/domain.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const maya={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 
 test('SQLite publication language remains frozen across preference changes in worker, reports and clarification reads',async () => {
   const db=openDatabase(':memory:'); seed(db);
-  const server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const server=sqliteApp(db);
   await new Promise((done) => server.listen(0,'127.0.0.1',done));
   const base=`http://127.0.0.1:${server.address().port}/api`;
   try {
     const original=db.prepare("SELECT snapshot_json FROM publications WHERE id='shelf-v3'").get().snapshot_json;
     db.prepare("UPDATE workers SET language='ur' WHERE id='worker-14'").run();
-    const login=await fetch(`${base}/demo/session`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal:'worker-14'})});
+    const login=await loginPrincipal(base, 'worker-14');
     const cookie=login.headers.get('set-cookie').split(';')[0];
     const detail=await (await fetch(`${base}/worker/briefings/assignment-14`,{headers:{cookie}})).json();
     assert.equal(detail.language,'ar'); assert.equal(detail.content.question,JSON.parse(original).languages.ar.question);

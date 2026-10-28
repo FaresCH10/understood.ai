@@ -8,6 +8,8 @@ import { seed } from '../server/seed.mjs';
 import { createCrew, createWorker } from '../server/people.mjs';
 import { createAppServer } from '../server/index.mjs';
 import { ensureWorkerImportSchema, previewWorkerImport, confirmWorkerImport, getWorkerImport, workerImportErrorsCsv } from '../server/worker-import.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const maya = { principal_type: 'staff', principal_id: 'maya', org_id: 'cedar', site_id: 'beirut', role: 'owner' };
 const harbor = { ...maya, principal_id: 'harbor-owner', org_id: 'harbor', site_id: 'harbor-yard' };
@@ -84,10 +86,10 @@ test('confirm revalidates changed directory and rolls back every row after a wri
 
 test('CSV HTTP validates raw body, denies forged scope and separates preview from confirm', async () => {
   const db = openDatabase(':memory:');
-  const server = createAppServer(db, { tier: 'local', aiMode: 'synthetic', accessMode: 'demo' });
+  const server = sqliteApp(db);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}/api`;
-  const login = async (principal) => (await fetch(`${base}/demo/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ principal }) }))
+  const login = async (principal) => (await loginPrincipal(base, principal))
     .headers.get('set-cookie').split(';')[0];
   try {
     const staffCookie = await login('maya'), harborCookie = await login('harbor-owner'), workerCookie = await login('worker-30');

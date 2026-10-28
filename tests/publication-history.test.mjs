@@ -14,6 +14,8 @@ import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {checkedPublicationHistory,checkedPublicationDetail} from '../src/publication-history.ts';
+import {sqliteApp,principalLoginBody} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'maya',role:'owner',org_id:'cedar',site_id:'beirut'},origin='http://127.0.0.1:3020';
 async function fixture(postgres) {
@@ -66,11 +68,11 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} versi
 
 for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} version history HTTP is no-store, current-session scoped, read-only and rejects ambiguous input`,async()=>{
   const f=await fixture(postgres),password='Synthetic history test password only';
-  const server=postgres?createPostgresRehearsalServer(f.pool,{schema:f.schema,dataClass:'synthetic',tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin}):createAppServer(f.db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:origin});
+  const server=postgres?createPostgresRehearsalServer(f.pool,{schema:f.schema,dataClass:'synthetic',tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin}):sqliteApp(f.db,{publicOrigin:origin});
   if(postgres)await provisionStaffCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'history@example.test',password},{schema:f.schema});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
   try{
-    const login=await fetch(base+(postgres?'/auth/staff/login':'/demo/session'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(postgres?{email:'history@example.test',password}:{principal:'maya'})});assert.equal(login.status,200);
+    const login=await fetch(base+('/auth/staff/login'),{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(postgres?{email:'history@example.test',password}:principalLoginBody('maya'))});assert.equal(login.status,200);
     const headers={cookie:login.headers.get('set-cookie').split(';')[0]},session=await (await fetch(base+'/session',{headers})).json(),context={...headers,'x-client-session-context':session.clientContext};
     assert.equal((await fetch(base+'/briefings/history/publications')).status,401);
     const before=await f.rows('SELECT * FROM audit ORDER BY id');

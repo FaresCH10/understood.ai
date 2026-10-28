@@ -1,0 +1,21 @@
+{
+  "intents": {
+    "flow:drive-an-invalid-email-code-leaves-company-registratio": {
+      "binding": {
+        "flow": "drive-an-invalid-email-code-leaves-company-registratio"
+      },
+      "declaredAt": 1793198023166,
+      "id": "flow:drive-an-invalid-email-code-leaves-company-registratio",
+      "state": "bound",
+      "statement": "An invalid email code leaves company registration unverified.",
+      "status": "proposed",
+      "subject": "drive-an-invalid-email-code-leaves-compa",
+      "surface": {
+        "flow": "drive-an-invalid-email-code-leaves-company-registratio"
+      },
+      "updatedAt": 1793198023282
+    }
+  },
+  "subject": "drive-an-invalid-email-code-leaves-compa",
+  "version": 1
+}

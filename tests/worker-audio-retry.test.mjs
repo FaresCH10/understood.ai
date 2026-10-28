@@ -4,7 +4,7 @@ import {sendWorkerRecording,WorkerAudioRetryError,workerAudioRetryText} from '..
 import {createRecordingSubmission} from '../src/audio.ts';
 import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
-const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2099-01-01T00:00:00.000Z'};
+const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-credential',clientContext:'a'.repeat(64),expiresAt:'2099-01-01T00:00:00.000Z'};
 const scope={assignmentId:'assignment-one',publicationId:'publication-one',version:3,language:'en'};
 const id='8deac46b-26eb-4cb3-9c4c-f3d03fdf7753';
 const receipt={id:'3b4ea3e1-fc77-4efb-9c60-36521ac5b5a7',requestId:id,assignmentId:scope.assignmentId,clientContext:session.clientContext,status:'received',receivedAt:'2026-10-07T12:00:00.000Z',duplicate:false};

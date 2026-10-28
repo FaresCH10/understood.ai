@@ -5,7 +5,7 @@ import {saveTextDraft} from '../src/worker-text-draft.ts';
 import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 
 const time=Date.parse('2026-10-10T12:00:00.000Z');
-const session={authenticated:true,role:'worker',workerId:'fixture-worker',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:new Date(time+60000).toISOString()};
+const session={authenticated:true,role:'worker',workerId:'fixture-worker',language:'en',mode:'synthetic-credential',clientContext:'a'.repeat(64),expiresAt:new Date(time+60000).toISOString()};
 function storage(){const values=new Map();return {values,getItem:key=>values.get(key) ?? null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};}
 test('shared mode is the default; private choice binds exact tab, session, expiry and device barrier',()=>{
   const tab=storage(),device=storage();assert.equal(privateDeviceAllowed(session.clientContext,tab,device,time),false);

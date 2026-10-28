@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-a-credential-deployment-shows-work-email-sign-in": {
+      "declaredAt": 1793114037965,
+      "id": "flow:drive-a-credential-deployment-shows-work-email-sign-in",
+      "state": "declared",
+      "statement": "A credential deployment shows work-email sign-in on the public page and does not offer the synthetic demo profiles.",
+      "status": "proposed",
+      "subject": "drive-a-credential-deployment-shows-work",
+      "surface": {
+        "flow": "drive-a-credential-deployment-shows-work-email-sign-in"
+      },
+      "updatedAt": 1793114038003
+    }
+  },
+  "subject": "drive-a-credential-deployment-shows-work",
+  "version": 1
+}

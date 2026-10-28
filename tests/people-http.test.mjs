@@ -5,14 +5,16 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import { openDatabase } from '../server/db.mjs';
 import { createAppServer } from '../server/index.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 test('People HTTP controls enforce site authority and preserve publication audience', async () => {
   const db = openDatabase(':memory:');
-  const server = createAppServer(db, { tier: 'local', aiMode: 'synthetic', accessMode: 'demo' });
+  const server = sqliteApp(db);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}/api`;
   const login = async (principal) => {
-    const response = await fetch(`${base}/demo/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ principal }) });
+    const response = await loginPrincipal(base, principal);
     return response.headers.get('set-cookie').split(';')[0];
   };
   const request = (cookie, path, method = 'GET', body) => fetch(base + path, { method,

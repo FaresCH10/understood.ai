@@ -4,7 +4,7 @@ import {audioOutboxKey,readAudioOutbox,clearAudioOutbox,saveAudioDraft,AudioDraf
 import {encodeWav} from '../src/audio.ts';
 
 const time=Date.parse('2026-10-10T12:00:00.000Z'),now=()=>time;
-const session={authenticated:true,role:'worker',workerId:'synthetic-one',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2026-10-10T20:00:00.000Z'};
+const session={authenticated:true,role:'worker',workerId:'synthetic-one',language:'en',mode:'synthetic-credential',clientContext:'a'.repeat(64),expiresAt:'2026-10-10T20:00:00.000Z'};
 const scope={assignmentId:'private-assignment-one',publicationId:'version-three',version:3,language:'en'};
 const bytes=encodeWav({duration:1,sampleRate:16000,numberOfChannels:1,getChannelData:()=>Float32Array.from({length:16000},(_,i)=>Math.sin(i/10)*.5)});
 const input=()=>({submissionId:crypto.randomUUID(),capturedAt:new Date(time).toISOString(),bytes});

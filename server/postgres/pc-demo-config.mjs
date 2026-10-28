@@ -1,3 +1,4 @@
+import {resolveRegistrationVerification} from '../registration-verification.mjs';
 import {isIP} from 'node:net';
 import {isAbsolute,resolve,relative} from 'node:path';
 import {disabledPushAdapter} from '../push-adapter.mjs';
@@ -26,7 +27,8 @@ export function pcDemoConfig(value,{service='api',mailEnv={}}={}) {
   const mail=Object.freeze(resolveMailConfig({mode:mailEnv.UNDERSTOOD_EMAIL_MODE ?? 'disabled',
     apiKey:mailEnv.UNDERSTOOD_RESEND_KEY ?? '',from:mailEnv.UNDERSTOOD_EMAIL_FROM ?? '',
     key:mailEnv.UNDERSTOOD_AUTH_MAIL_KEY ?? '',publicOrigin:value.publicOrigin}));
-  return Object.freeze({service,tier:'staging',aiMode:'synthetic',dataClass:'synthetic',integrationMode:'synthetic',accessMode:'credential',
+  const registrationVerification=resolveRegistrationVerification(mailEnv,mail,value.publicOrigin);
+  return Object.freeze({registrationVerification,service,tier:'staging',aiMode:'synthetic',dataClass:'synthetic',integrationMode:'synthetic',accessMode:'credential',
     publicOrigin:value.publicOrigin,schema:value.schema,port:value.port,audioRoot,requestAddress,operatorAccess:false,
     runtimePermissionsRequired:true,runtimeRoleProfile:service==='api'?'application':'worker',mail,
     storageChecks:false,pilotDestination:null,pushAdapter:disabledPushAdapter});

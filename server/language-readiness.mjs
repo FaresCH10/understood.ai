@@ -26,7 +26,7 @@ function contentState(snapshot, code) {
   return { state: present ? 'ready' : 'missing', evidence: present ? copy.present : copy.missing };
 }
 
-export function languageReadinessModel({ mode = 'synthetic-demo', publication = null, testedAt = null,generationDefaults=['en','ar','ur'],pipeline=pipelineStatus(),stageTests=STAGE_TESTS.map(test=>({...test,state:'untested'})),verifiedArtifactLanguages=[] } = {}) {
+export function languageReadinessModel({ mode = 'synthetic-credential', publication = null, testedAt = null,generationDefaults=['en','ar','ur'],pipeline=pipelineStatus(),stageTests=STAGE_TESTS.map(test=>({...test,state:'untested'})),verifiedArtifactLanguages=[] } = {}) {
   const defaults=generationLanguages(generationDefaults);
   const synthetic = String(mode).startsWith('synthetic');
   const snapshot = publication?.snapshot || null;

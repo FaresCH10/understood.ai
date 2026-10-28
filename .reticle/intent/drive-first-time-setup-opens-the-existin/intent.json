@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-first-time-setup-opens-the-existing-company-regi": {
+      "declaredAt": 1793177244345,
+      "id": "flow:drive-first-time-setup-opens-the-existing-company-regi",
+      "state": "declared",
+      "statement": "First-time setup opens the existing company registration flow.",
+      "status": "proposed",
+      "subject": "drive-first-time-setup-opens-the-existin",
+      "surface": {
+        "flow": "drive-first-time-setup-opens-the-existing-company-regi"
+      },
+      "updatedAt": 1793177244372
+    }
+  },
+  "subject": "drive-first-time-setup-opens-the-existin",
+  "version": 1
+}

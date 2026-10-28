@@ -88,3 +88,11 @@ test('PostgreSQL first-run onboarding matches SQLite and rejects forged scope',a
       await assert.rejects(async()=>pgCompleteFirstRun(pool,{...session,site_id:randomUUID()},{...input(),...patch},{schema}),/Invalid onboarding input/);
   }finally {await db.close();}
 });
+
+test('Neon receipts retain verification method and codes accept Arabic digits with leading zeroes',async()=>{
+ const {normalizeVerificationCode,readRegistrationReceipt}=await import('../src/registration.ts');
+ assert.equal(normalizeVerificationCode('٠٠١٢٣٤'),'001234');assert.equal(normalizeVerificationCode('۰۰۱۲۳۴'),'001234');
+ const receipt={requestId:'11111111-1111-4111-8111-111111111111',email:'test@example.test',createdAt:new Date().toISOString(),state:'accepted',verification:'neon-code'};
+ assert.deepEqual(readRegistrationReceipt({getItem:()=>JSON.stringify(receipt)}),receipt);
+ assert.equal(readRegistrationReceipt({getItem:()=>JSON.stringify({...receipt,verification:'skip'})}),null);
+});

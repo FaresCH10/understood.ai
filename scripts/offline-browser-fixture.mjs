@@ -6,12 +6,14 @@ import {openDatabase} from '../server/db.mjs';
 import {createAppServer} from '../server/index.mjs';
 import {createSession,requireLocalRequest,sessionCookie} from '../server/auth.mjs';
 import {encodeWav} from '../src/audio.ts';
+import {sqliteApp,openPrincipalSession} from '../tests/helpers/sqlite-app.mjs';
+
 
 // Disposable, loopback-only, generated tone. No real microphone/provider, main DB or cloud.
 const port=Number(process.env.UNDERSTOOD_OFFLINE_QA_PORT ?? 3194);
 if(!Number.isInteger(port) || port<3194 || port>3199)throw Error('Offline QA port must be between 3194 and 3199');
 const origin=`http://127.0.0.1:${port}`,db=openDatabase(':memory:');
-const api=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:origin});
+const api=sqliteApp(db,{publicOrigin:origin});
 const handler=api.listeners('request')[0];
 const vite=await createViteServer({configFile:false,server:{middlewareMode:true},appType:'custom'});
 const samples=Float32Array.from({length:32000},(_,i)=>Math.sin(i/10)*.5),tone=encodeWav({duration:2,sampleRate:16000,numberOfChannels:1,getChannelData:()=>samples});
@@ -24,7 +26,7 @@ const ui=createServer(async(req,res)=>{
     if(path.startsWith('/qa/')){
       requireLocalRequest(req);
       if(path==='/qa/start' && req.method==='GET'){
-        const session=createSession(db,db.prepare("SELECT * FROM workers WHERE id='worker-30'").get(),'worker','demo');
+        const session=openPrincipalSession(db,db.prepare("SELECT * FROM workers WHERE id='worker-30'").get());
         html(res,'<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private offline synthetic check</title><h1>Private offline synthetic check</h1><p>Disposable worker, generated tone, native encrypted browser storage. No microphone, provider or real worker data.</p><button id="run">Prepare synthetic offline check</button><button id="clear">Remove previous synthetic fixture data</button><a id="open" href="/#worker/assignment-30" hidden>Open worker briefing</a><pre id="result" role="status">Not run.</pre><script type="module" src="/tests/browser/worker-offline.ts"></script></html>',200,{'set-cookie':sessionCookie(session.token,session.maxSeconds)});return;
       }
       if(path==='/qa/evidence'){res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(evidence()));return;}

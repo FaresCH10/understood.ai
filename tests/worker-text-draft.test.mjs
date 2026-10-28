@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {canRestoreTextDraft,TextDraftError,textDraftCopy,textDraftStatus,saveTextDraft,restoreTextDraft,removeTextDraft} from '../src/worker-text-draft.ts';
 import {assertWorkerDictionary} from './helpers/worker-locales.mjs';
 const time=Date.parse('2026-10-07T12:00:00.000Z');
-const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-demo',clientContext:'a'.repeat(64),expiresAt:'2026-10-07T20:00:00.000Z'};
+const session={authenticated:true,role:'worker',workerId:'qa-one',language:'en',mode:'synthetic-credential',clientContext:'a'.repeat(64),expiresAt:'2026-10-07T20:00:00.000Z'};
 const scope={assignmentId:'one',publicationId:'published-one',version:3};
 const draft={answer:'Finished on blue; unfinished on yellow.',help:'Please explain the second shelf.',receipts:[{kind:'answer',requestId:crypto.randomUUID(),assignmentId:'one',status:'unknown'}]};
 const key='understood:worker-text-draft:v1';

@@ -21,6 +21,8 @@ import {processOne} from '../server/worker.mjs';
 import {ensureSettingsSchema,updateSettings as localSettings} from '../server/settings.mjs';
 import {updateSettings as pgSettings} from '../server/postgres/settings.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
+import {openPrincipalSession} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'owner',role:'owner',org_id:'a',site_id:'a'},origin='http://127.0.0.1:3020';
 const body=()=>({requestId:randomUUID(),title:' Shelf draft ',source:' Put finished items on the blue shelf. '});
@@ -97,11 +99,11 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} draft
   }finally {await f.close();}
 });
 for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} draft receipt HTTP is read-only, scoped, no-store and sanitized`,async()=>{
-  const f=await fixture(postgres),config={tier:'local',aiMode:'synthetic',accessMode:postgres?'credential':'demo',publicOrigin:origin,schema:f.options.schema,dataClass:'synthetic'},password='Disposable receipt password only';
+  const f=await fixture(postgres),config={tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin,schema:f.options.schema,dataClass:'synthetic'},password='Disposable receipt password only';
   if(postgres)for(const staffId of ['owner','reader'])await provisionStaffCredential(f.pool,{staffId,orgId:'a',siteId:'a',email:`${staffId}@example.test`,password},{schema:f.options.schema});
   const server=postgres?createPostgresRehearsalServer(f.pool,config):createAppServer(f.db,config);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/api`;
   const login=async staffId=>{
-    if(!postgres)return `understood_session=${createSession(f.db,f.db.prepare('SELECT * FROM staff WHERE id=?').get(staffId),'staff','demo').token}`;
+    if(!postgres)return `understood_session=${openPrincipalSession(f.db,f.db.prepare('SELECT * FROM staff WHERE id=?').get(staffId)).token}`;
     const r=await fetch(`${base}/auth/staff/login`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({email:`${staffId}@example.test`,password})});assert.equal(r.status,200);return r.headers.get('set-cookie').split(';')[0];
   };
   try {

@@ -4,10 +4,12 @@ import {seed} from '../server/seed.mjs';
 import {createAppServer} from '../server/index.mjs';
 import {syntheticPrepare,CANONICAL_SOURCE} from '../server/domain.mjs';
 import {processOne} from '../server/worker.mjs';
+import {sqliteApp} from '../tests/helpers/sqlite-app.mjs';
+
 const db=openDatabase(':memory:');seed(db);
 db.prepare("UPDATE organizations SET name='Disposable Review QA' WHERE id='cedar'").run();
 db.prepare("UPDATE briefings SET state='ready',prepared_json=? WHERE id='shelf'").run(JSON.stringify(syntheticPrepare(CANONICAL_SOURCE)));
-const api=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:'http://127.0.0.1:3030'});
+const api=sqliteApp(db,{publicOrigin:'http://127.0.0.1:3030'});
 let loseAcknowledgment=true,loseBeforeCommit=true;const handler=api.listeners('request')[0];api.removeAllListeners('request');
 api.on('request',(req,res)=>{
   if(req.url.includes('/review') || req.url.startsWith('/api/briefing-review/')) res.once('finish',()=>console.log(req.method,req.url,res.statusCode,db.prepare("SELECT revision,state FROM briefings WHERE id='shelf'").get(),'receipts',db.prepare('SELECT COUNT(*) n FROM briefing_review_requests').get().n));

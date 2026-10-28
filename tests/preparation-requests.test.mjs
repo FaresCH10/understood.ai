@@ -11,6 +11,8 @@ import {processOne} from '../server/worker.mjs';
 import {preparationRequestInput,preparationRequestReceipt} from '../server/preparation-request-input.mjs';
 import {createAppServer} from '../server/index.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
+import {sqliteApp,principalLoginBody} from './helpers/sqlite-app.mjs';
+
 const contextualFetch=createSessionContextFetch();
 const source='This unsupported synthetic instruction must fail safely.';
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
@@ -71,10 +73,10 @@ for(const mode of ['sqlite','postgres'])test(`${mode} preparation receipts survi
 });
 test('SQLite preparation recovery HTTP requires original session context before receipt or queue effects',async()=>{
   const f=await fixture('sqlite'),draft=await sqlite.createDraft(f.db,owner,{requestId:randomUUID(),title:'HTTP receipt',source});
-  const server=createAppServer(f.db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const server=sqliteApp(f.db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=`http://127.0.0.1:${server.address().port}`,path=`${origin}/api/briefings/${draft.id}/preparation-requests`;
   try {
-    const login=await contextualFetch(`${origin}/api/demo/session`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal:'maya'})});
+    const login=await contextualFetch(`${origin}/api/auth/staff/login`,{method:'POST',headers:{'content-type':'application/json',origin:'http://127.0.0.1:3020'},body:JSON.stringify(principalLoginBody('maya'))});
     const cookie=login.headers.get('set-cookie').split(';')[0],body={requestId:randomUUID(),revision:1,jobId:null,generation:0};
     for(const url of [path,`${path}/${body.requestId}`])assert.equal((await fetch(url,{headers:{cookie}})).status,409);
     assert.equal((await fetch(path,{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify(body)})).status,409);

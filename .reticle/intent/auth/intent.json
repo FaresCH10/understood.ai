@@ -1,0 +1,65 @@
+{
+  "intents": {
+    "inline:a-valid-email-code-activates-the-workspace-and-a-0d01095d": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "net",
+            "status": 200,
+            "urlContains": "/auth/registrations/verify-code"
+          },
+          {
+            "contains": "تم التحقق من البريد",
+            "kind": "text"
+          }
+        ]
+      },
+      "declaredAt": 1793197911890,
+      "id": "inline:a-valid-email-code-activates-the-workspace-and-a-0d01095d",
+      "provenBy": {
+        "at": 1793197932779,
+        "grade": "net",
+        "runId": "drive-2f4ce0b3284d435a",
+        "verdictId": "reticle_assert:1793197932779"
+      },
+      "state": "proved",
+      "statement": "A valid email code activates the workspace and asks the owner to sign in separately.",
+      "status": "proved",
+      "subject": "auth",
+      "surface": {
+        "files": [
+          "src/Register.tsx"
+        ]
+      },
+      "updatedAt": 1793197932842
+    },
+    "inline:an-invalid-email-code-leaves-company-registratio-9f660b1e": {
+      "binding": {
+        "kind": "net",
+        "status": 400,
+        "urlContains": "/auth/registrations/verify-code"
+      },
+      "declaredAt": 1793197886189,
+      "id": "inline:an-invalid-email-code-leaves-company-registratio-9f660b1e",
+      "provenBy": {
+        "at": 1793197886356,
+        "grade": "net",
+        "runId": "drive-2f4ce0b3284d435a",
+        "verdictId": "reticle_act_and_wait:1793197886356"
+      },
+      "state": "proved",
+      "statement": "An invalid email code leaves company registration unverified.",
+      "status": "proved",
+      "subject": "auth",
+      "surface": {
+        "files": [
+          "src/Register.tsx"
+        ]
+      },
+      "updatedAt": 1793197886435
+    }
+  },
+  "subject": "auth",
+  "version": 1
+}

@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { openDatabase } from '../server/db.mjs';
 import { createAppServer } from '../server/index.mjs';
 import { receiveRecording } from '../server/recordings.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 function wav() {
   const bytes = Buffer.alloc(32044);
@@ -20,12 +22,11 @@ function wav() {
 test('report CSV is site scoped, formula safe, and distinguishes a received audio answer', async () => {
   const db = openDatabase(':memory:');
   const audioRoot = await mkdtemp(join(tmpdir(), 'understood-report-'));
-  const server = createAppServer(db, { tier: 'local', aiMode: 'synthetic', accessMode: 'demo', audioRoot });
+  const server = sqliteApp(db,{audioRoot });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}/api`;
   const signIn = async (principal) => {
-    const response = await fetch(`${base}/demo/session`, { method: 'POST',
-      headers: { 'content-type': 'application/json' }, body: JSON.stringify({ principal }) });
+    const response = await loginPrincipal(base, principal);
     return response.headers.get('set-cookie').split(';')[0];
   };
   try {

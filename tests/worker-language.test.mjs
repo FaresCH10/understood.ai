@@ -10,6 +10,8 @@ import {ensurePeopleSchema,createWorker,updateWorker,listWorkers,disableWorker,c
 import {instructionAudienceOverview,startInstructionSend} from '../server/instructions.mjs';
 import {ensureBriefingSchema} from '../server/preparation.mjs';
 import {createAppServer} from '../server/index.mjs';
+import {sqliteApp,openPrincipalSession} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const auditor={...owner,role:'auditor'};
@@ -158,13 +160,13 @@ test('SQLite unselected workers are excluded from instruction audiences and cann
 });
 
 test('worker language HTTP routes persist first selection, fence stale contexts and serialize staff decisions',async()=>{
-  const db=fixture(),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=fixture(),server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`,origin='http://127.0.0.1:3020',contexts=new Map();
   const call=(path,cookie,body,method=body?'POST':'GET',context=contexts.get(cookie))=>fetch(base+path,{method,
     headers:{...(cookie?{cookie}:{}),...(body?{'content-type':'application/json'}:{}),...(method!=='GET'?{origin}:{}),
       ...(context?{'x-client-session-context':context}:{})},...(body?{body:JSON.stringify(body)}:{})});
-  const login=async row=>{const cookie=`understood_session=${createSession(db,row,row.role?'staff':'worker','demo').token}`;
+  const login=async row=>{const cookie=`understood_session=${openPrincipalSession(db,row).token}`;
     const session=await (await call('/session',cookie)).json();contexts.set(cookie,session.clientContext);return {cookie,session};};
   try{
     const ownerLogin=await login(db.prepare("SELECT * FROM staff WHERE id='maya'").get());
@@ -221,13 +223,13 @@ test('SQLite worker session payload and context fence expose language selection 
   try{
     const created=createWorker(db,owner,{code:'Worker 040',name:'Nadia Fares'});
     const raw=db.prepare('SELECT * FROM workers WHERE id=?').get(created.id);
-    const before=createSession(db,raw,'worker','demo');
-    const beforeSession=requireSession(db,{headers:{cookie:`understood_session=${before.token}`}},{accessMode:'demo'});
+    const before=openPrincipalSession(db,raw);
+    const beforeSession=requireSession(db,{headers:{cookie:`understood_session=${before.token}`}},{accessMode:'credential'});
     assert.equal(beforeSession.language_selection_required,1);
     assert.equal(beforeSession.name,'Nadia Fares');
     const beforeContext=clientSessionContext(beforeSession).clientContext;
     selectWorkerLanguage(db,self(db,created.id),{requestId:randomUUID(),language:'ar'});
-    const afterSession=requireSession(db,{headers:{cookie:`understood_session=${before.token}`}},{accessMode:'demo'});
+    const afterSession=requireSession(db,{headers:{cookie:`understood_session=${before.token}`}},{accessMode:'credential'});
     assert.equal(afterSession.language_selection_required,0);
     assert.notEqual(clientSessionContext(afterSession).clientContext,beforeContext);
     assert.equal(afterSession.language_selected_by,'worker');

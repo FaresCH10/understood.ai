@@ -10,6 +10,8 @@ import { ensureClarificationSchema,requestHelp,workerHelpCases,listClarification
 import {checkedClarificationPage,checkedClarificationDetail,checkedClarificationActionReceipt} from '../src/clarification-contract.ts';
 import {clarificationActionHash} from '../src/clarification-action-recovery.ts';
 import {checkedCaseTimeline} from '../src/case-timeline.ts';
+import {sqliteApp,loginRoute,principalLoginBody} from './helpers/sqlite-app.mjs';
+
 
 const maya={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const worker={principal_type:'worker',principal_id:'worker-30',org_id:'cedar',site_id:'beirut'};
@@ -99,15 +101,15 @@ test('audit failure rolls back help, ownership and resolution; legacy open help 
 });
 
 test('clarification HTTP shares paged contract and denies worker/staff/foreign case authority correctly',async () => {
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise((resolve) => server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
   const request=async(path,cookie,body) => {
-    const headers={...(cookie ? {cookie} : {}),'content-type':'application/json'};
+    const headers={origin:'http://127.0.0.1:3020',...(cookie ? {cookie} : {}),'content-type':'application/json'};
     if(cookie && (body!==undefined && path.startsWith('/worker/') || path.startsWith('/clarifications')))headers['x-client-session-context']=(await (await fetch(base+'/session',{headers:{cookie}})).json()).clientContext || '';
     return fetch(base+path,{headers,...(body===undefined ? {} : {method:'POST',body:JSON.stringify(body)})});
   };
-  const login=async (principal) => (await request('/demo/session',null,{principal})).headers.get('set-cookie').split(';')[0];
+  const login=async (principal) => (await request(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
   try {
     const staff=await login('maya'),workerCookie=await login('worker-30'),other=await login('harbor-owner');
     assert.equal((await request('/clarifications')).status,401);

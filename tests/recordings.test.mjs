@@ -13,6 +13,8 @@ import { handleRecordingRoute } from '../server/recording-http.mjs';
 import {clientSessionContext} from '../server/session-context.mjs';
 import {checkedWorkerReceipt} from '../src/worker-request.ts';
 import {createSession,requireSession} from '../server/auth.mjs';
+import {openPrincipalSession} from './helpers/sqlite-app.mjs';
+
 
 const worker30 = { principal_type: 'worker', principal_id: 'worker-30', org_id: 'cedar', site_id: 'beirut' };
 const maya = { principal_type: 'staff', principal_id: 'maya', role: 'owner', org_id: 'cedar', site_id: 'beirut' };
@@ -57,8 +59,8 @@ test('recording HTTP route accepts exact WAV and serves only scoped private audi
   const db = openDatabase(':memory:'); seed(db);
   const root = await mkdtemp(join(tmpdir(), 'understood-recording-http-'));
   const principal=db.prepare('SELECT * FROM workers WHERE id=?').get('worker-30');
-  const {token}=createSession(db,principal,'worker','demo');
-  let session = requireSession(db,{headers:{cookie:`understood_session=${token}`}},{accessMode:'demo'});
+  const {token}=openPrincipalSession(db,principal);
+  let session = requireSession(db,{headers:{cookie:`understood_session=${token}`}},{accessMode:'credential'});
   const server = createServer(async (req, res) => {
     try {
       if (!await handleRecordingRoute(req, res, db, session, new URL(req.url, 'http://localhost').pathname, root)) {

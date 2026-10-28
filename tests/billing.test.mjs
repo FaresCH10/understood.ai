@@ -8,6 +8,8 @@ import {seed} from '../server/seed.mjs';
 import {ensureBillingSchema,createInvoice,recordPayment,voidInvoice,getInvoice,listInvoices,billingReceipt} from '../server/billing.mjs';
 import {moneyCents,invoiceInput,paymentInput,voidInput,invoiceTotals,invoiceFilters,billingRequestSignature} from '../server/billing-input.mjs';
 import {createAppServer} from '../server/index.mjs';
+import {sqliteApp,loginRoute,principalLoginBody} from './helpers/sqlite-app.mjs';
+
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const invoice=()=>({requestId:randomUUID(),number:'INV-001',description:'Synthetic pilot service',issueDate:'2026-10-01',dueDate:'2026-10-10',amount:'25.00',confirmed:true});
 const payment=()=>({requestId:randomUUID(),reference:'Synthetic transfer',note:'Disposable record only',date:'2026-10-01',amount:'10.10',confirmed:true});
@@ -77,11 +79,11 @@ test('SQLite manual invoices and partial payments replay exactly, preserve balan
 });
 
 test('SQLite billing private HTTP routes replay invoices/payments and escape private downloads',async()=>{
-  const db=openDatabase(':memory:');seed(db);const server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:'http://127.0.0.1:3020'});
+  const db=openDatabase(':memory:');seed(db);const server=sqliteApp(db,{publicOrigin:'http://127.0.0.1:3020'});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
   const call=(path,cookie,body)=>fetch(base+path,{method:body ? 'POST' : 'GET',headers:{...(cookie ? {cookie} : {}),'content-type':'application/json',origin:'http://127.0.0.1:3020'},body:body ? JSON.stringify(body) : undefined});
   try {
-    const login=await call('/demo/session',null,{principal:'maya'}),cookie=login.headers.get('set-cookie').split(';')[0];
+    const login=await call(loginRoute('maya'),null,principalLoginBody('maya')),cookie=login.headers.get('set-cookie').split(';')[0];
     const request={...invoice(),description:'<script>alert(1)</script> & synthetic service'},created=await call('/invoices',cookie,request);assert.equal(created.status,201);const {id}=await created.json();
     assert.equal((await call('/invoices',cookie,request)).status,200);
     const invoiceReceipt=await call(`/invoices/requests/invoice/${request.requestId}`,cookie);assert.equal(invoiceReceipt.status,200);assert.equal((await invoiceReceipt.json()).invoiceId,id);assert.match(invoiceReceipt.headers.get('cache-control'),/no-store/);
@@ -90,9 +92,9 @@ test('SQLite billing private HTTP routes replay invoices/payments and escape pri
     const html=await download.text();assert.match(html,/\$14\.90/);assert.match(html,/&lt;script&gt;/);assert.ok(!html.includes('<script>'));
     assert.equal((await call('/invoices?status=bad',cookie)).status,400);assert.equal((await call(`/invoices/${id}/payments`,cookie,{...payment(),amount:'14.91'})).status,409);
     assert.equal((await call(`/invoices/${id}`,cookie)).status,200);assert.equal((await call(`/invoices/${id}/download`,null)).status,401);
-    const workerLogin=await call('/demo/session',null,{principal:'worker-30'}),workerCookie=workerLogin.headers.get('set-cookie').split(';')[0];assert.equal((await call(`/invoices/${id}/download`,workerCookie)).status,403);
+    const workerLogin=await call(loginRoute('worker-30'),null,principalLoginBody('worker-30')),workerCookie=workerLogin.headers.get('set-cookie').split(';')[0];assert.equal((await call(`/invoices/${id}/download`,workerCookie)).status,403);
     assert.equal((await call(`/invoices/requests/invoice/${request.requestId}`,workerCookie)).status,403);
-    const foreignLogin=await call('/demo/session',null,{principal:'harbor-owner'}),foreignCookie=foreignLogin.headers.get('set-cookie').split(';')[0];assert.equal((await call(`/invoices/${id}/download`,foreignCookie)).status,404);
+    const foreignLogin=await call(loginRoute('harbor-owner'),null,principalLoginBody('harbor-owner')),foreignCookie=foreignLogin.headers.get('set-cookie').split(';')[0];assert.equal((await call(`/invoices/${id}/download`,foreignCookie)).status,404);
     assert.equal((await (await call(`/invoices/requests/invoice/${request.requestId}`,foreignCookie)).json()).found,false);
     const voidRequest={...invoice(),number:'HTTP-VOID'},voidCreated=await call('/invoices',cookie,voidRequest),voidId=(await voidCreated.json()).id;
     const input={...cancellation(),number:'HTTP-VOID',reason:'Synthetic <script> cancellation'};

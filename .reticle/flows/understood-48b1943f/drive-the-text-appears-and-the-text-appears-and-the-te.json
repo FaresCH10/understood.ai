@@ -1,0 +1,66 @@
+{
+  "version": 2,
+  "name": "drive-the-text-appears-and-the-text-appears-and-the-te",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793186383845,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "heading",
+        "name": "تسليم واضح بين الورديات."
+      },
+      "args": {},
+      "action": "scrollIntoView",
+      "source": {
+        "file": "src/HeroJourney.tsx",
+        "line": 66
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "text",
+            "contains": "تسليم واضح بين الورديات.",
+            "visible": true
+          },
+          {
+            "kind": "text",
+            "contains": "تحديث واحد لأفراد الموقع.",
+            "visible": true
+          },
+          {
+            "kind": "text",
+            "contains": "بداية أوضح لكل وردية.",
+            "visible": true
+          },
+          {
+            "kind": "text",
+            "contains": "تعليمات واضحة للخطوة التالية.",
+            "visible": true
+          }
+        ]
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "The text \"تسليم واضح بين الورديات.\" appears and the text \"تحديث واحد لأفراد الموقع.\" appears and the text \"بداية أوضح لكل وردية.\" appears and the text \"تعليمات واضحة للخطوة التالية.\" appears",
+  "intentDerived": true,
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  }
+}

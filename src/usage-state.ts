@@ -57,7 +57,7 @@ export function checkedEntitlement(raw:unknown):UsageEntitlement {
 }
 export function checkedUsageModel(raw:unknown,mode:string|undefined,role:string|null|undefined):UsageModel {
   const row=raw as UsageModel,base='controls,denominator,entitlement,mode,period,plan,providerAllowance,publication,spend,units';
-  if(!(keys(row,base) || keys(row,'changeRequestsAvailable,'+base)) || row.mode!==mode || !['synthetic-demo','synthetic-credential'].includes(row.mode)
+  if(!(keys(row,base) || keys(row,'changeRequestsAvailable,'+base)) || row.mode!==mode || row.mode!=='synthetic-credential'
     || !['owner','administrator','supervisor','auditor'].includes(role || '') || !Array.isArray(row.units) || row.units.length!==5
     || row.changeRequestsAvailable!==undefined && (typeof row.changeRequestsAvailable!=='boolean' || row.changeRequestsAvailable!==['owner','administrator','supervisor'].includes(role || '')))throw Error('Plan and usage cannot be verified.');
   const units=row.units,assigned=units[0]?.used;

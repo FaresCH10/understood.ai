@@ -204,3 +204,18 @@ test('PostgreSQL failed audit rolls the whole verified workspace back',async()=>
     assert.equal((await f.q('SELECT count(*)::int n FROM staff_credentials'))[0].n,0);
   }finally{await f.db.close();}
 });
+
+test('PostgreSQL Neon verification rejects failed proof and creates exactly one workspace after proof',async()=>{
+ const {verifyRegistrationCode}=await import('../server/postgres/registration.mjs');const neon={...mail,provider:'neon'};
+ const f=await fixture();try{
+  const request=value(),input={requestId:request.requestId,email:request.email,code:'001234'};
+  assert.equal((await requestRegistration(f.pool,request,'neon-pg',neon,options)).verification,'neon-code');
+  await processOneRegistration(f.pool,neon,{...options,send:async(c,id,message)=>{assert.equal(message.text,'');return {providerId:'neon-test'};}});
+  assert.equal((await f.q('SELECT count(*)::int n FROM registration_tokens'))[0].n,0);
+  await assert.rejects(verifyRegistrationCode(f.pool,input,'neon-pg',neon,{...options,checkCode:async()=>false}));
+  assert.equal((await f.q('SELECT count(*)::int n FROM staff_credentials'))[0].n,0);
+  assert.equal((await verifyRegistrationCode(f.pool,input,'neon-pg',neon,{...options,checkCode:async()=>true})).duplicate,false);
+  assert.equal((await verifyRegistrationCode(f.pool,input,'neon-pg',neon,{...options,checkCode:async()=>{assert.fail('replayed proof');}})).duplicate,true);
+  assert.equal((await f.q('SELECT count(*)::int n FROM organization_entitlements'))[0].n,1);
+ }finally{await f.db.close();}
+});

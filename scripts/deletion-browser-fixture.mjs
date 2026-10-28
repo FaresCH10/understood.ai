@@ -26,10 +26,10 @@ import {captureReportAudience} from '../server/report-scope.mjs';
 
 // Disposable UI evidence: all state lives in memory; no existing local data is changed.
 const db=openDatabase(':memory:');
-const accessMode=process.argv.includes('--credential')?'credential':'demo';
+const accessMode='credential';
 const uiPort=Number(process.env.UNDERSTOOD_QA_WEB_PORT || 3168),apiPort=Number(process.env.UNDERSTOOD_QA_API_PORT || 3169);
 if(![uiPort,apiPort].every(port=>Number.isInteger(port) && port>=1024 && port<=65535) || uiPort===apiPort)throw Error('Invalid fixture ports');
-if(accessMode==='credential')seed(db);
+seed(db);
 const sourceAudioRoot=process.argv.includes('--source-audio')?await mkdtemp(join(tmpdir(),'understood-source-ui-')):undefined;
 const api=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode,publicOrigin:`http://127.0.0.1:${uiPort}`,mail:{mode:'disabled'},...(sourceAudioRoot?{audioRoot:sourceAudioRoot}:{})});
 if(process.argv.includes('--civil-time'))db.prepare("UPDATE sites SET timezone='America/New_York' WHERE id='beirut'").run();
@@ -178,7 +178,7 @@ api.on('request',(req,res)=>{
         const assignment={'qa-new':'qa-answer-new','qa-ar':'qa-answer-ar','qa-ur':'qa-answer-ur','worker-29':'assignment-29'}[worker];
         if(!assignment)throw Error('Invalid synthetic worker');
         const principal=db.prepare('SELECT * FROM workers WHERE id=?').get(worker);
-        const session=accessMode==='credential' ? redeemWorkerGrant(db,issueWorkerGrant(db,owner,worker,480).token) : createSession(db,principal,'worker','demo',null,url.searchParams.get('scenario')==='session-expire' ? 3 : 8*3600);
+        const session=redeemWorkerGrant(db,issueWorkerGrant(db,owner,worker,480).token);
         if(url.searchParams.get('scenario')==='request-corrupt'){
           res.writeHead(200,{'set-cookie':sessionCookie(session.token,session.maxSeconds),'content-type':'text/html','cache-control':'no-store'});
           res.end(`<p>Disposable synthetic request-ledger test</p><button id="prepare">Prepare corrupt request record</button><p id="state">Not prepared</p><a href="/#worker/${assignment}">Open worker briefing</a><script>document.getElementById('prepare').addEventListener('click',()=>{sessionStorage.setItem('understood:worker-requests:v1','{');document.getElementById('state').textContent='Synthetic corrupt record prepared';document.getElementById('prepare').disabled=true;});</script>`);return;
@@ -358,7 +358,7 @@ api.on('request',(req,res)=>{
     requireLocalRequest(req);res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
     res.end(JSON.stringify({notificationPosts,reads:db.prepare('SELECT COUNT(*) n FROM notification_reads').get().n,workerPosts}));return;
   }
-  if(req.method==='POST' && ['/api/demo/session','/api/auth/staff/login','/api/auth/worker/redeem'].includes(url.pathname))signInPosts++;
+  if(req.method==='POST' && ['/api/auth/staff/login','/api/auth/worker/login','/api/auth/worker/redeem'].includes(url.pathname))signInPosts++;
   if(req.method==='GET' && /^\/api\/worker\/briefings\/[^/]+\/receipts\//.test(url.pathname)){
     receiptReads++;
     if(rejectReceiptRead){requireLocalRequest(req);res.writeHead(503,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify({error:'Synthetic receipt read unavailable'}));return;}

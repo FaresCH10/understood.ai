@@ -281,8 +281,52 @@ test('registration HTTP is credential-only, origin-bound, query-free and never s
     assert.equal((await call('/api/auth/registrations',{...request,acceptTerms:false})).status,400);
     assert.equal((await call('/api/auth/registrations/verify?token=x',{token:delivery.token})).status,400);
   }finally {await new Promise(resolve=>server.close(resolve));db.close();}
-  const demo=openDatabase(':memory:'),demoServer=createAppServer(demo,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
-  await new Promise(resolve=>demoServer.listen(0,'127.0.0.1',resolve));
-  try {assert.equal((await fetch(`http://127.0.0.1:${demoServer.address().port}/api/auth/registrations`,{method:'POST',headers:{'content-type':'application/json'},body:'{}'})).status,404);}
-  finally {await new Promise(resolve=>demoServer.close(resolve));demo.close();}
+});
+
+test('Neon registration checks proof before activation, dispatches no legacy token, and activates once',async()=>{
+ const {verifyRegistrationCode}=await import('../server/registration.mjs');
+ const neon={...config,provider:'neon',authUrl:'https://ep-test.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth'};
+ const db=dbFixture();try{
+  const request=value(),input={requestId:request.requestId,email:request.email,code:'001234'};
+  assert.equal((await requestRegistration(db,request,'neon-request',neon)).verification,'neon-code');
+  let delivered=false;await processOneRegistration(db,neon,{send:async(c,id,message)=>{
+   assert.equal(message.email,request.email);assert.equal(message.text,'');delivered=true;return {providerId:'neon-test'};
+  }});assert(delivered);assert.equal(count(db,'registration_tokens'),0);assert.equal(count(db,'staff_credentials'),0);
+  await assert.rejects(verifyRegistrationCode(db,input,'neon-check',neon,{checkCode:async()=>false}),/verification unavailable/);
+  assert.equal(count(db,'staff_credentials'),0);
+  await assert.rejects(verifyRegistrationCode(db,{...input,email:'wrong@example.test'},'neon-check',neon,{checkCode:async()=>{assert.fail('wrong identity contacted provider');}}));
+  const result=await verifyRegistrationCode(db,input,'neon-check',neon,{checkCode:async()=>true});
+  assert.deepEqual(result,{completed:true,signInRequired:true,duplicate:false});
+  assert.equal(count(db,'staff_credentials'),1);assert.equal(count(db,'organization_entitlements'),1);
+  assert.equal((await verifyRegistrationCode(db,input,'neon-check',neon,{checkCode:async()=>{assert.fail('replayed proof');}})).duplicate,true);
+  assert.equal(count(db,'organization_entitlements'),1);
+ }finally{db.close();}
+});
+test('Neon proof cannot activate a registration expired while the provider request was running',async()=>{
+ const {verifyRegistrationCode}=await import('../server/registration.mjs');const neon={...config,provider:'neon'};
+ const db=dbFixture();try{
+  const request=value();await requestRegistration(db,request,'neon-expire',neon);
+  await assert.rejects(verifyRegistrationCode(db,{requestId:request.requestId,email:request.email,code:'123456'},'neon-expire',neon,{checkCode:async()=>{
+   db.prepare("UPDATE organization_registrations SET expires_at=? WHERE id=?").run('2000-01-01T00:00:00.000Z',request.requestId);return true;
+  }}));assert.equal(count(db,'staff_credentials'),0);
+ }finally{db.close();}
+});
+
+test('Neon verification HTTP enforces origin, input shape and separate sign-in',async()=>{
+ const neon={...config,provider:'neon',authUrl:'https://ep-fixture.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth'};
+ const db=dbFixture(),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'credential',mail:mailOptions,registrationVerification:neon});
+ const original=globalThis.fetch;
+ globalThis.fetch=(url,options)=>String(url).startsWith(neon.authUrl)?Promise.resolve(Response.json({success:JSON.parse(options.body).otp==='001234'})):original(url,options);
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}`;
+ try{
+  const options=await (await fetch(base+'/api/auth/registrations/options')).json();assert.deepEqual(options,{available:true,verification:'neon-code'});
+  const request=value();await requestRegistration(db,request,'neon-http',neon);
+  const input={requestId:request.requestId,email:request.email,code:'001234'};
+  const call=(path,body=input,origin=config.publicOrigin)=>fetch(base+path,{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify(body)});
+  assert.equal((await call('/api/auth/registrations/verify-code',input,'https://other.test')).status,403);
+  assert.equal((await call('/api/auth/registrations/verify-code?code=001234')).status,400);
+  assert.equal((await call('/api/auth/registrations/verify-code',{...input,role:'owner'})).status,400);
+  const response=await call('/api/auth/registrations/verify-code');assert.equal(response.status,200);assert.equal(response.headers.get('set-cookie'),null);
+  assert.equal((await response.json()).signInRequired,true);
+ }finally{globalThis.fetch=original;await new Promise(resolve=>server.close(resolve));db.close();}
 });

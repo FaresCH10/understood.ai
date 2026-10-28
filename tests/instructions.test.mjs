@@ -11,20 +11,22 @@ import {recipientDeliveryReadiness} from '../server/delivery-readiness.mjs';
 import {processOne} from '../server/worker.mjs';
 import {ensurePeopleSchema,createWorker} from '../server/people.mjs';
 import {assessKeywordAnswer,CANONICAL_SOURCE} from '../server/domain.mjs';
+import {sqliteApp,loginRoute,principalLoginBody,openPrincipalSession} from './helpers/sqlite-app.mjs';
+
 
 const origin='http://127.0.0.1:3020';
 const source='Move the red ladder to the north bay before the night shift.';
 
 test('instruction send publishes only prepared languages, freezes modes and supports idempotent sends',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
   const contexts=new Map();
   const call=(path,cookie,body,method=body?'POST':'GET')=>fetch(base+path,{method,headers:{...(cookie?{cookie}:{}),...(body?{'content-type':'application/json'}:{}),...(method!=='GET'?{origin}:{}),...(contexts.has(cookie)?{'x-client-session-context':contexts.get(cookie)}:{})},...(body?{body:JSON.stringify(body)}:{})});
   const login=async principal=>{
     const cookie=['worker-1','worker-13'].includes(principal)
-      ? `understood_session=${createSession(db,db.prepare('SELECT * FROM workers WHERE id=?').get(principal),'worker','demo').token}`
-      : (await call('/demo/session',null,{principal})).headers.get('set-cookie').split(';')[0];
+      ? `understood_session=${openPrincipalSession(db,db.prepare('SELECT * FROM workers WHERE id=?').get(principal)).token}`
+      : (await call(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
     const context=(await (await call('/session',cookie)).json()).clientContext;
     if(context)contexts.set(cookie,context);
     return cookie;
@@ -82,15 +84,15 @@ test('instruction send publishes only prepared languages, freezes modes and supp
 });
 
 test('acknowledgment-only instructions omit the question, move to Done and record scoped evidence once',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
   const contexts=new Map();
   const call=(path,cookie,body,method=body?'POST':'GET')=>fetch(base+path,{method,headers:{...(cookie?{cookie}:{}),...(body?{'content-type':'application/json'}:{}),...(method!=='GET'?{origin}:{}),...(contexts.has(cookie)?{'x-client-session-context':contexts.get(cookie)}:{})},...(body?{body:JSON.stringify(body)}:{})});
   const login=async principal=>{
     const cookie=['worker-1','worker-13'].includes(principal)
-      ? `understood_session=${createSession(db,db.prepare('SELECT * FROM workers WHERE id=?').get(principal),'worker','demo').token}`
-      : (await call('/demo/session',null,{principal})).headers.get('set-cookie').split(';')[0];
+      ? `understood_session=${openPrincipalSession(db,db.prepare('SELECT * FROM workers WHERE id=?').get(principal)).token}`
+      : (await call(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
     const context=(await (await call('/session',cookie)).json()).clientContext;
     if(context)contexts.set(cookie,context);
     return cookie;
@@ -139,15 +141,15 @@ test('acknowledgment-only instructions omit the question, move to Done and recor
 });
 
 test('canonical acknowledge-only text sends reach every prepared language',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
   const contexts=new Map();
   const call=(path,cookie,body,method=body?'POST':'GET')=>fetch(base+path,{method,headers:{...(cookie?{cookie}:{}),...(body?{'content-type':'application/json'}:{}),...(method!=='GET'?{origin}:{}),...(contexts.has(cookie)?{'x-client-session-context':contexts.get(cookie)}:{})},...(body?{body:JSON.stringify(body)}:{})});
   const login=async principal=>{
     const cookie=['worker-1','worker-13','worker-29'].includes(principal)
-      ? `understood_session=${createSession(db,db.prepare('SELECT * FROM workers WHERE id=?').get(principal),'worker','demo').token}`
-      : (await call('/demo/session',null,{principal})).headers.get('set-cookie').split(';')[0];
+      ? `understood_session=${openPrincipalSession(db,db.prepare('SELECT * FROM workers WHERE id=?').get(principal)).token}`
+      : (await call(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
     const context=(await (await call('/session',cookie)).json()).clientContext;
     if(context)contexts.set(cookie,context);
     return cookie;

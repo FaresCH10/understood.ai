@@ -1,3 +1,4 @@
+import {resolveRegistrationVerification} from '../registration-verification.mjs';
 import {BlockList,isIP} from 'node:net';
 import {schemaName} from './migrate.mjs';
 import {resolveMailConfig} from '../auth-mail.mjs';
@@ -67,6 +68,7 @@ export function hostedSyntheticConfig(env=process.env,{service='api'}={}) {
   if(storageAdapter==='r2' && (!/^[a-f0-9]{32}$/i.test(storageConfig.accountId ?? '') || !/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(storageConfig.bucket ?? '')
     || !['default','eu'].includes(storageConfig.jurisdiction) || !storageConfig.accessKeyId || !storageConfig.secretAccessKey))throw Error('Hosted private storage configuration is incomplete');
   const mail=resolveMailConfig({mode:env.UNDERSTOOD_EMAIL_MODE ?? 'disabled',apiKey:env.UNDERSTOOD_RESEND_KEY,from:env.UNDERSTOOD_EMAIL_FROM,key:env.UNDERSTOOD_AUTH_MAIL_KEY,publicOrigin});
-  return Object.freeze({...transport,runtimeRoleProfile:service==='worker'?'worker':'application',storageConfig:Object.freeze(storageConfig),storageAdapter,storageChecks:flag(env,'UNDERSTOOD_STORAGE_CHECKS'),operatorAccess:false,mail,pilotDestination:pilotDestination(env.UNDERSTOOD_PILOT_TO),
+  const registrationVerification=resolveRegistrationVerification(env,mail,publicOrigin);
+  return Object.freeze({...transport,registrationVerification,runtimeRoleProfile:service==='worker'?'worker':'application',storageConfig:Object.freeze(storageConfig),storageAdapter,storageChecks:flag(env,'UNDERSTOOD_STORAGE_CHECKS'),operatorAccess:false,mail,pilotDestination:pilotDestination(env.UNDERSTOOD_PILOT_TO),
     ...(service==='worker'?{providerVerification:resolveHostedWorkerVerification(env)}:{})});
 }

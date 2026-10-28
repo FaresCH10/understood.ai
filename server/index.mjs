@@ -1,3 +1,4 @@
+import {resolveRegistrationVerification} from './registration-verification.mjs';
 import { createServer as createHttpServer } from "node:http";
 import { send,readJson } from './http.mjs';
 import {ensurePilotSchema,savePilot,readPilot} from './pilot.mjs';
@@ -14,7 +15,6 @@ import {archivedWriteAllowed} from './site-lifecycle-input.mjs';
 import {siteHttpError} from './site-input.mjs';
 import { openDatabase, NOW, transaction } from "./db.mjs";
 import { tokenHash } from "./auth-crypto.mjs";
-import { seed } from "./seed.mjs";
 import { metrics, publish, submitAnswer,withdrawPublication } from "./domain.mjs";
 import { handleRecordingRoute } from "./recording-http.mjs";
 import {handleSourceAudioRoute} from './source-audio-http.mjs';
@@ -68,7 +68,7 @@ import {staffRecoveryScope} from './staff-input.mjs';
 import {staffSiteScope} from './account-input.mjs';
 import {resolveMailConfig} from './auth-mail.mjs';
 import {ensureRecoverySchema,requestRecovery,resetPassword} from './account-recovery.mjs';
-import {ensureRegistrationSchema,requestRegistration,resendRegistration,verifyRegistration} from './registration.mjs';
+import {ensureRegistrationSchema,requestRegistration,resendRegistration,verifyRegistration,verifyRegistrationCode} from './registration.mjs';
 import {listAccountSites,switchAccountSite} from './accounts.mjs';
 import {siteCrewOverview} from './site-crews.mjs';
 import {crewOverviewHttpError} from './crew-overview.mjs';
@@ -218,13 +218,13 @@ export function createAppHandler(db, options = {}) {
   const config = options.config ?? resolveAuthConfig(options);
   const caseFollowupAdapter = Object.hasOwn(options,'caseFollowupAdapter') ? options.caseFollowupAdapter : resolveCaseFollowup();
   const mail=resolveMailConfig({...options.mail,publicOrigin:config.publicOrigin,allowLocal:true});
+  const registrationVerification=options.registrationVerification ?? resolveRegistrationVerification(process.env,mail,config.publicOrigin);
   const destination=pilotDestination(options.pilotDestination);
   const pilotMail=config.accessMode==='credential'?mail:{available:false};
   const presentationTranslator=options.presentationTranslator ?? null;
   const presentationGenerationAllowed=options.presentationGenerationAllowed !== false;
   const pushAdapter=options.pushAdapter ?? resolvePushAdapter(options.pushEnv);
   db ??= openDatabase();
-  if (config.accessMode === "demo") seed(db);
   ensureRecordingSchema(db);
   ensurePeopleSchema(db);
   ensureExportSchema(db);
@@ -267,20 +267,26 @@ export function createAppHandler(db, options = {}) {
         const result=await resetPassword(db,await readJson(req),req.socket.remoteAddress,mail);
         return send(res,200,result,{'set-cookie':clearSessionCookie()});
       }
+      if(path==='/api/auth/registrations/options' && req.method==='GET')return send(res,200,{available:registrationVerification.available===true,verification:registrationVerification.provider==='neon'?'neon-code':'link'});
+      if(path==='/api/auth/registrations/verify-code' && req.method==='POST'){
+        if(config.accessMode!=='credential')return send(res,404,{error:'Not found'});
+        if(url.search)throw Error('Invalid registration input');
+        return send(res,200,await verifyRegistrationCode(db,await readJson(req),req.socket.remoteAddress,registrationVerification));
+      }
       if(path==='/api/auth/registrations' && req.method==='POST') {
         if(config.accessMode!=='credential') return send(res,404,{error:'Not found'});
         if(url.search) throw new Error('Invalid registration input');
-        return send(res,202,await requestRegistration(db,await readJson(req),req.socket.remoteAddress,mail));
+        return send(res,202,await requestRegistration(db,await readJson(req),req.socket.remoteAddress,registrationVerification));
       }
       if(path==='/api/auth/registrations/resend' && req.method==='POST') {
         if(config.accessMode!=='credential') return send(res,404,{error:'Not found'});
         if(url.search) throw new Error('Invalid registration input');
-        return send(res,202,resendRegistration(db,await readJson(req),req.socket.remoteAddress,mail));
+        return send(res,202,resendRegistration(db,await readJson(req),req.socket.remoteAddress,registrationVerification));
       }
       if(path==='/api/auth/registrations/verify' && req.method==='POST') {
         if(config.accessMode!=='credential') return send(res,404,{error:'Not found'});
         if(url.search) throw new Error('Invalid registration input');
-        return send(res,200,verifyRegistration(db,await readJson(req),req.socket.remoteAddress,mail));
+        return send(res,200,verifyRegistration(db,await readJson(req),req.socket.remoteAddress,registrationVerification));
       }
       const invitationAcceptMatch=path.match(/^\/api\/auth\/invitations\/(preview|signup|accept)$/);
       if(invitationAcceptMatch && req.method==='POST') {
@@ -341,51 +347,7 @@ export function createAppHandler(db, options = {}) {
           });
         }
       }
-      if (path === "/api/demo/session" && req.method === "POST") {
-        if (config.accessMode !== "demo")
-          return send(res, 404, { error: "Not found" });
-        const body = await readJson(req);
-        const allowed = new Set([
-          "maya",
-          "worker-14",
-          "worker-29",
-          "worker-30",
-          "harbor-owner",
-          "harbor-worker",
-        ]);
-        if (!allowed.has(body.principal))
-          throw new Error("Unknown synthetic profile");
-        const type =
-          body.principal.startsWith("worker") ||
-          body.principal === "harbor-worker"
-            ? "worker"
-            : "staff";
-        const principal = db
-          .prepare(
-            `SELECT * FROM ${type === "staff" ? "staff" : "workers"} WHERE id=? AND active=1`,
-          )
-          .get(body.principal);
-        if (!principal) throw new Error("Unknown synthetic profile");
-        let session;
-        if (config.demoSessionToken) {
-          const maxSeconds = 8 * 3600;
-          const token = config.demoSessionToken(body.principal);
-          db.prepare(`INSERT INTO sessions(token_hash,org_id,site_id,principal_type,principal_id,expires_at,revoked_at,grant_id,access_mode)
-            VALUES(?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(token_hash) DO UPDATE SET expires_at=excluded.expires_at,revoked_at=NULL`)
-            .run(tokenHash(token),principal.org_id,principal.site_id,type,principal.id,
-              new Date(Date.now()+maxSeconds*1000).toISOString(),null,null,"demo");
-          session={token,maxSeconds};
-        } else {
-          session = createSession(db, principal, type, "demo");
-        }
-        return send(
-          res,
-          200,
-          { ok: true },
-          { "set-cookie": sessionCookie(session.token, session.maxSeconds, config.cookieOptions) },
-        );
-      }
+      if (path === "/api/demo/session") return send(res, 404, { error: "Not found" });
       if (path === "/api/auth/staff/login" && req.method === "POST") {
         if (config.accessMode !== "credential")
           return send(res, 404, { error: "Not found" });

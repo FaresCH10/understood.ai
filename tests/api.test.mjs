@@ -10,15 +10,17 @@ import { publish } from '../server/domain.mjs';
 import { briefingFilters } from '../server/briefing-input.mjs';
 import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import {checkedWorkerReceipt} from '../src/worker-request.ts';
+import {sqliteApp,loginRoute,principalLoginBody,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 test('SQLite publication HTTP requires the confirmed version and returns stale-version conflict without writes',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
   const call=(path,cookie,body)=>fetch(base+path,{method:'POST',headers:{'content-type':'application/json',origin:'http://127.0.0.1:3020',...(cookie?{cookie}:{})},body:JSON.stringify(body)});
   try {
     db.prepare("UPDATE briefings SET state='ready',prepared_json=(SELECT snapshot_json FROM publications WHERE id='shelf-v3') WHERE id='shelf'").run();
-    const cookie=(await call('/demo/session',null,{principal:'maya'})).headers.get('set-cookie').split(';')[0];
+    const cookie=(await call(loginRoute('maya'),null,principalLoginBody('maya'))).headers.get('set-cookie').split(';')[0];
     const input={requestId:randomUUID(),revision:1,workerIds:['worker-30']};
     const missing=await call('/briefings/shelf/publish',cookie,input);assert.equal(missing.status,400);assert.deepEqual(await missing.json(),{error:'Invalid publication version'});
     const stale=await call('/briefings/shelf/publish',cookie,{...input,nextVersion:3});assert.equal(stale.status,409);assert.deepEqual(await stale.json(),{error:'Draft version changed'});
@@ -32,11 +34,11 @@ test('SQLite publication HTTP requires the confirmed version and returns stale-v
 });
 
 test('SQLite worker answer/help acknowledgements bind request, assignment and original page context',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}/api`;
   try {
-    const login=await fetch(base+'/demo/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal:'worker-30'})});
+    const login=await loginPrincipal(base, 'worker-30');
     const cookie=login.headers.get('set-cookie').split(';')[0];
     const {clientContext}=await (await fetch(base+'/session',{headers:{cookie}})).json();
     const detailResponse=await fetch(base+'/worker/briefings/assignment-30',{headers:{cookie,'x-client-session-context':clientContext}});
@@ -60,11 +62,11 @@ test('SQLite worker answer/help acknowledgements bind request, assignment and or
 });
 
 test('SQLite language readiness is scoped and separates stored content from untested provider evidence', async () => {
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise((resolve)=>server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}`;
   const request=(path,cookie,body,method=body?'POST':'GET')=>fetch(`${base}/api${path}`,{method,headers:{'content-type':'application/json',...(cookie?{cookie}:{}),...(method!=='GET'?{origin:'http://127.0.0.1:3020'}:{})},...(body?{body:JSON.stringify(body)}:{})});
-  const login=async principal=>(await request('/demo/session',null,{principal})).headers.get('set-cookie').split(';')[0];
+  const login=async principal=>(await request(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
   try {
     assert.equal((await request('/language-readiness')).status,401);
     const maya=await login('maya'),worker=await login('worker-30'),foreign=await login('harbor-owner');
@@ -106,11 +108,11 @@ test('briefing filters reject unknown fields, unsafe bounds and unsupported life
 });
 
 test('SQLite HTTP crew lifecycle requires scoped staff, current name and explicit archive confirmation',async () => {
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise((resolve) => server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}`;
   const request=(path,cookie,body,method='POST') => fetch(`${base}/api${path}`,{method,headers:{'content-type':'application/json',...(cookie ? {cookie} : {})},...(body ? {body:JSON.stringify(body)} : {})});
-  const login=async (principal) => (await request('/demo/session',null,{principal})).headers.get('set-cookie').split(';')[0];
+  const login=async (principal) => (await request(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
   try {
     const staff=await login('maya'),worker=await login('worker-30'),foreign=await login('harbor-owner');
     const crew=await (await request('/people/crews',staff,{name:'HTTP Morning'})).json();
@@ -135,11 +137,11 @@ test('SQLite HTTP crew lifecycle requires scoped staff, current name and explici
 });
 
 test('SQLite library pages past 100 rows with literal search, stable sorting and separate draft/publication states',async () => {
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise((resolve) => server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}`;
   try {
-    const login=await fetch(`${base}/api/demo/session`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal:'maya'})});
+    const login=await loginPrincipal(base, 'maya');
     const cookie=login.headers.get('set-cookie').split(';')[0];
     const get=(query='') => fetch(`${base}/api/briefings${query}`,{headers:{cookie}});
     const insert=db.prepare('INSERT INTO briefings VALUES(?,?,?,?,?,?,?,?,?,?,?)');
@@ -162,7 +164,7 @@ test('SQLite library pages past 100 rows with literal search, stable sorting and
 });
 
 test('SQLite HTTP withdraws only a scoped exact version and leaves history and reports readable',async () => {
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise((resolve) => server.listen(0,'127.0.0.1',resolve));
   const base=`http://127.0.0.1:${server.address().port}`;
   const request=async(path,cookie,body) => {
@@ -170,7 +172,7 @@ test('SQLite HTTP withdraws only a scoped exact version and leaves history and r
     if(body && path.startsWith('/worker/'))headers['x-client-session-context']=(await (await fetch(`${base}/api/session`,{headers:{cookie}})).json()).clientContext || '';
     return fetch(`${base}/api${path}`,{method:body ? 'POST' : 'GET',headers,...(body ? {body:JSON.stringify(body)} : {})});
   };
-  const login=async (principal) => (await request('/demo/session',null,{principal})).headers.get('set-cookie').split(';')[0];
+  const login=async (principal) => (await request(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
   try {
     const staff=await login('maya'),worker=await login('worker-30'),foreign=await login('harbor-owner');
     const input={requestId:randomUUID(),publicationId:'shelf-v3',version:3,reason:'Source replaced'};
@@ -193,7 +195,7 @@ test('SQLite HTTP withdraws only a scoped exact version and leaves history and r
 
 test('session-scoped API denies anonymous, worker, and cross-tenant briefing reads', async () => {
   const db = openDatabase(':memory:');
-  const server = createAppServer(db, { tier: 'local', aiMode: 'synthetic', accessMode: 'demo' });
+  const server = sqliteApp(db);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   const request = (path, cookie, options = {}) => fetch(`${base}/api${path}`, {
@@ -201,7 +203,7 @@ test('session-scoped API denies anonymous, worker, and cross-tenant briefing rea
     headers: { ...(cookie ? { cookie } : {}), 'content-type': 'application/json' },
   });
   async function signIn(principal) {
-    const response = await request('/demo/session', null, { method: 'POST', body: JSON.stringify({ principal }) });
+    const response = await request(loginRoute(principal), null, { method: 'POST', body: JSON.stringify(principalLoginBody(principal)) });
     assert.equal(response.status, 200);
     return response.headers.get('set-cookie').split(';')[0];
   }
@@ -233,7 +235,7 @@ test('session-scoped API denies anonymous, worker, and cross-tenant briefing rea
 
 test('queued synthetic job prepares draft through database and leaves publication unchanged', () => {
   const db = openDatabase(':memory:');
-  createAppServer(db, { tier: 'local', aiMode: 'synthetic', accessMode: 'demo' }).close();
+  sqliteApp(db).close();
   const before = db.prepare('SELECT snapshot_json FROM publications WHERE id=?').get('shelf-v3').snapshot_json;
   db.prepare('UPDATE briefings SET state=? WHERE id=?').run('processing', 'shelf');
   db.prepare('INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run('job-test', 'cedar', 'beirut', 'shelf', 1, 'prepare', 'queued', 0, new Date(0).toISOString(), null, null, new Date(0).toISOString());
@@ -246,11 +248,11 @@ test('queued synthetic job prepares draft through database and leaves publicatio
 
 test('help retries are idempotent and superseded assignments reject new help', async () => {
   const db = openDatabase(':memory:');
-  const server = createAppServer(db, { tier: 'local', aiMode: 'synthetic', accessMode: 'demo' });
+  const server = sqliteApp(db);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    const login = await fetch(`${base}/api/demo/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ principal: 'worker-30' }) });
+    const login = await loginPrincipal(base, 'worker-30');
     const cookie = login.headers.get('set-cookie').split(';')[0];
     const body = JSON.stringify({ requestId: '2b5ab86c-0a15-4da0-947b-15b93fa1bd3b', text: 'I need help with the shelves.' });
     const clientContext=(await (await fetch(`${base}/api/session`,{headers:{cookie}})).json()).clientContext;

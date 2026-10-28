@@ -20,6 +20,8 @@ import {getBriefing} from '../server/postgres/read-models.mjs';
 import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
+import {principalLoginBody,seedCredentials} from './helpers/sqlite-app.mjs';
+
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const input=(revision=1)=>({requestId:randomUUID(),revision,question:'',facts:[],askedFacts:[],confirmed:true});
 
@@ -83,13 +85,14 @@ for(const pg of [false,true]) test(`${pg ? 'PostgreSQL' : 'SQLite'} review saves
     await f.edit({revision:4,title:'Edited source revision',source:CANONICAL_SOURCE});assert.equal((await f.get()).review,null);assert.equal((await f.get()).state,'draft');
     assert.equal(JSON.stringify((await f.raw('SELECT snapshot_json,state FROM publications ORDER BY id')).rows),before);
     await assert.rejects(f.raw('DELETE FROM briefing_review_requests'),/immutable/);await assert.rejects(f.raw('UPDATE briefing_review_requests SET accepted_revision=99'),/immutable/);
-    const config={tier:'local',aiMode:'synthetic',accessMode:pg ? 'credential' : 'demo',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg ? {schema:f.options.schema} : {})};
+    const config={tier:'local',aiMode:'synthetic',accessMode:'credential',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg ? {schema:f.options.schema} : {})};
     if(pg) await provisionStaffCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'review@example.test',password:'Synthetic-review-password-123'},f.options);
+    else seedCredentials(f.db);
     const server=pg ? createPostgresRehearsalServer(f.pool,config) : createAppServer(f.db,config);
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
     const call=(path,cookie,body)=>fetch(base+path,{method:body ? 'POST' : 'GET',headers:{origin:config.publicOrigin,'content-type':'application/json',...(cookie ? {cookie} : {})},body:body ? JSON.stringify(body) : undefined});
     try {
-      const login=await call(pg ? '/auth/staff/login' : '/demo/session',null,pg ? {email:'review@example.test',password:'Synthetic-review-password-123'} : {principal:'maya'}),cookie=login.headers.get('set-cookie').split(';')[0];
+      const login=await call('/auth/staff/login',null,pg ? {email:'review@example.test',password:'Synthetic-review-password-123'} :principalLoginBody('maya')),cookie=login.headers.get('set-cookie').split(';')[0];
       assert.equal((await call('/briefings/shelf/review',null,input(5))).status,401);
       assert.equal((await call('/briefing-review/receipts/'+change.requestId,null)).status,401);
       const saved=await call('/briefing-review/receipts/'+change.requestId,cookie);assert.equal(saved.status,200);assert.match(saved.headers.get('cache-control'),/no-store/);assert.equal((await saved.json()).revision,2);

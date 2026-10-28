@@ -12,6 +12,8 @@ import {publish as pgPublish} from '../server/postgres/domain.mjs';
 import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'owner',role:'owner',org_id:'a',site_id:'a'},origin='http://127.0.0.1:3020';
 async function fixture(postgres) {
@@ -64,11 +66,11 @@ test('crew snapshot accepts no filter/scope overrides or invalid IDs',()=>{
   for(const input of [null,[],{page:1},{language:'en'},{site_id:'b'}])assert.throws(()=>crewRecipientId('crew',input),/Invalid/);
 });
 test('SQLite crew recipient HTTP denies workers/foreign scope, is no-store and sanitizes failures',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo',publicOrigin:origin});
+  const db=openDatabase(':memory:'),server=sqliteApp(db,{publicOrigin:origin});
   db.prepare("INSERT INTO crews VALUES('preview','cedar','beirut','Preview',1)").run();
   db.prepare("INSERT INTO crew_memberships VALUES('worker-29','cedar','beirut','preview',?)").run(new Date().toISOString());
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
-  const login=async principal=>(await fetch(`${base}/demo/session`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({principal})})).headers.get('set-cookie').split(';')[0];
+  const login=async principal=>(await loginPrincipal(base, principal, origin)).headers.get('set-cookie').split(';')[0];
   try {
     const cookie=await login('maya'),worker=await login('worker-29'),foreign=await login('harbor-owner'),url=`${base}/people/crews/preview/recipients`;
     assert.equal((await fetch(url)).status,401);assert.equal((await fetch(url,{headers:{cookie:worker}})).status,403);assert.equal((await fetch(url,{headers:{cookie:foreign}})).status,400);

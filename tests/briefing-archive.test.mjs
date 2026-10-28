@@ -11,6 +11,8 @@ import {requestHelp,ensureClarificationSchema} from '../server/clarifications.mj
 import {ensureRecordingSchema} from '../server/recordings.mjs';
 import {processOne} from '../server/worker.mjs';
 import {createAppServer} from '../server/index.mjs';
+import {sqliteApp,loginPrincipal} from './helpers/sqlite-app.mjs';
+
 
 const maya={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const worker={principal_type:'worker',principal_id:'worker-30',org_id:'cedar',site_id:'beirut'};
@@ -74,9 +76,9 @@ test('SQLite archive cancels preparation and retains accepted publication replay
 });
 
 test('SQLite archive HTTP filters active/history, returns scoped no-store receipts, and denies workers',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
-  const login=async principal=>(await fetch(base+'/demo/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({principal})})).headers.get('set-cookie').split(';')[0];
+  const login=async principal=>(await loginPrincipal(base, principal)).headers.get('set-cookie').split(';')[0];
   const call=(cookie,path,body,method='POST')=>fetch(base+path,{method,headers:{cookie,'content-type':'application/json'},body:body===undefined ? undefined : JSON.stringify(body)});
   try {
     const owner=await login('maya'),worker=await login('worker-30'),foreign=await login('harbor-owner'),request=input(),path='/briefings/shelf/archive';

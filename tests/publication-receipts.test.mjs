@@ -19,6 +19,8 @@ import {createSession} from '../server/auth.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {publicationInput,schedulePublicationInput} from '../server/briefing-input.mjs';
 import {readPendingPublication,savePendingPublication,clearPendingPublication,checkedPublicationReceipt,checkedPublicationResult} from '../src/publication-recovery.ts';
+import {openPrincipalSession} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'owner',role:'owner',org_id:'a',site_id:'a'},origin='http://127.0.0.1:3020';
 const body=()=>({requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['w2','w1'],dueAt:null});
@@ -69,12 +71,12 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} publi
   }finally {await f.close();}
 });
 for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} publication receipt HTTP rejects overrides and revoked authority and sanitizes infrastructure failures`,async()=>{
-  const f=await fixture(postgres),config={tier:'local',aiMode:'synthetic',accessMode:postgres?'credential':'demo',publicOrigin:origin,schema:f.options.schema,dataClass:'synthetic'};
+  const f=await fixture(postgres),config={tier:'local',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin,schema:f.options.schema,dataClass:'synthetic'};
   const password='Disposable receipt password only';
   if(postgres)for(const staffId of ['owner','reader'])await provisionStaffCredential(f.pool,{staffId,orgId:'a',siteId:'a',email:`${staffId}@example.test`,password},{schema:f.options.schema});
   const server=postgres?createPostgresRehearsalServer(f.pool,config):createAppServer(f.db,config);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/api`;
   const login=async staffId=>{
-    if(!postgres)return `understood_session=${createSession(f.db,f.db.prepare('SELECT * FROM staff WHERE id=?').get(staffId),'staff','demo').token}`;
+    if(!postgres)return `understood_session=${openPrincipalSession(f.db,f.db.prepare('SELECT * FROM staff WHERE id=?').get(staffId)).token}`;
     const r=await fetch(`${base}/auth/staff/login`,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({email:`${staffId}@example.test`,password})});assert.equal(r.status,200);return r.headers.get('set-cookie').split(';')[0];
   };
   try {

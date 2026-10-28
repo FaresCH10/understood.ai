@@ -19,6 +19,8 @@ import {createAppServer} from '../server/index.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential} from '../server/postgres/auth.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
+import {principalLoginBody,seedCredentials} from './helpers/sqlite-app.mjs';
+
 
 async function fixture(pg) {
   const schema='understood_test_report_scopes',owner={principal_type:'staff',principal_id:pg?'owner':'maya',org_id:pg?'org':'cedar',site_id:pg?'site':'beirut',role:'owner'};
@@ -86,13 +88,14 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} exports expose or
     await assert.rejects(async()=>retry(f.owner,body.requestId,{requestId:randomUUID(),attempts:1}),/cannot be retried/);
     await assert.rejects(async()=>receipt({...f.owner,principal_type:'worker'},'create',body.requestId),/Forbidden/);
     await assert.rejects(async()=>receipt(f.owner,'create','bad'),/Invalid/);
-    const config={tier:'local',aiMode:'synthetic',dataClass:'synthetic',accessMode:pg?'credential':'demo',publicOrigin:'http://127.0.0.1:3031',...(pg?options:{})};
+    const config={tier:'local',aiMode:'synthetic',dataClass:'synthetic',accessMode:'credential',publicOrigin:'http://127.0.0.1:3031',...(pg?options:{})};
     if(pg)await provisionStaffCredential(f.pool,{staffId:f.owner.principal_id,orgId:f.owner.org_id,siteId:f.owner.site_id,email:'receipt@example.test',password:'Synthetic export receipt password'},options);
+    else seedCredentials(f.db);
     const server=pg?createPostgresRehearsalServer(f.pool,config):createAppServer(f.db,config);
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`,normalFetch=createSessionContextFetch();
     const call=(path,cookie,input)=>normalFetch(base+path,{method:input===undefined?'GET':'POST',headers:{origin:config.publicOrigin,'content-type':'application/json',...(cookie?{cookie}:{})},body:input===undefined?undefined:JSON.stringify(input)});
     try {
-      const login=await call(pg?'/auth/staff/login':'/demo/session',null,pg?{email:'receipt@example.test',password:'Synthetic export receipt password'}:{principal:'maya'}),cookie=login.headers.get('set-cookie').split(';')[0];
+      const login=await call('/auth/staff/login',null,pg?{email:'receipt@example.test',password:'Synthetic export receipt password'}:principalLoginBody('maya')),cookie=login.headers.get('set-cookie').split(';')[0];
       const path=`/reports/exports/receipts/retry/${change.requestId}`;
       assert.equal((await fetch(base+path,{headers:{cookie}})).status,409);
       const httpReceipt=await call(path,cookie);assert.equal(httpReceipt.status,200);assert.match(httpReceipt.headers.get('cache-control'),/no-store/);

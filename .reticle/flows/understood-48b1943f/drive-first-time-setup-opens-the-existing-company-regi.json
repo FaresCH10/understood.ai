@@ -1,0 +1,79 @@
+{
+  "version": 2,
+  "name": "drive-first-time-setup-opens-the-existing-company-regi",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793177244113,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "link",
+        "name": "First-time setup الإعداد للمرة الأولى"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 494
+      },
+      "expect": {
+        "kind": "route",
+        "contains": "#register"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "العربية"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/Register.tsx",
+        "line": 61
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "الاسم الكامل"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "لديك حساب بالفعل؟ سجّل الدخول"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/Register.tsx",
+        "line": 162
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "First-time setup opens the existing company registration flow.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-first-time-setup-opens-the-existing-company-regi"
+}

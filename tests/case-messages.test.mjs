@@ -20,6 +20,8 @@ import {workerBriefings as pgInbox} from '../server/postgres/read-models.mjs';
 import {checkedConversationPage,checkedConversationReceipt,requestConversation} from '../src/conversation-request.ts';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {issueWorkerGrant,redeemWorkerGrant,provisionStaffCredential,authenticateStaff} from '../server/postgres/auth.mjs';
+import {sqliteApp,loginRoute,principalLoginBody} from './helpers/sqlite-app.mjs';
+
 
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const worker={principal_type:'worker',principal_id:'worker-1',org_id:'cedar',site_id:'beirut'};
@@ -50,11 +52,11 @@ test('conversation trust boundary bounds content, IDs, scope and pagination',()=
   for(const input of [null,[],{page:0},{pageSize:51},{site_id:'foreign'}])assert.throws(()=>caseMessageFilters(input),/Invalid/);
 });
 test('conversation HTTP fences current page identity, scopes receipts and redacts unexpected failures',async()=>{
-  const db=openDatabase(':memory:'),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'demo'});
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
   const base=`http://127.0.0.1:${server.address().port}/api`;
-  const request=(path,cookie,body,context)=>fetch(base+path,{headers:{...(cookie?{cookie}:{}),'content-type':'application/json',...(context?{'x-client-session-context':context}:{})},...(body===undefined?{}:{method:'POST',body:JSON.stringify(body)})});
-  const login=async principal=>{const cookie=(await request('/demo/session',null,{principal})).headers.get('set-cookie').split(';')[0];return {cookie,context:(await (await request('/session',cookie)).json()).clientContext};};
+  const request=(path,cookie,body,context)=>fetch(base+path,{headers:{origin:'http://127.0.0.1:3020',...(cookie?{cookie}:{}),'content-type':'application/json',...(context?{'x-client-session-context':context}:{})},...(body===undefined?{}:{method:'POST',body:JSON.stringify(body)})});
+  const login=async principal=>{const cookie=(await request(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];return {cookie,context:(await (await request('/session',cookie)).json()).clientContext};};
   try {
     const staff=await login('maya'),w=await login('worker-30'),other=await login('harbor-owner');
     const caseId=randomUUID();requestHelp(db,{...worker,principal_id:'worker-30'},'assignment-30',{requestId:caseId,text:'Synthetic HTTP help'});

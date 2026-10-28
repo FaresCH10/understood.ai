@@ -1,0 +1,130 @@
+{
+  "version": 2,
+  "name": "drive-an-invalid-email-code-leaves-company-registratio",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793198022946,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Verification code"
+      },
+      "args": {
+        "value": "999999"
+      },
+      "action": "fill",
+      "source": {
+        "file": "src/Register.tsx",
+        "line": 148
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Verify email and start trial"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/Register.tsx",
+        "line": 148
+      },
+      "expect": {
+        "kind": "net",
+        "urlContains": "/auth/registrations/verify-code",
+        "status": 400
+      },
+      "page": "/",
+      "writes": true
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "العربية"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/Register.tsx",
+        "line": 63
+      },
+      "expect": {
+        "kind": "text",
+        "contains": "رمز التحقق"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "رمز التحقق"
+      },
+      "args": {
+        "value": "٠٠١٢٣٤"
+      },
+      "action": "fill",
+      "source": {
+        "file": "src/Register.tsx",
+        "line": 148
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "تحقق من البريد وابدأ التجربة"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/Register.tsx",
+        "line": 148
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "net",
+            "urlContains": "/auth/registrations/verify-code",
+            "status": 200
+          },
+          {
+            "kind": "text",
+            "contains": "تم التحقق من البريد"
+          }
+        ]
+      },
+      "page": "/",
+      "writes": true
+    }
+  ],
+  "startPath": "/",
+  "intent": "An invalid email code leaves company registration unverified.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-an-invalid-email-code-leaves-company-registratio"
+}

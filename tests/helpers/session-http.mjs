@@ -13,6 +13,8 @@ export function createSessionContextFetch(fetcher=globalThis.fetch) {
     const url=new URL(String(input));
     if(url.protocol!=='http:' || !['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw Error('Synthetic session fixture requires loopback HTTP');
     const headers=new Headers(options.headers),cookie=headers.get('cookie');
+    const method=(options.method || 'GET').toUpperCase();
+    if(!headers.has('origin') && method!=='GET' && method!=='HEAD') headers.set('origin','http://127.0.0.1:3020');
     const scoped=staffBriefingContextRequired(url.pathname,options.method || 'GET') || staffBillingContextRequired(url.pathname,options.method || 'GET') || staffPeopleContextRequired(url.pathname,options.method || 'GET') || staffResponseContextRequired(url.pathname,options.method || 'GET') || staffPolicyContextRequired(url.pathname,options.method || 'GET') || staffWorkspaceContextRequired(url.pathname,options.method || 'GET') || staffArtifactContextRequired(url.pathname,options.method || 'GET') || staffReportContextRequired(url.pathname,options.method || 'GET') || staffNotificationContextRequired(url.pathname,options.method || 'GET') || staffOnboardingContextRequired(url.pathname,options.method || 'GET') || staffUsageContextRequired(url.pathname,options.method || 'GET') || staffApplicationContextRequired(url.pathname,options.method || 'GET') || /^\/api\/settings\/(staff|invitations)(?:\/|$)/.test(url.pathname);
     if(cookie && scoped && !headers.has('x-client-session-context')) {
       const context=await capture(url.origin,cookie);if(context)headers.set('x-client-session-context',context);

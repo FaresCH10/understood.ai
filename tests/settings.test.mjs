@@ -21,6 +21,8 @@ import {processOne} from '../server/worker.mjs';
 import {createDraft as pgDraft,queuePreparation as pgQueue,processOnePreparation as pgProcess} from '../server/postgres/preparation.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {checkedSettingsReceipt} from '../src/workspace-settings-state.ts';
+import {principalLoginBody,seedCredentials} from './helpers/sqlite-app.mjs';
+
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const orgInput=()=>({requestId:randomUUID(),revision:0,name:'Updated Synthetic Organization',supportEmail:'support@example.test',confirmed:true});
 const siteInput=()=>({requestId:randomUUID(),revision:0,name:'Updated Synthetic Site',timezone:'UTC',confirmed:true});
@@ -139,13 +141,14 @@ for(const pg of [false,true]) test(`${pg ? 'PostgreSQL' : 'SQLite'} workspace ed
     const foreign={...owner,principal_id:'harbor-owner',org_id:'harbor',site_id:'harbor-yard'};assert.equal((await f.get(foreign)).organization.name,pg ? 'Other Organization' : 'Harbor Tools');
     assert.ok(!JSON.stringify(current).includes('created_by'));assert.equal((await f.raw("SELECT COUNT(*) AS n FROM settings_requests")).rows[0].n,3);
     await assert.rejects(f.raw("UPDATE settings_requests SET kind='site'"),/immutable/);await assert.rejects(f.raw('DELETE FROM settings_requests'),/immutable/);
-    const config={tier:'local',aiMode:'synthetic',accessMode:pg ? 'credential' : 'demo',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg ? {schema:f.options.schema} : {})};
+    const config={tier:'local',aiMode:'synthetic',accessMode:'credential',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020',...(pg ? {schema:f.options.schema} : {})};
     if(pg) await provisionStaffCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'synthetic@example.test',password:'Synthetic-only-password-123'},f.options);
+    else seedCredentials(f.db);
     const server=pg ? createPostgresRehearsalServer(f.pool,config) : createAppServer(f.db,config);
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
     const call=(path,cookie,body)=>fetch(base+path,{method:body ? 'POST' : 'GET',headers:{origin:config.publicOrigin,'content-type':'application/json',...(cookie ? {cookie} : {})},body:body ? JSON.stringify(body) : undefined});
     try {
-      const login=await call(pg ? '/auth/staff/login' : '/demo/session',null,pg ? {email:'synthetic@example.test',password:'Synthetic-only-password-123'} : {principal:'maya'}),cookie=login.headers.get('set-cookie').split(';')[0];
+      const login=await call('/auth/staff/login',null,pg ? {email:'synthetic@example.test',password:'Synthetic-only-password-123'} :principalLoginBody('maya')),cookie=login.headers.get('set-cookie').split(';')[0];
       const response=await call('/settings',cookie);assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-store/);assert.equal((await response.json()).site.revision,2);
       assert.equal((await call('/settings',null)).status,401);assert.equal((await call('/settings?org=harbor',cookie)).status,400);
       const contacts=await call('/settings/contacts?pageSize=1',cookie);assert.equal(contacts.status,200);assert.match(contacts.headers.get('cache-control'),/no-store/);assert.equal((await contacts.json()).items.length,1);
