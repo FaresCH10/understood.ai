@@ -1,3 +1,5 @@
+import {handleWorkspaceRoute} from './workspace-http.mjs';
+import {sqliteWorkspace} from './workspace-sqlite.mjs';
 import {resolveRegistrationVerification} from './registration-verification.mjs';
 import { createServer as createHttpServer } from "node:http";
 import { send,readJson } from './http.mjs';
@@ -24,7 +26,6 @@ import {DEFAULT_AUDIO_ROOT} from './recordings.mjs';
 import { ensureRecordingSchema, isCurrentRecording, responseColumns } from "./recordings.mjs";
 import { briefingActivityCsv,listReportPublications,reportActivity } from "./reports.mjs";
 import {reportScope} from './report-scope.mjs';
-import { listAuditEvents, getAuditEvent, exportAuditEvents } from './audit.mjs';
 import {listNotifications,readNotification,notificationReceipt} from './notifications.mjs';
 import {listWorkerNotifications,readWorkerNotification,workerNotificationReceipt,savePushSubscription,revokePushSubscription,pushSubscriptionStatus} from './notification-events.mjs';
 import {resolvePushAdapter} from './push-adapter.mjs';
@@ -467,6 +468,7 @@ export function createAppHandler(db, options = {}) {
         staffOnly(session);
         return send(res, 200, staffOverview(db, session, config));
       }
+      if(await handleWorkspaceRoute(req,res,session,url,(s,op,input)=>sqliteWorkspace(db,s,op,input)))return;
       if(path==='/api/instructions/audience' && req.method==='GET') {
         if(url.search) throw new Error('Invalid instruction request');
         return send(res,200,instructionAudienceOverview(db,session));
@@ -534,15 +536,6 @@ export function createAppHandler(db, options = {}) {
           ?readWorkerNotification(db,session,notificationMatch[1])
           :readNotification(db,session,notificationMatch[1]));
       }
-      if (path === '/api/audit' && req.method === 'GET') return send(res, 200, listAuditEvents(db, session, Object.fromEntries(url.searchParams)));
-      if (path === '/api/audit.csv' && req.method === 'GET') {
-        const csv = exportAuditEvents(db, session, Object.fromEntries(url.searchParams));
-        res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="activity-history.csv"',
-          'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer' });
-        res.end(csv); return;
-      }
-      const auditMatch = path.match(/^\/api\/audit\/([^/]+)$/);
-      if (auditMatch && req.method === 'GET') return send(res, 200, getAuditEvent(db, session, auditMatch[1]));
       if(path==='/api/people/crew-overview' && req.method==='GET') {
         try {
           if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid crew overview request');

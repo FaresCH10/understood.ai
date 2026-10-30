@@ -18,7 +18,7 @@ export function retainWorkerDetail(currentId:string|null,loadedId:unknown,unsent
   return !!currentId && currentId===loadedId && unsent && (status===0 || (status!==null && status>=500 && status<=599));
 }
 export const workerRefreshText={
-  en:{refresh:'Refresh briefing',failed:'The briefing could not be refreshed. Recheck before sending.'},
+  en:{refresh:'Refresh instruction',failed:'The instruction could not be refreshed. Recheck before sending.'},
   ar:{refresh:'تحديث التعليمات',failed:'تعذر تحديث التعليمات. تحقق مجددًا قبل الإرسال.'},
   hi:{refresh:'ब्रीफिंग रीफ़्रेश करें',failed:'ब्रीफिंग रीफ़्रेश नहीं हो सकी। भेजने से पहले फिर जाँचें।'},
   ur:{refresh:'ہدایت تازہ کریں',failed:'ہدایت تازہ نہیں ہو سکی۔ بھیجنے سے پہلے دوبارہ چیک کریں۔'},
@@ -27,7 +27,7 @@ export const workerRefreshText={
   ta:{refresh:'வழிமுறையைப் புதுப்பி',failed:'வழிமுறையைப் புதுப்பிக்க முடியவில்லை. அனுப்பும் முன் மீண்டும் சரிபார்க்கவும்.'},
   te:{refresh:'బ్రీఫింగ్ రిఫ్రెష్ చేయండి',failed:'బ్రీఫింగ్ రిఫ్రెష్ చేయలేకపోయాం. పంపే ముందు మళ్లీ తనిఖీ చేయండి.'},
   ne:{refresh:'ब्रिफिङ रिफ्रेस गर्नुहोस्',failed:'ब्रिफिङ रिफ्रेस गर्न सकिएन। पठाउनु अघि फेरि जाँच्नुहोस्।'},
-  fil:{refresh:'I-refresh ang briefing',failed:'Hindi na-refresh ang briefing. Suriin muli bago magpadala.'},
+  fil:{refresh:'I-refresh ang instruction',failed:'Hindi na-refresh ang instruction. Suriin muli bago magpadala.'},
   si:{refresh:'බ්‍රීෆිං නැවුම් කරන්න',failed:'බ්‍රීෆිං නැවුම් කළ නොහැකි විය. යැවීමට පෙර නැවත පරීක්ෂා කරන්න.'},
   ru:{refresh:'Обновить инструкцию',failed:'Не удалось обновить инструкцию. Проверьте ещё раз перед отправкой.'},
   'pa-Guru':{refresh:'ਬ੍ਰੀਫਿੰਗ ਤਾਜ਼ਾ ਕਰੋ',failed:'ਬ੍ਰੀਫਿੰਗ ਤਾਜ਼ਾ ਨਹੀਂ ਹੋ ਸਕੀ। ਭੇਜਣ ਤੋਂ ਪਹਿਲਾਂ ਫਿਰ ਜਾਂਚੋ।'},

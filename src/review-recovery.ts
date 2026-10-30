@@ -21,7 +21,7 @@ export function readPendingReview(storage:Store,scope:string):PendingReview|null
     if(!value || typeof value!=='object' || Array.isArray(value) || Object.keys(value).some(name=>!['requestId','briefingId','body'].includes(name))
       || typeof value.briefingId!=='string' || !value.briefingId || value.briefingId.length>100 || !value.body || typeof value.body!=='object' || Array.isArray(value.body) || 'requestId' in value.body) throw new Error();
     pendingReviewContent(value);return value;
-  } catch {throw new Error('Pending review request cannot be read. Check the briefing history before creating another review.');}
+  } catch {throw new Error('Pending review request cannot be read. Check the instruction history before creating another review.');}
 }
 export function savePendingReview(storage:Store,scope:string,value:PendingReview) {
   pendingReviewContent(value);

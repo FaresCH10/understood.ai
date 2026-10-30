@@ -97,6 +97,9 @@ const columns = {
   // Restore the freeze policy only after all retained operational history is imported.
   site_lifecycle:'site_id org_id revision state reason updated_at',
   site_lifecycle_requests:'request_id org_id origin_site_id site_id actor_id request_json revision created_at',
+  instruction_compositions:'id org_id site_id staff_id content_json updated_at',
+  instruction_attachments:'id request_id org_id site_id staff_id name mime bytes data_base64 created_at',
+  assignment_completions:'assignment_id org_id site_id worker_id completed_at',
   instruction_sends:'request_id org_id site_id briefing_id publication_request_id audience_json response_mode delivery_mode state publication_id audience_count delivered undelivered undelivered_json error request_json requested_by created_at updated_at',
   instruction_deliveries:'request_id org_id site_id worker_id language state reason attempts assignment_id content_json content_hash updated_at',
   instruction_retries:'request_id send_request_id org_id site_id requested_by generation request_json created_at',
@@ -140,6 +143,7 @@ for(const table of ['glossary_terms','glossary_versions','glossary_requests']) o
 for(const table of ['staff_access_revisions','staff_access_requests']) optional.add(table);
 for(const table of ['staff_accounts','staff_account_memberships']) optional.add(table);
 for(const table of ['staff_invitations','staff_invitation_tokens','staff_invitation_mail','staff_invitation_requests','staff_invitation_acceptances']) optional.add(table);
+optional.add('instruction_compositions');optional.add('instruction_attachments');optional.add('assignment_completions');
 optional.add('instruction_sends');optional.add('instruction_deliveries');optional.add('instruction_retries');optional.add('acknowledgments');
 optional.add('worker_language_requests');
 optional.add('organization_entitlements');optional.add('organization_entitlement_transitions');optional.add('organization_activation_requests');

@@ -8,7 +8,7 @@ import type {WorkerUiLanguage} from './worker-ui-language';
 
 export type AudioOutboxProps={session:PageSession;language:WorkerUiLanguage;disabled:boolean;current:()=>boolean;onOperation:(work:()=>Promise<void>)=>Promise<void>;onSessionLost:()=>void};
 const copy={
-  en:{title:'Saved recordings',scope:'Briefing',version:'Version',expires:'Expires',limits:'Up to 10 recordings and 25 MiB on this device. Saved copies remain until removed or expired.',removeAll:'Remove all saved recordings'},
+  en:{title:'Saved recordings',scope:'Instruction',version:'Version',expires:'Expires',limits:'Up to 10 recordings and 25 MiB on this device. Saved copies remain until removed or expired.',removeAll:'Remove all saved recordings'},
   ar:{title:'التسجيلات المحفوظة',scope:'التعليمات',version:'الإصدار',expires:'تنتهي الصلاحية',limits:'حتى 10 تسجيلات و25 ميبيبايت على هذا الجهاز. تبقى النسخ المحفوظة حتى حذفها أو انتهاء صلاحيتها.',removeAll:'حذف جميع التسجيلات المحفوظة'},
   ur:{title:'محفوظ ریکارڈنگز',scope:'ہدایات',version:'ورژن',expires:'میعاد',limits:'اس آلے پر زیادہ سے زیادہ 10 ریکارڈنگز اور 25 میبی بائٹس۔ محفوظ نقول ہٹانے یا میعاد ختم ہونے تک باقی رہتی ہیں۔',removeAll:'تمام محفوظ ریکارڈنگز ہٹائیں'},
   hi:{title:'सहेजी गई रिकॉर्डिंग',scope:'निर्देश',version:'संस्करण',expires:'समाप्ति',limits:'इस डिवाइस पर अधिकतम 10 रिकॉर्डिंग और 25 MiB। सहेजी प्रतियाँ हटाने या समाप्त होने तक रहती हैं।',removeAll:'सभी सहेजी रिकॉर्डिंग हटाएँ'},
@@ -17,12 +17,12 @@ const copy={
   ta:{title:'சேமித்த பதிவுகள்',scope:'அறிவுறுத்தல்',version:'பதிப்பு',expires:'காலாவதி',limits:'இந்தச் சாதனத்தில் அதிகபட்சம் 10 பதிவுகளும் 25 MiB-யும். சேமித்த நகல்கள் நீக்கும் வரை அல்லது காலாவதியாகும் வரை இருக்கும்.',removeAll:'சேமித்த அனைத்துப் பதிவுகளையும் நீக்கு'},
   te:{title:'సేవ్ చేసిన రికార్డింగ్‌లు',scope:'సూచన',version:'వెర్షన్',expires:'గడువు',limits:'ఈ పరికరంలో గరిష్ఠంగా 10 రికార్డింగ్‌లు మరియు 25 MiB. సేవ్ చేసిన కాపీలు తొలగించే వరకు లేదా గడువు ముగిసే వరకు ఉంటాయి.',removeAll:'సేవ్ చేసిన అన్ని రికార్డింగ్‌లను తొలగించండి'},
   ne:{title:'सुरक्षित रेकर्डिङहरू',scope:'निर्देशन',version:'संस्करण',expires:'म्याद',limits:'यो यन्त्रमा अधिकतम १० रेकर्डिङ र २५ MiB। सुरक्षित प्रतिलिपिहरू हटाउने वा म्याद सकिनेसम्म रहन्छन्।',removeAll:'सबै सुरक्षित रेकर्डिङ हटाउनुहोस्'},
-  fil:{title:'Mga naka-save na recording',scope:'Briefing',version:'Bersyon',expires:'Mag-e-expire',limits:'Hanggang 10 recording at 25 MiB sa device na ito. Mananatili ang mga naka-save na kopya hanggang maalis o mag-expire.',removeAll:'Alisin ang lahat ng naka-save na recording'},
+  fil:{title:'Mga naka-save na recording',scope:'Instruction',version:'Bersyon',expires:'Mag-e-expire',limits:'Hanggang 10 recording at 25 MiB sa device na ito. Mananatili ang mga naka-save na kopya hanggang maalis o mag-expire.',removeAll:'Alisin ang lahat ng naka-save na recording'},
   si:{title:'සුරකින ලද පටිගත කිරීම්',scope:'උපදෙස්',version:'අනුවාදය',expires:'කල් ඉකුත් වේ',limits:'මෙම උපාංගයේ උපරිම පටිගත කිරීම් 10ක් සහ 25 MiB. සුරකින ලද පිටපත් ඉවත් කරන තෙක් හෝ කල් ඉකුත් වන තෙක් රැඳේ.',removeAll:'සුරකින ලද සියලුම පටිගත කිරීම් ඉවත් කරන්න'},
   ru:{title:'Сохранённые записи',scope:'Инструкция',version:'Версия',expires:'Истекает',limits:'До 10 записей и 25 MiB на этом устройстве. Сохранённые копии остаются до удаления или истечения срока.',removeAll:'Удалить все сохранённые записи'},
   'pa-Guru':{title:'ਸੰਭਾਲੀਆਂ ਰਿਕਾਰਡਿੰਗਾਂ',scope:'ਹਦਾਇਤ',version:'ਵਰਜ਼ਨ',expires:'ਮਿਆਦ',limits:'ਇਸ ਡਿਵਾਈਸ ’ਤੇ ਵੱਧ ਤੋਂ ਵੱਧ 10 ਰਿਕਾਰਡਿੰਗਾਂ ਅਤੇ 25 MiB। ਸੰਭਾਲੀਆਂ ਕਾਪੀਆਂ ਹਟਾਉਣ ਜਾਂ ਮਿਆਦ ਖਤਮ ਹੋਣ ਤੱਕ ਰਹਿੰਦੀਆਂ ਹਨ।',removeAll:'ਸਾਰੀਆਂ ਸੰਭਾਲੀਆਂ ਰਿਕਾਰਡਿੰਗਾਂ ਹਟਾਓ'},
   'pa-Arab':{title:'محفوظ ریکارڈنگاں',scope:'ہدایت',version:'ورژن',expires:'میعاد',limits:'ایس آلے تے زیادہ توں زیادہ 10 ریکارڈنگاں تے 25 MiB۔ محفوظ نقلاں ہٹان یا میعاد ختم ہون تک رہندیاں نیں۔',removeAll:'ساریاں محفوظ ریکارڈنگاں ہٹاؤ'},
-  id:{title:'Rekaman tersimpan',scope:'Briefing',version:'Versi',expires:'Berakhir',limits:'Maksimal 10 rekaman dan 25 MiB di perangkat ini. Salinan tersimpan tetap ada sampai dihapus atau kedaluwarsa.',removeAll:'Hapus semua rekaman tersimpan'},
+  id:{title:'Rekaman tersimpan',scope:'Instruction',version:'Versi',expires:'Berakhir',limits:'Maksimal 10 rekaman dan 25 MiB di perangkat ini. Salinan tersimpan tetap ada sampai dihapus atau kedaluwarsa.',removeAll:'Hapus semua rekaman tersimpan'},
 };
 function Preview({item,label}:{item:AudioOutboxItem;label:string}){
   const [url,setUrl]=useState('');

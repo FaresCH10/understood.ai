@@ -46,7 +46,7 @@ export function RetentionSettings({authority}:{authority:StaffRequestAuthority})
       {data.caseRetentionAvailable&&<Suspense fallback={<p role="status">Loading case retention settings...</p>}><TextRetentionSettings authority={authority} category="case"/></Suspense>}
       {data.generatedRetentionAvailable&&<Suspense fallback={<p role="status">Loading generated audio retention settings...</p>}><TextRetentionSettings authority={authority} category="generated"/></Suspense>}
       {data.activityRetentionAvailable&&<Suspense fallback={<p role="status">Loading activity retention settings...</p>}><TextRetentionSettings authority={authority} category="activity"/></Suspense>}
-      {data.briefingRetentionAvailable&&<Suspense fallback={<p role="status">Loading briefing retention settings...</p>}><TextRetentionSettings authority={authority} category="briefing"/></Suspense>}
+      {data.briefingRetentionAvailable&&<Suspense fallback={<p role="status">Loading instruction retention settings...</p>}><TextRetentionSettings authority={authority} category="briefing"/></Suspense>}
       <Suspense fallback={<p role="status">Loading recording notice...</p>}><RecordingNoticeSettings authority={authority}/></Suspense>
       {data.canWrite&&<Suspense fallback={<p role="status">Loading worker data requests...</p>}><PrivacyWorkers authority={authority}/></Suspense>}
       <div className="notice notice-amber"><TriangleAlert size={22}/><span>{data.limitations}</span></div>

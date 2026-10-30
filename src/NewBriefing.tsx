@@ -1,6 +1,6 @@
 import {GENERATION_LANGUAGE_CODES,workerLocale} from '../server/languages.mjs';
 import {useEffect,useRef,useState,type RefObject} from 'react';
-import {ArrowLeft,CheckCircle2,ChevronRight,Clock3,FileText,Languages,LayoutTemplate,MapPin,Mic,RefreshCw,Save,Upload} from 'lucide-react';
+import {ArrowLeft,CheckCircle2,ChevronRight,Clock3,FileText,Languages,MapPin,Mic,RefreshCw,Save,Upload} from 'lucide-react';
 import {useBriefingRequest,BriefingRequestError} from './BriefingControls';
 import type {StaffRequestAuthority} from './useStaffRequest';
 import {readPendingDraftCreation,savePendingDraftCreation,clearPendingDraftCreation,checkedDraftCreationResult,checkedDraftCreationReceipt,type PendingDraftCreation} from './draft-creation-recovery';
@@ -20,13 +20,11 @@ function readLocalDraft(scope?:string|null):LocalDraft|null {
   }catch{return null;}
 }
 type ComposeJob={id:string;title:string;kind:string;status:string;created_at:string;updated_at?:string};
-type ComposeTemplate={id:string;title:string;status:string};
 type ComposeMetrics={assigned:number;responses:number;matches:number;clarifications:number;pending:number;publication?:{briefingId:string;title:string;version:number}|null};
 export default function NewBriefing({scope,uploadSession,navigate,navigationGuard,authority,site,audioCapture=true}:{scope?:string|null;uploadSession:SourceUploadSession;navigate:(path:string)=>void;navigationGuard:RefObject<((next:string,resume?:()=>void)=>boolean)|null>;authority:StaffRequestAuthority;site?:string;audioCapture?:boolean}) {
   const {request,current,complete,ensureCompletion,sourceFetch}=useBriefingRequest(authority);
   const [restoredDraft]=useState(()=>readLocalDraft(scope));
   const [autosave,setAutosave]=useState<'idle'|'saving'|'saved'|'error'>(restoredDraft?'saved':'idle'),[autosavedAt,setAutosavedAt]=useState(restoredDraft?.savedAt || 0);
-  const [templates,setTemplates]=useState<ComposeTemplate[]>([]),[templateId,setTemplateId]=useState(''),[templateBusy,setTemplateBusy]=useState(false),[templateStatus,setTemplateStatus]=useState('');
   const [jobs,setJobs]=useState<ComposeJob[]>([]),[metrics,setMetrics]=useState<ComposeMetrics|null>(null);
   const [recovery,setRecovery]=useState<{pending:PendingDraftCreation|null;error:string}>(()=>{
     try {return {pending:scope?readPendingDraftCreation(sessionStorage,scope):null,error:''};}catch(reason){return {pending:null,error:(reason as Error).message};}
@@ -42,12 +40,10 @@ export default function NewBriefing({scope,uploadSession,navigate,navigationGuar
   useEffect(()=>{
     const controller=new AbortController(),live=()=>current() && !controller.signal.aborted;
     void Promise.allSettled([
-      request<{items:ComposeTemplate[]}>('/templates?status=active&page=1&pageSize=50',undefined,undefined,controller.signal),
       request<{items:ComposeJob[]}>('/processing?page=1&pageSize=5&sort=newest',undefined,undefined,controller.signal),
       request<ComposeMetrics>('/overview',undefined,undefined,controller.signal),
-    ]).then(([templateList,jobList,overview])=>{
+    ]).then(([jobList,overview])=>{
       if(!live())return;
-      if(templateList.status==='fulfilled' && Array.isArray(templateList.value?.items))setTemplates(templateList.value.items);
       if(jobList.status==='fulfilled' && Array.isArray(jobList.value?.items))setJobs(jobList.value.items);
       if(overview.status==='fulfilled')setMetrics(overview.value);
     });
@@ -63,19 +59,6 @@ export default function NewBriefing({scope,uploadSession,navigate,navigationGuar
     return()=>window.clearTimeout(timer);
   },[scope,title,source,sourceMode]);
   const clearLocalDraft=()=>{const key=localDraftKey(scope);if(key)try{sessionStorage.removeItem(key);}catch{/* Storage may be unavailable. */}};
-  async function applyTemplate(id:string){
-    setTemplateId(id);setTemplateStatus('');if(!id){return;}
-    setTemplateBusy(true);
-    try {
-      const value=await request<{selected?:{content?:{title?:string;source?:string}}}>(`/templates/${encodeURIComponent(id)}`,'GET');
-      const content=value?.selected?.content;
-      if(typeof content?.title!=='string' || typeof content.source!=='string')throw Error('Template content is unavailable.');
-      const templateTitle=content.title,templateSource=content.source;
-      const apply=()=>{setTitle(templateTitle);setSource(templateSource);setSourceMode('type');setSourceAudio(null);setAudioActive(false);requestId.current=crypto.randomUUID();setTemplateStatus(`Applied “${templateTitle}”. Review the text before saving.`);};
-      if(audioActive || sourceAudio)askLeave(apply);else apply();
-    }catch(reason){setTemplateStatus((reason as Error).message);}
-    finally{setTemplateBusy(false);}
-  }
   const leaveDialog=useRef<HTMLDialogElement>(null),leaveAction=useRef<(()=>void)|null>(null),leaveTrigger=useRef<HTMLElement|null>(null);
   function askLeave(action:()=>void) {
     leaveAction.current=action;leaveTrigger.current=document.activeElement as HTMLElement;leaveDialog.current?.showModal();
@@ -149,7 +132,7 @@ export default function NewBriefing({scope,uploadSession,navigate,navigationGuar
   const ago=(value:string)=>{const stamp=Date.parse(value);if(!Number.isFinite(stamp))return '';const minutes=Math.max(0,Math.round((Date.now()-stamp)/60000));return minutes<1?'Just now':minutes<60?`${minutes}m ago`:minutes<1440?`${Math.round(minutes/60)}h ago`:`${Math.round(minutes/1440)}d ago`;};
   const needsAudio=audioCapture && sourceMode!=='type' && !sourceAudio;
   const typed=!audioCapture || sourceMode==='type';
-  return <><button className="back-link" onClick={()=>navigate('briefings')}><ArrowLeft size={18}/>Back to briefings</button><div className="page-header"><div><h1>{audioCapture?'Record an instruction':'Write an instruction'}</h1><p>{audioCapture?'Record your voice, review the transcript, then publish it to your workers.':'Type the instruction, then save the draft. Voice capture needs a transcription provider.'}</p></div></div><DraftSteps draft={null} active="source"/>
+  return <><button className="back-link" onClick={()=>navigate('briefings')}><ArrowLeft size={18}/>Back to instructions</button><div className="page-header"><div><h1>{audioCapture?'Record an instruction':'Write an instruction'}</h1><p>{audioCapture?'Record your voice, review the transcript, then publish it to your workers.':'Type the instruction, then save the draft. Voice capture needs a transcription provider.'}</p></div></div><DraftSteps draft={null} active="source"/>
     <form className="briefing-compose" onSubmit={event=>{event.preventDefault();void save();}}>
       <div className="briefing-compose-main">
         <section className="panel"><h2>Title</h2>
@@ -160,7 +143,7 @@ export default function NewBriefing({scope,uploadSession,navigate,navigationGuar
             <button type="button" aria-pressed={sourceMode==='type'} className={sourceMode==='type'?'selected':''} disabled={busy} onClick={()=>switchMode('type')}><FileText size={20}/>Type</button>
             <button type="button" aria-pressed={sourceMode==='upload'} className={sourceMode==='upload'?'selected':''} disabled={busy || !audioCapture} onClick={()=>switchMode('upload')}><Upload size={20}/>Upload</button>
           </div>
-          {typed?<label className="field">Briefing text<textarea value={source} disabled={busy} onChange={event=>{requestId.current=crypto.randomUUID();setSource(event.target.value);}} required minLength={10} maxLength={4000} rows={7}/><span className="muted">{source.length} / 4000 characters</span></label>:<><SourceAudio mode={sourceMode==='upload'?'upload':'record'} disabled={busy} onChange={setSourceAudio} onActivityChange={setAudioActive}/><p role="status" className="compose-audio-state">{sourceAudio?'Source audio is retained in memory until uploaded.':'No source audio has been sent.'} Transcription requires a permitted provider. Without one, the recording is kept and then stopped, and no draft is created.</p></>}
+          {typed?<label className="field">Instruction text<textarea value={source} disabled={busy} onChange={event=>{requestId.current=crypto.randomUUID();setSource(event.target.value);}} required minLength={10} maxLength={4000} rows={7}/><span className="muted">{source.length} / 4000 characters</span></label>:<><SourceAudio mode={sourceMode==='upload'?'upload':'record'} disabled={busy} onChange={setSourceAudio} onActivityChange={setAudioActive}/><p role="status" className="compose-audio-state">{sourceAudio?'Source audio is retained in memory until uploaded.':'No source audio has been sent.'} Transcription requires a permitted provider. Without one, the recording is kept and then stopped, and no draft is created.</p></>}
           <fieldset className="generation-language-options"><legend>Preparation languages</legend><label className="billing-confirm"><input type="checkbox" disabled={busy} checked={siteDefaults} onChange={event=>{requestId.current=crypto.randomUUID();setSiteDefaults(event.target.checked);}}/><span>Use site generation defaults</span></label>
             {!siteDefaults && GENERATION_LANGUAGE_CODES.map(code=><label className="billing-confirm" key={code}><input type="checkbox" disabled={busy || code==='en'} checked={languages.includes(code)} onChange={event=>{requestId.current=crypto.randomUUID();setLanguages(old=>GENERATION_LANGUAGE_CODES.filter(language=>language===code?event.target.checked:old.includes(language)));}}/><span>{code==='en'?'English (source)':workerLocale(code)?.englishName || code}</span></label>)}
           </fieldset>
@@ -171,13 +154,11 @@ export default function NewBriefing({scope,uploadSession,navigate,navigationGuar
           <dl className="assignment-stats"><div><dt>Assigned</dt><dd>{metrics.assigned}</dd></div><div><dt>Responses</dt><dd>{metrics.responses}</dd></div><div><dt>Matches</dt><dd>{metrics.matches}</dd></div><div className="warn"><dt>Clarifications</dt><dd>{metrics.clarifications}</dd></div><div><dt>Pending</dt><dd>{metrics.pending}</dd></div></dl>
         </section>}
       </div>
-      <aside className="briefing-compose-rail" aria-label="Briefing settings and processing">
+      <aside className="briefing-compose-rail" aria-label="Instruction settings and processing">
         <section className="panel"><div className="people-panel-heading"><h2>AI processing ({jobs.length})</h2><button type="button" className="icon-button" title="Open AI processing" aria-label="Open AI processing" disabled={busy} onClick={()=>navigate('processing')}><ChevronRight size={18}/></button></div>
           {jobs.length?<div className="compose-jobs">{jobs.map(job=><button type="button" className="compose-job" key={job.id} disabled={busy} onClick={()=>navigate(`processing/${job.id}`)}><span className={`compose-job-icon ${job.status}`}>{/complete|ready/.test(job.status)?<CheckCircle2 size={18}/>:<Clock3 size={18}/>}</span><span><strong>{job.title}</strong><small>{job.status.replaceAll('_',' ')}{job.kind==='prepare'?' · preparation':job.kind==='answer_check'?' · answer check':job.kind==='source_transcription'?' · transcription':' · audio'}</small></span><time dateTime={job.updated_at || job.created_at}>{ago(job.updated_at || job.created_at)}</time></button>)}</div>:<p className="muted">No AI processing activity yet.</p>}
         </section>
-        <section className="panel"><h2>Briefing settings</h2>
-          <label className="compose-setting"><LayoutTemplate size={20}/><span>Template</span><select value={templateId} disabled={busy || templateBusy} onChange={event=>void applyTemplate(event.target.value)}><option value="">No template</option>{templates.map(template=><option key={template.id} value={template.id}>{template.title}</option>)}</select></label>
-          {templateBusy && <p role="status">Loading template...</p>}{templateStatus && <p className="muted">{templateStatus}</p>}
+        <section className="panel"><h2>Instruction settings</h2>
           <label className="compose-setting"><Languages size={20}/><span>Source language</span><select value="en" disabled><option value="en">English</option></select></label>
           <label className="compose-setting"><MapPin size={20}/><span>Site</span><select value={site || ''} disabled><option value={site || ''}>{site || 'Current site'}</option></select></label>
           <p className="compose-autosave" role="status">{autosave==='saved'?<><CheckCircle2 size={16}/>Draft autosaved · {autosavedAt?new Date(autosavedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'Just now'}</>:autosave==='saving'?'Saving draft locally...':autosave==='error'?'Local autosave unavailable. Save the draft before leaving.':'Draft is not saved yet.'}</p>

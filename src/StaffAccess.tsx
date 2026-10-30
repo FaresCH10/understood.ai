@@ -10,10 +10,10 @@ type StaffRow={id:string;name:string;role:string;active:boolean;revision:number}
 type StaffPage={items:StaffRow[];total:number;page:number;pageSize:number;activeOwners:number;canWrite:boolean};
 type InviteFormState={row:InvitationRow|null;action:'issue'|'resend'|'cancel'};
 const roleNames:Record<string,string>={owner:'Owner',administrator:'Administrator',supervisor:'Supervisor',auditor:'Read-only auditor'};
-const permissions:Record<string,string>={owner:'Full access for their site, including staff, sites, AI processing and all content.',administrator:'Can manage staff and sites for their assigned site. Cannot change owner settings.',supervisor:'Can create and publish briefings, view results and optionally help with unclear answers. Cannot change owner settings.',auditor:'Read briefing results, activity and billing. Cannot change records or play worker recordings.'};
+const permissions:Record<string,string>={owner:'Full access for their site, including staff, sites, AI processing and all content.',administrator:'Can manage staff and sites for their assigned site. Cannot change owner settings.',supervisor:'Can create and publish instructions, view results and optionally help with unclear answers. Cannot change owner settings.',auditor:'Read instruction results, activity and billing. Cannot change records or play worker recordings.'};
 function accessAreas(role:string):{label:string;detail:string}[] {
   return [
-    {label:'Briefings',detail:role==='auditor'?'View published briefings.':'Create and publish briefings.'},
+    {label:'Instructions',detail:role==='auditor'?'View published instructions.':'Create and publish instructions.'},
     {label:'Results',detail:'View completed items and AI checks.'},
     {label:'Clarifications',detail:['owner','supervisor'].includes(role)?'Optionally help with unclear answers.':'View clarification history.'},
     {label:'Staff & sites',detail:role==='owner'?'Full access for the assigned site.':'Cannot change owner settings.'}

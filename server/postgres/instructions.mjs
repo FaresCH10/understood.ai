@@ -26,6 +26,7 @@ function requestMatches(saved,request) {
     && saved?.responseMode===request.responseMode && saved?.deliveryMode===request.deliveryMode
     && saved?.audience?.type===request.audience.type
     && (saved?.audience?.crewId ?? null)===(request.audience.crewId ?? null)
+    && JSON.stringify(saved?.audience?.workerIds||[])===JSON.stringify(request.audience.workerIds||[])
     && (saved?.dueAt ?? null)===(request.dueAt ?? null)
     && (saved?.reminderMinutes ?? 0)===(request.reminderMinutes ?? 0)
     && (saved?.sourceHash===undefined || saved.sourceHash===request.sourceHash);
@@ -52,6 +53,10 @@ async function sendView(client,row,duplicate) {
 }
 
 async function audienceWorkers(client,session,audience) {
+  if(audience.type==='members'){
+    const rows=(await client.query('SELECT id,language FROM workers WHERE org_id=$1 AND site_id=$2 AND active=true AND language_selection_required=false AND id=ANY($3::text[]) ORDER BY id',[session.org_id,session.site_id,audience.workerIds])).rows;
+    if(rows.length!==audience.workerIds.length)throw Error('Selected members are unavailable or need a language');return rows;
+  }
   if(audience.type==='crew') {
     const crew=(await client.query('SELECT id,name FROM crews WHERE id=$1 AND org_id=$2 AND site_id=$3 AND active=true',
       [audience.crewId,session.org_id,session.site_id])).rows[0];
@@ -329,7 +334,9 @@ export async function instructionAudienceOverview(pool,session,{schema='public'}
     for(const crew of crews){crew.byLanguage={};crew.notSelected=0;}
     const crewById=new Map(crews.map(crew=>[crew.id,crew]));
     for(const row of crewLanguages){const crew=crewById.get(row.crew_id);if(!crew)continue;if(row.language_selection_required)crew.notSelected+=row.n;else crew.byLanguage[row.language]=(crew.byLanguage[row.language]||0)+row.n;}
-    return {workers:{total:selected,byLanguage,notSelected},crews,asOf:iso(await nowOf(client))};
+    const members=(await client.query('SELECT id,code,name,language,language_selection_required FROM workers WHERE org_id=$1 AND site_id=$2 AND active=true ORDER BY code,id LIMIT 5001',[session.org_id,session.site_id])).rows;
+    if(members.length>5000)throw Error('Instruction member audience exceeds limit');
+    return {workers:{total:selected,byLanguage,notSelected},crews,members,asOf:iso(await nowOf(client))};
   });
 }
 
@@ -345,7 +352,9 @@ export async function startInstructionSend(pool,session,input,{schema='public'}=
       return sendView(client,old,true);
     }
     await requireWritableEntitlement(client,session.org_id);
-    const pendingLanguage=(await client.query(`SELECT 1 FROM workers w WHERE w.org_id=$1 AND w.site_id=$2 AND w.active=true AND w.language_selection_required=true AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM crew_memberships cm WHERE cm.worker_id=w.id AND cm.org_id=w.org_id AND cm.site_id=w.site_id AND cm.crew_id=$3)) LIMIT 1`,[session.org_id,session.site_id,value.audience.type==='crew'?value.audience.crewId:null])).rows.length>0;
+    const composition=(await client.query('SELECT staff_id,org_id,site_id FROM instruction_compositions WHERE id=$1 FOR UPDATE',[value.requestId])).rows[0];
+    if(composition&&(composition.staff_id!==session.principal_id||composition.org_id!==session.org_id||composition.site_id!==session.site_id))throw Error('Instruction draft belongs to another supervisor');
+    const pendingLanguage=value.audience.type!=='members' && (await client.query(`SELECT 1 FROM workers w WHERE w.org_id=$1 AND w.site_id=$2 AND w.active=true AND w.language_selection_required=true AND ($3::text IS NULL OR EXISTS(SELECT 1 FROM crew_memberships cm WHERE cm.worker_id=w.id AND cm.org_id=w.org_id AND cm.site_id=w.site_id AND cm.crew_id=$3)) LIMIT 1`,[session.org_id,session.site_id,value.audience.type==='crew'?value.audience.crewId:null])).rows.length>0;
     if(pendingLanguage)throw Error('Choose a language for every selected worker in Team before sending.');
     const workers=await audienceWorkers(client,session,value.audience);
     if(!workers.length) throw new Error('Instruction audience is empty');

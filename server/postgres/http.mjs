@@ -1,3 +1,5 @@
+import {handleWorkspaceRoute} from '../workspace-http.mjs';
+import {postgresWorkspace} from './workspace.mjs';
 import {assertProductionAdmission} from './production-admission.mjs';
 import { createServer } from 'node:http';
 import {sendPrivateWav} from '../audio-response.mjs';
@@ -54,7 +56,6 @@ import { createPresentation,listPresentations } from './presentations.mjs';
 import { readPublicationReport,listReportPublications } from './reports.mjs';
 import { listWorkers,createWorker,updateWorker,disableWorker,reenableWorker,listCrews,getCrew,listCrewRecipients,createCrew,moveWorkerToCrew,renameCrew,archiveCrew,restoreCrew,
   workerLanguageState,workerLanguageHistory,selectWorkerLanguage,requestWorkerLanguage,staffWorkerLanguageHistory,listLanguageRequests,decideWorkerLanguageRequest } from './people.mjs';
-import { listAuditEvents,getAuditEvent,exportAuditEvents } from './audit.mjs';
 import {listNotifications,readNotification,notificationReceipt} from './notifications.mjs';
 import {listWorkerNotifications,readWorkerNotification,workerNotificationReceipt,savePushSubscription,revokePushSubscription,pushSubscriptionStatus} from './notification-events.mjs';
 import {resolvePushAdapter} from '../push-adapter.mjs';
@@ -362,6 +363,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
         return send(res,200,{ok:true},{'set-cookie':sessionCookie(next.token,next.maxSeconds,cookieOptions)});
       }
       if (path==='/api/overview' && req.method==='GET') return send(res,200,await staffOverview(pool,session,repository));
+      if(await handleWorkspaceRoute(req,res,session,url,(s,op,input)=>postgresWorkspace(pool,s,op,input,repository)))return;
       if(path==='/api/instructions/audience' && req.method==='GET') {
         if(url.search) throw new Error('Invalid instruction request');
         return send(res,200,await instructionAudienceOverview(pool,session,repository));
@@ -612,14 +614,6 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
           ?await readWorkerNotification(pool,session,notificationMatch[1],repository)
           :await readNotification(pool,session,notificationMatch[1],repository));
       }
-      if (path==='/api/audit' && req.method==='GET') return send(res,200,await listAuditEvents(pool,session,Object.fromEntries(url.searchParams),repository));
-      if (path==='/api/audit.csv' && req.method==='GET') {
-        const csv=await exportAuditEvents(pool,session,Object.fromEntries(url.searchParams),repository);
-        res.writeHead(200,{'content-type':'text/csv; charset=utf-8','cache-control':'no-store','content-disposition':'attachment; filename="activity-history.csv"','x-content-type-options':'nosniff','referrer-policy':'no-referrer'});
-        res.end(csv); return;
-      }
-      const audit=path.match(/^\/api\/audit\/([^/]+)$/);
-      if (audit && req.method==='GET') return send(res,200,await getAuditEvent(pool,session,audit[1],repository));
       if(path==='/api/clarification-creations/subjects'&&req.method==='GET'){
         if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid clarification subject filter');
         return send(res,200,{...await listClarificationSubjects(pool,session,Object.fromEntries(url.searchParams),repository),clientContext:clientSessionContext(session).clientContext});

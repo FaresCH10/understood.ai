@@ -38,7 +38,7 @@ export function RegenerationControl({id,revision,language,scope,disabled,onChang
   const locked=busy || uncertain;
   useEffect(()=>{if(kind) consent.current?.focus();else if(focusBack.current) {focusBack.current=false;if(trigger.current) commands.current[trigger.current]?.focus();}},[kind]);
   const close=()=>{if(locked) return;focusBack.current=true;setKind(null);onEditingChange(false);};
-  const finish=(acceptedId:string)=>{ensureCompletion();if(acceptedId!==id) throw Error('Regeneration briefing changed.');clearPendingRegeneration(sessionStorage,scope!,pending.current!.requestId);pending.current=null;setUncertain(false);setKind(null);onEditingChange(false);onChanged();};
+  const finish=(acceptedId:string)=>{ensureCompletion();if(acceptedId!==id) throw Error('Regeneration instruction changed.');clearPendingRegeneration(sessionStorage,scope!,pending.current!.requestId);pending.current=null;setUncertain(false);setKind(null);onEditingChange(false);onChanged();};
   async function submit(event:FormEvent) {
     event.preventDefault();if(sending.current || !confirmed || !kind || !current()) return;
     pending.current ||= {requestId:crypto.randomUUID(),briefingId:id,body:{revision,language,kind,confirmed:true}};

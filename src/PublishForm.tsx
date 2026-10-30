@@ -55,7 +55,7 @@ function CrewRecipients({disabled,onSelected,onLoading,authority}:{disabled:bool
   </div>;
 }
 
-export default function PublishForm({id,revision,version,timezone:siteTimezone,scope,onPending,onChanged,authority}:{id:string;revision:number;version:number;timezone:string;scope?:string|null;onPending:(value:PendingPublication)=>void;onChanged:()=>void;authority:StaffRequestAuthority}) {
+export default function PublishForm({id,revision,version,timezone:siteTimezone,scope,onPending,onChanged,authority}:{id:string;revision:number;version:number;timezone:string;scope?:string|null;onPending:(value:PendingPublication)=>void;onChanged:(outcome?:'publish'|'schedule')=>void;authority:StaffRequestAuthority}) {
   const {request,current:sessionCurrent,complete}=useBriefingRequest(authority),sending=useRef(false);
   const [search,setSearch]=useState(''),[language,setLanguage]=useState('all'),[page,setPage]=useState(1);
   const [data,setData]=useState<WorkerPage|null>(null),[selected,setSelected]=useState<Map<string,Worker>>(new Map());
@@ -92,7 +92,7 @@ export default function PublishForm({id,revision,version,timezone:siteTimezone,s
       await complete(result,value=>checkedPublicationResult(value,accepted),()=>{
         clearPendingPublication(sessionStorage,scope!,accepted);stored=false;
         setConfirmed(false);setSelected(new Map());form.reset();retry.current=null;
-        setTimingReset(value=>value+1);setTimezone(siteTimezone);onChanged();
+        setTimingReset(value=>value+1);setTimezone(siteTimezone);onChanged(mode==='schedule'?'schedule':'publish');
       });
     } catch(err) {
       if(!sessionCurrent())return;
@@ -126,6 +126,6 @@ export default function PublishForm({id,revision,version,timezone:siteTimezone,s
     {error && <p role="alert" className="record-error">{error}</p>}
     </fieldset>
     <button type="submit" className="button primary" disabled={busy || readingCrew || stale || !confirmed || selected.size===0 || selected.size>5000}>{mode==='schedule'?<CalendarClock size={18}/>:<Send size={18}/>}{busy ? 'Saving...' : mode==='schedule'?'Schedule version':'Publish version'}</button>
-    {stale && <button type="button" className="button outline" onClick={onChanged}><RefreshCw size={18}/>Refresh draft</button>}
+    {stale && <button type="button" className="button outline" onClick={()=>onChanged()}><RefreshCw size={18}/>Refresh draft</button>}
   </form></section>;
 }

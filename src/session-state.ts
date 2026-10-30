@@ -72,7 +72,7 @@ export const workerSessionText={
   id:{title:'Sesi pekerja ini terkunci',body:'Sesi berubah, berakhir, atau tidak dapat diverifikasi. Pekerjaan yang belum terkirim di halaman ini telah dihapus. Permintaan yang sudah dikirim mungkin masih selesai.',next:'Buka lagi tautan akses Anda sendiri, atau muat ulang dan periksa identitas sebelum melanjutkan.',reload:'Muat ulang'},
 };
 export const sessionLoadText={
-  en:{title:'Session unavailable',body:'Your session could not be checked. No workspace has been opened.',retry:'Recheck session',saved:'Open saved briefings',loading:'Loading Understood...'},
+  en:{title:'Session unavailable',body:'Your session could not be checked. No workspace has been opened.',retry:'Recheck session',saved:'Open saved instructions',loading:'Loading Understood...'},
   ar:{title:'الجلسة غير متاحة',body:'تعذر التحقق من جلستك. لم يتم فتح أي مساحة عمل.',retry:'إعادة التحقق من الجلسة',saved:'فتح التعليمات المحفوظة',loading:'جارٍ تحميل Understood...'},
   ur:{title:'سیشن دستیاب نہیں',body:'آپ کے سیشن کی تصدیق نہیں ہو سکی۔ کوئی ورک اسپیس نہیں کھولی گئی۔',retry:'سیشن دوبارہ چیک کریں',saved:'محفوظ شدہ ہدایات کھولیں',loading:'Understood لوڈ ہو رہا ہے...'},
   hi:{title:'सत्र उपलब्ध नहीं',body:'आपका सत्र जाँचा नहीं जा सका। कोई कार्यक्षेत्र नहीं खोला गया।',retry:'सत्र फिर जाँचें',saved:'सहेजे गए निर्देश खोलें',loading:'Understood लोड हो रहा है...'},

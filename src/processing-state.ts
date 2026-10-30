@@ -1,7 +1,7 @@
 import {isWorkerLanguage} from '../server/languages.mjs';
 export const processingKinds=['prepare','source_transcription','response_transcription','answer_check'] as const;
 export type ProcessingKind=typeof processingKinds[number];
-export const processingKindLabels:Record<ProcessingKind,string>={prepare:'Briefing preparation',source_transcription:'Source transcription',response_transcription:'Response transcription',answer_check:'Answer check'};
+export const processingKindLabels:Record<ProcessingKind,string>={prepare:'Instruction preparation',source_transcription:'Source transcription',response_transcription:'Response transcription',answer_check:'Answer check'};
 export type ProcessingEvent={step:number;stage:string;language:string|null;track:string|null;state:string;origin:string;errorCode:string|null;occurredAt:string};
 export type ProcessingProgress={available:boolean;attempts:Array<{current:boolean;startedAt:string;events:ProcessingEvent[]}>};
 export type ProcessingJob={id:string;kind:ProcessingKind;status:string;mode:'durable'|'inline-synthetic';attempts:number;revision:number|null;title:string;briefing_id:string|null;

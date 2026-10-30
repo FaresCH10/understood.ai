@@ -79,7 +79,7 @@ test('SQLite preparation recovery HTTP requires original session context before 
     const login=await contextualFetch(`${origin}/api/auth/staff/login`,{method:'POST',headers:{'content-type':'application/json',origin:'http://127.0.0.1:3020'},body:JSON.stringify(principalLoginBody('maya'))});
     const cookie=login.headers.get('set-cookie').split(';')[0],body={requestId:randomUUID(),revision:1,jobId:null,generation:0};
     for(const url of [path,`${path}/${body.requestId}`])assert.equal((await fetch(url,{headers:{cookie}})).status,409);
-    assert.equal((await fetch(path,{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify(body)})).status,409);
+    assert.equal((await fetch(path,{method:'POST',headers:{cookie,'content-type':'application/json',origin:'http://127.0.0.1:3020'},body:JSON.stringify(body)})).status,409);
     assert.equal(f.db.prepare('SELECT count(*) AS n FROM preparation_requests').get().n,0);
     assert.equal((await contextualFetch(path,{headers:{cookie}})).status,200);
     const response=await contextualFetch(path,{method:'POST',headers:{cookie,'content-type':'application/json'},body:JSON.stringify(body)});assert.equal(response.status,202);

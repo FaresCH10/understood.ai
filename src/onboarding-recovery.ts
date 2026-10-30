@@ -56,12 +56,12 @@ export function checkedSetupModel(raw:unknown,scope:string):SetupModel {
     || !keys(row.resources,'activeGrants,firstBriefing,workers') || ![row.resources.workers,row.resources.activeGrants].every(n=>Number.isSafeInteger(n) && n>=0))throw Error('Setup readiness cannot be verified.');
   const first=row.resources.firstBriefing;
   if(first!==null && (!keys(first,'id,publicationState,state,title') || first.id!==row.firstBriefingId || !reference(first.id) || typeof first.title!=='string' || !first.title || first.title.length>160
-    || typeof first.state!=='string' || !first.state || !(first.publicationState===null || typeof first.publicationState==='string' && !!first.publicationState)))throw Error('Selected setup briefing cannot be verified.');
+    || typeof first.state!=='string' || !first.state || !(first.publicationState===null || typeof first.publicationState==='string' && !!first.publicationState)))throw Error('Selected setup instruction cannot be verified.');
   return row;
 }
 export function checkedSetupOptions(raw:unknown):{id:string;title:string}[] {
   const row=raw as {items:{id:string;title:string}[];page:number;pageSize:number;total:number};
   if(!row || row.page!==1 || row.pageSize!==20 || !Number.isSafeInteger(row.total) || row.total<0 || !Array.isArray(row.items) || row.items.length>20
-    || row.items.some(item=>!reference(item?.id) || typeof item.title!=='string' || !item.title || item.title.length>160) || new Set(row.items.map(item=>item.id)).size!==row.items.length)throw Error('Setup briefing choices cannot be verified.');
+    || row.items.some(item=>!reference(item?.id) || typeof item.title!=='string' || !item.title || item.title.length>160) || new Set(row.items.map(item=>item.id)).size!==row.items.length)throw Error('Setup instruction choices cannot be verified.');
   return row.items.map(({id,title})=>({id,title}));
 }

@@ -1,5 +1,5 @@
-import {useRef,useState,type ReactNode} from 'react';
-import {AudioLines,Globe2,Pause,Play,Smartphone,Zap} from 'lucide-react';
+import {useRef,type ReactNode} from 'react';
+import {AudioLines,Globe2,Smartphone,Zap} from 'lucide-react';
 import {gsap,useGSAP} from './gsap';
 import './auth-layout.css';
 
@@ -10,13 +10,11 @@ export function AuthLayout({children,variant='sign-in',note}:AuthLayoutProps){
   const root=useRef<HTMLElement>(null),story=useRef<HTMLDivElement>(null);
   const animations=useRef<gsap.core.Animation[]>([]);
   const entranceAnimation=useRef<gsap.core.Timeline|null>(null);
-  const playback=useRef({paused:false,visible:true});
-  const [paused,setPaused]=useState(false);
+  const playback=useRef({visible:true});
 
   function syncPlayback(){
-    const stop=playback.current.paused||!playback.current.visible||document.hidden;
-    // Finishing the entrance keeps the form usable if motion is paused early,
-    // or a mobile visitor skips past the scene straight to the form.
+    const stop=!playback.current.visible||document.hidden;
+    // Finish the entrance when a visitor skips past the scene to the form.
     if(stop)entranceAnimation.current?.progress(1);
     for(const animation of animations.current)animation.paused(stop);
   }
@@ -64,7 +62,7 @@ export function AuthLayout({children,variant='sign-in',note}:AuthLayoutProps){
         <li className="auth-callout-slot auth-callout-slot--languages"><div className="auth-callout-float"><div className="auth-callout"><Globe2 size={30}/><div><strong>Arabic and English</strong><span lang="ar" dir="rtl">بالعربية والإنجليزية</span></div></div></div></li>
         <li className="auth-callout-slot auth-callout-slot--setup"><div className="auth-callout-float"><div className="auth-callout"><Zap size={31}/><div><strong>Fast first-time setup</strong><span lang="ar" dir="rtl">إعداد سريع للمرة الأولى</span></div></div></div></li>
       </ul>
-      <div className="auth-story-footer"><span>One team. Every language.</span><button type="button" className="auth-motion-toggle" aria-pressed={paused} onClick={()=>{const next=!playback.current.paused;playback.current.paused=next;setPaused(next);syncPlayback();}}>{paused?<Play size={13}/>:<Pause size={13}/>}<span>{paused?'Resume motion':'Pause motion'}</span></button></div>
+      <div className="auth-story-footer"><span>One team. Every language.</span></div>
     </div>
     <div className="auth-form-column"><section className="auth-card" id="auth-form" tabIndex={-1} aria-label={variant==='register'?'Create your workspace':variant==='worker'?'Worker sign in':'Supervisor sign in'}>{children}</section><p className="auth-card-footnote">{note??<>Clear communication starts here.<span lang="ar" dir="rtl">التواصل الواضح يبدأ هنا.</span></>}</p></div>
   </main>;

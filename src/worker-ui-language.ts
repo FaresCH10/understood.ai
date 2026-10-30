@@ -39,7 +39,7 @@ export function workerBrowserLanguage(languages:readonly string[]|undefined=type
   return 'en';
 }
 export const workerUiLanguageText={
-  en:{label:'Interface language',failed:'The interface language could not be saved. Your current language is unchanged.',content:'Assigned briefing languages stay unchanged.'},
+  en:{label:'Interface language',failed:'The interface language could not be saved. Your current language is unchanged.',content:'Assigned instruction languages stay unchanged.'},
   ar:{label:'لغة الواجهة',failed:'تعذر حفظ لغة الواجهة. لم تتغير اللغة الحالية.',content:'تبقى لغات التعليمات المسندة دون تغيير.'},
   hi:{label:'इंटरफ़ेस की भाषा',failed:'इंटरफ़ेस की भाषा सहेजी नहीं जा सकी। आपकी वर्तमान भाषा नहीं बदली है।',content:'सौंपी गई निर्देश भाषाएँ नहीं बदलतीं।'},
   ur:{label:'انٹرفیس کی زبان',failed:'انٹرفیس کی زبان محفوظ نہیں ہو سکی۔ موجودہ زبان تبدیل نہیں ہوئی۔',content:'تفویض شدہ ہدایات کی زبانیں تبدیل نہیں ہوں گی۔'},

@@ -55,7 +55,7 @@ export default function SourceUploadRecovery({pending,audio,onAudio,onActivity,o
       <SourceAudio disabled={busy} onChange={onAudio} onActivityChange={onActivity}/></>}
     <div className="actions"><button className="button outline" disabled={busy} onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={18}/>Check receipt</button>
       {retryable && <button className="button primary" disabled={busy || !audio} onClick={()=>void retry()}><Upload size={18}/>Retry exact upload</button>}
-      {(receipt?.receivedAt || receipt?.audioStatus) && receipt.status!=='transcribed' && <button className="button primary" disabled={busy} onClick={()=>{try {onContinue();}catch(reason){setError((reason as Error).message);}}}><Upload size={18}/>Continue with a new briefing</button>}
-      <button className="button outline" disabled={busy} onClick={()=>navigate('briefings')}><ArrowLeft size={18}/>Briefing library</button>
+      {(receipt?.receivedAt || receipt?.audioStatus) && receipt.status!=='transcribed' && <button className="button primary" disabled={busy} onClick={()=>{try {onContinue();}catch(reason){setError((reason as Error).message);}}}><Upload size={18}/>Continue with a new instruction</button>}
+      <button className="button outline" disabled={busy} onClick={()=>navigate('briefings')}><ArrowLeft size={18}/>Instruction library</button>
     </div></section>;
 }

@@ -1,0 +1,331 @@
+{
+ "version": 1,
+ "at": "2026-10-30T06:15:34.752Z",
+ "seed": 815735735,
+ "redraws": 0,
+ "input": {
+  "brief": "Understood single platform section: one instruction moves from supervisor to worker in their language and back as a response; preserve existing green brand and surrounding page",
+  "sector": "saas",
+  "tone": null,
+  "have": [
+   "product-ui"
+  ],
+  "keep": [
+   "palette",
+   "type"
+  ],
+  "avoid": [],
+  "sections": [
+   "showcase"
+  ],
+  "direction": "one-motif"
+ },
+ "imagery": "interface",
+ "allow": [],
+ "direction": {
+  "id": "one-motif",
+  "name": "One motif",
+  "sectors": [
+   "saas",
+   "finance",
+   "consumer-app",
+   "ai-product",
+   "dev-tool",
+   "health",
+   "physical-product",
+   "restaurant",
+   "education",
+   "nonprofit",
+   "other"
+  ],
+  "tones": [
+   "playful",
+   "technical",
+   "warm",
+   "bold"
+  ],
+  "needs": [],
+  "idea": "Take one shape from the subject and let it run the whole system. A drilling tool's octagonal cross-section becomes the buttons, the image masks and the loader. A two-account money app becomes two circles that recur as icon, inline dot and section colour. A café's striped awning becomes every band on the page. Look at the product, the logo, the object or the word in the headline and find the simplest geometry in it (a circle, an arc, a chamfer, a stripe, a notch, a ring). Then use only that shape, at three or four very different scales, everywhere a designer would normally reach for a generic rounded rectangle.",
+  "composition": "Hero: the motif appears once at enormous scale as a flat filled shape, cropped by the viewport (a circle 120vh across entering from the right, a chamfered block filling the lower half), with a short headline at 6–8vw and one supporting sentence set on the remaining ground, left-aligned on a shared margin. Through the page the motif returns as: the mask for every photograph (via `clip-path` or `border-radius` made from the same geometry), the shape of the primary button, the bullet beside list items at text size, and one full-width band that separates the two halves of the page. Sections use simple two-column or single-column layouts so the shape is the only thing with character.",
+  "typography": "A clean geometric or grotesk face that echoes the shape (round bowls for circles, squared terminals for chamfers). Medium weight; headings 6–8vw in the hero and 3–4vw after.",
+  "typeClasses": [
+   "geometric",
+   "grotesk-tight",
+   "rounded-friendly"
+  ],
+  "colour": "The motif carries the accent colour at large scale, flat. Everything else is ground and ink. A second motif colour is allowed only if the subject has a real pair (two accounts, two modes).",
+  "paletteTags": [
+   "mono-accent",
+   "two-tone",
+   "pastel-fields"
+  ],
+  "imagery": "Photographs appear inside the motif's shape. If there is product interface to show, it sits on a flat colour stage shaped by the motif. Draw the shape with CSS or a simple inline SVG path; do not draw illustrations.",
+  "sectionTags": [
+   "colour-field",
+   "object-led",
+   "type-led"
+  ],
+  "motion": "shutter-image",
+  "richness": "One shape at many sizes. The giant cropped shape gives the hero mass and colour without a single image.",
+  "pitfalls": "One motif means one. A circle here, a hexagon there and a blob behind is the generated look this replaces. The motif must come from the subject and you must be able to say from where in one clause.",
+  "seenIn": [
+   "aww-sstr-friction-reduction",
+   "opl-tara",
+   "opl-boaxt",
+   "opl-midnight-2",
+   "opl-superlocal-2026",
+   "opl-billow"
+  ],
+  "allow": []
+ },
+ "hero": {
+  "id": "striped-card-beside-room",
+  "name": "Striped card beside the room",
+  "archetype": "split",
+  "directions": [
+   "one-motif",
+   "page-is-the-object",
+   "split-stage"
+  ],
+  "needs": [],
+  "blueprint": "The viewport is split 50/50 with a 12px gap and 12px outer margins. The right half is one full-height photograph of the room, corners radiused 16px, `position: sticky` so it stays in view while the left half scrolls. The left half is a printed card: a flat paper-colour panel with the same 16px radius, and the subject's stripe (from its awning, label or ribbon) as the only ornament. Across the card's top runs a band 56px tall made of alternating bars of the single ink colour and paper, each bar 28px wide, built as a flex row of filled blocks. The same stripe returns as an 8px band above the footer and inside the button on hover. Under the band, centred: the wordmark about 300px wide, then a two-line headline in a light serif at clamp(40px, 3.6vw, 56px) in the ink colour, one supporting sentence at 17px held to 36ch, and the single action as a solid rectangular button. Three text links sit in one centred row at 15px, 28px above the card's bottom edge. One ink on paper; the photograph supplies every other colour.",
+  "mobile": "The photograph comes first at full width inside 12px margins, 48svh tall, with the 16px radius. The card follows and overlaps the photograph's bottom edge by 24px using a negative margin. Its striped band is 40px tall; below it the wordmark at 56% width, the headline at 8vw on two lines, the sentence and the button, all centred. The links wrap into the card's foot.",
+  "headline": "A warm two-line welcome of three to six words, up to about 18 characters per line at 3.6vw.",
+  "motion": "slow-crossfade",
+  "seenIn": [
+   "opl-le-petit-bleu",
+   "opl-zara-webb"
+  ]
+ },
+ "type": null,
+ "palette": null,
+ "photos": {
+  "set": "fog-and-quiet",
+  "title": "Fog and quiet",
+  "note": "misty, muted, minimal landscapes and empty horizons; calm areas for text",
+  "treatment": null,
+  "others": [
+   "architecture",
+   "sky-and-space",
+   "water"
+  ],
+  "photos": [
+   {
+    "id": 228,
+    "alt": "Single round hay bale in a field under dense fog",
+    "tone": "mid",
+    "colours": [
+     "grey green",
+     "golden tan"
+    ],
+    "mono": false,
+    "calm": "top",
+    "quality": 5,
+    "ratio": 1.33,
+    "by": "Michal Kubicek",
+    "page": "https://unsplash.com/photos/0AbVUUorULU"
+   },
+   {
+    "id": 194,
+    "alt": "Wooden deck and a single rock disappearing into thick fog",
+    "tone": "mid",
+    "colours": [
+     "cool grey",
+     "weathered brown"
+    ],
+    "mono": false,
+    "calm": "top",
+    "quality": 5,
+    "ratio": 1.51,
+    "by": "Aleksi Tappura",
+    "page": "https://unsplash.com/photos/hVOv8me9ue8"
+   },
+   {
+    "id": 353,
+    "alt": "Low cloud drifting over dark green forested hills",
+    "tone": "dark",
+    "colours": [
+     "deep green",
+     "grey"
+    ],
+    "mono": false,
+    "calm": "top",
+    "quality": 5,
+    "ratio": 1.78,
+    "by": "Forrest Cavale",
+    "page": "https://unsplash.com/photos/qfmd9bu7IgA"
+   },
+   {
+    "id": 130,
+    "alt": "Single seagull gliding over a grey sea beneath pale clouds",
+    "tone": "light",
+    "colours": [
+     "pale grey",
+     "white"
+    ],
+    "mono": true,
+    "calm": "all",
+    "quality": 4,
+    "ratio": 1.5,
+    "by": "Ryan Jacques",
+    "page": "https://unsplash.com/photos/ywiAen4L4qA"
+   }
+  ]
+ },
+ "motion": {
+  "id": "slow-crossfade",
+  "name": "Slow crossfade",
+  "description": "The principal photograph quietly changes: three or four images of the same framing crossfade over about 1.6 seconds, holding five to six seconds each, or the fixed image changes when its matching section arrives. It should feel like light shifting in a room. Pause when the tab is hidden; under reduced motion show only the first image."
+ },
+ "sections": [
+  {
+   "id": "showcase-object-on-a-disc",
+   "role": "showcase",
+   "name": "Object on a disc",
+   "shape": "index",
+   "tags": [
+    "object-led",
+    "colour-field"
+   ],
+   "directions": [
+    "one-motif",
+    "specimen-catalogue",
+    "hero-object",
+    "colour-chapters"
+   ],
+   "needs": [],
+   "blueprint": "One section about a viewport tall on a plain ground. A flat filled disc 64vh across, in one palette colour, sits with its centre at 58% of the width; swap the disc for the subject's own shape if it has one. A cut-out object photograph stands in front of it, centred on it, about 78% of the disc's height and breaking the disc's outline at the top. Bottom-left, starting on the margin and ending level with the disc's lower edge: a vertical list of four to six item names at clamp(28px, 2.9vw, 44px), leading 1.15. The selected name is in full ink and the rest at 25%; choosing a name swaps the object (300ms crossfade) and the disc's colour. The heading, two to four words at the same size as the names but in the soft ink, is the first line of that list. One fact about the selected item sits at the disc's right edge at 17px.",
+   "mobile": "The disc comes first, 86vw across and centred, with the object in front. The names follow as a single sideways-scrolling line at 26px with 24px gaps, the selected one in full ink. The fact sits under the names at 16px.",
+   "seenIn": [
+    "aww-cominvi",
+    "opl-tara"
+   ]
+  }
+ ],
+ "references": [
+  {
+   "id": "opl-superlocal-2026",
+   "name": "Superlocal 2026",
+   "url": "https://www.superlocaldesign.com/",
+   "source": "One Page Love",
+   "kind": "event",
+   "score": 7.4,
+   "idea": "Everything is a circle: a dot-matrix logotype whose dots become floating photo circles and glowing orbs across a grey-to-orange field.",
+   "mood": [
+    "playful",
+    "experimental",
+    "warm",
+    "kinetic"
+   ],
+   "archetype": "immersive-webgl",
+   "hero": "Mid-grey field with a faint dot grid (one dot every 33px) that fades through the lower half into saturated orange at the bottom edge. The captured first paint contains one element: a 270×80px logotype dead centre, built from black ellipses of varying size, its letters progressively compressed to the right. No nav or text yet. After loading, a cluster of four small pills (one black, three white) appears top-centre; the logo turns white inside a 330px ring of about fifty tiny circles — round photo crops, glowing orbs, coins; and the bottom edge carries the event name left and dates right in an outlined dot-matrix face 40px tall.",
+   "type": "Display text is an outlined dot-matrix face drawn on canvas, about 40px caps, modules flickering. All other text is one tight bold grotesk ('fontSans') from 12 to 24px with negative tracking. The logotype is built from ellipses on the same matrix.",
+   "colour": "#bcbcbc #ff641e #1a1302 #ffb740 #c13bff #ffffff — Every screen repeats a vertical fade from flat grey to hot orange. Orbs add magenta-violet cores; the footer swaps to a soft yellow glow. Text is near-black, nav pills black and white.",
+   "imagery": "Event photographs cropped to circles from 60 to 240px, floating without a grid alongside hard-edged radial-gradient orbs and coin images; some pairs overlap. The logo and footer art are generated dot matrices.",
+   "layout": "No visible grid: circles drift across each screen while text locks to the bottom corners (statement bottom-left, description bottom-right). A four-pill nav stays top-centre. The footer resolves into three text columns over a screen-filling dot-matrix glow.",
+   "sections": [
+    {
+     "role": "gallery",
+     "description": "No grid. Circular photo crops between 60 and 240px across float over the grey-to-orange field, a few overlapping in pairs. A flat radial orb (orange rim, magenta-violet core, about 160px) sits among them and others are cut by the viewport edges. The pill nav stays top-centre; nothing else is fixed."
+    },
+    {
+     "role": "intro",
+     "description": "Bottom-left: a small bold date line, then a two-line statement in the outlined dot-matrix face at about 36px, some modules lit orange mid-animation. Bottom-right: a two-line 12px bold description. Above them three photo circles (190px portrait near centre, poster collage left, stage shot right) and a large orb top-right."
+    },
+    {
+     "role": "footer",
+     "description": "Grey field with a huge soft yellow radial glow. The dot-matrix logo is enlarged to fill the screen, its ellipses knocked out of the yellow in grey. On top: three columns of bold 18px text (contact message and email left, press list centre, socials right), a tiny credits list, and a bottom line with dates, year and city in the same three columns."
+    }
+   ],
+   "steal": [
+    "Build the logotype from a dot matrix of ellipses of varying size, then reuse the same matrix at screen-filling scale as the footer background.",
+    "Crop every photo to a circle at wildly different diameters and let them float with coloured orbs instead of sitting in a gallery grid.",
+    "Fade each screen from flat grey into one saturated colour at its bottom edge so the viewport itself carries the brand colour."
+   ]
+  },
+  {
+   "id": "opl-tara",
+   "name": "Tara",
+   "url": "https://tara.com",
+   "source": "One Page Love",
+   "kind": "finance",
+   "score": 7.2,
+   "idea": "Two pastel circles, mint for saving and pink for spending, stand for the app's two accounts and recur as icon, inline dot, section colour and card gradient.",
+   "mood": [
+    "friendly",
+    "clean",
+    "pastel",
+    "confident"
+   ],
+   "archetype": "split-text-media",
+   "hero": "Off-white field with no navigation, only a small bold wordmark top-left. The left column is vertically centred and starts about 8% in: a two-line headline in a wide heavy grotesk at roughly 6vw with tight leading, a grey one-line subhead beneath, then a pill-shaped email field about 400px wide with a black pill button nested inside its right end. The right half holds a 3D pair floating on the page colour: a mint-to-pink gradient bank card tilted about 30 degrees, overlapping a perspective-tilted phone showing a balance screen. Two small award badges are stacked on the right edge. Roughly half the viewport is empty.",
+   "type": "Herokid Wide at weight 600 with -0.04em tracking for headlines, regular-width Herokid for everything else. Sentence case in the hero, all-caps for the scroll statements. Roughly 86px headline against 14px body, with a mid size of about 24px for centred explainer lines.",
+   "colour": "#f8f8f8 #0a0a0a #c3edce #f8c7c9 #ffffff — Near-white base with black type. Mint and pink appear only as the two account colours: first as small circles, then as full-screen section fields and a soft glow behind the footer wordmark.",
+   "imagery": "3D bank card and tilted phone mock-ups carrying app screens, floating without a container on the page colour; later a straight-on phone on a flat mint field. Simple line icons inside solid pastel circles.",
+   "layout": "Twenty screens of scroll but very little per screen: one centred object or statement per viewport with large empty margins. A wordmark top-left and a tiny pill button top-right persist. Full-bleed pastel fields mark the two product chapters; a row of four white cards closes.",
+   "sections": [
+    {
+     "role": "intro",
+     "description": "A pinned, nearly empty viewport where a single mint circle holding a line icon sits upper-centre with a pink circle peeking from behind it. On scroll the pink circle slides out to sit beside the mint one, overlapping slightly, each with its own icon, and three centred lines of roughly 24px text appear beneath explaining the two accounts. Nothing else is on screen."
+    },
+    {
+     "role": "other",
+     "description": "A chapter-title screen: two words of heavy uppercase at about 5vw, centred and stacked on two lines, with a mint dot the height of the capitals sitting inline after the first word like punctuation. The dot is the same circle from the previous scene, so the colour carries its meaning straight into the full-mint section that follows."
+    },
+    {
+     "role": "showcase",
+     "description": "Full-viewport mint field. A small eyebrow and a bold product name are centred near the top. Below, a straight-on phone mock-up stands just right of centre, and a short right-aligned bold claim with two lines of small text sits to its left, level with the phone's lower third. Text and phone hug the centre line, leaving both outer thirds empty."
+    },
+    {
+     "role": "footer",
+     "description": "After four white rounded cards and a repeated centred email pill, the footer is one row of small links and then the wordmark set enormous, around 45vw wide and cropped by the bottom edge. It is white on the off-white page and becomes visible only through blurred pink and mint glows placed behind the letters."
+    }
+   ],
+   "steal": [
+    "Assign each product concept a colour and a shape early (two pastel circles), then reuse it as bullet, inline punctuation dot and full section background.",
+    "Nest the call-to-action button inside the email field's pill so the form reads as one object.",
+    "Set the footer wordmark in the page's own background colour and reveal it only with soft coloured glows behind the letters."
+   ]
+  },
+  {
+   "id": "aww-illoca",
+   "name": "Illoca",
+   "url": "https://illoca.unseen.co/",
+   "source": "Awwwards Site of the Day",
+   "kind": "saas",
+   "score": 8.2,
+   "idea": "Software for architects sold as a drafting table: a two-colour illustrated studio on graph paper that the scroll camera pushes into until the drawing fills the screen.",
+   "mood": [
+    "drafted",
+    "calm",
+    "analogue",
+    "confident",
+    "graphic"
+   ],
+   "archetype": "centred-statement-media-below",
+   "hero": "Captured on the preloader: a beige graph-paper field (12px grid) with a small cobalt logo tile dead centre, handwritten X/Y cursor coordinates top-left and an email in architect's hand lettering top-right. Loaded, a centred grotesk headline at 7.7vw in near-black sits at the top, breaking over two lines in the capture, with a tiny hand-lettered margin note and arrow beside its last word. Directly beneath, inset 12px from each side, a huge wide cel-shaded scene in only cobalt and beige: an architect at a drafting desk beside a window with a skyline. A small white nav capsule floats top-centre with logo, three mono links and a navy button.",
+   "type": "F37 Analog medium at 111px for the headline, a warm grotesk with tight default spacing. Graphik for body at 15px, Geist Mono for nav links, and Architect Pro, a hand-lettered drafting face in caps, for coordinates, email and margin notes. Four faces, one job each.",
+   "colour": "#e6dbc7 #0b3db8 #283f7d #cfc6b4 #2a2a2a #f25c1c — Paper beige and one cobalt blue do everything, including the whole illustration. Navy for the button, near-black for type, and a single small orange square inside the button as the only warm accent.",
+   "imagery": "A real-time 3D interior flattened to two inks with a fine grain: light surfaces in beige, shadow in solid cobalt, thin pencil linework on the drawings. One square-cornered frame, inset 12px, containing the entire page's imagery.",
+   "layout": "A single pinned viewport over graph paper. Centred headline, then one inset image frame with 12px margins taking 75% of the height; small persistent items at three top positions (left, centre capsule, right). The frame occasionally narrows to open a text gutter.",
+   "sections": [
+    {
+     "role": "showcase",
+     "description": "The page is one pinned scene. The inset illustration frame stays fixed while scroll moves a camera: a wide shot of the studio, a push-in over the architect's shoulder, then a top-down close-up where a translucent blueprint sheet and a pencil perspective sketch lying on the desk fill the frame. In one frame the image narrows to the right 70%, leaving a graph-paper gutter at left for text."
+    },
+    {
+     "role": "other",
+     "description": "Navigation is a compact white capsule about 280px wide, centred at the top with square corners: icon tile and wordmark, three mono links, and a navy button with a small orange square inside. Two corner items in hand lettering (live cursor coordinates top-left, email top-right) stay on screen over the graph paper throughout, like notes in a drawing's title block."
+    }
+   ],
+   "steal": [
+    "Restrict a detailed 3D scene to two flat colours (one ink, one paper) so it reads as a printed illustration rather than a render.",
+    "Use scroll as a camera push from an establishing shot down to the object on the desk that the product actually makes.",
+    "Reserve a handwritten drafting face for marginalia only (coordinates, arrows, a correction beside the headline) over a graph-paper ground."
+   ],
+   "media": "One fixed Three.js scene carries all the imagery, seen through a window cut by four animated paper masks: a letterbox under the title on about 56% of the fold, then 87-97% of the viewport from the first scroll step, then a two-thirds window docked right or left with text in the remaining third. A flat two-ink render (cobalt against greige, ink outlines, paper grain); no img and no video.",
+   "motion": "A logo-on-graph-paper preloader holds past 4.5s with no progress, then headings fill character by character from outline to solid (406 split characters) and handwritten labels write on. Lenis drives a keyframed camera from a wide studio onto the sketch, the plan and an extruding massing model, while the masks morph between letterbox, immersive and split states; the only CSS easing is the default cubic-bezier(.4,0,.2,1) on 0.1s opacity changes, and there is no reduced-motion rule."
+  }
+ ],
+ "scenes": []
+}

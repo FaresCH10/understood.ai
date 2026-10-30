@@ -2,13 +2,13 @@ import type {WorkerUiLanguage} from './worker-ui-language';
 
 export const workerPresentationText={
   en:{view:'Show translation',hide:'Hide translation',title:'Translated view',loading:'Opening the translated view...',
-    ready:'This is a translated view. The original briefing remains the record.',question:'Question',
+    ready:'This is a translated view. The original instruction remains the record.',question:'Question',
     pending:'The translation is still being prepared. Check again in a moment.',
     failed:'This translation could not be completed. The original is still available.',
-    unavailable:'A translation is not available for this briefing.',
+    unavailable:'A translation is not available for this instruction.',
     notRequired:'No translation is needed. This is already in your approved language.',
     deferred:'Translation is paused for this workspace. The original is still available.',
-    conflict:'This briefing changed, so the translated view cannot be shown. The original is still available.',
+    conflict:'This instruction changed, so the translated view cannot be shown. The original is still available.',
     check:'Check again',providerLabel:'Translation source',prepared:'Prepared',live:'Live service',
     answer:'Translated answer',answerNote:'Text only. The audio above is your original recording and is unchanged.',
     boundNote:'Your answer will be linked to this translated question.',

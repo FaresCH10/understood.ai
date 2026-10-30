@@ -1,6 +1,6 @@
 import React, { createContext,lazy,Suspense,useContext,useEffect,useMemo, useRef, useState } from 'react';
 import { Archive,ArchiveRestore, Check, ChevronLeft, ChevronRight, Languages, Pencil, Plus, Search, Upload, UserRound,UserCheck, UserX, Users, X } from 'lucide-react';
-import { WorkerAssignments } from './PublicationResponses';
+import {WorkerWorkHistory} from './WorkProgress';
 import { WorkerAccess } from './WorkerAccess';
 const WorkerDeletion=lazy(()=>import('./WorkerDeletion').then(module=>({default:module.WorkerDeletion})));
 import { keepDialogFocus } from './dialog-focus';
@@ -31,7 +31,7 @@ type LanguageRequestPage = { items: LanguageRequest[]; total: number; page: numb
 type Crew = { id: string; name: string; active: boolean; member_count: number };
 type CrewPage = {items:Crew[];total:number;page:number;pageSize:number};
 type WorkerPage = { items: Worker[]; total: number; page: number; pageSize: number };
-type Props = { refresh?: number; onImport: () => void;canManage:boolean;canDelete:boolean;credentialAccess:boolean;navigate:(path:string)=>void;initialWorkerId?:string;initialCrewId?:string;initialAdd?:boolean;initialCrewCreate?:boolean;authority:StaffRequestAuthority;locale?:PeopleLocale;onLocaleChange?:(locale:PeopleLocale)=>void };
+type Props = { refresh?: number; onImport: () => void;canManage:boolean;canDelete:boolean;credentialAccess:boolean;navigate:(path:string)=>void;initialWorkerId?:string;initialCrewId?:string;initialAdd?:boolean;authority:StaffRequestAuthority;locale?:PeopleLocale;onLocaleChange?:(locale:PeopleLocale)=>void };
 
 const PeopleLocaleContext=createContext<PeopleLocale>('en');
 
@@ -125,15 +125,16 @@ function LanguageDecision({request,disabled,onDecided,authority}:{request:Langua
 function LanguageRequestsPanel({refresh,disabled,onChanged,authority}:{refresh:number;disabled:boolean;onChanged:(message:string)=>void;authority:StaffRequestAuthority}) {
   const locale=useContext(PeopleLocaleContext),t=peopleText[locale],languages=peopleLanguageNames(locale);
   const {peopleApi,current}=usePeopleApi(authority);
+  const [page,setPage]=useState(1);
   const [data,setData]=useState<LanguageRequestPage|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
   useEffect(() => {
     const controller=new AbortController();setLoading(true);
-    peopleApi<LanguageRequestPage>('/language-requests?status=pending&page=1&pageSize=5','GET',undefined,controller.signal)
-      .then((result)=>{if(!controller.signal.aborted && current()){setData(result);setError('');}})
+    peopleApi<LanguageRequestPage>(`/language-requests?status=pending&page=${page}&pageSize=10`,'GET',undefined,controller.signal)
+      .then((result)=>{if(!controller.signal.aborted && current()){setData(result);setError('');if(page>1&&result.items.length===0)setPage(n=>Math.max(1,n-1));}})
       .catch((reason:Error)=>{if(!controller.signal.aborted && current())setError(reason.message);})
       .finally(()=>{if(!controller.signal.aborted && current())setLoading(false);});
     return () => controller.abort();
-  },[refresh,peopleApi,current]);
+  },[refresh,page,peopleApi,current]);
   return <section className="panel people-language-requests" aria-label={t.languageRequests}>
     <h2><Languages size={19}/> {t.languageRequests}{data && data.total ? ` (${data.total})` : ''}</h2>
     {loading ? <p role="status">{t.loadingLanguageRequests}</p> : error ? <p role="alert" className="record-error">{peopleErrorText(locale,new Error(error))}</p> : data?.items.length ? <ul className="language-request-list">{data.items.map((request)=><li key={request.id}>
@@ -142,6 +143,7 @@ function LanguageRequestsPanel({refresh,disabled,onChanged,authority}:{refresh:n
       <p className="muted">{t.languageRequestReason}: {request.reason ? <bdi>{request.reason}</bdi> : t.noReasonGiven}</p>
       <LanguageDecision authority={authority} request={request} disabled={disabled} onDecided={(message)=>onChanged(message)}/>
     </li>)}</ul> : <p className="empty-state">{t.noLanguageRequests}</p>}
+    {data&&data.total>10&&<div className="people-pagination"><span>{peoplePageText(locale,page,Math.max(1,Math.ceil(data.total/10)))}</span><div className="actions"><button className="icon-button" aria-label={t.previousPage} disabled={loading||page<=1} onClick={()=>setPage(n=>n-1)}><ChevronLeft size={18}/></button><button className="icon-button" aria-label={t.nextPage} disabled={loading||page>=Math.ceil(data.total/10)} onClick={()=>setPage(n=>n+1)}><ChevronRight size={18}/></button></div></div>}
   </section>;
 }
 
@@ -175,15 +177,33 @@ function CrewMembership({worker,refresh,disabled,onSave,authority}:{worker:Worke
   </div>;
 }
 
-export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentialAccess,navigate,initialWorkerId,initialCrewId,initialAdd=false,initialCrewCreate=false,authority,locale='en',onLocaleChange }: Props) {
+export function CreateCrewPage({authority,canManage,locale,navigate}:{authority:StaffRequestAuthority;canManage:boolean;locale:PeopleLocale;navigate:(path:string)=>void}){
+  const t=peopleText[locale],{peopleApi,current}=usePeopleApi(authority);
+  const [name,setName]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const inFlight=useRef(false);
+  async function submit(event:React.FormEvent){
+    event.preventDefault();if(inFlight.current||!current()||!authority.canMutate()||!canManage)return;
+    inFlight.current=true;setBusy(true);setError('');
+    try{await peopleApi<Crew>('/crews','POST',{name:name.trim()});if(current())navigate('people/crews');}
+    catch(reason){if(current())setError(peopleErrorText(locale,reason instanceof Error?reason:Error('Request unavailable')));}
+    finally{inFlight.current=false;if(current())setBusy(false);}
+  }
+  if(!canManage)return <p role="status">{t.limited}</p>;
+  return <section className="crew-create-page" lang={locale} dir={locale==='ar'?'rtl':'ltr'}><button className="back-link" onClick={()=>navigate('people/crews')}><ChevronLeft size={18}/>{t.crews}</button><div className="page-header"><div><h1>{t.createCrew}</h1><p>{locale==='ar'?'أنشئ فريقاً، ثم أضف العمال من دليل العمال.':'Give your crew a name, then assign workers from the worker directory.'}</p></div></div><form className="panel crew-create-form" onSubmit={submit}><label className="field">{t.crewName}<input autoFocus required dir="auto" minLength={2} maxLength={80} value={name} onChange={event=>setName(event.target.value)} placeholder={t.crewPlaceholder} disabled={busy}/></label>{error&&<p role="alert" className="record-error">{error}</p>}<div className="actions"><button className="button outline" type="button" disabled={busy} onClick={()=>navigate('people/crews')}>{t.cancel}</button><button className="button primary" type="submit" disabled={busy||name.trim().length<2}><Plus size={18}/>{busy?t.saving:t.createCrew}</button></div></form></section>;
+}
+
+export function LanguageRequestsPage({authority,refresh,canManage,locale}:{authority:StaffRequestAuthority;refresh:number;canManage:boolean;locale:PeopleLocale}){
+  const [revision,setRevision]=useState(0),[message,setMessage]=useState('');const t=peopleText[locale];
+  if(!canManage)return <p role="status">{t.limited}</p>;
+  return <PeopleLocaleContext.Provider value={locale}><section className="language-requests-page" lang={locale} dir={locale==='ar'?'rtl':'ltr'}><div className="page-header"><div><h1>{t.languageRequests}</h1><p>{locale==='ar'?'راجع طلبات العمال ووافق على اللغة المناسبة لتعليماتهم.':'Review workers’ requested languages and approve or decline each change.'}</p></div></div>{message&&<p className="notice notice-green" role="status">{peopleMessageText(locale,message)}</p>}<LanguageRequestsPanel authority={authority} refresh={refresh+revision} disabled={false} onChanged={value=>{setMessage(value);setRevision(n=>n+1);}}/></section></PeopleLocaleContext.Provider>;
+}
+
+export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentialAccess,navigate,initialWorkerId,initialCrewId,initialAdd=false,authority,locale='en' }: Props) {
   const t=peopleText[locale],languages=peopleLanguageNames(locale);
   const {peopleApi,current}=usePeopleApi(authority);
   const changing=useRef(false);
   const [workers, setWorkers] = useState<WorkerPage | null>(null);
-  const [crews, setCrews] = useState<CrewPage|null>(null);
   const [crewChoices,setCrewChoices]=useState<CrewPage|null>(null);
-  const [crewSearch,setCrewSearch]=useState(''),[crewStatus,setCrewStatus]=useState('all'),[crewPage,setCrewPage]=useState(1);
-  const [crewLoading,setCrewLoading]=useState(true),[crewError,setCrewError]=useState('');
   const [selected, setSelected] = useState<Worker | null>(null);
   const selectedRef=useRef(selected);selectedRef.current=selected;
   const [search, setSearch] = useState('');
@@ -197,40 +217,38 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [form, setForm] = useState<'add' | 'edit' | null>(initialAdd?'add':null);
+  const workerDialog=useRef<HTMLDialogElement>(null);
+  useEffect(()=>{if(form && !workerDialog.current?.open){workerDialog.current?.showModal();workerDialog.current?.querySelector('input')?.focus();}else if(!form)workerDialog.current?.close();},[form]);
   const formRef=useRef(form);formRef.current=form;
   const [code, setCode] = useState('');
   const [workerName,setWorkerName]=useState('');
   const [workerLanguage, setWorkerLanguage] = useState<'' | WorkerLanguage>('');
-  const [crewName, setCrewName] = useState('');
   const [confirmDisable, setConfirmDisable] = useState(false);
   const [deletionLocked,setDeletionLocked]=useState(true);
-  const workerSearchInput=useRef<HTMLInputElement>(null),crewStatusInput=useRef<HTMLSelectElement>(null);
+  const workerSearchInput=useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if(!canManage) return;
     const controller=new AbortController();
-    const query = new URLSearchParams({ search, language, status,crewId:workerCrew.id, page: String(page), pageSize: '5' });
+    const query = new URLSearchParams({ search, language, status,crewId:workerCrew.id, page: String(page), pageSize: '10' });
     if(initialWorkerId)query.set('workerId',initialWorkerId);
     setLoading(true);setWorkers(null);
     peopleApi<WorkerPage>(`/workers?${query}`,'GET',undefined,controller.signal).then((nextWorkers) => {
       if (controller.signal.aborted || !current()) return;
       setWorkers(nextWorkers);
-      setSelected((current) => current && nextWorkers.items.find((worker) => worker.id === current.id) || nextWorkers.items[0] || null);
+      setSelected(initialWorkerId ? nextWorkers.items.find(worker=>worker.id===initialWorkerId) || null : null);
       setError('');
     }).catch((reason) => { if (!controller.signal.aborted && current()) setError((reason as Error).message); })
       .finally(() => { if (!controller.signal.aborted && current()) setLoading(false); });
     return () => controller.abort();
   }, [refresh, revision, search, language, status,workerCrew.id,page,canManage,initialWorkerId,peopleApi,current]);
 
-  useEffect(() => {
-    if(!canManage) return;
-    const controller=new AbortController();setCrewLoading(true);setCrews(null);
-    const query=new URLSearchParams({search:crewSearch,status:crewStatus,page:String(crewPage),pageSize:'5'});
-    const load=initialCrewId?peopleApi<Crew>(`/crews/${encodeURIComponent(initialCrewId)}`,'GET',undefined,controller.signal).then(crew=>({items:[crew],total:1,page:1,pageSize:5})):peopleApi<CrewPage>(`/crews?${query}`,'GET',undefined,controller.signal);
-    load.then((result) => {if(!controller.signal.aborted && current()) {setCrews(result);setCrewError('');if(initialCrewId && result.items[0])setWorkerCrew(old=>old.id===initialCrewId?{id:initialCrewId,name:result.items[0].name}:old);}})
-      .catch((reason:Error) => {if(!controller.signal.aborted && current()) setCrewError(reason.message);}).finally(() => {if(!controller.signal.aborted && current()) setCrewLoading(false);});
-    return () => controller.abort();
-  },[refresh,revision,crewSearch,crewStatus,crewPage,canManage,initialCrewId,peopleApi,current]);
+  useEffect(()=>{
+    if(!initialCrewId||!canManage)return;
+    const controller=new AbortController();
+    peopleApi<Crew>(`/crews/${encodeURIComponent(initialCrewId)}`,'GET',undefined,controller.signal).then(crew=>{if(!controller.signal.aborted&&current())setWorkerCrew(old=>old.id===crew.id?{id:crew.id,name:crew.name}:old);}).catch(()=>{});
+    return()=>controller.abort();
+  },[initialCrewId,canManage,peopleApi,current]);
 
   useEffect(() => {
     if(!canManage) return;
@@ -278,15 +296,9 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
       setSelected(worker);
       setForm(null);
       setSearch(worker.name || worker.code); setLanguage('all'); setPage(1);
-      if(form==='add') setWorkerCrew({id:'all',name:''});
+      if(form==='add'){navigate(`people/worker/${encodeURIComponent(worker.id)}`);return;}
       if (status === 'inactive') setStatus('all');
     }
-  }
-
-  async function addCrew(event: React.FormEvent) {
-    event.preventDefault();
-    const crew = await change(() => peopleApi<Crew>('/crews', 'POST', { name: crewName }), t.crewCreated);
-    if (crew && current() && authority.canMutate()) {setCrewName('');if(initialCrewId || initialWorkerId)navigate(`people/crew/${crew.id}`);else{setCrewSearch(crew.name);setCrewStatus('all');setCrewPage(1);}}
   }
 
   async function moveCrew(crewId:string|null) {
@@ -302,19 +314,15 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
     if (worker && current() && authority.canMutate() && selectedRef.current?.id===selected.id) { setSelected(worker); setStatus('all'); setConfirmDisable(false); }
   }
 
-  function languageDecided(message:string) {
-    if(!current()) return;
-    setMessage(message);setRevision((n) => n + 1);
-  }
-
+  function languageDecided(message:string){if(current()){setMessage(message);setRevision(n=>n+1);}}
   const pages = workers ? Math.max(1, Math.ceil(workers.total / workers.pageSize)) : 1;
-  const crewPages=Math.max(1,Math.ceil((crews?.total || 0)/5));
   if(!canManage) return <p className="notice notice-blue" role="status" lang={locale} dir={locale==='ar'?'rtl':'ltr'}>{t.limited}</p>;
   return <PeopleLocaleContext.Provider value={locale}><div className="people-localized" lang={locale} dir={locale==='ar'?'rtl':'ltr'}>
-    <button className="back-link" onClick={()=>navigate('people/crews')}><Users size={18}/>{locale==='ar'?'فرق الموقع':'Site crews'}</button>
-    <div className="page-header"><div><h1>{t.workers}</h1><p>{t.intro}</p></div>
-      <div className="actions people-header-actions">{onLocaleChange && <label className="select-label people-locale">{t.locale}<select value={locale} disabled={busy} onChange={event=>onLocaleChange(event.target.value==='ar'?'ar':'en')}><option value="en" lang="en">English</option><option value="ar" lang="ar">العربية</option></select></label>}<button className="button outline" onClick={onImport}><Upload size={19} />{t.importCsv}</button><button className="button primary" onClick={startAdd}><Plus size={19} />{t.addWorker}</button></div>
+    {initialWorkerId && <button className="back-link" onClick={()=>navigate('people')}><ChevronLeft size={18}/>{t.workers}</button>}
+    <div className="page-header"><div><h1>{initialWorkerId ? selected?.name || selected?.code || t.workerDetails : t.workers}</h1><p>{initialWorkerId ? selected?.code : t.intro}</p></div>
+      {!initialWorkerId && <div className="actions people-header-actions"><button className="button outline" onClick={onImport}><Upload size={19}/>{t.importCsv}</button><button className="button primary" onClick={startAdd}><Plus size={19}/>{t.addWorker}</button></div>}
     </div>
+    {!initialWorkerId && <>
     <div className="filters people-filters">
       {(initialWorkerId || initialCrewId) && <button className="button outline" onClick={()=>navigate('people')}><X size={18}/>{t.clearFilter}</button>}
       <label className="search-box"><Search size={18} /><span className="sr-only">{t.searchWorkers}</span><input dir="auto" ref={workerSearchInput} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={t.searchPlaceholder} /></label>
@@ -322,17 +330,18 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
       <label className="select-label">{t.access}<select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="active">{t.active}</option><option value="inactive">{t.disabled}</option><option value="all">{t.allStatuses}</option></select></label>
       <label className="select-label">{t.membership}<select value={workerCrew.id} onChange={(event) => {const crew=crewChoices?.items.find(item=>item.id===event.target.value);setWorkerCrew({id:event.target.value,name:crew?.name || ''});setPage(1);}}><option value="all">{t.allCrews}</option><option value="none">{t.noCrew}</option>{crewChoices?.items.map(crew=><option key={crew.id} dir="auto" value={crew.id}>{crew.name}</option>)}{!['all','none'].includes(workerCrew.id) && !crewChoices?.items.some(crew=>crew.id===workerCrew.id) && <option dir="auto" value={workerCrew.id}>{workerCrew.name || t.selectedCrew}</option>}</select></label>
     </div>
+    </>}
     {error && <p className="notice" role="alert">{peopleErrorText(locale,new Error(error))}</p>}
     {message && <p className="notice notice-green" role="status">{peopleMessageText(locale,message)}</p>}
-    <div className="people-layout">
-      <section className="panel people-directory" aria-label={t.directory}>
+    <div className={initialWorkerId?"worker-profile-layout":"worker-directory-layout"}>
+      {!initialWorkerId && <section className="panel people-directory" aria-label={t.directory}>
         <h2>{t.workers} ({workers?.total ?? 0})</h2>
         {loading && !workers ? <p role="status">{t.loadingWorkers}</p> : workers?.items.length ? <div className="table-wrap" role="region" aria-label={t.directory} tabIndex={0}><table className="people-table">
           <thead><tr><th>{t.workerId}</th><th>{t.language}</th><th>{t.accessStatus}</th><th>{t.crew}</th><th><span className="sr-only">{t.details}</span></th></tr></thead>
-          <tbody>{workers.items.map((worker) => <tr key={worker.id} className={selected?.id === worker.id ? 'people-selection' : ''}>
-            <td><button className="people-row-button" onClick={() => { setSelected(worker); setForm(null); }}><UserRound size={18} /> <span className="people-worker-identity"><strong><bdi>{worker.name || worker.code}</bdi></strong>{worker.name && <small><bdi>{worker.code}</bdi></small>}</span></button></td>
+          <tbody>{workers.items.map((worker) => <tr key={worker.id} className="worker-profile-row" onClick={()=>navigate(`people/worker/${encodeURIComponent(worker.id)}`)}>
+            <td><button className="people-row-button" onClick={event => {event.stopPropagation();navigate(`people/worker/${encodeURIComponent(worker.id)}`);}}><UserRound size={18} /> <span className="people-worker-identity"><strong><bdi>{worker.name || worker.code}</bdi></strong>{worker.name && <small><bdi>{worker.code}</bdi></small>}</span></button></td>
             <td>{worker.language_selected ? <>{languages[worker.language]}{worker.pending_language_request && <small className="language-pending">{t.pendingChangeTo} {languages[worker.pending_language_request.requestedLanguage]}</small>}</> : <span className="status status-amber"><span className="status-dot" />{t.notSelected}</span>}</td><td><span className={`status ${worker.active ? 'status-green' : 'status-amber'}`}><span className="status-dot" />{worker.active ? t.active : t.disabled}</span></td>
-            <td><bdi>{worker.crew_name || '—'}</bdi></td><td><button className="icon-button direction-arrow" aria-label={`${t.details}: ${worker.code}`} onClick={() => { setSelected(worker); setForm(null); }}><ChevronRight size={19} /></button></td>
+            <td><bdi>{worker.crew_name || '—'}</bdi></td><td><button className="icon-button direction-arrow" aria-label={`${t.details}: ${worker.code}`} onClick={event => {event.stopPropagation();navigate(`people/worker/${encodeURIComponent(worker.id)}`);}}><ChevronRight size={19} /></button></td>
           </tr>)}</tbody>
         </table></div> : <p className="empty-state">{t.noWorkers}</p>}
         <div className="people-pagination"><span>{peopleShowingText(locale,workers?.items.length || 0,workers?.total || 0)}</span><div>
@@ -340,34 +349,29 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
           <span>{peoplePageText(locale,page,pages)}</span>
           <button className="icon-button direction-arrow" aria-label={t.nextPage} disabled={page >= pages || loading} onClick={() => setPage(page + 1)}><ChevronRight size={19} /></button>
         </div></div>
-      </section>
-      <div className="people-side">
-        {form ? <section className="panel people-form"><div className="people-panel-heading"><h2>{form === 'add' ? t.addWorker : t.editWorker}</h2><button className="icon-button" aria-label={t.closeForm} onClick={() => setForm(null)}><X size={19} /></button></div>
-          <form onSubmit={saveWorker}><label className="field">{t.workerId}<input autoFocus={initialAdd} dir="auto" value={code} onChange={(event) => setCode(event.target.value)} minLength={2} maxLength={80} required /></label>
-            <label className="field">{t.workerName}<input dir="auto" value={workerName} onChange={(event) => setWorkerName(event.target.value)} minLength={2} maxLength={80} placeholder={t.namePlaceholder} /></label>
-            <label className="field">{t.preferred}<select value={workerLanguage} onChange={(event) => setWorkerLanguage(event.target.value as '' | WorkerLanguage)}>{(form==='add' || selected?.language_selection_required) && <option value="">{t.chooseLater}</option>}{WORKER_LOCALES.map(item=><option key={item.code} value={item.code}>{languages[item.code]}</option>)}</select></label>
+      </section>}
+      <div className="worker-profile-content">
+        {<dialog ref={workerDialog} className="worker-form-dialog" aria-label={form==='add'?t.addWorker:t.editWorker} onCancel={event=>{if(busy)event.preventDefault();else setForm(null);}}><section className="panel people-form"><div className="people-panel-heading"><h2>{form === 'add' ? t.addWorker : t.editWorker}</h2><button className="icon-button" aria-label={t.closeForm} disabled={busy} onClick={() => setForm(null)}><X size={19} /></button></div>
+          <form onSubmit={saveWorker}>{error&&<p role="alert" className="notice">{peopleErrorText(locale,new Error(error))}</p>}<label className="field">{t.workerId}<input autoFocus disabled={busy} dir="auto" value={code} onChange={(event) => setCode(event.target.value)} minLength={2} maxLength={80} required /></label>
+            <label className="field">{t.workerName}<input disabled={busy} dir="auto" value={workerName} onChange={(event) => setWorkerName(event.target.value)} minLength={2} maxLength={80} placeholder={t.namePlaceholder} /></label>
+            <label className="field">{t.preferred}<select disabled={busy} value={workerLanguage} onChange={(event) => setWorkerLanguage(event.target.value as '' | WorkerLanguage)}>{(form==='add' || selected?.language_selection_required) && <option value="">{t.chooseLater}</option>}{WORKER_LOCALES.map(item=><option key={item.code} value={item.code}>{languages[item.code]}</option>)}</select></label>
             <p className="muted">{t.workerLanguageHint}{form==='edit' && ` ${t.directCorrection}`}</p>
             <button className="button primary full" type="submit" disabled={busy}><Check size={18} />{t.saveWorker}</button></form>
-        </section> : selected ? <section className="panel people-detail"><div className="people-panel-heading"><div className="people-detail-title"><span className="small-avatar"><UserRound size={23} /></span><div><h2><bdi>{selected.name || selected.code}</bdi></h2><p><bdi>{selected.code}</bdi> · {selected.active ? t.active : t.disabled} · {selected.language_selected ? languages[selected.language] : t.notSelected}</p></div></div><button className="icon-button" aria-label={t.closeDetails} onClick={() => setSelected(null)}><X size={19} /></button></div>
+        </section></dialog>}
+        {initialWorkerId && selected ? <section className="panel people-detail"><div className="people-panel-heading"><div className="people-detail-title"><span className="small-avatar"><UserRound size={23} /></span><div><h2><bdi>{selected.name || selected.code}</bdi></h2><p><bdi>{selected.code}</bdi> · {selected.active ? t.active : t.disabled} · {selected.language_selected ? languages[selected.language] : t.notSelected}</p></div></div><button className="icon-button" aria-label={t.closeDetails} onClick={() => navigate('people')}><X size={19} /></button></div>
           <dl className="people-facts"><dt>{t.workerName}</dt><dd><bdi>{selected.name || '—'}</bdi></dd><dt>{t.workerId}</dt><dd><bdi>{selected.code}</bdi></dd><dt>{t.preferred}</dt><dd>{selected.language_selected ? <>{languages[selected.language]}{selected.language_selected_by==='worker' ? <small className="language-source">{t.chosenByWorker}</small> : selected.language_selected_by==='staff' ? <small className="language-source">{t.setByStaff}</small> : null}</> : <>{t.firstUse}<small className="language-source">{t.noLanguage}</small></>}</dd><dt>{t.crew}</dt><dd><bdi>{selected.crew_name || t.noCrew}</bdi></dd><dt>{t.access}</dt><dd>{selected.active ? t.active : t.disabled}</dd></dl>
           {selected.pending_language_request && <div className="language-pending-request"><p><strong>{t.pendingLanguage}</strong>: <bdi>{languages[selected.pending_language_request.currentLanguage]}</bdi> → <bdi>{languages[selected.pending_language_request.requestedLanguage]}</bdi></p>{selected.pending_language_request.reason && <p className="muted">{t.languageRequestReason}: <bdi>{selected.pending_language_request.reason}</bdi></p>}<LanguageDecision authority={authority} request={{...selected.pending_language_request,workerId:selected.id,workerCode:selected.code,workerName:selected.name,state:'pending',decidedAt:null,decidedBy:null,decisionNote:null,workerActive:selected.active}} disabled={busy || (canDelete && deletionLocked)} onDecided={(success)=>languageDecided(success)}/></div>}
           {selected.active && <><CrewMembership authority={authority} key={`${selected.id}:${selected.crew_id}`} worker={selected} refresh={refresh+revision} disabled={busy || (canDelete && deletionLocked)} onSave={moveCrew}/>
             <div className="people-actions"><button className="button outline" disabled={canDelete && deletionLocked} onClick={startEdit}><Pencil size={18} />{t.edit}</button><button className="button subtle" disabled={canDelete && deletionLocked} onClick={() => setConfirmDisable(true)}><UserX size={18} />{t.disable}</button></div>
             {confirmDisable && <div className="notice people-confirm" role="alert"><p>{t.disableWorker}: <bdi>{selected.name || selected.code}</bdi>? {peopleDisableText(locale)}</p><div className="actions"><button className="button outline" onClick={() => setConfirmDisable(false)}>{t.cancel}</button><button className="button primary" disabled={busy} onClick={disable}>{t.disableWorker}</button></div></div>}</>}
           {!selected.active && (!canDelete || !deletionLocked) && <WorkerReenable authority={authority} key={selected.id} worker={selected} onChanged={(updated) => {if(!current())return;setSelected(updated);setStatus('all');setSearch(updated.code);setPage(1);setRevision((n) => n+1);setMessage(updated.active ? t.workerReenabled : t.reenableRecorded);workerSearchInput.current?.focus();}}/>}
-        </section> : <section className="panel people-detail"><h2>{t.workerDetails}</h2><p>{t.chooseWorker}</p></section>}
-        {selected && !form && <div lang="en" dir="ltr"><WorkerAccess authority={authority} key={selected.id} workerId={selected.id} code={selected.code} active={selected.active} credentialAccess={credentialAccess} canManage={canManage}/></div>}
-        {selected && !form && canDelete && <div lang="en" dir="ltr"><Suspense fallback={<p role="status">{t.loadingData}</p>}><WorkerDeletion authority={authority} key={selected.id} workerId={selected.id} code={selected.code} onLocked={setDeletionLocked} onQueued={(status)=>{if(!current() || selectedRef.current?.id!==selected.id)return;setSelected({...selected,active:false});setStatus('all');setMessage(status==='complete'?t.cleanupComplete:t.cleanupQueued);}}/></Suspense></div>}
-        <section className="panel people-crews"><h2>{crewLoading ? t.crews : `${t.crews} (${crews?.total ?? 0})`}</h2>
-          {!initialCrewId && <><label className="field">{t.searchCrews}<input dir="auto" type="search" value={crewSearch} maxLength={80} onChange={(event) => {setCrewSearch(event.target.value);setCrewPage(1);}}/></label>
-          <label className="field">{t.crewStatus}<select ref={crewStatusInput} value={crewStatus} onChange={(event) => {setCrewStatus(event.target.value);setCrewPage(1);}}><option value="all">{t.allCrews}</option><option value="active">{t.active}</option><option value="inactive">{t.archived}</option></select></label></>}
-          {crewLoading ? <p role="status">{t.loadingCrews}</p> : crewError ? <p role="alert" className="record-error">{peopleErrorText(locale,new Error(crewError))}</p> : crews?.items.length ? <ul>{crews.items.map((crew) => <li key={crew.id}><Users size={17} /><span><button className="people-row-button crew-member-link" title={`${t.viewMembers} ${crew.name}`} aria-label={`${t.viewMembers} ${crew.name}`} aria-pressed={workerCrew.id===crew.id} onClick={() => {setWorkerCrew({id:crew.id,name:crew.name});setSearch('');setLanguage('all');setStatus('active');setPage(1);}}><bdi>{crew.name}</bdi></button><small>{peopleCountText(locale,crew.member_count,'workers')}{!crew.active ? ` · ${t.archived}` : ''}</small></span><CrewActions authority={authority} crew={crew} disabled={busy} onChanged={(success,updated) => {if(!current())return;if(workerCrew.id===updated.id) setWorkerCrew({id:updated.id,name:updated.name});if(updated.active && crewStatus==='inactive') {setCrewStatus('all');setCrewSearch(updated.name);setCrewPage(1);}setMessage(success);setRevision((n) => n+1);crewStatusInput.current?.focus();}}/></li>)}</ul> : <p>{t.noCrews}</p>}
-          <div className="crew-pagination"><span role="status">{crewLoading ? t.loadingCrewPage : `${peoplePageText(locale,crewPage,crewPages)} · ${peopleCountText(locale,crews?.total || 0,'crews')}`}</span><div className="actions"><button className="icon-button direction-arrow" title={t.previousCrews} aria-label={t.previousCrews} aria-disabled={crewLoading || !!crewError || crewPage<=1} onClick={() => {if(!crewLoading && !crewError && crewPage>1) setCrewPage(crewPage-1);}}><ChevronLeft size={18}/></button><button className="icon-button direction-arrow" title={t.nextCrews} aria-label={t.nextCrews} aria-disabled={crewLoading || !!crewError || crewPage>=crewPages} onClick={() => {if(!crewLoading && !crewError && crewPage<crewPages) setCrewPage(crewPage+1);}}><ChevronRight size={18}/></button>{!crewLoading && !crewError && crewPage>crewPages && <button className="button subtle" onClick={() => setCrewPage(1)}>{t.firstPage}</button>}</div></div>
-          <form className="people-create-crew" onSubmit={addCrew}><label className="field">{t.crewName}<input autoFocus={initialCrewCreate} dir="auto" value={crewName} onChange={(event) => setCrewName(event.target.value)} minLength={2} maxLength={80} placeholder={t.crewPlaceholder} required /></label><button className="button outline" type="submit" disabled={busy}><Plus size={18} />{t.createCrew}</button></form>
-        </section>
+        </section> : initialWorkerId && !loading ? <p role="status">Worker unavailable.</p> : null}
+        {initialWorkerId && selected && !form && <div lang="en" dir="ltr"><WorkerAccess authority={authority} key={selected.id} workerId={selected.id} code={selected.code} active={selected.active} credentialAccess={credentialAccess} canManage={canManage}/></div>}
+        {initialWorkerId && selected && !form && canDelete && <div lang="en" dir="ltr"><Suspense fallback={<p role="status">{t.loadingData}</p>}><WorkerDeletion authority={authority} key={selected.id} workerId={selected.id} code={selected.code} onLocked={setDeletionLocked} onQueued={(status)=>{if(!current() || selectedRef.current?.id!==selected.id)return;setSelected({...selected,active:false});setStatus('all');setMessage(status==='complete'?t.cleanupComplete:t.cleanupQueued);}}/></Suspense></div>}
+
       </div>
     </div>
-    <LanguageRequestsPanel authority={authority} refresh={refresh+revision} disabled={busy} onChanged={languageDecided}/>
-    {selected && !form && <div lang="en" dir="ltr"><WorkerAssignments authority={authority} key={selected.id} workerId={selected.id} refresh={refresh+revision} navigate={navigate} /></div>}
+
+    {initialWorkerId && selected && !form && <div><WorkerWorkHistory authority={authority} key={selected.id} workerId={selected.id} refresh={refresh+revision} navigate={navigate} /></div>}
   </div></PeopleLocaleContext.Provider>;
 }

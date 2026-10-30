@@ -8,7 +8,7 @@ export function readPendingDraftCreation(storage:Store,scope:string):PendingDraf
   let raw;try {raw=storage.getItem(key(scope));}catch {throw Error('Draft recovery storage is unavailable.');}
   if(raw===null)return null;
   try {if(raw.length>30000)throw Error();const value=JSON.parse(raw);signature(value);return value;}
-  catch {throw Error('Saved draft request cannot be verified. Check the briefing library before creating another draft.');}
+  catch {throw Error('Saved draft request cannot be verified. Check the instruction library before creating another draft.');}
 }
 export function savePendingDraftCreation(storage:Store,scope:string,value:PendingDraftCreation) {
   const normalized=signature(value),old=readPendingDraftCreation(storage,scope),raw=JSON.stringify(value);

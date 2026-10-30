@@ -61,7 +61,7 @@ export function checkedUsageModel(raw:unknown,mode:string|undefined,role:string|
     || !['owner','administrator','supervisor','auditor'].includes(role || '') || !Array.isArray(row.units) || row.units.length!==5
     || row.changeRequestsAvailable!==undefined && (typeof row.changeRequestsAvailable!=='boolean' || row.changeRequestsAvailable!==['owner','administrator','supervisor'].includes(role || '')))throw Error('Plan and usage cannot be verified.');
   const units=row.units,assigned=units[0]?.used;
-  if(!count(assigned) || units.some(unit=>!unit || !count(unit.used) || unit.used>assigned || unit.limit!==assigned))throw Error('Briefing usage counts cannot be verified.');
+  if(!count(assigned) || units.some(unit=>!unit || !count(unit.used) || unit.used>assigned || unit.limit!==assigned))throw Error('Instruction usage counts cannot be verified.');
   const publication=row.publication;
   if(publication!==null && (!keys(publication,'id,state,version') || typeof publication.id!=='string' || !publication.id || publication.id.length>100 || /[\x00-\x1f\x7f]/.test(publication.id)
     || !Number.isSafeInteger(publication.version) || publication.version<1 || publication.state!=='published'))throw Error('Usage publication cannot be verified.');

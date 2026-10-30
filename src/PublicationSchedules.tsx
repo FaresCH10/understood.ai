@@ -27,16 +27,16 @@ export default function PublicationSchedules({id,refresh,onChanged,authority,tim
   }
   const pages=Math.max(1,Math.ceil((data?.total || 0)/20));
   const date=(value:string)=>`${new Date(value).toLocaleString('en-GB',{timeZone:timezone,timeZoneName:'shortOffset'})} ${timezone}`;
-  return <section className="panel publication-schedules"><div className="panel-heading"><h2 ref={title} tabIndex={-1}>Publication schedules</h2><button className="icon-button" title="Refresh publication schedules" aria-label="Refresh publication schedules" disabled={loading || busy} onClick={()=>setTick(value=>value+1)}><RefreshCw size={18}/></button></div>
-    {loading?<p role="status">Loading publication schedules...</p>:data?.items.length ? <ul className="schedule-list">{data.items.map(row=><li key={row.id}>
+  return <section className="panel publication-schedules"><div className="panel-heading"><h2 ref={title} tabIndex={-1}>Delivery schedules</h2><button className="icon-button" title="Refresh delivery schedules" aria-label="Refresh delivery schedules" disabled={loading || busy} onClick={()=>setTick(value=>value+1)}><RefreshCw size={18}/></button></div>
+    {loading?<p role="status">Loading delivery schedules...</p>:data?.items.length ? <ul className="schedule-list">{data.items.map(row=><li key={row.id}>
       <CalendarClock size={20}/><div><strong>v{row.version} · {row.state==='queued'?'Scheduled':row.state}</strong><p><time dateTime={row.publishAt}>{date(row.publishAt)}</time> · {row.recipientCount} selected workers</p>
       <small>Revision {row.revision}{row.dueAt?` · Response deadline ${date(row.dueAt)}`:''}</small>{row.error && <p role="status" className="record-error">{row.error}</p>}
       {!!row.reminderMinutes && <p>In-app reminder · up to {row.reminderMinutes/60} {row.reminderMinutes===60?'hour':'hours'} before deadline</p>}
       {row.retryAt && <p role="status">Publication retry {row.attempts+1} at {date(row.retryAt)}</p>}
       {row.state==='queued' && <button className="button outline" disabled={busy} onClick={()=>{setSelected(row.id);setConfirmed(false);}}>Cancel schedule</button>}
       {selected===row.id && <div className="schedule-cancel"><label className="recipient-row"><input type="checkbox" checked={confirmed} disabled={busy} onChange={event=>setConfirmed(event.target.checked)}/>Cancel this saved schedule for v{row.version}</label><div className="actions"><button className="button outline" disabled={!confirmed || busy} onClick={()=>void cancel()}><X size={18}/>{busy?'Cancelling...':'Confirm cancellation'}</button><button className="icon-button" aria-label="Keep schedule" title="Keep schedule" disabled={busy} onClick={()=>{setSelected('');setConfirmed(false);}}><X size={18}/></button></div></div>}
-      </div></li>)}</ul>:!error && <p>No saved publication schedules.</p>}
+      </div></li>)}</ul>:!error && <p>No saved delivery schedules.</p>}
     {error && <p role="alert" className="record-error">{error}</p>}
-    {data && <div className="audit-pagination"><span>Page {page} of {pages} · {data.total} schedules</span><div className="actions"><button className="icon-button" aria-label="Previous schedules" title="Previous schedules" disabled={loading || busy || page<=1} onClick={()=>setPage(value=>value-1)}><ChevronLeft size={18}/></button><button className="icon-button" aria-label="Next schedules" title="Next schedules" disabled={loading || busy || page>=pages} onClick={()=>setPage(value=>value+1)}><ChevronRight size={18}/></button></div></div>}
+    {data && (pages>1||page>1) && <div className="audit-pagination"><span>Page {page} of {pages} · {data.total} schedules</span><div className="actions"><button className="icon-button" aria-label="Previous schedules" title="Previous schedules" disabled={loading || busy || page<=1} onClick={()=>setPage(value=>value-1)}><ChevronLeft size={18}/></button><button className="icon-button" aria-label="Next schedules" title="Next schedules" disabled={loading || busy || page>=pages} onClick={()=>setPage(value=>value+1)}><ChevronRight size={18}/></button></div></div>}
   </section>;
 }

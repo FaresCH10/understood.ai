@@ -67,25 +67,16 @@ test('activity download uses filtered metadata only, neutralizes formulas and lo
   } finally { db.close(); }
 });
 
-test('activity HTTP denies anonymous, worker, foreign event, forged filters and revoked staff', async () => {
+test('removed activity history endpoints are unavailable to signed-in staff', async () => {
   const db = openDatabase(':memory:');
   const server = sqliteApp(db);
   await new Promise((resolve) => server.listen(0,'127.0.0.1',resolve));
   const base = `http://127.0.0.1:${server.address().port}/api`;
-  const login = async (principal) => (await loginPrincipal(base, principal)).headers.get('set-cookie').split(';')[0];
-  const request = (cookie,path) => fetch(base+path,{headers:cookie ? {cookie} : {}});
   try {
-    event(db,'http-event','staff','maya','test.created','item','2026-10-04T12:00:00.000Z');
-    const maya = await login('maya'), other = await login('harbor-owner'), worker = await login('worker-29');
-    assert.equal((await request(null,'/audit')).status,401);
-    for (const path of ['/audit','/audit/http-event','/audit.csv']) assert.equal((await request(worker,path)).status,403);
-    assert.equal((await request(other,'/audit/http-event')).status,404);
-    assert.equal((await request(maya,'/audit?site_id=harbor-yard')).status,400);
-    assert.equal((await request(maya,'/audit/http-event')).status,200);
-    const csv = await request(maya,'/audit.csv?action=test.created');
-    assert.equal(csv.status,200); assert.equal(csv.headers.get('cache-control'),'no-store');
-    assert.ok((await csv.text()).includes('http-event'));
-    db.prepare('UPDATE staff SET active=0 WHERE id=?').run('maya');
-    assert.equal((await request(maya,'/audit')).status,401);
+    const cookie = (await loginPrincipal(base,'maya')).headers.get('set-cookie').split(';')[0];
+    for (const path of ['/audit','/audit/http-event','/audit.csv']) {
+      const response = await fetch(base+path,{headers:{cookie}});
+      assert.equal(response.status,404,path);
+    }
   } finally { await new Promise((resolve) => server.close(resolve)); db.close(); }
 });

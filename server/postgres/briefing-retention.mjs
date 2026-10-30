@@ -75,6 +75,10 @@ export async function redactExpiredBriefingContent(client,id) {
   await client.query("UPDATE generated_bundles SET manifest_json='{}' WHERE briefing_id=$1",[id]);
   await client.query("UPDATE briefing_copies SET title='[Expired]' WHERE copy_briefing_id=$1",[id]);
   await client.query("UPDATE source_audio_requests SET title='[Expired]' WHERE briefing_id=$1",[id]);
+  if((await client.query("SELECT to_regclass('instruction_attachments') IS NOT NULL AS present")).rows[0].present){
+    await client.query('DELETE FROM instruction_attachments WHERE request_id IN (SELECT request_id FROM instruction_sends WHERE briefing_id=$1)',[id]);
+    await client.query('DELETE FROM instruction_compositions WHERE id IN (SELECT request_id FROM instruction_sends WHERE briefing_id=$1)',[id]);
+  }
   const sends=(await client.query(`SELECT to_regclass('instruction_sends') IS NOT NULL
     AND to_regclass('instruction_deliveries') IS NOT NULL
     AND to_regprocedure('instruction_send_request_tombstone(jsonb)') IS NOT NULL AS present`)).rows[0].present;

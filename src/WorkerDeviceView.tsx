@@ -4,7 +4,7 @@ import type {WorkerDeviceProps} from './WorkerDevice';
 import {workerUiDirection,type WorkerUiLanguage} from './worker-ui-language';
 const Device=lazy(()=>import('./WorkerDevice').then(module=>({default:module.WorkerDevice})));
 const text:Record<WorkerUiLanguage,{loading:string;failed:string;reload:string;back:string}>={
-  en:{loading:'Loading device settings...',failed:'Device settings are unavailable.',reload:'Reload',back:'Back to my briefings'},
+  en:{loading:'Loading device settings...',failed:'Device settings are unavailable.',reload:'Reload',back:'Back to my instructions'},
   ar:{loading:'جارٍ تحميل إعدادات الجهاز...',failed:'إعدادات الجهاز غير متاحة.',reload:'إعادة التحميل',back:'العودة إلى تعليماتي'},
   ur:{loading:'آلے کی ترتیبات لوڈ ہو رہی ہیں...',failed:'آلے کی ترتیبات دستیاب نہیں۔',reload:'دوبارہ لوڈ کریں',back:'میری ہدایات پر واپس'},
   hi:{loading:'डिवाइस सेटिंग्स लोड हो रही हैं...',failed:'डिवाइस सेटिंग्स उपलब्ध नहीं हैं।',reload:'पुनः लोड करें',back:'मेरे निर्देशों पर वापस'},

@@ -1,0 +1,36 @@
+.plans-studio-heading{display:grid;grid-template-columns:1.1fr 1fr;gap:80px;align-items:end;margin-bottom:38px}
+.marketing-site .plans-studio-heading h2{font-size:clamp(30px,3.4vw,46px);line-height:1.12;margin:0;max-width:600px}
+.marketing-site .plans-studio-heading>p{font-size:18px;line-height:1.65;max-width:450px;margin:0}
+.plans-studio-board{display:grid;grid-template-columns:.9fr 1.1fr;border:1px solid #d9e5df;border-radius:12px;overflow:hidden;background:#f5f8f5}
+.plans-studio-board article{display:flex;flex-direction:column;align-items:flex-start;padding:40px;min-width:0}
+.plans-studio-trial{background:var(--landing-green);color:#fff;position:relative;isolation:isolate}
+.plans-studio-trial::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:-1;background:url('/hero/journey-paper.svg');opacity:.12;mix-blend-mode:soft-light}
+.plans-option-label{display:flex;justify-content:space-between;gap:20px;align-items:center;width:100%;font-size:14px;line-height:1.5;font-weight:550}
+.plans-option-label>span:last-child{font-size:12px;font-weight:400;opacity:.7}
+.marketing-site .plans-trial-duration{font-size:clamp(48px,6.5vw,84px);font-weight:600;line-height:1.15;color:#fff;margin:30px 0 15px;letter-spacing:-.035em}
+.plans-worker-limit{display:flex;align-items:center;gap:10px;font-size:16px;color:#daece2;line-height:1.5}
+.marketing-site .plans-studio-trial>p{color:#daece2;font-size:16px;line-height:1.75;margin:26px 0 0;max-width:410px}
+.plans-studio-checks{list-style:none;padding:0;margin:25px 0 34px;display:grid;gap:14px}
+.plans-studio-checks>li{display:flex;align-items:flex-start;gap:10px;font-size:15px;line-height:1.6}
+.plans-studio-checks svg{flex:none;margin-top:4px;color:#b6d8c6}
+.plans-studio-board .landing-button{margin-top:auto;min-height:50px;gap:20px}
+.marketing-site .plans-studio-board .plans-studio-note{font-size:12px;line-height:1.65;margin-top:16px;max-width:430px}
+.plans-studio-pilot .plans-option-label{color:var(--landing-green)}
+.marketing-site .plans-studio-pilot>h3{font-size:clamp(28px,3vw,38px);line-height:1.2;margin:36px 0 0;max-width:390px}
+.marketing-site .plans-studio-pilot>p{font-size:16px;line-height:1.75;max-width:440px;margin:20px 0 0}
+.plans-pilot-steps{list-style:none;width:100%;padding:0;margin:24px 0 32px;display:grid}
+.plans-pilot-steps>li{display:flex;align-items:center;gap:20px;padding:17px 0;border-bottom:1px solid #d9e5df;font-size:15px;line-height:1.6;color:var(--landing-ink)}
+.plans-pilot-steps>li:first-child{padding-top:0}
+.plans-pilot-steps>li>span:first-child{font-size:12px;color:var(--landing-green)}
+.plans-studio-faq{display:grid;grid-template-columns:.65fr 1.35fr;gap:80px;margin-top:48px}
+.marketing-site .plans-studio-faq>h3{font-size:25px;line-height:1.3;margin:0}
+.plans-studio-faq details{border-bottom:1px solid #d9e5df;padding:0 0 18px;margin-bottom:20px;scroll-margin-top:110px}
+.plans-studio-faq summary{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;font-size:16px;line-height:1.5;font-weight:550;cursor:pointer;list-style:none}
+.plans-studio-faq summary::-webkit-details-marker{display:none}
+.plans-studio-faq summary svg{flex:none;margin-top:3px;transition:transform .2s}
+.plans-studio-faq details[open] summary svg{transform:rotate(180deg)}
+.marketing-site .plans-studio-faq details>p{font-size:15px;line-height:1.7;margin:15px 0 0;max-width:65ch}
+@media(max-width:1000px){.plans-studio-heading{gap:40px}.plans-studio-board article{padding:30px}.plans-studio-faq{gap:40px}}
+@media(max-width:750px){.plans-studio-heading{grid-template-columns:1fr;gap:18px;margin-bottom:28px}.plans-studio-board{grid-template-columns:1fr}.plans-studio-board article{padding:28px}.marketing-site .plans-trial-duration{font-size:64px}.plans-studio-board .landing-button{width:100%;justify-content:space-between}.plans-studio-faq{grid-template-columns:1fr;gap:26px}.marketing-site .plans-studio-heading>p{font-size:17px}}
+@media(max-width:400px){.plans-studio-board article{padding:24px}.marketing-site .plans-trial-duration{font-size:56px}}
+@media(prefers-reduced-motion:reduce){.plans-studio-faq summary svg{transition:none}}

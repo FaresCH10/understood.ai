@@ -4,14 +4,13 @@ export type ReportLocale='en'|'ar'|'ur';
 
 // UI copy only. Published content, captured export filters and CSV bytes stay unchanged.
 export const reportTranslations={
-  'Briefing activity':['نشاط التعليمات','ہدایات کی سرگرمی'],
+  'Instruction activity':['نشاط التعليمات','ہدایات کی سرگرمی'],
   'Response activity at this site':['نشاط الإجابات في هذا الموقع','اس مقام پر جوابات کی سرگرمی'],
   'Published v{version}':['الإصدار المنشور {version}','شائع شدہ نسخہ {version}'],
-  'Activity history':['سجل النشاط','سرگرمی کی تاریخ'],
   'Export CSV':['تصدير CSV','CSV برآمد کریں'],
   'Queuing...':['جارٍ الإدراج في قائمة الانتظار...','قطار میں شامل ہو رہا ہے...'],
   'Working...':['جارٍ التنفيذ...','کام جاری ہے...'],
-  'Briefing version':['إصدار التعليمات','ہدایات کا نسخہ'],
+  'Instruction version':['إصدار التعليمات','ہدایات کا نسخہ'],
   'Publication history':['سجل النشر','اشاعت کی تاریخ'],
   'Refresh publication history':['تحديث سجل النشر','اشاعت کی تاریخ تازہ کریں'],
   'Title':['العنوان','عنوان'],
@@ -40,7 +39,7 @@ export const reportTranslations={
   'to':['إلى','تا'],
   'Loading report...':['جارٍ تحميل التقرير...','رپورٹ لوڈ ہو رہی ہے...'],
   'Retry report':['إعادة محاولة تحميل التقرير','رپورٹ دوبارہ لوڈ کریں'],
-  'No published briefing is available.':['لا توجد تعليمات منشورة متاحة.','کوئی شائع شدہ ہدایات دستیاب نہیں۔'],
+  'No published instruction is available.':['لا توجد تعليمات منشورة متاحة.','کوئی شائع شدہ ہدایات دستیاب نہیں۔'],
   'assigned':['مكلّف','تفویض شدہ'],
   'responses':['إجابات','جوابات'],
   'match key facts':['تطابق المعلومات الأساسية','اہم معلومات سے مطابقت'],

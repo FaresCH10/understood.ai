@@ -1,3 +1,4 @@
+import {ensureWorkspaceSchema} from './workspace-schema.mjs';
 import {expandBriefingLanguageRequestCheck,expandGenerationLanguageChecks} from './generation-language-schema.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -358,6 +359,7 @@ export function openDatabase(path = process.env.UNDERSTOOD_DB || 'data/understoo
   ensurePresentationSchema(db);
   ensureEntitlementSchema(db);
   ensureNotificationEventSchema(db);
+  ensureWorkspaceSchema(db);
   expandGenerationLanguageChecks(db);
   expandBriefingLanguageRequestCheck(db);
   return db;

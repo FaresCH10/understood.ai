@@ -24,7 +24,7 @@ const copy={
 };
 
 const statusCopy={
-  en:{received:'Received',paused:'Check paused',unavailable:'Recording no longer available',version:'Briefing',limits:'A match is not proof of understanding or permission to begin work.'},
+  en:{received:'Received',paused:'Check paused',unavailable:'Recording no longer available',version:'Instruction',limits:'A match is not proof of understanding or permission to begin work.'},
   ar:{received:'تم الاستلام',paused:'التحقق متوقف مؤقتاً',unavailable:'التسجيل لم يعد متاحاً',version:'التعليمات',limits:'تطابق الإجابة ليس دليلاً على الفهم أو إذناً ببدء العمل.'},
   ur:{received:'موصول ہو گیا',paused:'جانچ رکی ہوئی ہے',unavailable:'ریکارڈنگ اب دستیاب نہیں',version:'ہدایت',limits:'جواب کا درست ہونا سمجھ کا ثبوت یا کام شروع کرنے کی اجازت نہیں۔'},
   hi:{received:'प्राप्त हुआ',paused:'जाँच रुकी हुई',unavailable:'रिकॉर्डिंग अब उपलब्ध नहीं',version:'निर्देश',limits:'मिलता हुआ उत्तर समझ का प्रमाण या काम शुरू करने की अनुमति नहीं है।'},

@@ -30,16 +30,18 @@ export function instructionInput(input) {
   if(!INSTRUCTION_RESPONSE_MODES.includes(responseMode) || !INSTRUCTION_DELIVERY_MODES.includes(deliveryMode))
     throw new Error('Invalid instruction request');
   const raw=input.audience;
-  if(!raw || typeof raw!=='object' || Array.isArray(raw) || !['all','crew'].includes(raw.type)
-    || Object.keys(raw).some((key)=>!['type','crewId'].includes(key))
-    || (raw.type==='all' && Object.hasOwn(raw,'crewId'))
+  if(!raw || typeof raw!=='object' || Array.isArray(raw) || !['all','crew','members'].includes(raw.type)
+    || Object.keys(raw).some((key)=>!['type','crewId','workerIds'].includes(key))
+    || (raw.type==='all' && (Object.hasOwn(raw,'crewId')||Object.hasOwn(raw,'workerIds')))
+    || (raw.type==='crew' && Object.hasOwn(raw,'workerIds'))
+    || (raw.type==='members' && (Object.hasOwn(raw,'crewId') || !Array.isArray(raw.workerIds) || raw.workerIds.length<1 || raw.workerIds.length>5000 || raw.workerIds.some(id=>!nonempty(id,100)) || new Set(raw.workerIds).size!==raw.workerIds.length))
     || (raw.type==='crew' && (!nonempty(raw.crewId,100) || raw.crewId.trim().length===0)))
     throw new Error('Invalid instruction audience');
   const dueAt=input.dueAt ?? null;
   if(dueAt!==null && !validDeadline(dueAt)) throw new Error('Invalid instruction deadline');
   const reminderMinutes=input.reminderMinutes ?? 0;
   if(![0,60,1440].includes(reminderMinutes) || (reminderMinutes && dueAt===null)) throw new Error('Invalid instruction reminder');
-  const audience=raw.type==='all' ? {type:'all'} : {type:'crew',crewId:raw.crewId.trim()};
+  const audience=raw.type==='all' ? {type:'all'} : raw.type==='members'?{type:'members',workerIds:[...raw.workerIds].sort()}:{type:'crew',crewId:raw.crewId.trim()};
   const source=input.source.trim();
   const request={title:input.title.trim(),source,audience,responseMode,deliveryMode,
     sourceHash:createHash('sha256').update(source).digest('hex')};
@@ -54,12 +56,17 @@ function requestMatches(saved,request) {
     && saved?.responseMode===request.responseMode && saved?.deliveryMode===request.deliveryMode
     && saved?.audience?.type===request.audience.type
     && (saved?.audience?.crewId ?? null)===(request.audience.crewId ?? null)
+    && JSON.stringify(saved?.audience?.workerIds||[])===JSON.stringify(request.audience.workerIds||[])
     && (saved?.dueAt ?? null)===(request.dueAt ?? null)
     && (saved?.reminderMinutes ?? 0)===(request.reminderMinutes ?? 0)
     && (saved?.sourceHash===undefined || saved.sourceHash===request.sourceHash);
 }
 
 function audienceWorkers(db,session,audience) {
+  if(audience.type==='members'){
+    const rows=db.prepare('SELECT id,language FROM workers WHERE org_id=? AND site_id=? AND active=1 AND language_selection_required=0 AND id IN (SELECT value FROM json_each(?)) ORDER BY id').all(session.org_id,session.site_id,JSON.stringify(audience.workerIds));
+    if(rows.length!==audience.workerIds.length)throw Error('Selected members are unavailable or need a language');return rows;
+  }
   if(audience.type==='crew') {
     const crew=db.prepare('SELECT id,name FROM crews WHERE id=? AND org_id=? AND site_id=? AND active=1')
       .get(audience.crewId,session.org_id,session.site_id);
@@ -119,7 +126,9 @@ export function instructionAudienceOverview(db,session) {
   for(const crew of crews){crew.byLanguage={};crew.notSelected=0;}
   const crewById=new Map(crews.map(crew=>[crew.id,crew]));
   for(const row of crewLanguages){const crew=crewById.get(row.crew_id);if(!crew)continue;if(row.language_selection_required)crew.notSelected+=row.n;else crew.byLanguage[row.language]=(crew.byLanguage[row.language]||0)+row.n;}
-  return {workers:{total:selected,byLanguage,notSelected},crews,asOf:NOW()};
+  const members=db.prepare('SELECT id,code,name,language,language_selection_required FROM workers WHERE org_id=? AND site_id=? AND active=1 ORDER BY code,id LIMIT 5001').all(session.org_id,session.site_id);
+  if(members.length>5000)throw Error('Instruction member audience exceeds limit');
+  return {workers:{total:selected,byLanguage,notSelected},crews,members,asOf:NOW()};
 }
 
 export function startInstructionSend(db,session,input) {
@@ -133,8 +142,10 @@ export function startInstructionSend(db,session,input) {
       if(!requestMatches(JSON.parse(old.request_json),value.request)) throw new Error('Instruction request conflict');
       return sendView(db,old,true);
     }
+    const composition=db.prepare('SELECT staff_id,org_id,site_id FROM instruction_compositions WHERE id=?').get(value.requestId);
+    if(composition&&(composition.staff_id!==session.principal_id||composition.org_id!==session.org_id||composition.site_id!==session.site_id))throw Error('Instruction draft belongs to another supervisor');
     requireWritableEntitlement(db,session.org_id);
-    const pendingLanguage=db.prepare(`SELECT 1 FROM workers w WHERE w.org_id=? AND w.site_id=? AND w.active=1 AND w.language_selection_required=1 ${value.audience.type==='crew'?'AND EXISTS(SELECT 1 FROM crew_memberships cm WHERE cm.worker_id=w.id AND cm.org_id=w.org_id AND cm.site_id=w.site_id AND cm.crew_id=?)':''} LIMIT 1`).get(session.org_id,session.site_id,...(value.audience.type==='crew'?[value.audience.crewId]:[]));
+    const pendingLanguage=value.audience.type!=='members' && db.prepare(`SELECT 1 FROM workers w WHERE w.org_id=? AND w.site_id=? AND w.active=1 AND w.language_selection_required=1 ${value.audience.type==='crew'?'AND EXISTS(SELECT 1 FROM crew_memberships cm WHERE cm.worker_id=w.id AND cm.org_id=w.org_id AND cm.site_id=w.site_id AND cm.crew_id=?)':''} LIMIT 1`).get(session.org_id,session.site_id,...(value.audience.type==='crew'?[value.audience.crewId]:[]));
     if(pendingLanguage)throw Error('Choose a language for every selected worker in Team before sending.');
     const workers=audienceWorkers(db,session,value.audience);
     if(!workers.length) throw new Error('Instruction audience is empty');

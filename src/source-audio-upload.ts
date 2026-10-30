@@ -49,7 +49,7 @@ export function readPendingSourceUpload(storage:Store,session:SourceUploadSessio
   let raw;try {raw=storage.getItem(key(session));}catch {throw Error('Source receipt storage is unavailable.');}
   if(raw===null)return null;
   try {if(raw.length>4096)throw Error();return checkedPending(JSON.parse(raw),session);}
-  catch {throw Error('Saved source upload cannot be verified. Check the briefing library before creating another upload.');}
+  catch {throw Error('Saved source upload cannot be verified. Check the instruction library before creating another upload.');}
 }
 export function savePendingSourceUpload(storage:Store,session:SourceUploadSession,pending:PendingSourceUpload) {
   checkedPending(pending,session);const old=readPendingSourceUpload(storage,session),raw=JSON.stringify(pending);

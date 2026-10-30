@@ -32,7 +32,7 @@ export function readPendingRegeneration(storage:Store,scope:string):PendingRegen
   try {
     if(new TextEncoder().encode(raw).length>2000) throw Error();
     const value=JSON.parse(raw);pendingRegenerationContent(value);return value;
-  }catch {throw Error('Pending regeneration request cannot be read. Check the briefing history before creating another request.');}
+  }catch {throw Error('Pending regeneration request cannot be read. Check the instruction history before creating another request.');}
 }
 export function savePendingRegeneration(storage:Store,scope:string,value:PendingRegeneration) {
   pendingRegenerationContent(value);const old=readPendingRegeneration(storage,scope);

@@ -89,13 +89,13 @@ export function ArchiveBriefingControl({id,revision,nextVersion,disabled,onChang
       await complete(result,value=>value,()=>{dialog.current?.close();onChanged();});
     } catch(reason) {if(current())setError((reason as Error).message);} finally {inFlight.current=false;if(current())setBusy(false);}
   }
-  return <><button className="button outline" disabled={disabled || busy} onClick={open}><Archive size={18}/>Archive briefing</button>
+  return <><button className="button outline" disabled={disabled || busy} onClick={open}><Archive size={18}/>Archive instruction</button>
     <dialog ref={dialog} className="withdraw-dialog" aria-labelledby={`archive-title-${id}`} aria-describedby={`archive-impact-${id}`} onKeyDown={keepDialogFocus} onCancel={event=>{if(inFlight.current) event.preventDefault();}} onClose={()=>setConfirmed(false)}>
       <form onSubmit={event=>void archive(event)}>
-        <div className="withdraw-heading"><h2 id={`archive-title-${id}`}>Archive this briefing?</h2><button autoFocus type="button" className="icon-button" title="Close briefing archive" aria-label="Close briefing archive" disabled={busy} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
-        <p id={`archive-impact-${id}`} className="withdraw-impact"><TriangleAlert size={24}/>New edits, processing, publication, answers and help requests will close. Published content, accepted answers and existing clarifications stay in history. Pending checks can finish. This briefing cannot be restored; a separate draft copy can be created.</p>
+        <div className="withdraw-heading"><h2 id={`archive-title-${id}`}>Archive this instruction?</h2><button autoFocus type="button" className="icon-button" title="Close instruction archive" aria-label="Close instruction archive" disabled={busy} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
+        <p id={`archive-impact-${id}`} className="withdraw-impact"><TriangleAlert size={24}/>New edits, processing, publication, answers and help requests will close. Published content, accepted answers and existing clarifications stay in history. Pending checks can finish. This instruction cannot be restored; a separate draft copy can be created.</p>
         <label className="field">Reason for archiving<textarea value={reason} disabled={busy} minLength={3} maxLength={500} required rows={3} onChange={event=>{setReason(event.target.value);setConfirmed(false);}}/></label>
-        <label className="recipient-row publish-confirm"><input type="checkbox" checked={confirmed} disabled={busy || reason.trim().length<3} onChange={event=>setConfirmed(event.target.checked)}/><span>Archive the briefing and close new responses for its live versions</span></label>
+        <label className="recipient-row publish-confirm"><input type="checkbox" checked={confirmed} disabled={busy || reason.trim().length<3} onChange={event=>setConfirmed(event.target.checked)}/><span>Archive the instruction and close new responses for its live versions</span></label>
         {error && <p role="alert" className="record-error">{error}</p>}
         <div className="actions"><button type="button" className="button outline" disabled={busy} onClick={()=>dialog.current?.close()}>Cancel</button><button className="button danger" disabled={busy || !confirmed || reason.trim().length<3}><Archive size={18}/>{busy ? 'Archiving...' : 'Confirm archive'}</button></div>
       </form>

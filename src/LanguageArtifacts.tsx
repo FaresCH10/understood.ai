@@ -11,10 +11,9 @@ import {PublicationPicker,usePublicationDetail} from './PublicationHistory';
 import type {PublicationSummary} from './publication-history';
 import type {StaffRequestAuthority} from './useStaffRequest';
 
-type Props={draft:{id:string;source:string;revision:number;next_version:number;state:string;prepared:PreparedArtifacts|null;artifactAudio?:unknown;regenerationLanguages?:string[];targetRegeneration?:{jobId:string;status:string;language:string;kind:string}|null;review?:{revision:number;question:string;facts:string[];askedFacts:string[];translations?:import('./review-recovery').TranslationEdits};archive?:unknown};selected:PublicationSummary|null;onSelect:(value:PublicationSummary|null)=>void;refresh:number;canViewRubric:boolean;scope?:string|null;clientContext:string;onChanged:()=>void;onEditingChange:(value:boolean)=>void;authority:StaffRequestAuthority};
-const fieldLabels={present:'Present',missing:'Missing',invalid:'Invalid'};
+type Props={pickerMode?:'all'|'draft'|'published';draft:{id:string;source:string;revision:number;next_version:number;state:string;prepared:PreparedArtifacts|null;artifactAudio?:unknown;regenerationLanguages?:string[];targetRegeneration?:{jobId:string;status:string;language:string;kind:string}|null;review?:{revision:number;question:string;facts:string[];askedFacts:string[];translations?:import('./review-recovery').TranslationEdits};archive?:unknown};selected:PublicationSummary|null;onSelect:(value:PublicationSummary|null)=>void;refresh:number;canViewRubric:boolean;scope?:string|null;clientContext:string;onChanged:()=>void;onEditingChange:(value:boolean)=>void;authority:StaffRequestAuthority};
 
-export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric,scope,clientContext,onChanged,onEditingChange,authority}:Props) {
+export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric,scope,clientContext,onChanged,onEditingChange,authority,pickerMode='all'}:Props) {
   const selection=selected?.id || 'draft';
   const [target,setTarget]=useState('ar'),[detailTick,setDetailTick]=useState(0);
   const published=usePublicationDetail(draft.id,selected?.id || null,clientContext,refresh+detailTick);
@@ -34,9 +33,6 @@ export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric
   const language=artifactLanguages.find((item) => item.code===target)!;
   const voice=voices.find((item) => artifactVoiceLanguage(item.lang,target));
   const sourceQuestion=artifactField(prepared?.question,500);
-  const known=artifactLanguages.map((item) => item.code as string);
-  const unknown=Object.keys(prepared?.languages || {}).filter((code) => !known.includes(code));
-  const adapter=artifactField(prepared?.provenance?.adapter,120).value;
   const savedTranslation=isWorkerLanguage(target) && target!=='en' ? draft.review?.translations?.[target] : null;
   useEffect(() => {
     if(!('speechSynthesis' in window)) return;
@@ -77,12 +73,9 @@ export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric
     <div className="filters artifact-filters">
       <label className="select-label">Target language<select disabled={editing} value={target} onChange={event=>setTarget(event.target.value)}>{artifactLanguages.map(item=><option key={item.code} value={item.code}>{item.name}</option>)}</select></label>
     </div>
-    <PublicationPicker briefingId={draft.id} selected={publication || selected} onSelect={onSelect} context={clientContext} refresh={refresh} disabled={editing} allowDraft draftLabel={`Draft v${draft.next_version} · revision ${draft.revision}`}/>
+    {pickerMode!=='draft'&&<PublicationPicker briefingId={draft.id} selected={publication || selected} onSelect={onSelect} context={clientContext} refresh={refresh} disabled={editing} allowDraft={pickerMode==='all'} draftLabel={`Draft v${draft.next_version} · revision ${draft.revision}`}/>}
     {selected && published.loading && <p role="status">Loading selected version...</p>}
     {selected && published.error && <><p role="alert">{published.error}</p><button className="icon-button" title="Reload selected version" aria-label="Reload selected version" disabled={editing} onClick={()=>setDetailTick(n=>n+1)}><RotateCcw size={18}/></button></>}
-    <div className="artifact-provenance"><strong>{selection==='draft'?'Draft v'+draft.next_version+' · revision '+draft.revision+' · '+draft.state:publication?'v'+publication.version+' · '+publication.state+' · immutable':'v'+selected?.version+' · evidence '+(published.loading?'loading':'unavailable')}</strong><span>Adapter: <bdi>{selected && !publication?'Not loaded':adapter || 'Not recorded'}</bdi></span><span>{selected && !publication?'No artifact evidence loaded':view.synthetic || prepared?.provenance?.dataClass==='synthetic'?'Synthetic outputs · no live AI verification':'Live artifact verification unavailable'}</span></div>
-    {(!selected || publication) && <div className="artifact-coverage table-wrap" tabIndex={0} role="region" aria-label="Stored language coverage"><table><caption className="sr-only">Stored language fields and audio evidence</caption><thead><tr><th>Language</th><th>Title</th><th>Text</th><th>Question</th><th>Audio</th></tr></thead><tbody>{artifactLanguages.map(item=>{const result=languageArtifacts(prepared,source,item.code),privateAudio=canViewRubric && result.sourceMatches && artifactSpeechUrls(audioMap,draft.id,selection,draft.revision,item.code);return <tr key={item.code} className={item.code===target?'selected':''}><th scope="row"><button className="text-link" disabled={editing} aria-pressed={item.code===target} onClick={()=>setTarget(item.code)}>{item.name}</button></th><td>{fieldLabels[result.title.status]}</td><td>{fieldLabels[result.text.status]}</td><td>{fieldLabels[result.question.status]}</td><td>{privateAudio?'Private generated audio':result.audio==='device-demo'?'Device demo only':result.audio==='missing'?'Missing':'Unverified'}</td></tr>;})}</tbody></table></div>}
-    {unknown.length>0 && <p role="status">Unsupported stored languages ({unknown.length}): <bdi>{unknown.slice(0,20).join(', ')}</bdi>{unknown.length>20?'...':''}</p>}
     <div className="artifact-tabs" role="tablist" aria-label="Artifact views">{artifactReviewTabs.map(item=><button type="button" role="tab" key={item} id={tabId+'-'+item+'-tab'} aria-controls={tabId+'-'+item+'-panel'} aria-selected={tab===item} tabIndex={tab===item?0:-1} disabled={editing} ref={element=>{tabRefs.current[item]=element;}} onClick={()=>setTab(item)} onKeyDown={event=>{const next=nextArtifactTab(item,event.key);if(next){event.preventDefault();setTab(next);tabRefs.current[next]?.focus();}}}>{item[0].toUpperCase()+item.slice(1)}</button>)}</div>
     {artifactReviewTabs.filter(item=>item!==tab).map(item=><div key={item} hidden id={tabId+'-'+item+'-panel'} role="tabpanel" aria-labelledby={tabId+'-'+item+'-tab'}/>)}
     <div key={[selection,target,draft.revision,tab,clientContext].join(':')} id={tabId+'-'+tab+'-panel'} className="artifact-tab-panel" role="tabpanel" aria-labelledby={tabId+'-'+tab+'-tab'} tabIndex={0}>

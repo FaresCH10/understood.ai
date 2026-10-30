@@ -18,11 +18,11 @@ export default function StaffSearch({route,context,canPeople,navigate}:{route:st
       .catch(reason=>{if(!controller.signal.aborted)setError((reason as Error).message);}).finally(()=>{if(!controller.signal.aborted)setBusy(false);});
     return()=>controller.abort();
   },[initial,routeError,context,kind,page,refresh]);
-  const pages=Math.max(1,Math.ceil((data?.total??0)/20)),labels={briefing:'Briefings',worker:'Workers',crew:'Crews'};
+  const pages=Math.max(1,Math.ceil((data?.total??0)/20)),labels={briefing:'Instructions',worker:'Workers',crew:'Crews'};
   const categories:('all'|SearchKind)[]=['all','briefing',...(canPeople?['worker','crew'] as SearchKind[]:[])];
   function submit(event:FormEvent){event.preventDefault();if(query.trim())navigate(searchRoute(query));}
   return <section className="staff-search-view"><div className="page-header"><h1 ref={heading} tabIndex={-1}>Search</h1></div>
-    <form className="staff-search-form" role="search" onSubmit={submit}><label className="search-box"><Search size={20}/><input autoComplete="off" aria-label="Search this site" type="search" value={query} onChange={event=>setQuery(event.target.value)} maxLength={80} required placeholder={canPeople?'Search briefings, people...':'Search briefings...'}/></label><button className="icon-button" type="submit" title="Search" aria-label="Submit search"><ArrowRight size={21}/></button></form>
+    <form className="staff-search-form" role="search" onSubmit={submit}><label className="search-box"><Search size={20}/><input autoComplete="off" aria-label="Search this site" type="search" value={query} onChange={event=>setQuery(event.target.value)} maxLength={80} required placeholder={canPeople?'Search instructions, people...':'Search instructions...'}/></label><button className="icon-button" type="submit" title="Search" aria-label="Submit search"><ArrowRight size={21}/></button></form>
     {initial && <><nav className="briefing-detail-tabs" aria-label="Search categories">{categories.map(category=><button key={category} aria-pressed={kind===category} onClick={()=>{setData(null);setKind(category);setPage(1);}}>{category==='all'?'All':labels[category]}{data && ` (${category==='all'?Object.values(data.counts).reduce((n,value)=>n+value,0):data.counts[category]})`}</button>)}</nav>
     {busy?<p role="status">Searching...</p>:error?<div role="alert"><p>{error}</p><button className="button outline" onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={18}/>Retry search</button></div>:data && <>
       <p role="status" className="muted">{data.total} {data.total===1?'result':'results'} for <bdi>{initial}</bdi></p>

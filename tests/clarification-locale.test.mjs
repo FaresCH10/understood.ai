@@ -26,7 +26,7 @@ test('clarification localization is explicitly route-scoped and has safe locale 
 test('localized counts, versions, states and receipt copy preserve exact evidence and uncertainty',()=>{
   for(const locale of ['en','ar','ur']){
     assert.match(caseText(locale,'Page {page} of {pages}',{page:2,pages:7}),/2/);
-    assert.match(caseText(locale,'briefing v{version}',{version:14}),/14/);
+    assert.match(caseText(locale,'instruction v{version}',{version:14}),/14/);
     assert.notEqual(caseState(locale,'matched'),caseState(locale,'clarification'));
     assert.notEqual(caseState(locale,'unassessable'),caseState(locale,null));
     assert.equal(caseState(locale,'unknown'),caseText(locale,'Status unavailable'));
