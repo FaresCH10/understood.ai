@@ -1,3 +1,4 @@
+import {watchNeonNotifications} from './neon-notifications';
 import {useEffect,useRef,useState} from 'react';
 import {Bell} from 'lucide-react';
 import {validPageSession,type PageSession} from './session-state';
@@ -31,10 +32,11 @@ export function NotificationBell({session,label,locale='en',disabled=false,onOpe
       finally{pending=false;}
     };
     const changed=()=>{void read();};
+    const stopLive=watchNeonNotifications(binding,controller.signal,changed);
     void read();const timer=window.setInterval(changed,30000);
     window.addEventListener(notificationChanged,changed);window.addEventListener('focus',changed);
     window.addEventListener('hashchange',changed);document.addEventListener('visibilitychange',changed);
-    return()=>{controller.abort();clearInterval(timer);window.removeEventListener(notificationChanged,changed);
+    return()=>{controller.abort();stopLive();clearInterval(timer);window.removeEventListener(notificationChanged,changed);
       window.removeEventListener('focus',changed);window.removeEventListener('hashchange',changed);document.removeEventListener('visibilitychange',changed);};
   },[binding]);
   const unread=count?.binding===binding && validPageSession(session)?count.unread:0;

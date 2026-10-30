@@ -1,3 +1,4 @@
+import {neonEnvironment} from '../server/neon-env.mjs';
 import { spawn } from 'node:child_process';
 import {existsSync} from 'node:fs';
 
@@ -8,7 +9,7 @@ if(existsSync('.env'))process.loadEnvFile('.env');
 
 const credentialTest = process.argv.includes('--credential-test');
 const env = {
-  ...process.env,
+  ...neonEnvironment(process.env),
   UNDERSTOOD_TIER: 'local',
   UNDERSTOOD_AI_MODE: 'synthetic',
   UNDERSTOOD_ACCESS_MODE: 'credential',

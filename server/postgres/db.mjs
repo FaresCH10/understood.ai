@@ -70,12 +70,15 @@ export async function withPostgresClient(pool, fn) {
   } finally { client.release(); }
 }
 
-export async function createPostgresPool({ connectionString = process.env.UNDERSTOOD_POSTGRES_URL,
-  tls = process.env.UNDERSTOOD_POSTGRES_TLS === 'true', caFile = process.env.UNDERSTOOD_POSTGRES_CA_FILE } = {}) {
+export async function createPostgresPool({ connectionString = process.env.UNDERSTOOD_POSTGRES_URL || process.env.DATABASE_URL,
+  tls = process.env.UNDERSTOOD_POSTGRES_TLS === 'true' || (!process.env.UNDERSTOOD_POSTGRES_URL && !!process.env.DATABASE_URL), caFile = process.env.UNDERSTOOD_POSTGRES_CA_FILE } = {}) {
   if (!connectionString) throw new Error('UNDERSTOOD_POSTGRES_URL is required');
   let url;
   try { url = new URL(connectionString); } catch { throw new Error('Invalid PostgreSQL connection URL'); }
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname) throw new Error('Invalid PostgreSQL connection URL');
+  if(!process.env.UNDERSTOOD_POSTGRES_URL && connectionString===process.env.DATABASE_URL && ['require','verify-full'].includes(url.searchParams.get('sslmode'))) {
+    url.searchParams.delete('sslmode');connectionString=url.href;
+  }
   if (['sslmode', 'sslcert', 'sslkey', 'sslrootcert'].some((key) => url.searchParams.has(key))) {
     throw new Error('Configure PostgreSQL TLS outside the connection URL');
   }

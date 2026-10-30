@@ -1,0 +1,3 @@
+[mcp_servers.Neon]
+type = "http"
+url = "https://mcp.neon.tech/mcp?readonly=true&projectId=lucky-surf-24349943"

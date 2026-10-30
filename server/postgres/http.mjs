@@ -1,3 +1,5 @@
+import {notificationLiveQuery} from '../neon-realtime.mjs';
+import {neonFunctionStatus} from '../neon-services.mjs';
 import {handleWorkspaceRoute} from '../workspace-http.mjs';
 import {postgresWorkspace} from './workspace.mjs';
 import {assertProductionAdmission} from './production-admission.mjs';
@@ -261,6 +263,7 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
       if(secure)res.setHeader('strict-transport-security','max-age=31536000');
       const url=new URL(req.url || '/','http://127.0.0.1'),path=url.pathname;
       requestPath=path;
+      if(path==='/api/neon/status'&&req.method==='GET')return send(res,200,await neonFunctionStatus());
       if (path==='/api/health' && req.method==='GET') {
         await withPostgresClient(pool,client=>client.query('SELECT 1'));
         return send(res,200,{status:'ok',mode:`${config.aiMode}-credential`,backend});
@@ -597,6 +600,11 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
       if(pushSubscriptionMatch && req.method==='DELETE') {
         if(url.search) throw Error('Invalid push request');
         return send(res,200,await revokePushSubscription(pool,session,decodeURIComponent(pushSubscriptionMatch[1]),repository));
+      }
+      if(path==='/api/notifications/live'&&req.method==='GET'){
+        await listNotifications(pool,session,{pageSize:'1'},repository);
+        const live=await notificationLiveQuery(session,{schema});
+        return send(res,live?200:404,live||{error:'Not configured'});
       }
       if(path==='/api/notifications' && req.method==='GET')return send(res,200,session.principal_type==='worker'
         ?await listWorkerNotifications(pool,session,Object.fromEntries(url.searchParams),repository)

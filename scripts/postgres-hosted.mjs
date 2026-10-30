@@ -1,3 +1,4 @@
+import {neonEnvironment} from '../server/neon-env.mjs';
 import {readFileSync,statSync} from 'node:fs';
 import {productionServiceConfig} from '../server/postgres/production-admission.mjs';
 import {hostedSyntheticConfig} from '../server/postgres/hosted-config.mjs';
@@ -15,6 +16,7 @@ export function hostedServiceArguments(args) {
   return {mode,service:['worker','check-worker'].includes(mode)?'worker':['operator','check-operator'].includes(mode)?'operator':'api'};
 }
 async function main() {
+  Object.assign(process.env,neonEnvironment(process.env));
   const {mode,service}=hostedServiceArguments(process.argv.slice(2));
   let approvalManifest;
   if(process.env.UNDERSTOOD_TIER==='production'){const path=process.env.UNDERSTOOD_RELEASE_APPROVAL_FILE;if(!path||statSync(path).size>65536)throw Error('Production approval file required');approvalManifest=JSON.parse(readFileSync(path,'utf8'));}

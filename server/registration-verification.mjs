@@ -7,7 +7,7 @@ export function resolveRegistrationVerification(env={},mail={available:false},pu
   if(provider!=='neon')throw Error('Invalid registration verification provider');
   const secret=env.UNDERSTOOD_AUTH_MAIL_KEY;
   const key=typeof secret==='string'&&/^[a-f0-9]{64}$/i.test(secret)?Buffer.from(secret,'hex'):null;
-  const value=env.UNDERSTOOD_NEON_AUTH_URL;
+  const value=env.UNDERSTOOD_NEON_AUTH_URL || env.NEON_AUTH_BASE_URL;
   if(!value)return {provider:'neon',available:false,key,publicOrigin};
   let url,origin;try{url=new URL(value);origin=new URL(publicOrigin);}catch{throw Error('Invalid Neon verification configuration');}
   if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||url.port

@@ -1,3 +1,4 @@
+import {neonFunctionStatus} from './neon-services.mjs';
 import {handleWorkspaceRoute} from './workspace-http.mjs';
 import {sqliteWorkspace} from './workspace-sqlite.mjs';
 import {resolveRegistrationVerification} from './registration-verification.mjs';
@@ -268,6 +269,7 @@ export function createAppHandler(db, options = {}) {
         const result=await resetPassword(db,await readJson(req),req.socket.remoteAddress,mail);
         return send(res,200,result,{'set-cookie':clearSessionCookie()});
       }
+      if(path==='/api/neon/status'&&req.method==='GET')return send(res,200,await neonFunctionStatus());
       if(path==='/api/auth/registrations/options' && req.method==='GET')return send(res,200,{available:registrationVerification.available===true,verification:registrationVerification.provider==='neon'?'neon-code':'link'});
       if(path==='/api/auth/registrations/verify-code' && req.method==='POST'){
         if(config.accessMode!=='credential')return send(res,404,{error:'Not found'});

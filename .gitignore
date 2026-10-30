@@ -20,3 +20,4 @@ artifacts/
 !.env.example
 !.env.*.example
 deploy/runtime/
+.neon
