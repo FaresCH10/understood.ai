@@ -7,6 +7,8 @@ export type RegistrationLanguage='en'|'ar';
 type AccountBody={requestId:string;ownerName:string;email:string;password:string;companyName:string;country:string;phone?:string;acceptTerms:boolean;acceptPrivacy:boolean};
 
 const en={
+  verifyEyebrow:'Email verification',verifyIntro:'Enter the six-digit code for',verifyHint:'Paste the code from your most recent email.',verifyTrialNote:'Your free trial starts after verification.',verifyDifferent:'Use a different email',verifyMissing:'Didn’t receive an email?',verifyPrivacy:'Already registered? Sign in instead.',
+  codeExpired:'This code has expired. Request a new code below.',codeLimited:'Too many attempts. Wait a few minutes before trying again.',codeService:'The verification service is temporarily unavailable. Please try again shortly.',
   codeLabel:'Verification code',codeHint:'Enter the six-digit code from your email. Codes expire; use the latest code or request another.',codeSent:'If this registration is eligible, a verification code has been requested for',codeResend:'Request another code',codeResent:'If this registration is still pending, a new code has been requested.',codeError:'The code could not be verified. Check the latest code and try again.',codeUnavailable:'Email verification is not configured or could not be checked. Please try again later.',codeNote:'We email a verification code before your trial starts.',checkingVerification:'Checking email verification…',retryVerification:'Check again',
   kicker:'Free trial',title:'Start using Understood',
   lead:'Create your company workspace. Verify your work email to start a 14-day trial for up to 25 workers. No card required.',
@@ -31,6 +33,8 @@ const en={
   uncertainTitle:'Verification not confirmed',uncertainBody:'The result could not be confirmed. Retry this same link before signing in.',retryVerify:'Retry verification',signInShort:'Sign in',
 };
 const ar={
+  verifyEyebrow:'تأكيد البريد الإلكتروني',verifyIntro:'أدخل الرمز المكوّن من ستة أرقام للبريد',verifyHint:'الصق الرمز من أحدث رسالة وصلتك.',verifyTrialNote:'تبدأ تجربتك المجانية بعد التحقق.',verifyDifferent:'استخدام بريد مختلف',verifyMissing:'لم تصلك رسالة؟',verifyPrivacy:'لديك حساب؟ سجّل الدخول بدلاً من ذلك.',
+  codeExpired:'انتهت صلاحية هذا الرمز. اطلب رمزاً جديداً أدناه.',codeLimited:'محاولات كثيرة. انتظر بضع دقائق قبل المحاولة مجدداً.',codeService:'خدمة التحقق غير متاحة مؤقتاً. حاول مجدداً بعد قليل.',
   codeLabel:'رمز التحقق',codeHint:'أدخل الرمز المكوّن من ستة أرقام من بريدك. تنتهي صلاحية الرموز؛ استخدم أحدث رمز أو اطلب رمزاً آخر.',codeSent:'إذا كان التسجيل مؤهلاً، فقد طُلب إرسال رمز تحقق إلى',codeResend:'طلب رمز آخر',codeResent:'إذا كان التسجيل ما زال معلقاً، فقد طُلب رمز جديد.',codeError:'تعذّر التحقق من الرمز. راجع أحدث رمز وحاول مجدداً.',codeUnavailable:'التحقق من البريد غير مضبوط أو تعذّر فحصه. حاول لاحقاً.',codeNote:'نرسل رمز تحقق إلى بريدك قبل بدء تجربتك.',checkingVerification:'جارٍ فحص التحقق من البريد…',retryVerification:'إعادة الفحص',
   kicker:'تجربة مجانية',title:'ابدأ استخدام Understood',
   lead:'أنشئ مساحة عمل شركتك. تحقق من بريد العمل لبدء تجربة مجانية لمدة 14 يوماً لما يصل إلى 25 عاملاً. لا حاجة لبطاقة.',
@@ -122,7 +126,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
     event.preventDefault();if(!receipt||sending.current||code.length!==6)return;
     sending.current=true;setBusy(true);setError('');setNotice('');
     try{checkedVerification(await verifyAccountCode(receipt,code));try{clearRegistrationReceipt(sessionStorage);}catch{setStorageError(true);}setCode('');setCodeComplete(true);}
-    catch{setError(t.codeError);}
+    catch(caught){const code=caught instanceof RegistrationError?caught.code:null;setError(code==='REGISTRATION_CODE_EXPIRED'?t.codeExpired:code==='REGISTRATION_CODE_RATE_LIMITED'?t.codeLimited:code==='REGISTRATION_PROVIDER_UNAVAILABLE'?t.codeService:t.codeError);}
     finally{sending.current=false;setBusy(false);}
   }
   function startOver() {
@@ -140,7 +144,23 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   </section>;
   return <section className="registration-page" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     <div className="registration-top"><button type="button" className="button subtle" onClick={onBack}><ArrowLeft size={18}/>{t.back}</button><LanguageSwitch language={language} onLanguage={onLanguage} disabled={busy}/></div>
-    {codeComplete?<div className="registration-sent"><div className="registration-icon"><CheckCircle2 size={30}/></div><h1 ref={heading} tabIndex={-1}>{t.verifiedTitle}</h1><p role="status">{t.verifiedLead}</p><p>{t.verifiedTrial}</p><button type="button" className="button primary" onClick={onSignIn}>{t.openSignIn}</button></div>:receipt ? <div className="registration-sent">
+    {codeComplete?<div className="registration-sent"><div className="registration-icon"><CheckCircle2 size={30}/></div><h1 ref={heading} tabIndex={-1}>{t.verifiedTitle}</h1><p role="status">{t.verifiedLead}</p><p>{t.verifiedTrial}</p><button type="button" className="button primary" onClick={onSignIn}>{t.openSignIn}</button></div>:receipt?.state==='accepted'&&receipt.verification==='neon-code'?<div className="registration-sent registration-verification">
+      <div className="verification-heading"><Mail size={22} aria-hidden="true"/><span>{t.verifyEyebrow}</span></div>
+      <h1 ref={heading} tabIndex={-1}>{t.sentTitle}</h1>
+      <p className="verification-recipient">{t.verifyIntro}<bdi dir="ltr">{receipt.email}</bdi></p>
+      <form className="registration-code-form" onSubmit={verifyCode}>
+        <label className="field" htmlFor="registration-code">{t.codeLabel}</label>
+        <input id="registration-code" className="verification-code-input" aria-describedby={`verification-code-hint${error?' verification-code-error':''}`} aria-invalid={!!error} required inputMode="numeric" autoComplete="one-time-code" dir="ltr" minLength={6} maxLength={6} pattern="[0-9]{6}" placeholder="000000" value={code} disabled={busy} onChange={event=>{setCode(normalizeVerificationCode(event.target.value));setError('');}}/>
+        <p id="verification-code-hint" className="verification-hint">{t.verifyHint}</p>
+        {error&&<p id="verification-code-error" role="alert" className="verification-error">{error}</p>}
+        <button type="submit" className="button primary full" disabled={busy||code.length!==6}>{busy?t.verifying:t.verify}<ArrowRight size={16}/></button>
+      </form>
+      <div className="verification-resend"><span>{t.verifyMissing}</span><button type="button" className="text-link" disabled={busy} onClick={()=>void resend()}>{busy?t.resending:t.codeResend}</button></div>
+      {notice&&<p role="status" className="verification-status"><Check size={15}/>{t.codeResent}</p>}
+      <div className="verification-footer"><p><ShieldCheck size={16}/>{t.verifyTrialNote}</p><button type="button" className="text-link" disabled={busy} onClick={startOver}>{t.verifyDifferent}</button></div>
+      {storageError&&<p className="verification-hint">{t.storage}</p>}
+      <button type="button" className="text-link verification-signin" disabled={busy} onClick={onSignIn}>{t.signIn}<ArrowRight size={16}/></button>
+    </div>:receipt ? <div className="registration-sent">
       <div className="registration-icon">{receipt.state==='accepted'?<Mail size={30}/>:<RefreshCw size={30}/>}</div>
       <h1 ref={heading} tabIndex={-1}>{receipt.state==='accepted'?t.sentTitle:language==='ar'?'لم يتم تأكيد التسجيل':'Registration not confirmed'}</h1>
       {receipt.state==='accepted'?

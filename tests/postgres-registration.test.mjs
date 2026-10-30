@@ -13,6 +13,7 @@ import {openMail} from '../server/auth-mail.mjs';
 import {createServer,request as httpRequest} from 'node:http';
 import {createVercelNeonHandler} from '../server/vercel-neon.mjs';
 import {verifyRegistrationCode} from '../server/postgres/registration.mjs';
+import {validStaffSession} from '../src/session-state.ts';
 
 const schema='understood_test_registration';
 const options={schema};
@@ -43,7 +44,7 @@ async function fixture({failAudit=null}={}) {
   return {db,pool,q,request,dispatch,verify};
 }
 
-test('Vercel Neon registration dispatches before responding and survives handler replacement through sign-in',async()=>{
+test('Vercel Neon registration dispatches before responding and survives handler replacement through sign-in',async(t)=>{
   const f=await fixture();let server;
   const env={VERCEL_PROJECT_PRODUCTION_URL:'understood-fixture.vercel.app',UNDERSTOOD_POSTGRES_SCHEMA:schema,
     NEON_AUTH_BASE_URL:'https://ep-fixture.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth',
@@ -61,10 +62,10 @@ test('Vercel Neon registration dispatches before responding and survives handler
     const {handler}=await createVercelNeonHandler({env,pool:f.pool,send});
     server=createServer(handler);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   }
-  const request=(path,body)=>new Promise((resolve,reject)=>{
+  const request=(path,body,headers={})=>new Promise((resolve,reject)=>{
     const req=httpRequest(`http://127.0.0.1:${server.address().port}/api/${path}`,{
       method:body?'POST':'GET',headers:{host:'understood-fixture.vercel.app',origin,'x-forwarded-proto':'https',
-        'x-vercel-forwarded-for':'192.0.2.10','content-type':'application/json'}},res=>{
+        'x-vercel-forwarded-for':'192.0.2.10','content-type':'application/json',...headers}},res=>{
       const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('end',()=>resolve(new Response(Buffer.concat(chunks),{
         status:res.statusCode,headers:Object.fromEntries(Object.entries(res.headers).map(([key,value])=>[key,Array.isArray(value)?value.join(','):value]))})));
     });req.on('error',reject);req.end(body?JSON.stringify(body):undefined);
@@ -87,11 +88,21 @@ test('Vercel Neon registration dispatches before responding and survives handler
     assert.equal(dispatches,2);
     assert.equal((await f.q("SELECT count(*)::int AS n FROM registration_mail WHERE state='sent'"))[0].n,1);
     await new Promise(resolve=>server.close(resolve));await start();
-    await verifyRegistrationCode(f.pool,{requestId:receipt.requestId,email,code:'123456'},'192.0.2.10',config,
-      {...options,checkCode:async()=>true});
+    t.mock.method(globalThis,'fetch',async(url)=>{
+      if(url.endsWith('/email-otp/check-verification-otp'))return Response.json({code:'USER_NOT_FOUND'},{status:400});
+      assert(url.endsWith('/sign-in/email-otp'));
+      return Response.json({user:{email,emailVerified:true},token:'provider-session-must-not-be-forwarded'});
+    });
+    const verification=await request('auth/registrations/verify-code',{requestId:receipt.requestId,email,code:'123456'});
+    assert.equal(verification.status,200);
+    assert.equal((await verification.json()).completed,true);
+    assert.equal(verification.headers.get('set-cookie'),null);
     const login=await request('auth/staff/login',{email,password});
     assert.equal(login.status,200);
     assert.match(login.headers.get('set-cookie'),/__Host-understood_session=.*Secure/);
+    const session=await request('session',null,{cookie:login.headers.get('set-cookie').split(';')[0]});
+    assert.equal(session.status,200);
+    assert.equal(validStaffSession(await session.json()),true,'signed-in session must satisfy the browser contract');
   }finally{if(server?.listening)await new Promise(resolve=>server.close(resolve));await f.db.close();}
 });
 

@@ -6,7 +6,7 @@ type HelpAssignment={id:string;title:string;language:string;version:number};
 export function WorkerHelpHub({language,items,loading,failed,disabled,onOpen,onFollowup}:{language:WorkerUiLanguage;items:HelpAssignment[];loading:boolean;failed:boolean;disabled:boolean;onOpen:(id:string)=>void;onFollowup:()=>void}){
   const t=workerNavigationText[language],Forward=workerUiDirection(language)==='rtl'?ChevronLeft:ChevronRight;
   return <section className="worker-help-hub" aria-labelledby="worker-help-hub-title">
-    <h1 id="worker-help-hub-title">{t.helpTitle}</h1>
+    <header className="worker-page-heading"><MessageCircle size={26} aria-hidden="true"/><h1 id="worker-help-hub-title">{t.helpTitle}</h1></header>
     <p className="notice notice-amber worker-help-contact"><TriangleAlert size={22} aria-hidden="true"/>{t.urgent}</p>
     <button type="button" className="button outline full" disabled={disabled} onClick={onFollowup}><MessageCircle size={20} aria-hidden="true"/>{t.followup}</button>
     <h2>{t.currentBriefings}</h2>

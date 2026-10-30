@@ -54,7 +54,11 @@
 .send-composer .instruction-attachments .field{margin-bottom:10px}
 
 .interface-language-picker{position:relative;flex:none}
-.interface-language-trigger{list-style:none;border:0;border-radius:8px;color:var(--ui-ink,#263a30);cursor:pointer}
+.interface-language-picker>.interface-language-trigger{display:flex;align-items:center;gap:5px;width:auto;min-height:40px;padding:7px 6px;list-style:none;border:0;border-radius:6px;background:transparent;color:#244634;cursor:pointer;font-size:13px;font-weight:400;line-height:1.4}
+.interface-language-trigger>svg{flex:none}
+.interface-language-trigger>span{white-space:nowrap}
+.interface-language-trigger:focus-visible{outline:2px solid #2d826b;outline-offset:3px}
+.interface-language-trigger[aria-disabled=true]{opacity:.55;cursor:wait}
 .interface-language-trigger::-webkit-details-marker{display:none}
 .interface-language-trigger:hover,.interface-language-picker[open]>.interface-language-trigger{background:#edf3ef}
 .interface-language-panel{position:absolute;inset-inline-end:0;top:calc(100% + 10px);width:224px;padding:6px;border:1px solid #d9e2dc;border-radius:10px;background:#fff;box-shadow:0 8px 24px #10251b1a;z-index:40}

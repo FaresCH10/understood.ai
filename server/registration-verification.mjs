@@ -18,19 +18,31 @@ export function resolveRegistrationVerification(env={},mail={available:false},pu
   return {provider:'neon',available:true,key,publicOrigin,authUrl:url.href.replace(/\/$/,'')};
 }
 export const registrationAcceptance=config=>config.provider==='neon'?{accepted:true,delivery:'queued',verification:'neon-code'}:{accepted:true,delivery:'queued'};
+const verificationError=code=>Object.assign(Error('Registration verification unavailable'),{code});
+export function registrationVerificationHttpError(error){
+  const codes={REGISTRATION_CODE_REJECTED:[400,'The verification code is incorrect.'],REGISTRATION_CODE_EXPIRED:[400,'The verification code has expired. Request a new code.'],
+    REGISTRATION_CODE_RATE_LIMITED:[429,'Too many verification attempts. Please wait before trying again.'],
+    REGISTRATION_PROVIDER_UNAVAILABLE:[503,'Email verification is temporarily unavailable. Please try again.']};
+  const entry=codes[error?.code];return entry?{status:entry[0],error:entry[1],code:error.code}:null;
+}
 
-async function neonPost(config,path,body,fetchImpl){
+async function neonPost(config,path,body,fetchImpl,validate=result=>result?.success===true){
   if(config.provider!=='neon'||!config.available||!config.authUrl)throw Error('Email delivery unavailable');
   let response;
   try{
     response=await fetchImpl(config.authUrl+path,{method:'POST',redirect:'error',credentials:'omit',signal:AbortSignal.timeout(10000),
       headers:{'content-type':'application/json',origin:config.publicOrigin},body:JSON.stringify(body)});
-    if(!response.ok){await response.body?.cancel();throw Error();}
     let size=0;const chunks=[];for await(const chunk of response.body){size+=chunk.length;if(size>16384)throw Error();chunks.push(chunk);}
     const result=JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    if(result?.success!==true)throw Error();
+    if(!response.ok){
+      const code=result?.code;
+      throw verificationError(response.status===429||['TOO_MANY_ATTEMPTS','RATE_LIMITED'].includes(code)?'REGISTRATION_CODE_RATE_LIMITED':
+        ['OTP_EXPIRED','OTP_HAS_EXPIRED'].includes(code)?'REGISTRATION_CODE_EXPIRED':
+        ['INVALID_OTP','INVALID_VERIFICATION_CODE','OTP_NOT_FOUND'].includes(code)?'REGISTRATION_CODE_REJECTED':'REGISTRATION_PROVIDER_UNAVAILABLE');
+    }
+    if(!validate(result))throw verificationError('REGISTRATION_PROVIDER_UNAVAILABLE');
     return true;
-  }catch{throw Error('Registration verification unavailable');}
+  }catch(error){if(registrationVerificationHttpError(error))throw error;throw verificationError('REGISTRATION_PROVIDER_UNAVAILABLE');}
 }
 export async function sendRegistrationVerification(config,id,message,fetchImpl=fetch){
   if(config.provider!=='neon')return sendAuthMail(config,id,message,fetchImpl);
@@ -41,7 +53,11 @@ export async function sendRegistrationVerification(config,id,message,fetchImpl=f
 }
 export function checkRegistrationCode(config,email,code,fetchImpl=fetch){
   if(typeof code!=='string'||!/^\d{6}$/.test(code))throw Error('Registration verification unavailable');
-  // Check-only deliberately creates no Neon login/session. The application transaction
-  // consumes the pending registration exactly once and enforces its immutable scope.
-  return neonPost(config,'/email-otp/check-verification-otp',{email,otp:code,type:'sign-in'},fetchImpl);
+  // Neon check-verification-otp requires an existing user, even though sending a
+  // sign-in OTP works for a new address. Complete the supported OTP flow instead.
+  // Its verified identity is email proof only: discard the provider session/token;
+  // Understood still creates its own credentials and requires a separate sign-in.
+  return neonPost(config,'/sign-in/email-otp',{email,otp:code},fetchImpl,
+    result=>result?.user?.emailVerified===true && typeof result.user.email==='string'
+      && result.user.email.toLowerCase()===email.toLowerCase());
 }

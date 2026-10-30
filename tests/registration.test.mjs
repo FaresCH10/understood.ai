@@ -316,7 +316,9 @@ test('Neon verification HTTP enforces origin, input shape and separate sign-in',
  const neon={...config,provider:'neon',authUrl:'https://ep-fixture.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth'};
  const db=dbFixture(),server=createAppServer(db,{tier:'local',aiMode:'synthetic',accessMode:'credential',mail:mailOptions,registrationVerification:neon});
  const original=globalThis.fetch;
- globalThis.fetch=(url,options)=>String(url).startsWith(neon.authUrl)?Promise.resolve(Response.json({success:JSON.parse(options.body).otp==='001234'})):original(url,options);
+ globalThis.fetch=(url,options)=>String(url).startsWith(neon.authUrl)?Promise.resolve(JSON.parse(options.body).otp==='001234'
+   ?Response.json({user:{email,emailVerified:true},token:'discard-provider-session'})
+   :Response.json({code:'INVALID_OTP'},{status:400})):original(url,options);
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}`;
  try{
   const options=await (await fetch(base+'/api/auth/registrations/options')).json();assert.deepEqual(options,{available:true,verification:'neon-code'});

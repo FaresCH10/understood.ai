@@ -1,0 +1,1 @@
+server/postgres/migrations/*.sql text eol=lf

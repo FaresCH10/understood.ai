@@ -84,6 +84,78 @@ Full hosting still requires selecting the frontend/API/worker hosting targets, s
 
 ## Agent tooling and failures
 
+### Worker direct links and assigned credentials (30 October 2026)
+
+Worker link entry now automatically submits the private token and opens the inbox
+after verifying the resulting worker session and matching grant digest. The
+existing one-time redemption, expiry, tenant/site access, revocation and shared
+device cleanup checks remain. No worker ID or password is required on this path;
+manual company ID / worker ID / password sign-in remains available.
+
+The supervisor Add worker form and its public API now require an assigned password
+and worker ID. Both database backends create the worker and hashed credentials in
+one transaction. Internal import/migration helpers retain their existing separate
+credential-provisioning path. Generated passwords use browser cryptographic
+randomness with rejection sampling and are 18 characters long. Generation and
+show/hide controls exist on Add worker and the credential assignment dialog.
+Plaintext passwords are not stored in browser storage or sent to a generator API.
+
+Build and 30 focused tests passed. Tests cover atomic PostgreSQL creation,
+password authentication, token-only worker entry, one-time redemption, expiry,
+revocation and rejected creation without a password. An isolated browser test
+confirmed automatic inbox navigation with one token-only request; a clean-browser
+check confirmed all normal worker sign-in inputs remain available.
+The final worker-access build was deployed to `understood-ai.vercel.app` as
+`dpl_9eYMxSLnQEx9ccZoMbL4TGazqHqc`. The live API remains healthy and rejects
+invalid token-only links with HTTP 401.
+
+### New-user OTP verification and screen correction (30 October 2026)
+
+Neon accepted and delivered sign-in OTP emails for new addresses, but the old
+`/email-otp/check-verification-otp` call returned `USER_NOT_FOUND` before checking
+the code. Verification now uses `/sign-in/email-otp` and requires a verified user
+whose email exactly matches the registration. Provider tokens/cookies are not
+forwarded to the browser or used as an Understood session. The app still activates
+the immutable pending registration once and requires a separate staff sign-in.
+Expired/incorrect codes, rate limits and provider outages have distinct safe error
+codes and translated UI messages.
+
+The verification screen now has a single unboxed form, a prominent numeric input,
+adjacent validation errors, quieter resend feedback and simpler secondary actions.
+Desktop and 390px mobile screenshots were inspected with Playwright; no mobile
+horizontal overflow was found. Reticle's mocked 202 registration checks remained
+undecided and were not counted as functional proof.
+
+Build and 28 focused tests passed, including new-user verification through the
+HTTP endpoint with Neon's real response shape. Deployment
+`dpl_57v2TBUujAe66rVhUfkV2Mt2ssbi` was promoted to the live domain. After explicit
+user approval to activate the existing workspace, its fresh inbox code produced
+HTTP 200 with `completed:true, signInRequired:true, duplicate:false`. The original
+registration password was preserved. Verification codes were not saved to files.
+
+### Vercel session startup correction (30 October 2026)
+
+The Vercel project was recreated as `prj_ZHwxn7wXRYwhO7wyiPOQEcEuN9Xz`.
+The local link now targets that existing project. Its Node.js setting was aligned
+from 26.x to the application's 24.x requirement.
+
+The database ledger contained 113 checksums generated from CRLF migration files.
+A Linux Git checkout used LF, so strict raw-byte verification refused startup.
+Migration checks now use canonical LF for new migrations and accept historical
+LF/CRLF checksums for the same SQL. SQL edits still fail verification. No database
+ledger or schema changes were needed. `.gitattributes` pins migration files to LF;
+`vercel.json` explicitly includes them in the gateway function. Startup errors now
+log safe error categories without credentials or provider details.
+
+Build passed; migration/registration tests passed, including SQL-change rejection
+and an authenticated session validated against the frontend contract. All 114 LF
+migrations passed against the existing Neon ledger. Deployment
+`dpl_5X8xxnRnHEo6F23xaRxknHTgrdxi` was promoted to the public domain. Public health,
+session and registration-options endpoints returned HTTP 200. Reticle confirmed
+the public page and supervisor sign-in form load without the session error.
+Changes remain local and must be included in the next Git push to preserve this
+fix in later Git-triggered deployments.
+
 - Official requested skill was downloaded into `artifacts/neon-setup/neon-SKILL.md` and read. Seven relevant Neon skills are installed under `.agents/skills`.
 - `.codex/config.toml` adds OAuth MCP at `https://mcp.neon.tech/mcp?readonly=true&projectId=lucky-surf-24349943`. No account-wide API key was minted. Restart/reopen the Codex project to load newly installed tools if they are not visible.
 - Global CLI installation failed with npm DNS resolution; `npx --yes neon@latest` succeeded.

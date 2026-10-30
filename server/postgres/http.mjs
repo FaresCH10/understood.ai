@@ -1,4 +1,6 @@
+import {requiredWorkerCreation} from '../people.mjs';
 import {notificationLiveQuery} from '../neon-realtime.mjs';
+import {registrationVerificationHttpError} from '../registration-verification.mjs';
 import {neonFunctionStatus} from '../neon-services.mjs';
 import {handleWorkspaceRoute} from '../workspace-http.mjs';
 import {postgresWorkspace} from './workspace.mjs';
@@ -320,8 +322,8 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         return send(res,200,{ok:true},{'set-cookie':sessionCookie(login.session.token,login.session.maxSeconds,cookieOptions)});
       }
       if (path==='/api/auth/worker/redeem' && req.method==='POST') {
-        const body=await readJson(req);if(!['token','company','workerId','password'].every(key=>typeof body[key]==='string' && body[key].length>0))throw new Error('Invalid credentials');
-        const session=await authenticateWorker(pool,body,req.socket.remoteAddress,repository);
+        const body=await readJson(req);if(url.search || Object.keys(body).length!==1 || typeof body.token!=='string')throw new Error('Invalid credentials');
+        const session=await redeemWorkerGrant(pool,body.token,repository);
         return send(res,200,{ok:true},{'set-cookie':sessionCookie(session.token,session.maxSeconds,cookieOptions)});
       }
       if(path==='/api/auth/worker/context' && req.method==='GET') {
@@ -726,7 +728,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       }
       if (path==='/api/people/workers') {
         if (req.method==='GET') return send(res,200,await listWorkers(pool,session,Object.fromEntries(url.searchParams),repository));
-        if (req.method==='POST') return send(res,201,await createWorker(pool,session,await readJson(req),repository));
+        if (req.method==='POST') return send(res,201,await createWorker(pool,session,requiredWorkerCreation(await readJson(req)),repository));
       }
       const workerAssignments=path.match(/^\/api\/people\/workers\/([^/]+)\/assignments$/);
       if(workerAssignments && req.method==='GET') return send(res,200,await staffWorkerAssignments(pool,session,workerAssignments[1],Object.fromEntries(url.searchParams),repository));
@@ -995,6 +997,8 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         if(message==='Onboarding unavailable') return send(res,404,{error:message});
       }
       if(requestPath.startsWith('/api/auth/registrations')) {
+        const verificationFailure=registrationVerificationHttpError(error);
+        if(verificationFailure){const {status,...body}=verificationFailure;return send(res,status,body);}
         if(message==='Email delivery unavailable') return send(res,503,{error:message});
         if(['Invalid registration input','Registration verification unavailable'].includes(message)) return send(res,400,{error:message});
         return send(res,503,{error:'Registration unavailable. Check the service before retrying.'});

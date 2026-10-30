@@ -6,7 +6,8 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 export class RegistrationError extends Error {
   readonly status:number|null;
   readonly uncertain:boolean;
-  constructor(message:string,status:number|null=null,uncertain=false){super(message);this.status=status;this.uncertain=uncertain;}
+  readonly code:string|null;
+  constructor(message:string,status:number|null=null,uncertain=false,code:string|null=null){super(message);this.status=status;this.uncertain=uncertain;this.code=code;}
 }
 
 export function verificationToken(hash:string) {
@@ -48,6 +49,8 @@ async function post(path:string,body:unknown) {
     value=await response.json();
   } catch {throw new RegistrationError('The result could not be confirmed. Retry the same request before starting over.',null,true);}
   if(!response.ok) {
+    if(typeof value.code==='string' && ['REGISTRATION_CODE_REJECTED','REGISTRATION_CODE_EXPIRED','REGISTRATION_CODE_RATE_LIMITED','REGISTRATION_PROVIDER_UNAVAILABLE'].includes(value.code))
+      throw new RegistrationError('Email verification could not be completed.',response.status,response.status>=500,value.code);
     if(response.status===404) throw new RegistrationError('Online account creation is not available in this environment.',404);
     if(response.status===400) throw new RegistrationError('Check the account details and try again.',400);
     if(response.status>=500) throw new RegistrationError('Account creation is temporarily unavailable. Your details remain in this tab.',response.status,true);

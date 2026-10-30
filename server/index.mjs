@@ -1,7 +1,8 @@
+import {requiredWorkerCreation} from './people.mjs';
 import {neonFunctionStatus} from './neon-services.mjs';
 import {handleWorkspaceRoute} from './workspace-http.mjs';
 import {sqliteWorkspace} from './workspace-sqlite.mjs';
-import {resolveRegistrationVerification} from './registration-verification.mjs';
+import {resolveRegistrationVerification,registrationVerificationHttpError} from './registration-verification.mjs';
 import { createServer as createHttpServer } from "node:http";
 import { send,readJson } from './http.mjs';
 import {ensurePilotSchema,savePilot,readPilot} from './pilot.mjs';
@@ -373,8 +374,8 @@ export function createAppHandler(db, options = {}) {
         if (config.accessMode !== "credential")
           return send(res, 404, { error: "Not found" });
         const body = await readJson(req);
-        if(!['token','company','workerId','password'].every(key=>typeof body[key]==='string' && body[key].length>0))throw new Error('Invalid credentials');
-        const session = authenticateWorker(db,body,req.socket.remoteAddress);
+        if(Object.keys(body).length!==1 || typeof body.token!=='string')throw new Error('Invalid credentials');
+        const session = redeemWorkerGrant(db,body.token);
         return send(
           res,
           200,
@@ -546,7 +547,7 @@ export function createAppHandler(db, options = {}) {
       }
       if (path === '/api/people/workers') {
         if (req.method === 'GET') return send(res, 200, listWorkers(db, session, Object.fromEntries(url.searchParams)));
-        if (req.method === 'POST') return send(res, 201, createWorker(db, session, await readJson(req)));
+        if (req.method === 'POST') return send(res, 201, createWorker(db, session, requiredWorkerCreation(await readJson(req))));
       }
       const workerAssignments=path.match(/^\/api\/people\/workers\/([^/]+)\/assignments$/);
       if(workerAssignments && req.method==='GET') return send(res,200,staffWorkerAssignments(db,session,workerAssignments[1],Object.fromEntries(url.searchParams)));
@@ -1146,6 +1147,8 @@ export function createAppHandler(db, options = {}) {
         return send(res,503,{error:'Onboarding unavailable. Refresh before retrying.'});
       }
       if(path.startsWith('/api/auth/registrations')) {
+        const verificationFailure=registrationVerificationHttpError(error);
+        if(verificationFailure){const {status,...body}=verificationFailure;return send(res,status,body);}
         if(message==='Email delivery unavailable') return send(res,503,{error:message});
         if(message==='Sign in required') return send(res,401,{error:message});
         if(['Forbidden','Forbidden origin'].includes(message)) return send(res,403,{error:message});

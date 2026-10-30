@@ -1,6 +1,7 @@
+import {passwordRecordSync} from './auth-crypto.mjs';
 import { randomUUID } from 'node:crypto';
 import { NOW, transaction } from './db.mjs';
-import {normalizeWorkerLogin} from './worker-credentials-input.mjs';
+import {workerPassword,normalizeWorkerLogin} from './worker-credentials-input.mjs';
 import {isWorkerLanguage,WORKER_LANGUAGE_CODES,sqlLanguageList} from './languages.mjs';
 import {requireWritableEntitlement} from './entitlements.mjs';
 import {requireWorkerCapacity} from './worker-capacity.mjs';
@@ -285,10 +286,11 @@ export function workerFilters(filters={}) {
 }
 
 export function createWorkerInput(input) {
-  inputKeys(input, ['code', 'name', 'language']);
+  inputKeys(input, ['code', 'name', 'language', 'password']);
   const workerName = input.name === undefined || input.name === null ? null : name(input.name, 'worker name');
   return {
     code: name(input.code, 'worker code'),
+    ...(input.password===undefined?{}:{password:workerPassword(input.password,{login:normalizeWorkerLogin(input.code)})}),
     name: workerName,
     ...(input.language === undefined ? {} : { language: language(input.language) }),
   };
@@ -299,6 +301,7 @@ export function createWorker(db, session, input) {
   const value = createWorkerInput(input);
   const login = normalizeWorkerLogin(value.code);
   const id = randomUUID();
+  const credential=value.password===undefined?null:passwordRecordSync(workerPassword(value.password,{login,company:session.org_id}));
   transaction(db, () => {
     const now = NOW();
     requireWritableEntitlement(db,session.org_id);
@@ -316,6 +319,7 @@ export function createWorker(db, session, input) {
           language_selected_at,language_selected_by) VALUES (?,?,?,?,?,?,1,0,?,'staff')`)
         .run(id, session.org_id, session.site_id, value.code, value.name, value.language, now);
     }
+    if(credential)db.prepare(`INSERT INTO worker_credentials(worker_id,org_id,site_id,login_id,state,password_salt,password_hash,credential_revision,password_changed_at,created_at,updated_at) VALUES(?,?,?,?,'active',?,?,1,?,?,?)`).run(id,session.org_id,session.site_id,login,credential.salt,credential.derived,now,now,now);
     audit(db, session, 'worker.created', id);
   });
   return workerRow(db, session, id);
@@ -754,4 +758,10 @@ export function moveWorkerToCrew(db, session, workerId, crewId) {
     }
     return workerRow(db, session, workerId);
   });
+}
+
+export function requiredWorkerCreation(input){
+  const value=createWorkerInput(input);
+  if(value.password===undefined)throw Error('Invalid password');
+  return input;
 }

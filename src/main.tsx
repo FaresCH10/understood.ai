@@ -24,6 +24,7 @@ import {WorkerDeviceView} from './WorkerDeviceView';
 const WorkerAccessEntry=lazy(()=>import('./WorkerAccessEntry').then(module=>({default:module.WorkerAccessEntry})));
 const AuthLayout=lazy(()=>import('./AuthLayout').then(module=>({default:module.AuthLayout})));
 import {WorkerHelpHub} from './WorkerHelpHub';
+import {WorkerSurface} from './WorkerSurface';
 import {WorkerNotifications} from './WorkerNotifications';
 import {workerNotificationText} from './worker-notifications';
 import {WorkerAudioPlayer} from './WorkerAudioPlayer';
@@ -373,8 +374,8 @@ export default function App() {
       setMessage('Saved.'); reload(); return result;
     } catch (error) {if(error instanceof WorkerRequestError)throw error;if(['Session context changed','Sign in required'].includes((error as Error).message))sessionGuard.invalidate();setMessage((error as Error).message); return null; }
   };
-  const signInCredential = async (kind: 'staff' | 'worker',workerInput?:{company:string;workerId:string;password:string}) => {
-    if(authInFlight.current || localCleanupFailed || workerEntryRecovery.pending || workerEntryRecovery.error || (kind==='worker' && !workerInput)) return;
+  const signInCredential = async (kind: 'staff' | 'worker') => {
+    if(authInFlight.current || localCleanupFailed || workerEntryRecovery.pending || workerEntryRecovery.error) return;
     authInFlight.current=true;setAuthBusy(true);setMessage('');
     let entry:PendingWorkerEntry|null=null;
     try {
@@ -388,7 +389,7 @@ export default function App() {
         setSession({authenticated:false,mode:session.mode,language:session.language});
       }
       await api(kind === 'staff' ? '/auth/staff/login' : '/auth/worker/redeem', {
-        method: 'POST', body: JSON.stringify(kind === 'staff' ? { email, password } : { token: workerToken.trim(),...workerInput }),
+        method: 'POST', body: JSON.stringify(kind === 'staff' ? { email, password } : { token: workerToken.trim() }),
       });
       if(kind==='worker') {
         const recovered=await recoverWorkerEntry(entry!,api);if(!recovered)throw Error('Worker access could not be confirmed.');
@@ -481,7 +482,7 @@ export default function App() {
   }
   if(view==='accept-invitation') return <main className="entry-page"><Brand/><InvitationView key={invitationToken}><AcceptInvitation token={invitationToken} identity={session} onBack={()=>{setInvitationToken('');navigate('overview');}} onIdentityChanged={async()=>{setSession(checkedSiteSession(await api('/session')));}} onOpenSite={changeSite}/></InvitationView></main>;
   if(['account-recovery','reset-password'].includes(view)) return <main className="entry-page"><Brand/><AccountRecovery key={view} reset={view==='reset-password'} token={recoveryToken} onBack={()=>{setRecoveryToken('');navigate('overview');}} onReset={()=>{setPassword('');setSession({authenticated:false,mode:session.mode});}}/></main>;
-  if(view==='worker-access')return <WorkerAccessEntry language={workerEntryLanguage} onLanguage={setWorkerEntryLanguage} token={workerToken} linkSignal={workerLinkSignal} onToken={setWorkerToken} busy={authBusy} blocked={localCleanupFailed} authenticated={session.authenticated} session={session} supported failed={!!message} onSubmit={input=>void signInCredential('worker',input)} onPasswordLogin={(input)=>void signInWorkerPassword(input)} onClearFailure={()=>setMessage('')} onCancel={()=>{setWorkerToken('');setMessage('');navigate('overview');}}><Brand/>{localCleanupFailed && <section role="alert"><p>{localCleanupText[workerEntryLanguage].failed}</p><button className="button outline" disabled={authBusy} onClick={async()=>{if(authInFlight.current)return;authInFlight.current=true;setAuthBusy(true);try{setLocalCleanupFailed(!await clearWorkerLocalData());}finally{authInFlight.current=false;setAuthBusy(false);}}}>{localCleanupText[workerEntryLanguage].remove}</button></section>}</WorkerAccessEntry>;
+  if(view==='worker-access')return <WorkerAccessEntry language={workerEntryLanguage} onLanguage={setWorkerEntryLanguage} token={workerToken} linkSignal={workerLinkSignal} onToken={setWorkerToken} busy={authBusy} blocked={localCleanupFailed} authenticated={session.authenticated} session={session} supported failed={!!message} onSubmit={()=>void signInCredential('worker')} onPasswordLogin={(input)=>void signInWorkerPassword(input)} onClearFailure={()=>setMessage('')} onCancel={()=>{setWorkerToken('');setMessage('');navigate('overview');}}><Brand/>{localCleanupFailed && <section role="alert"><p>{localCleanupText[workerEntryLanguage].failed}</p><button className="button outline" disabled={authBusy} onClick={async()=>{if(authInFlight.current)return;authInFlight.current=true;setAuthBusy(true);try{setLocalCleanupFailed(!await clearWorkerLocalData());}finally{authInFlight.current=false;setAuthBusy(false);}}}>{localCleanupText[workerEntryLanguage].remove}</button></section>}</WorkerAccessEntry>;
   if (!session.authenticated || view==='worker-access') return (
     <AuthLayout note="Local preview · Review generated content before sending.">
       <div className="auth-form-heading"><h1>Welcome back<span className="auth-heading-ar" lang="ar" dir="rtl">مرحباً بعودتك</span></h1><p>Sign in to access your team's work for today.</p><p className="auth-lead-ar" lang="ar" dir="rtl">سجّل الدخول للوصول إلى أعمال فريقك اليوم.</p></div>
@@ -1108,7 +1109,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
           <button className="icon-button" title={leaveText.end} aria-label={leaveText.end} disabled={busy} onClick={()=>askLeave('logout',()=>void endSession())}><LogOut size={20} /></button>
         </div>
       </header>
-      <main className="worker-content" id="worker-main" tabIndex={-1}>
+      <WorkerSurface view={`${view}:${tab}`} >
         {requestFailure && <p ref={requestFailureRef} tabIndex={-1} className="notice notice-amber" role="alert">{requestFailure}</p>}
         {pendingReceipts.filter(value=>value.assignmentId===id).map(value=><div className="notice notice-amber worker-receipt-check" key={value.kind}>
           <strong>{checkText[value.kind]}</strong><p role="status">{checkText[value.status]}</p>
@@ -1117,7 +1118,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
         {view==='device' ? <WorkerDeviceView language={language} session={session} disabled={busy} current={()=>!sessionInvalid() && validWorkerSession(session) && currentView.current==='device'} onOperation={outboxOperation} onSessionLost={onSessionLost} onBack={()=>navigate('inbox')} languageError={languageError} onEndSession={()=>askLeave('logout',()=>void endSession())} onEndSessionAndClear={()=>void endSession()} languageControl={<WorkerLanguageDialog session={session} language={language} disabled={busy}/>}/> : view==='notifications' ? <WorkerNotifications session={session} language={language} navigate={navigate} refresh={refresh+audioRefresh} current={()=>!sessionInvalid() && validWorkerSession(session)} onSessionLost={onSessionLost} timezone={session.timezone}/> : !id ? (
           <>
             {view==='help'?<WorkerHelpHub language={language} items={visible} loading={inbox.loading} failed={!!inbox.error} disabled={busy} onOpen={assignmentId=>{pendingHelpAssignment.current=assignmentId;navigate('worker/'+assignmentId);}} onFollowup={()=>{setTab('followup');setPage(1);navigate('inbox');}}/>:<>
-            <h1>{t.mine}</h1>
+            <header className="worker-page-heading"><FileText size={26} aria-hidden="true"/><h1>{t.mine}</h1></header>
             <div className="segmented worker-inbox-tabs">
               <button className={tab === 'todo' ? 'selected' : ''} aria-pressed={tab==='todo'} onClick={() => {setTab('todo');setPage(1);}}>{t.todo} {inbox.data && `(${inbox.data.counts.todo})`}</button>
               <button className={tab === 'completed' ? 'selected' : ''} aria-pressed={tab==='completed'} onClick={() => {setTab('completed');setPage(1);}}>{statusText.sent}</button>
@@ -1267,7 +1268,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
           </>
         )}
         {message && <div className="toast" role="status">{message === 'Saved.' ? a.saved : message}</div>}
-      </main>
+      </WorkerSurface>
       <nav className="worker-bottom-nav" aria-label={navText.navigation}><div>
         <button type="button" aria-current={view!=='device' && view!=='help' && view!=='notifications'?'page':undefined} disabled={busy} onClick={()=>navigate('inbox')}><FileText size={23} aria-hidden="true"/><span>{navText.briefings}</span></button>
         <button type="button" aria-current={view==='help'?'page':undefined} disabled={busy} onClick={()=>{setPage(1);navigate('help');}}><HelpCircle size={23} aria-hidden="true"/><span>{navText.help}</span></button>

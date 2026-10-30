@@ -4,7 +4,17 @@ import {createVercelNeonHandler} from '../server/vercel-neon.mjs';
 let runtime;
 function getRuntime() {
   if(!runtime)runtime=(process.env.DATABASE_URL?createVercelNeonHandler():Promise.resolve(createVercelDemoHandler()))
-    .catch(error=>{runtime=undefined;throw error;});
+    .catch(error=>{
+      runtime=undefined;
+      const known=new Set(['Invalid Vercel host configuration','Invalid Vercel public origin','Neon verification configuration required',
+        'Invalid Neon verification configuration','Configure PostgreSQL TLS outside the connection URL',
+        'PostgreSQL schema does not exist','PostgreSQL schema migrations are not current','PostgreSQL schema migration verification failed',
+        'No PostgreSQL migrations found','Private Neon storage configuration is incomplete or invalid']);
+      const reason=known.has(error?.message)?error.message:
+        (['ENOENT','ENOTFOUND','ETIMEDOUT','ECONNREFUSED','28P01','3D000'].includes(error?.code)?error.code:'Initialization failed');
+      console.error('Understood API initialization:',reason);
+      throw error;
+    });
   return runtime;
 }
 

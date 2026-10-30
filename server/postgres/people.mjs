@@ -1,5 +1,6 @@
+import {passwordRecord} from '../auth-crypto.mjs';
 import { randomUUID } from 'node:crypto';
-import { normalizeWorkerLogin } from '../worker-credentials-input.mjs';
+import { workerPassword,normalizeWorkerLogin } from '../worker-credentials-input.mjs';
 import { inputKeys,name,createWorkerInput,workerFilters,crewChangeInput,crewFilters,crewRecipientId,reactivationInput,reactivationReplay,
   selectWorkerLanguageInput,requestWorkerLanguageInput,languageRequestFilters,languageDecisionInput } from '../people.mjs';
 import { isWorkerLanguage } from '../languages.mjs';
@@ -79,6 +80,7 @@ async function writeConflict(operation) {
 
 export async function createWorker(pool,session,input,{schema='public'}={}) {
   const content=createWorkerInput(input),workerId=randomUUID(),login=normalizeWorkerLogin(content.code);
+  const credential=content.password===undefined?null:await passwordRecord(workerPassword(content.password,{login,company:session.org_id}));
   return writeConflict(() => domainTransaction(pool,schema,async (client) => {
     await requirePrincipal(client,session,'staff');
     await requireWritableEntitlement(client,session.org_id);
@@ -94,6 +96,7 @@ export async function createWorker(pool,session,input,{schema='public'}={}) {
         language_selected_at,language_selected_by) VALUES ($1,$2,$3,$4,$5,$6,false,clock_timestamp(),'staff')`,
         [workerId,session.org_id,session.site_id,content.code,content.name,content.language]);
     }
+    if(credential)await client.query(`INSERT INTO worker_credentials(worker_id,org_id,site_id,login_id,state,password_salt,password_hash,credential_revision,password_changed_at,created_at,updated_at) VALUES($1,$2,$3,$4,'active',$5,$6,1,clock_timestamp(),clock_timestamp(),clock_timestamp())`,[workerId,session.org_id,session.site_id,login,credential.salt,credential.derived]);
     await domainAudit(client,session,'worker.created',workerId);
     return workerRow(client,session,workerId);
   }));

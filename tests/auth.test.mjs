@@ -102,7 +102,7 @@ test('one-time worker grant is scoped, expires and revokes redeemed sessions', a
       (token_hash,org_id,site_id,principal_type,principal_id,expires_at,revoked_at,grant_id,access_mode)
       VALUES (?,?,?,?,?,?,?,?,?)`).run('forged-grant-session', 'cedar', 'beirut', 'worker', 'worker-29',
       new Date(Date.now() + 10000).toISOString(), null, grant.id, 'credential'), /Scope mismatch/);
-    const redeem = () => request('/auth/worker/redeem', null, { method: 'POST', body: JSON.stringify({ token: grant.token, company:'cedar',workerId:'TEAM-014',password:'Assigned synthetic worker password' }) });
+    const redeem = () => request('/auth/worker/redeem', null, { method: 'POST', body: JSON.stringify({ token: grant.token }) });
     const workerLogin = await redeem();
     assert.equal(workerLogin.status, 200);
     assert.equal((await redeem()).status, 401);

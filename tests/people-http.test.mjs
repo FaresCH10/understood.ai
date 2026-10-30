@@ -24,7 +24,8 @@ test('People HTTP controls enforce site authority and preserve publication audie
     assert.equal((await request(worker, '/people/workers')).status, 403);
     const list = await (await request(maya, '/people/workers?language=ur&page=1&pageSize=5')).json();
     assert.equal(list.total, 8); assert.equal(list.items.length, 5);
-    const added = await request(maya, '/people/workers', 'POST', { code: 'QA Worker 900', language: 'en' });
+    assert.equal((await request(maya,'/people/workers','POST',{code:'MISSING-PASSWORD'})).status,400);
+    const added = await request(maya, '/people/workers', 'POST', { code: 'QA Worker 900', language: 'en', password:'Assigned test password 900' });
     assert.equal(added.status, 201);
     const person = await added.json();
     assert.equal((await request(other, `/people/workers/${person.id}`, 'PATCH', { code: 'Forged' })).status, 404);

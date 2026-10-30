@@ -15,8 +15,13 @@ async function migrationFiles(directory) {
   if (!names.length) throw new Error('No PostgreSQL migrations found');
   const files=[];
   for (const name of names) {
-    const sql=await readFile(join(directory,name),'utf8');
-    files.push({name,sql,checksum:createHash('sha256').update(sql).digest('hex')});
+    const source=await readFile(join(directory,name),'utf8');
+    const sql=source.replace(/\r\n/g,'\n');
+    const hash=value=>createHash('sha256').update(value).digest('hex');
+    // Git checks out LF on Linux and may use CRLF on Windows. Keep accepting
+    // historical checksums for either representation of exactly the same SQL.
+    const checksum=hash(sql),checksums=new Set([checksum,hash(sql.replace(/\n/g,'\r\n')),hash(source)]);
+    files.push({name,sql,checksum,checksums});
   }
   return files;
 }
@@ -33,7 +38,7 @@ export async function verifyMigrations(pool,{schema='public',directory=defaultDi
     const rows=(await client.query('SELECT version,checksum FROM schema_migrations')).rows;
     const previous=new Map(rows.map((row) => [row.version,row.checksum]));
     if (previous.size!==files.length) throw new Error('PostgreSQL schema migrations are not current');
-    for (const file of files) if (previous.get(file.name)!==file.checksum) throw new Error('PostgreSQL schema migration verification failed');
+    for (const file of files) if (!file.checksums.has(previous.get(file.name))) throw new Error('PostgreSQL schema migration verification failed');
     return {schema,migrations:files.length};
   });
 }
@@ -52,9 +57,9 @@ export async function runMigrations(pool, { schema = 'public', directory = defau
     const previous = new Map((await client.query('SELECT version,checksum FROM schema_migrations')).rows
       .map((row) => [row.version, row.checksum]));
     const applied = [];
-    for (const {name,sql,checksum} of files) {
+    for (const {name,sql,checksum,checksums} of files) {
       if (previous.has(name)) {
-        if (previous.get(name) !== checksum) throw new Error(`Migration checksum mismatch: ${name}`);
+        if (!checksums.has(previous.get(name))) throw new Error(`Migration checksum mismatch: ${name}`);
         continue;
       }
       await client.query(sql);

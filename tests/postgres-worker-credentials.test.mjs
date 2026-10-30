@@ -59,6 +59,24 @@ async function withHttp(f,run){
 const cookieOf=(response)=>response.headers.get('set-cookie').split(';')[0];
 const post=(body)=>({method:'POST',body:JSON.stringify(body)});
 
+test('PostgreSQL creates worker credentials atomically and a token alone opens the assigned worker session',async()=>{
+ const f=await fixture();try{
+  const worker=await createWorker(f.pool,owner,{code:'DIRECT-01',language:'en',password:PASSWORD},options);
+  assert.equal((await workerCredentialStatus(f.pool,owner,worker.id,options)).state,'active');
+  const login=await authenticateWorker(f.pool,{company:'alder',workerId:'DIRECT-01',password:PASSWORD},'192.0.2.1',options);
+  assert.equal(login.workerId,worker.id);
+  const grant=await issueWorkerGrant(f.pool,owner,worker.id,30,options);
+  await withHttp(f,async({request})=>{
+    const response=await request('/auth/worker/redeem',null,post({token:grant.token}));
+    assert.equal(response.status,200);
+    const cookie=cookieOf(response);
+    const session=await (await request('/session',cookie)).json();
+    assert.equal(session.workerId,worker.id);
+    assert.equal((await request('/auth/worker/redeem',null,post({token:grant.token}))).status,401);
+  });
+ }finally{await f.db.close();}
+});
+
 test('PostgreSQL worker setup, activation, login and revision fencing stay scoped and generic',async()=>{
   const f=await fixture(),{db,pool}=f;
   try{

@@ -140,3 +140,28 @@
 
 .auth-card .worker-entry-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
 .auth-languages-note{font-size:11px;line-height:1.5;color:#677c6f;margin:0 0 12px}
+
+/* Verification has one surface and one primary action. */
+.auth-card .registration-sent{border:0;background:transparent;border-radius:0}
+.auth-form-column:has(.registration-verification){align-self:center}
+.registration-verification .verification-heading{display:flex;align-items:center;gap:9px;color:#104f43;font-size:13px;font-weight:600;margin:4px 0 18px}
+.auth-card .registration-verification h1{font-size:28px;line-height:1.2;margin:0 0 12px;text-wrap:balance}
+.auth-card .registration-verification .verification-recipient{margin:0;color:#52615e;font-size:14px;line-height:1.6;text-wrap:pretty}
+.verification-recipient bdi{display:block;color:#182e26;font-weight:600;overflow-wrap:anywhere;margin-top:3px}
+.registration-code-form{display:grid;gap:10px;margin:26px 0 0}
+.auth-card input.verification-code-input:not([type=checkbox]):not([type=radio]){height:60px;min-height:60px;text-align:center;font-size:28px;font-variant-numeric:tabular-nums;font-weight:500;border-color:#a7bcb1;box-shadow:none}
+.auth-card input.verification-code-input[aria-invalid=true]{border-color:#a43831}
+.auth-card input.verification-code-input::placeholder{color:#68786f}
+.verification-hint{font-size:12px;line-height:1.5;color:#5e6f65;margin:0}
+.verification-error{margin:0;color:#a03129;font-size:13px;line-height:1.5}
+.registration-code-form>.button{margin-top:8px;justify-content:center}
+.verification-resend{display:flex;flex-wrap:wrap;gap:4px 7px;align-items:center;margin:18px 0 0;font-size:12px;color:#5e6f65}
+.auth-card .verification-resend .text-link{font-size:12px;margin:0;min-height:32px;padding:4px 0}
+.verification-status{display:flex;align-items:flex-start;gap:7px;color:#25624d;font-size:12px;line-height:1.5;margin:8px 0 0}
+.verification-status svg{flex:none;margin-top:2px}
+.verification-footer{border-top:1px solid #e5ebe7;padding-top:18px;margin-top:22px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.verification-footer p{display:flex;align-items:center;gap:7px;margin:0;color:#5e6f65;font-size:12px;line-height:1.5}
+.verification-footer .text-link,.auth-card .verification-signin{font-size:12px;min-height:32px;margin:0;padding:4px 0}
+.auth-card .verification-signin{margin-top:18px}
+.registration-verification[dir=rtl] .button svg{transform:scaleX(-1)}
+@media(max-width:480px){.auth-card .registration-verification h1{font-size:26px}.verification-resend{align-items:flex-start}.verification-footer{margin-top:20px}.auth-card input.verification-code-input:not([type=checkbox]):not([type=radio]){font-size:26px}}
