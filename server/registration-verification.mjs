@@ -2,7 +2,7 @@ import {sendAuthMail} from './auth-mail.mjs';
 
 // Neon proves email possession; Understood still owns credentials, sessions and trial activation.
 export function resolveRegistrationVerification(env={},mail={available:false},publicOrigin=mail.publicOrigin){
-  const provider=env.UNDERSTOOD_REGISTRATION_PROVIDER ?? 'resend';
+  const provider=env.UNDERSTOOD_REGISTRATION_PROVIDER ?? ((env.UNDERSTOOD_NEON_AUTH_URL || env.NEON_AUTH_BASE_URL)?'neon':'resend');
   if(provider==='resend')return mail;
   if(provider!=='neon')throw Error('Invalid registration verification provider');
   const secret=env.UNDERSTOOD_AUTH_MAIL_KEY;

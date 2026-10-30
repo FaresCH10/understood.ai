@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {ArrowLeft,ArrowRight,Check,CheckCircle2,Clock3,Globe2,KeyRound,LogIn,Mail,RefreshCw,ShieldCheck} from 'lucide-react';
 import {countryOptions} from './country-options';
-import {clearRegistrationReceipt,checkedVerification,readRegistrationReceipt,requestAccount,resendAccount,RegistrationError,saveRegistrationReceipt,verifyAccount,verifyAccountCode,normalizeVerificationCode,registrationOptions,type RegistrationReceipt} from './registration';
+import {acceptedRegistrationReceipt,clearRegistrationReceipt,checkedVerification,readRegistrationReceipt,requestAccount,resendAccount,RegistrationError,saveRegistrationReceipt,verifyAccount,verifyAccountCode,normalizeVerificationCode,registrationOptions,type RegistrationReceipt} from './registration';
 
 export type RegistrationLanguage='en'|'ar';
 type AccountBody={requestId:string;ownerName:string;email:string;password:string;companyName:string;country:string;phone?:string;acceptTerms:boolean;acceptPrivacy:boolean};
@@ -83,7 +83,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
       try {saveRegistrationReceipt(sessionStorage,{...value,state:'pending'});} catch {setStorageError(true);}
       const result=await requestAccount(body);
       if(result.accepted!==true) throw new RegistrationError('Account creation could not be confirmed. Retry the same registration.',null,true);
-      const accepted:RegistrationReceipt={...value,state:'accepted',verification:result.verification==='neon-code'?'neon-code':'link'};
+      const accepted=acceptedRegistrationReceipt(value,result);
       try {saveRegistrationReceipt(sessionStorage,accepted);} catch {setStorageError(true);}
       setReceipt(accepted);setPending(null);setPassword('');setConfirmPassword('');
       heading.current?.focus();

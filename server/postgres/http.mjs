@@ -227,7 +227,7 @@ export function createPostgresHostedServer(pool,{config,storage,publicBuild}={})
     || typeof config.requestAddress!=='function' || typeof publicBuild!=='function' || typeof pool?.connect!=='function')throw Error('Invalid hosted synthetic runtime');
   return createServer(postgresHandler(pool,{...config,config,storage,publicBuild,secure:true,cookieName:'__Host-understood_session',backend:config.integrationMode==='live'?'postgres-hosted-live':'postgres-hosted-synthetic'}));
 }
-function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestAddress,secure=false,publicBuild,...options}) {
+export function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestAddress,secure=false,publicBuild,...options}) {
   const voiceAvailable=!!storage && ['save','read','remove','exists'].every(key=>typeof storage[key]==='function');
   const presentationTranslator=options.presentationTranslator ?? null;
   const presentationGenerationAllowed=options.presentationGenerationAllowed !== false;
@@ -289,11 +289,17 @@ function postgresHandler(pool,{storage,schema,config,cookieName,backend,requestA
       }
       if(path==='/api/auth/registrations' && req.method==='POST') {
         if(url.search) throw new Error('Invalid registration input');
-        return send(res,202,await requestRegistration(pool,await readJson(req),address,registrationVerification,repository));
+        const input=await readJson(req);
+        const result=await requestRegistration(pool,input,address,registrationVerification,repository);
+        await options.dispatchRegistration?.(result.requestId ?? input.requestId);
+        return send(res,202,result);
       }
       if(path==='/api/auth/registrations/resend' && req.method==='POST') {
         if(url.search) throw new Error('Invalid registration input');
-        return send(res,202,await resendRegistration(pool,await readJson(req),address,registrationVerification,repository));
+        const input=await readJson(req);
+        const result=await resendRegistration(pool,input,address,registrationVerification,repository);
+        await options.dispatchRegistration?.(input.requestId);
+        return send(res,202,result);
       }
       if(path==='/api/auth/registrations/verify' && req.method==='POST') {
         if(url.search) throw new Error('Invalid registration input');

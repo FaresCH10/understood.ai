@@ -57,7 +57,8 @@ export async function requestRegistration(pool,input,remoteAddress,config,{schem
     const emailHash=tokenHash(registrationEmailHash(value.email));
     if((await client.query('SELECT 1 FROM staff_credentials WHERE email=$1',[value.email])).rows[0]) return generic;
     const existing=(await client.query('SELECT * FROM organization_registrations WHERE email_hash=$1 FOR UPDATE',[emailHash])).rows[0];
-    if(existing && (existing.state==='verified' || existing.state==='pending')) return generic;
+    if(existing && (existing.state==='verified' || existing.state==='pending'))
+      return config.provider==='neon' && existing.state==='pending' && existing.id!==value.requestId?{...generic,requestId:existing.id}:generic;
     if(!existing && (await client.query('SELECT 1 FROM organization_registrations WHERE id=$1',[value.requestId])).rows[0]) return generic;
     const now=(await client.query('SELECT clock_timestamp() AS now')).rows[0].now;
     const id=existing?.id ?? value.requestId;
@@ -82,7 +83,7 @@ export async function requestRegistration(pool,input,remoteAddress,config,{schem
       expiresAt=inserted.rows[0].expires_at;
     }
     await queueMail(client,config,id,value.email,expiresAt,now);
-    return generic;
+    return config.provider==='neon' && id!==value.requestId?{...generic,requestId:id}:generic;
   });
 }
 export function resendRegistration(pool,input,remoteAddress,config,{schema='public'}={}) {
@@ -203,16 +204,16 @@ export async function verifyRegistrationCode(pool,input,remoteAddress,config,{sc
     return {completed:true,signInRequired:true,duplicate:false};
   });
 }
-export async function processOneRegistration(pool,config,{schema='public',send=sendRegistrationVerification}={}) {
+export async function processOneRegistration(pool,config,{schema='public',send=sendRegistrationVerification,registrationId=null,throwOnFailure=false}={}) {
   if(!config.available) return false;
   await expireRegistrations(pool,{schema});
   const job=await inSchema(pool,schema,async client=>{
     const row=(await client.query(`SELECT m.*,r.email_hash AS registration_email_hash,r.expires_at AS registration_expires_at
       FROM registration_mail m JOIN organization_registrations r ON r.id=m.registration_id
       WHERE m.expires_at>clock_timestamp() AND m.attempts<3 AND r.state='pending' AND r.expires_at>clock_timestamp()
-        AND r.payload IS NOT NULL AND ((m.state='queued' AND m.next_at<=clock_timestamp())
+        AND ($1::text IS NULL OR r.id=$1) AND r.payload IS NOT NULL AND ((m.state='queued' AND m.next_at<=clock_timestamp())
           OR (m.state='processing' AND m.lease_until<=clock_timestamp()))
-      ORDER BY m.created_at,m.id LIMIT 1 FOR UPDATE OF m SKIP LOCKED`)).rows[0];
+      ORDER BY m.created_at,m.id LIMIT 1 FOR UPDATE OF m SKIP LOCKED`,[registrationId])).rows[0];
     if(!row) return null;
     const now=(await client.query('SELECT clock_timestamp() AS now')).rows[0].now;
     const lease=randomUUID();
@@ -259,6 +260,7 @@ export async function processOneRegistration(pool,config,{schema='public',send=s
       next_at=clock_timestamp()+$1*interval '1 second',payload=CASE WHEN attempts>=3 THEN NULL ELSE payload END,
       lease_token=NULL,lease_until=NULL WHERE id=$2 AND state='processing' AND lease_token=$3 AND lease_until>clock_timestamp()`,
     [30*(job.attempts+1),job.id,job.lease]));
+    if(throwOnFailure)throw Error('Email delivery unavailable');
   }
   return true;
 }

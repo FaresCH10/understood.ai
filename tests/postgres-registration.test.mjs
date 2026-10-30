@@ -10,6 +10,9 @@ import {createWorker} from '../server/postgres/people.mjs';
 import {requestRegistration,resendRegistration,verifyRegistration,expireRegistrations,processOneRegistration} from '../server/postgres/registration.mjs';
 import {configureRuntimePermissions,verifyRuntimePermissions} from '../server/postgres/runtime-permissions.mjs';
 import {openMail} from '../server/auth-mail.mjs';
+import {createServer,request as httpRequest} from 'node:http';
+import {createVercelNeonHandler} from '../server/vercel-neon.mjs';
+import {verifyRegistrationCode} from '../server/postgres/registration.mjs';
 
 const schema='understood_test_registration';
 const options={schema};
@@ -39,6 +42,58 @@ async function fixture({failAudit=null}={}) {
   const verify=token=>verifyRegistration(pool,{token},'127.0.0.1',mail,options);
   return {db,pool,q,request,dispatch,verify};
 }
+
+test('Vercel Neon registration dispatches before responding and survives handler replacement through sign-in',async()=>{
+  const f=await fixture();let server;
+  const env={VERCEL_PROJECT_PRODUCTION_URL:'understood-fixture.vercel.app',UNDERSTOOD_POSTGRES_SCHEMA:schema,
+    NEON_AUTH_BASE_URL:'https://ep-fixture.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth',
+    UNDERSTOOD_AUTH_MAIL_KEY:'07'.repeat(32)};
+  const origin='https://understood-fixture.vercel.app';
+  const config={provider:'neon',available:true,key:Buffer.alloc(32,7),publicOrigin:origin};
+  let dispatches=0,fail=false;
+  const send=async(c,id,message)=>{
+    assert.equal(c.provider,'neon');assert.equal(message.email,email);
+    assert.equal(message.password,undefined);dispatches++;
+    if(fail)throw Error('private provider failure');
+    return {providerId:'neon-fixture-'+id};
+  };
+  async function start(){
+    const {handler}=await createVercelNeonHandler({env,pool:f.pool,send});
+    server=createServer(handler);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  }
+  const request=(path,body)=>new Promise((resolve,reject)=>{
+    const req=httpRequest(`http://127.0.0.1:${server.address().port}/api/${path}`,{
+      method:body?'POST':'GET',headers:{host:'understood-fixture.vercel.app',origin,'x-forwarded-proto':'https',
+        'x-vercel-forwarded-for':'192.0.2.10','content-type':'application/json'}},res=>{
+      const chunks=[];res.on('data',chunk=>chunks.push(chunk));res.on('end',()=>resolve(new Response(Buffer.concat(chunks),{
+        status:res.statusCode,headers:Object.fromEntries(Object.entries(res.headers).map(([key,value])=>[key,Array.isArray(value)?value.join(','):value]))})));
+    });req.on('error',reject);req.end(body?JSON.stringify(body):undefined);
+  });
+  try{
+    await start();
+    assert.deepEqual(await (await request('auth/registrations/options')).json(),{available:true,verification:'neon-code'});
+    const old=value();await requestRegistration(f.pool,old,'192.0.2.10',config,options);
+    await f.q("UPDATE organization_registrations SET state='expired',payload=NULL WHERE id=$1",[old.requestId]);
+    const input=value();
+    fail=true;
+    const failed=await request('auth/registrations',input);
+    assert.equal(failed.status,503);assert.equal(dispatches,1);
+    assert(!(await failed.text()).includes('private provider'));
+    fail=false;
+    const retry=await request('auth/registrations',input);
+    assert.equal(retry.status,202);
+    const receipt=await retry.json();assert.equal(receipt.requestId,old.requestId);
+    assert.equal((await request('auth/registrations/resend',{requestId:receipt.requestId,email})).status,202);
+    assert.equal(dispatches,2);
+    assert.equal((await f.q("SELECT count(*)::int AS n FROM registration_mail WHERE state='sent'"))[0].n,1);
+    await new Promise(resolve=>server.close(resolve));await start();
+    await verifyRegistrationCode(f.pool,{requestId:receipt.requestId,email,code:'123456'},'192.0.2.10',config,
+      {...options,checkCode:async()=>true});
+    const login=await request('auth/staff/login',{email,password});
+    assert.equal(login.status,200);
+    assert.match(login.headers.get('set-cookie'),/__Host-understood_session=.*Secure/);
+  }finally{if(server?.listening)await new Promise(resolve=>server.close(resolve));await f.db.close();}
+});
 
 test('PostgreSQL registration verifies exactly one owner workspace with a fresh 14-day trial',async()=>{
   const f=await fixture();try{

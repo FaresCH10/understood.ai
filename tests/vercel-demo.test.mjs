@@ -27,6 +27,8 @@ test('a Vercel deployment uses credential sign-in and never demo profiles', asyn
     const session = await (await fetch(`${origin}/api/session`)).json();
     assert.equal(session.authenticated, false);
     assert.equal(session.mode, 'synthetic-credential');
+    const registration = await (await fetch(`${origin}/api/auth/registrations/options`)).json();
+    assert.equal(registration.available, false, 'ephemeral demo must never accept real registrations');
   } finally {
     await new Promise(resolve => server.close(resolve));
   }

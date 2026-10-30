@@ -15,6 +15,8 @@ test('Neon CLI values configure existing adapters without overwriting explicit c
 test('registration supports the pulled Auth URL while retaining explicit overrides',()=>{
   const env={UNDERSTOOD_REGISTRATION_PROVIDER:'neon',UNDERSTOOD_AUTH_MAIL_KEY:'aa'.repeat(32),NEON_AUTH_BASE_URL:'https://ep-fixture.neonauth.c-8.eu-central-1.aws.neon.tech/neondb/auth'};
   assert.equal(resolveRegistrationVerification(env,{},'http://127.0.0.1:3020').authUrl,env.NEON_AUTH_BASE_URL);
+  const {UNDERSTOOD_REGISTRATION_PROVIDER,...cliEnv}=env;
+  assert.equal(resolveRegistrationVerification(cliEnv,{},'https://understood-ai.vercel.app').provider,'neon');
 });
 test('Function readiness fails closed on a false successful response',async()=>{
   const env={NEON_FUNCTION_HELLO_BASE_URL:'https://function.compute.neon.tech/'};

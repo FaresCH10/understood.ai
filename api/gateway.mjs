@@ -1,6 +1,12 @@
 import { createVercelDemoHandler } from '../server/vercel-demo.mjs';
+import {createVercelNeonHandler} from '../server/vercel-neon.mjs';
 
-const { handler } = createVercelDemoHandler();
+let runtime;
+function getRuntime() {
+  if(!runtime)runtime=(process.env.DATABASE_URL?createVercelNeonHandler():Promise.resolve(createVercelDemoHandler()))
+    .catch(error=>{runtime=undefined;throw error;});
+  return runtime;
+}
 
 export default async function gateway(req, res) {
   const url = new URL(req.url || '/api', 'http://internal.invalid');
@@ -15,7 +21,15 @@ export default async function gateway(req, res) {
   }
   const query = params.toString();
   req.url = `/api${capturedPath ? `/${capturedPath}` : ''}${query ? `?${query}` : ''}`;
-  return handler(req, res);
+  try {
+    const {handler}=await getRuntime();
+    return await handler(req,res);
+  }catch {
+    res.statusCode=503;
+    res.setHeader('content-type','application/json');
+    res.setHeader('cache-control','no-store');
+    res.end(JSON.stringify({error:'Service configuration unavailable. Check Neon database, Auth URL and registration encryption key.'}));
+  }
 }
 
 export const config = { maxDuration: 30 };

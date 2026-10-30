@@ -126,7 +126,8 @@ export async function requestRegistration(db,input,remoteAddress,config) {
     const emailHash=tokenHash(registrationEmailHash(value.email));
     if(db.prepare('SELECT 1 FROM staff_credentials WHERE lower(email)=?').get(value.email)) return generic;
     const existing=db.prepare('SELECT * FROM organization_registrations WHERE email_hash=?').get(emailHash);
-    if(existing && (existing.state==='verified' || existing.state==='pending')) return generic;
+    if(existing && (existing.state==='verified' || existing.state==='pending'))
+      return config.provider==='neon' && existing.state==='pending' && existing.id!==value.requestId?{...generic,requestId:existing.id}:generic;
     if(!existing && db.prepare('SELECT 1 FROM organization_registrations WHERE id=?').get(value.requestId)) return generic;
     const id=existing?.id ?? value.requestId,expiresAt=date(registrationLifetime);
     const envelope=sealMail(config,id,{email:value.email,ownerName:value.ownerName,companyName:value.companyName,country:value.country,
@@ -144,7 +145,7 @@ export async function requestRegistration(db,input,remoteAddress,config) {
         .run(id,emailHash,envelope,now,expiresAt,value.country,REGISTRATION_TERMS_VERSION,REGISTRATION_PRIVACY_VERSION,now);
     }
     queueMail(db,config,id,value.email,expiresAt,now);
-    return generic;
+    return config.provider==='neon' && id!==value.requestId?{...generic,requestId:id}:generic;
   });
 }
 export function resendRegistration(db,input,remoteAddress,config) {

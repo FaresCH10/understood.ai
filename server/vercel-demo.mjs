@@ -22,6 +22,7 @@ export function createVercelDemoHandler({ localDemo = process.env.VERCEL !== '1'
     demoHosts: hosts,
     cookieOptions: { name: 'understood_session', secure: !localDemo },
   });
-  const handler = createAppHandler(db, { config, audioRoot, mail: { available: false } });
+  // Never accept a real registration into ephemeral serverless memory.
+  const handler = createAppHandler(db, { config, audioRoot, mail: { mode:'disabled' },registrationVerification:{available:false} });
   return { handler, db, config };
 }

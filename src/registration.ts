@@ -29,6 +29,12 @@ export function saveRegistrationReceipt(storage:Storage,receipt:RegistrationRece
 export function clearRegistrationReceipt(storage:Storage) {
   storage.removeItem(RECEIPT_KEY);
 }
+export function acceptedRegistrationReceipt(receipt:RegistrationReceipt,result:Record<string,unknown>):RegistrationReceipt {
+  if(result.requestId!==undefined && (typeof result.requestId!=='string' || !uuid.test(result.requestId)))
+    throw new RegistrationError('Registration receipt could not be confirmed.',null,true);
+  return {...receipt,requestId:typeof result.requestId==='string'?result.requestId:receipt.requestId,
+    state:'accepted',verification:result.verification==='neon-code'?'neon-code':'link'};
+}
 export function checkedVerification(value:unknown):VerificationResult {
   const row=value as VerificationResult;
   if(!row || typeof row!=='object' || row.completed!==true || row.signInRequired!==true || typeof row.duplicate!=='boolean')

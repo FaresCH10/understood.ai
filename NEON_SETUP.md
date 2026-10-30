@@ -24,6 +24,60 @@ Observed: build succeeded; 20 focused tests passed, 0 failed; live service check
 
 ## Important deployment boundary
 
+### Vercel registration fix (30 October 2026)
+
+The Vercel gateway now selects the persistent Neon PostgreSQL handler when
+`DATABASE_URL` is present. It verifies the existing migrations in schema
+`understood` (override with `UNDERSTOOD_POSTGRES_SCHEMA`) and does not migrate,
+seed, or import data during requests. Accounts and sessions share this backend.
+The application remains in its existing synthetic AI mode; this does not claim
+production admission or replace the background worker needed for other jobs.
+
+Set these **server-only Production variables** in the `understood-ai` Vercel project:
+
+- `DATABASE_URL`: the existing pooled Neon connection string.
+- `NEON_AUTH_BASE_URL`: the Auth URL for the same project/branch.
+- `UNDERSTOOD_AUTH_MAIL_KEY`: the existing 64-character hexadecimal encryption key;
+  preserve it across deployments so pending registrations remain readable.
+- `UNDERSTOOD_REGISTRATION_PROVIDER=neon`: explicit selection is recommended.
+  A configured Neon Auth URL also selects Neon by default when this is absent.
+- `VERCEL_PROJECT_PRODUCTION_URL`: Vercel normally supplies this automatically.
+  The canonical origin must be `https://understood-ai.vercel.app`.
+
+The existing Neon AWS storage variables configure private attachments/audio when
+present. Resend credentials are not required for Neon registration. Password
+recovery and invitation emails are separate mail flows.
+
+The hosted origin was added to Neon Auth's trusted domains; the two previously
+approved local origins remain. Registration and resend await dispatch of only
+that registration's queued email before the serverless request ends. Provider
+failure returns HTTP 503 and retains the queue's bounded retry handling. The
+in-memory demo fallback now refuses online registration rather than accepting a
+registration it cannot persist or deliver.
+
+Validation: build passed; 32 focused tests passed, including failed dispatch,
+resend, handler replacement, expired-registration receipts, code verification
+and subsequent staff sign-in. The browser now retains the server's canonical
+registration ID when an expired registration is restarted.
+
+Deployed and promoted `dpl_GqV3mxHm7kHW4smPx37nQnHCkoMM` to
+`https://understood-ai.vercel.app` on 30 October 2026. The public health endpoint
+returned HTTP 200 with backend `postgres-vercel-synthetic`; registration options
+returned `available:true, verification:neon-code`. A real public signup returned
+HTTP 202 and persisted a `sent` dispatch receipt with `attempts:1` and a provider
+receipt. The user confirmed the email arrived. A restarted expired test
+registration also returned the correct canonical receipt and dispatched on its
+first attempt. Synthetic pending registrations were expired without activating
+accounts. Entering a live inbox code remains untested; code verification and
+subsequent sign-in passed integration tests.
+
+Existing Production variables were preserved. Vercel linking created ignored
+`.vercel/project.json` and `.env.local`; configuration inspection wrote the
+ignored `artifacts/vercel-production.env` (protected values remain placeholders).
+Vercel CLI generated an automation protection-bypass token when checking the
+protected deployment URL. Uploads initially failed with transient network
+errors; archive upload retries succeeded. No source commit or push was made.
+
 `npm run dev` intentionally still uses the existing SQLite application database. No local accounts, instruction data, or recordings were migrated. The hosted PostgreSQL backend now accepts CLI database variables and existing private storage adapters accept mapped AWS variables, but a complete runtime/data cutover has **not** been performed. Realtime notification integration is used by PostgreSQL deployments, not the local SQLite backend.
 
 Full hosting still requires selecting the frontend/API/worker hosting targets, setting the real HTTPS application origin and trusted proxy configuration, performing the existing backup/import and runtime-role setup, and satisfying the repository's production runtime admission checks. Applying the schema or a successful service probe is not evidence that the full app has been deployed.
