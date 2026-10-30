@@ -3,6 +3,7 @@ import {Mic,Send,MessageCircle} from 'lucide-react';
 import {gsap,useGSAP,ScrollTrigger} from './gsap-scroll';
 import {LandingLanguages} from './LandingLanguages';
 import {LandingPlans} from './LandingPlans';
+import {LandingContact} from './PublicContact';
 import {landingCopy,type LandingLocale} from './landing-content';
 import {LandingDemo} from './LandingDemo';
 import {CompanyPreview} from './LandingIllustrations';
@@ -69,5 +70,6 @@ export function LandingSections({locale,registrationAvailable}:{locale:LandingLo
     </div></section>
 
     <LandingPlans locale={locale} registrationAvailable={registrationAvailable}/>
+    <LandingContact locale={locale}/>
   </div>;
 }

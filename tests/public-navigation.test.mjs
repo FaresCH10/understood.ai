@@ -9,6 +9,7 @@ test('all five marketing destinations and product aliases stay public on a direc
   for(const role of ['worker','supervisor']){assert.ok(isPublicLandingView(`platform/${role}`));assert.equal(publicLandingTarget(`platform/${role}`),'platform');}
   assert.ok(isPublicLandingView('company-controls'));assert.equal(publicLandingTarget('company-controls'),'company-controls');
   assert.ok(isPublicLandingView('home'));assert.equal(publicLandingTarget('home'),'landing-top');
+  assert.ok(isPublicLandingView('contact'));assert.equal(publicLandingTarget('contact'),'landing-top');
 });
 
 test('marketing route matching does not swallow authentication or private application routes',()=>{
