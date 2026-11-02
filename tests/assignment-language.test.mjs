@@ -45,7 +45,7 @@ test('legacy SQLite upgrade freezes available current preference once without ch
   try {
     const before=db.prepare("SELECT snapshot_json FROM publications WHERE id='shelf-v3'").get().snapshot_json;
     const attempts=db.prepare('SELECT * FROM attempts ORDER BY id').all();
-    db.exec('DROP TRIGGER assignment_language_frozen; DROP TRIGGER assignment_language_available; ALTER TABLE assignments DROP COLUMN language;');
+    db.exec('DROP TRIGGER assignment_language_frozen; DROP TRIGGER assignment_language_available; DROP TRIGGER worker_competency_award_valid; ALTER TABLE assignments DROP COLUMN language;');
     db.prepare("UPDATE workers SET language='ur' WHERE id='worker-14'").run();
     db.close(); db=openDatabase(path);
     assert.equal(db.prepare("SELECT language FROM assignments WHERE id='assignment-14'").get().language,'ur');

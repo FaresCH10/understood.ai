@@ -59,7 +59,7 @@ test('embedded PostgreSQL executes migration and protects tenant, site, receipt 
       '110_presentation_choices_and_preparation_budget.sql',
       '111_production_provider_evidence.sql',
       '112_presentation_translation_jobs.sql','113_briefing_language_requests.sql',
-      '114_instruction_workspace.sql','115_worker_id_prefixes.sql','116_photo_evidence.sql','118_restore_instruction_retention_guard.sql','119_instruction_improvements.sql'    ]);
+      '114_instruction_workspace.sql','115_worker_id_prefixes.sql','116_photo_evidence.sql','118_restore_instruction_retention_guard.sql','119_instruction_improvements.sql','120_template_favorites.sql','121_translation_feedback.sql','122_instruction_attachment_captions.sql','123_worker_competencies.sql'    ]);
     assert.deepEqual(await runMigrations(pool), []);
     await db.query("INSERT INTO organizations(id,name) VALUES ('org-a','A'),('org-b','B')");
     await db.query("INSERT INTO sites(id,org_id,name,timezone) VALUES ('site-a','org-a','A','UTC'),('site-c','org-a','C','UTC'),('site-b','org-b','B','UTC')");
