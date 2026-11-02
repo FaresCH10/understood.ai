@@ -1,6 +1,7 @@
 import {passwordRecord} from '../auth-crypto.mjs';
 import { randomUUID } from 'node:crypto';
 import { workerPassword,normalizeWorkerLogin } from '../worker-credentials-input.mjs';
+import {nextWorkerId,normalizeWorkerPrefix,suggestWorkerPrefix,workerIdFormat} from '../worker-ids.mjs';
 import { inputKeys,name,createWorkerInput,workerFilters,crewChangeInput,crewFilters,crewRecipientId,reactivationInput,reactivationReplay,
   selectWorkerLanguageInput,requestWorkerLanguageInput,languageRequestFilters,languageDecisionInput } from '../people.mjs';
 import { isWorkerLanguage } from '../languages.mjs';
@@ -78,23 +79,80 @@ async function writeConflict(operation) {
   }
 }
 
+async function companyWorkerPrefix(client,orgId) {
+  const existing=(await client.query('SELECT prefix FROM organization_worker_ids WHERE org_id=$1 FOR UPDATE',[orgId])).rows[0];
+  if(existing)return existing.prefix;
+  const organization=(await client.query('SELECT name FROM organizations WHERE id=$1',[orgId])).rows[0];
+  if(!organization)throw new Error('Forbidden');
+  await client.query(`INSERT INTO organization_worker_ids(org_id,prefix,updated_at) VALUES($1,$2,clock_timestamp())
+    ON CONFLICT (org_id) DO NOTHING`,[orgId,suggestWorkerPrefix(organization.name)]);
+  return (await client.query('SELECT prefix FROM organization_worker_ids WHERE org_id=$1 FOR UPDATE',[orgId])).rows[0].prefix;
+}
+
+async function companyWorkerCodes(client,orgId,prefix) {
+  const pattern=`${prefix}-%`;
+  return (await client.query(`SELECT code AS value FROM workers WHERE org_id=$1 AND upper(code) LIKE $2
+    UNION SELECT login_id AS value FROM worker_credentials WHERE org_id=$1 AND upper(login_id) LIKE $2`,[orgId,pattern]))
+    .rows.map(row=>row.value);
+}
+
+async function nextCompanyWorkerCode(client,orgId) {
+  const prefix=await companyWorkerPrefix(client,orgId);
+  return nextWorkerId(prefix,await companyWorkerCodes(client,orgId,prefix));
+}
+
+async function workerIdSettingsRow(client,session) {
+  const organization=(await client.query('SELECT name FROM organizations WHERE id=$1',[session.org_id])).rows[0];
+  if(!organization)throw new Error('Forbidden');
+  const suggestedPrefix=suggestWorkerPrefix(organization.name);
+  const stored=(await client.query('SELECT prefix FROM organization_worker_ids WHERE org_id=$1',[session.org_id])).rows[0];
+  const prefix=stored?.prefix ?? suggestedPrefix;
+  return {prefix,suggestedPrefix,format:workerIdFormat(prefix),
+    nextCode:nextWorkerId(prefix,await companyWorkerCodes(client,session.org_id,prefix)),canEdit:session.role==='owner'};
+}
+
+export async function readWorkerIdSettings(pool,session,{schema='public'}={}) {
+  return domainTransaction(pool,schema,async (client) => {
+    await requirePrincipal(client,session,'staff');
+    return workerIdSettingsRow(client,session);
+  });
+}
+
+export async function updateWorkerIdPrefix(pool,session,input,{schema='public'}={}) {
+  return domainTransaction(pool,schema,async (client) => {
+    await requirePrincipal(client,session,'staff');
+    if(session.role!=='owner')throw new Error('Forbidden');
+    inputKeys(input,['prefix']);
+    const prefix=normalizeWorkerPrefix(input.prefix);
+    const before=(await client.query('SELECT prefix FROM organization_worker_ids WHERE org_id=$1 FOR UPDATE',[session.org_id])).rows[0];
+    if(before?.prefix!==prefix) {
+      await client.query(`INSERT INTO organization_worker_ids(org_id,prefix,updated_at) VALUES($1,$2,clock_timestamp())
+        ON CONFLICT (org_id) DO UPDATE SET prefix=excluded.prefix,updated_at=excluded.updated_at`,[session.org_id,prefix]);
+      await domainAudit(client,session,'organization.worker_prefix_updated',session.org_id);
+    }
+    return workerIdSettingsRow(client,session);
+  });
+}
+
 export async function createWorker(pool,session,input,{schema='public'}={}) {
-  const content=createWorkerInput(input),workerId=randomUUID(),login=normalizeWorkerLogin(content.code);
-  const credential=content.password===undefined?null:await passwordRecord(workerPassword(content.password,{login,company:session.org_id}));
+  const content=createWorkerInput(input),workerId=randomUUID();
   return writeConflict(() => domainTransaction(pool,schema,async (client) => {
     await requirePrincipal(client,session,'staff');
     await requireWritableEntitlement(client,session.org_id);
+    const code=content.code ?? await nextCompanyWorkerCode(client,session.org_id);
+    const login=normalizeWorkerLogin(code);
+    const credential=content.password===undefined?null:await passwordRecord(workerPassword(content.password,{login,company:session.org_id}));
     if((await client.query('SELECT id FROM workers WHERE org_id=$1 AND upper(code)=$2',[session.org_id,login])).rows.length
       || (await client.query('SELECT worker_id FROM worker_credentials WHERE org_id=$1 AND login_id=$2',[session.org_id,login])).rows.length)
       throw new Error('Worker ID already in use');
     await requireWorkerCapacity(client,session.org_id);
     if (content.language===undefined) {
       await client.query(`INSERT INTO workers(id,org_id,site_id,code,name,language,language_selection_required)
-        VALUES ($1,$2,$3,$4,$5,'en',true)`,[workerId,session.org_id,session.site_id,content.code,content.name]);
+        VALUES ($1,$2,$3,$4,$5,'en',true)`,[workerId,session.org_id,session.site_id,code,content.name]);
     } else {
       await client.query(`INSERT INTO workers(id,org_id,site_id,code,name,language,language_selection_required,
         language_selected_at,language_selected_by) VALUES ($1,$2,$3,$4,$5,$6,false,clock_timestamp(),'staff')`,
-        [workerId,session.org_id,session.site_id,content.code,content.name,content.language]);
+        [workerId,session.org_id,session.site_id,code,content.name,content.language]);
     }
     if(credential)await client.query(`INSERT INTO worker_credentials(worker_id,org_id,site_id,login_id,state,password_salt,password_hash,credential_revision,password_changed_at,created_at,updated_at) VALUES($1,$2,$3,$4,'active',$5,$6,1,clock_timestamp(),clock_timestamp(),clock_timestamp())`,[workerId,session.org_id,session.site_id,login,credential.salt,credential.derived]);
     await domainAudit(client,session,'worker.created',workerId);

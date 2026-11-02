@@ -14,6 +14,7 @@ export function clientSessionContext(session) {
 
 export function staffBriefingContextRequired(path,method) {
   return ['GET','HEAD'].includes(method) && (/^\/api\/briefings(?:\/[^/]+)?$/.test(path) || /^\/api\/briefings\/[^/]+\/schedules$/.test(path)
+      || /^\/api\/briefings\/[^/]+\/reverification$/.test(path)
       || /^\/api\/draft-creation-receipts\/[^/]+$/.test(path) || /^\/api\/briefings\/[^/]+\/publication-receipts\/(publish|schedule)\/[^/]+$/.test(path)
       || /^\/api\/briefing-(review|regeneration)\/receipts\/[^/]+$/.test(path)
       || /^\/api\/briefings\/[^/]+\/preparation-requests(?:\/[^/]+)?$/.test(path))
@@ -41,7 +42,8 @@ export function staffPeopleContextRequired(path,method) {
 }
 
 export function staffResponseContextRequired(path,method) {
-  return ['GET','HEAD'].includes(method) && /^\/api\/publications\/[^/]+\/responses(?:\/[^/]+)?$/.test(path);
+  return ['GET','HEAD'].includes(method) && /^\/api\/publications\/[^/]+\/responses(?:\/[^/]+)?$/.test(path)
+    || ['GET','HEAD','POST'].includes(method) && /^\/api\/publications\/[^/]+\/improvement(?:\/draft)?$/.test(path);
 }
 
 export function staffPolicyContextRequired(path,method) {
@@ -90,7 +92,7 @@ export function staffApplicationContextRequired(path,method) {
     || /^\/api\/processing\/[^/]+\/retries(?:\/[^/]+)?$/.test(path)
     || /^\/api\/processing\/[^/]+\/provenance$/.test(path)
     || /^\/api\/audit(?:\/[^/]+)?$/.test(path) || path==='/api/language-readiness'
-    || path==='/api/instructions/audience' || /^\/api\/instructions\/sends\/[^/]+$/.test(path))
+    || path==='/api/calendar' || path==='/api/instructions/audience' || /^\/api\/instructions\/sends\/[^/]+$/.test(path))
     || method==='POST' && (path==='/api/language-readiness/test' || /^\/api\/processing\/[^/]+\/retries$/.test(path) || path==='/api/instructions/send'
       || /^\/api\/instructions\/sends\/[^/]+\/retry$/.test(path));
 }

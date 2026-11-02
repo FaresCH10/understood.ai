@@ -25,9 +25,12 @@ test('People HTTP controls enforce site authority and preserve publication audie
     const list = await (await request(maya, '/people/workers?language=ur&page=1&pageSize=5')).json();
     assert.equal(list.total, 8); assert.equal(list.items.length, 5);
     assert.equal((await request(maya,'/people/workers','POST',{code:'MISSING-PASSWORD'})).status,400);
-    const added = await request(maya, '/people/workers', 'POST', { code: 'QA Worker 900', language: 'en', password:'Assigned test password 900' });
+    assert.equal((await request(maya,'/people/workers','POST',{code:'NO-NAME',password:'Assigned test password 901'})).status,400);
+    const added = await request(maya, '/people/workers', 'POST', { code: 'QA Worker 900', name: 'QA Worker 900', language: 'en', password:'Assigned test password 900' });
     assert.equal(added.status, 201);
     const person = await added.json();
+    assert.match(person.code, /^CE-\d+$/);
+    assert.notEqual(person.code, 'QA Worker 900');
     assert.equal((await request(other, `/people/workers/${person.id}`, 'PATCH', { code: 'Forged' })).status, 404);
     assert.equal((await request(maya, `/people/workers/${person.id}/crew`, 'POST', { crewId: 'other-site' })).status, 404);
     const crew = await (await request(maya, '/people/crews', 'POST', { name: 'QA Crew' })).json();

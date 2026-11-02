@@ -4,6 +4,7 @@ import {requireWorkerSiteAccess} from './site-access.mjs';
 import {ensureCaseMessageSchema} from './case-messages.mjs';
 import {workerCredentialSessionValid} from './auth.mjs';
 import {WORKER_LANGUAGE_CODES} from './languages.mjs';
+import {assignmentEvidence,assignmentEvidenceData,ensureEvidenceSchema} from './evidence.mjs';
 
 const present=(db,name)=>!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
 
@@ -37,11 +38,11 @@ export function assignmentRequest(workerId,input={}) {
 }
 
 export function workerInboxFilters(input={}) {
-  if(!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).some((key) => !['view','page','pageSize'].includes(key))) throw new Error('Invalid response filter');
-  const {view='all',...paging}=input;
-  if(!['all','todo','sent','followup'].includes(view)) throw new Error('Invalid response filter');
+  if(!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).some((key) => !['view','page','pageSize','briefing'].includes(key))) throw new Error('Invalid response filter');
+  const {view='all',briefing='',...paging}=input;
+  if(!['all','todo','sent','followup'].includes(view) || typeof briefing!=='string' || briefing.length>100) throw new Error('Invalid response filter');
   const {page,pageSize}=submissionFilters(paging);
-  return {view,page,pageSize};
+  return {view,page,pageSize,briefing};
 }
 
 export function workerBriefingRow(row) {
@@ -50,7 +51,7 @@ export function workerBriefingRow(row) {
   const expired=row.content_expired===true;
   if(!language && !expired) throw new Error('Assignment language unavailable');
   const audio=isCurrentRecording(row),acknowledged=!!row.acknowledged_at;
-  return {id:row.id,publicationId:row.publication_id,version:row.version,state:row.state,title:expired?'[Expired]':language.title,language:row.language,
+  return {id:row.id,briefingId:row.briefing_id,publicationId:row.publication_id,version:row.version,state:row.state,title:expired?'[Expired]':language.title,language:row.language,
     ...(expired?{contentExpired:true}:{}),
     ...(row.repeat_request?{repeatRequest:row.repeat_request}:{}),responseMode:row.response_mode||'question',deliveryMode:row.delivery_mode||'both',
     dueAt:row.due_at instanceof Date ? row.due_at.toISOString() : row.due_at || null,outcome:audio ? null : row.outcome || null,
@@ -60,8 +61,8 @@ export function workerBriefingRow(row) {
 }
 
 export function workerInboxPage(rows,counts,filters,history,asOf) {
-  const {view,page,pageSize}=filters;
-  return {items:rows.map(workerBriefingRow),total:view==='todo' ? counts.todo : view==='sent' ? counts.sent : view==='followup' ? counts.followup : history ? counts.history : counts.current,
+  const {view,page,pageSize,briefing}=filters;
+  return {items:rows.map(workerBriefingRow),total:briefing ? rows.length : view==='todo' ? counts.todo : view==='sent' ? counts.sent : view==='followup' ? counts.followup : history ? counts.history : counts.current,
     counts:{todo:counts.todo,sent:counts.sent,history:counts.history,followup:counts.followup},page,pageSize,asOf};
 }
 
@@ -184,7 +185,7 @@ export function workerRequestReceipt(db,session,assignmentId,kind,requestId) {
 }
 
 export function workerBriefings(db,session,input={},history=false) {
-  const filters=workerInboxFilters(input),{view,page,pageSize}=filters;
+  const filters=workerInboxFilters(input),{view,page,pageSize,briefing}=filters;
   if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='case_messages'").get()) {
     authority(db,session,'worker');ensureCaseMessageSchema(db);
   }
@@ -197,7 +198,7 @@ export function workerBriefings(db,session,input={},history=false) {
       COALESCE(SUM(${workerFollowupPredicate}),0) AS followup,
       COALESCE(SUM(${accepted}),0) AS sent,COALESCE(SUM(p.state='published' AND (a.due_at IS NULL OR a.due_at>?) AND NOT ${accepted}),0) AS todo ${scope}`)
       .get(now,session.org_id,session.site_id,session.principal_id);
-    const rows=db.prepare(`SELECT a.id,a.due_at,a.language,p.id AS publication_id,p.version,p.state,
+    const rows=db.prepare(`SELECT a.id,a.due_at,a.language,p.id AS publication_id,p.briefing_id,p.version,p.state,
       CASE WHEN p.state='published' AND a.due_at>? AND NOT ${accepted} THEN
         (SELECT r.finished_at FROM assignment_reminders r WHERE r.assignment_id=a.id AND r.org_id=a.org_id AND r.site_id=a.site_id AND r.worker_id=a.worker_id AND r.state='visible') END AS reminder_at,
       ${present(db,'instruction_deliveries') ? `(SELECT d.content_json FROM instruction_deliveries d
@@ -208,8 +209,9 @@ export function workerBriefings(db,session,input={},history=false) {
       ${responseColumns} ${scope}
       AND (?=1 OR p.state='published') AND (?='all' OR (?='sent' AND ${accepted})
         OR (?='todo' AND p.state='published' AND (a.due_at IS NULL OR a.due_at>?) AND NOT ${accepted}) OR (?='followup' AND ${workerFollowupPredicate}))
+      AND (?='' OR p.briefing_id=?)
       ORDER BY p.published_at DESC,p.id DESC,a.id DESC LIMIT ? OFFSET ?`)
-      .all(now,session.org_id,session.site_id,session.principal_id,history || view==='sent' ? 1 : 0,view,view,view,now,view,pageSize,(page-1)*pageSize);
+      .all(now,session.org_id,session.site_id,session.principal_id,history || view==='sent' ? 1 : 0,view,view,view,now,view,briefing,briefing,pageSize,(page-1)*pageSize);
     return workerInboxPage(rows,counts,filters,history,now);
   });
 }
@@ -252,6 +254,7 @@ export function listPublicationResponses(db,session,publicationId,input={}) {
 
 export function getPublicationResponse(db,session,publicationId,assignmentId,input={}) {
   const {page,pageSize}=responseRequest(publicationId,assignmentId,input,true);
+  ensureEvidenceSchema(db);
   return transaction(db,() => {
     authority(db,session);const {publication,snapshot}=scopedPublication(db,session,publicationId);
     const assignment=db.prepare(`SELECT a.id,a.worker_id,w.code AS worker,a.language,a.due_at FROM assignments a JOIN workers w
@@ -270,12 +273,45 @@ export function getPublicationResponse(db,session,publicationId,assignmentId,inp
     const acknowledgment=db.prepare('SELECT received_at FROM acknowledgments WHERE assignment_id=? AND org_id=? AND site_id=?')
       .get(assignmentId,session.org_id,session.site_id);
     const responseMode=snapshot.responseMode || 'question',deliveryMode=snapshot.deliveryMode || 'both';
+    const evidenceMode=snapshot.evidenceMode==='photo' && responseMode==='acknowledge'?'photo':'none';
+    const evidence=evidenceMode==='photo'?assignmentEvidence(db,session.org_id,session.site_id,assignmentId):null;
     return {publication,assignment:{id:assignment.id,worker:assignment.worker,language:assignment.language,dueAt:assignment.due_at},
       question:responseMode==='acknowledge'?null:snapshot.question,facts:snapshot.facts,
       workerQuestion:responseMode==='acknowledge'?null:deliveredContent?.question || snapshot.languages?.[assignment.language]?.question || null,
-      responseMode,deliveryMode,
+      responseMode,deliveryMode,evidenceMode,evidence,
       ...(snapshot.rubric?.mode==='multiple-choice'?{questionType:'multiple-choice',choices:deliveredContent?.choices || snapshot.languages?.[assignment.language]?.choices || snapshot.languages?.en?.choices}:{}),
       acknowledgedAt:acknowledgment?.received_at || null,
       ...submissionHistory(db,session,assignmentId,page,pageSize,true),cases};
+  });
+}
+
+export function publicationAssignmentEvidence(db,session,publicationId,assignmentId) {
+  if(typeof publicationId!=='string' || !publicationId || publicationId.length>100
+    || typeof assignmentId!=='string' || !assignmentId || assignmentId.length>100) throw new Error('Evidence unavailable');
+  ensureEvidenceSchema(db);
+  return transaction(db,()=>{
+    authority(db,session);
+    const assignment=db.prepare('SELECT id FROM assignments WHERE id=? AND publication_id=? AND org_id=? AND site_id=?')
+      .get(assignmentId,publicationId,session.org_id,session.site_id);
+    if(!assignment) throw new Error('Evidence unavailable');
+    const row=assignmentEvidenceData(db,session.org_id,session.site_id,assignmentId);
+    if(!row) throw new Error('Evidence unavailable');
+    return row;
+  });
+}
+
+export function workerAssignmentEvidence(db,session,assignmentId) {
+  if(typeof assignmentId!=='string' || !assignmentId || assignmentId.length>100) throw new Error('Evidence unavailable');
+  ensureEvidenceSchema(db);
+  return transaction(db,()=>{
+    authority(db,session,'worker');
+    const assignment=db.prepare(`SELECT a.id FROM assignments a JOIN publications p
+      ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
+      WHERE a.id=? AND a.org_id=? AND a.site_id=? AND a.worker_id=? AND p.state='published'`)
+      .get(assignmentId,session.org_id,session.site_id,session.principal_id);
+    if(!assignment) throw new Error('Evidence unavailable');
+    const row=assignmentEvidenceData(db,session.org_id,session.site_id,assignmentId);
+    if(!row) throw new Error('Evidence unavailable');
+    return row;
   });
 }

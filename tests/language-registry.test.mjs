@@ -145,7 +145,7 @@ test('PostgreSQL stores every worker locale and rejects the ambiguous bare Punja
   try {
     await db.exec(`CREATE SCHEMA ${schema};SET search_path TO ${schema},pg_catalog`);
     await runMigrations(pool,{schema});
-    assert.deepEqual(await verifyMigrations(pool,{schema}),{schema,migrations:113});
+    assert.deepEqual(await verifyMigrations(pool,{schema}),{schema,migrations:118});
     await db.query("INSERT INTO organizations(id,name) VALUES('org','Organization')");
     await db.query("INSERT INTO sites(id,org_id,name,timezone) VALUES('site','org','Site','UTC')");
     for(const [index,code] of WORKER_LANGUAGE_CODES.entries()){

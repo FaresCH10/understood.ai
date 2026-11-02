@@ -49,7 +49,8 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} brief
     assert.equal((await call('/clarifications',second.cookie,second.context)).status,200);
     assert.equal((await call(`/briefings/${id}/preparation-requests`,second.cookie,first.context,'POST',{})).status,409);
     assert.equal((await call('/language-readiness/test',second.cookie,first.context,'POST',{})).status,409);
-    for(const path of ['/overview','/processing','/audit','/language-readiness'])assert.equal((await call(path,second.cookie,second.context)).status,200,path);
+    for(const path of ['/overview','/processing','/language-readiness'])assert.equal((await call(path,second.cookie,second.context)).status,200,path);
+    for(const path of ['/audit',`/audit/${id}`])assert.equal((await call(path,second.cookie,second.context)).status,404,path);
     const usageBefore=postgres?(await db.query('SELECT * FROM usage_change_requests ORDER BY id')).rows:null;
     for(const context of [undefined,'invalid','b'.repeat(64)]) {
       for(const path of ['/usage','/usage/requests',`/usage/requests/${id}`])assert.equal((await call(path,first.cookie,context)).status,409,path);
@@ -141,7 +142,7 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} brief
       verifyTextRetentionReceipt(await (await call(`${endpoint}/requests/${change.requestId}`,second.cookie,second.context)).json(),change);
       assert.equal((await (await call(endpoint,second.cookie,second.context,'POST',change)).json()).duplicate,true);
     }
-    const createdWorker=await call('/people/workers',second.cookie,second.context,'POST',{code:'Captured synthetic worker',language:'en'});assert.equal(createdWorker.status,201);const workerRow=await createdWorker.json();
+    const createdWorker=await call('/people/workers',second.cookie,second.context,'POST',{code:'Captured synthetic worker',name:'Captured synthetic worker',language:'en',password:'Captured synthetic password'});assert.equal(createdWorker.status,201);const workerRow=await createdWorker.json();
     const input={requestId:randomUUID(),title:'Captured synthetic draft',source:'Put finished items on the blue shelf. Put unfinished items on the yellow shelf.'};
     const created=await call('/briefings',second.cookie,second.context,'POST',input);assert.equal(created.status,201);
     const result=await created.json();assert.equal(typeof result.id,'string');

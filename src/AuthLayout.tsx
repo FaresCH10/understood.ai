@@ -64,6 +64,6 @@ export function AuthLayout({children,variant='sign-in',note}:AuthLayoutProps){
       </ul>
       <div className="auth-story-footer"><span>One team. Every language.</span></div>
     </div>
-    <div className="auth-form-column"><section className="auth-card" id="auth-form" tabIndex={-1} aria-label={variant==='register'?'Create your workspace':variant==='worker'?'Worker sign in':'Supervisor sign in'}>{children}</section><p className="auth-card-footnote">{note??<>Clear communication starts here.<span lang="ar" dir="rtl">التواصل الواضح يبدأ هنا.</span></>}</p></div>
+    <div className="auth-form-column"><a className="auth-mobile-brand" href="#home" aria-label="Understood home">Understood<AudioLines size={22}/></a><section className="auth-card" id="auth-form" tabIndex={-1} aria-label={variant==='register'?'Create your workspace':variant==='worker'?'Worker sign in':'Supervisor sign in'}>{children}</section><p className="auth-card-footnote">{note??<>Clear communication starts here.<span lang="ar" dir="rtl">التواصل الواضح يبدأ هنا.</span></>}</p></div>
   </main>;
 }

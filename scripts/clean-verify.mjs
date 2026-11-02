@@ -4,7 +4,7 @@ import {lstat,mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
 import {dirname,join,resolve,relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const roots=['src','server','scripts','tests','public','evaluation'];
+const roots=['api','src','server','scripts','tests','public','evaluation'];
 const files=['package.json','package-lock.json','index.html','operator.html','tsconfig.json','vite.config.ts','.github/workflows/verify.yml'];
 const excluded=new Set(['node_modules','dist','data','artifacts','references','.git','.npm-cache','.clean-check','.npmrc']);
 const hash=value=>createHash('sha256').update(value).digest('hex');

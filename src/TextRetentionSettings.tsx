@@ -1,3 +1,4 @@
+import {useStaffText as useStaffStaticText} from './staff-language';
 import {useMemo,useState} from 'react';
 import {RefreshCw,Save} from 'lucide-react';
 import {textRetentionDays,textRetentionInput} from '../server/text-retention-input.mjs';
@@ -8,6 +9,7 @@ import {usePolicySettings,type PolicyDefinition} from './usePolicySettings';
 
 type Data={revision:number;days:number|null;canWrite:boolean;recoveryScope:string|null;options:number[];completed:Record<string,number>;limitations:string};
 export function TextRetentionSettings({authority,category='response'}:{authority:StaffRequestAuthority;category?:RetentionCategory}) {
+  const staffT=useStaffStaticText();
   const isCase=category==='case',isGenerated=category==='generated',isActivity=category==='activity',isBriefing=category==='briefing',endpoint=isBriefing?'/api/retention/briefings':isActivity?'/api/retention/activity':isGenerated?'/api/retention/generated':isCase?'/api/retention/cases':'/api/retention/text';
   const title=isBriefing?'Archived instruction content retention':isActivity?'Activity identity retention':isGenerated?'Generated instruction audio retention':isCase?'Resolved case retention':'Response text retention';
   const policyName=isBriefing?'briefing':isActivity?'activity':isGenerated?'generated audio':isCase?'case':'text';
@@ -31,16 +33,16 @@ export function TextRetentionSettings({authority,category='response'}:{authority
     setConfirmed(false);await savePolicy(change);
   }
   const displayedConfirmation=isBriefing?'I understand that archived instruction source, prepared content and publication copies will be redacted from the current application view after the archive and related answers/case resolutions have aged past this policy. Pending checks and open cases prevent cleanup. Generated audio must finish its separate cleanup first. Version identities, audiences, outcomes and hashes remain; disabling cleanup cannot restore content.':confirmation;
-  return <section className="panel content-retention" aria-label={title}>
-    <div className="people-panel-heading"><h2>{title}</h2><button className="icon-button" title={`Refresh ${policyName} retention`} aria-label={`Refresh ${policyName} retention`} disabled={saving} onClick={refresh}><RefreshCw size={18}/></button></div>
-    {error&&<p role="alert" className="record-error">{error}</p>}{saved&&<p role="status">{isBriefing?'Instruction':isActivity?'Activity':isGenerated?'Generated audio':isCase?'Case':'Text'} retention policy save confirmed.</p>}
+  return <section className="panel content-retention" aria-label={staffT.message(title)}>
+    <div className="people-panel-heading"><h2>{staffT.message(title)}</h2><button className="icon-button" title={staffT("Refresh {p0} retention",{p0:staffT(policyName)})} aria-label={staffT("Refresh {p0} retention",{p0:staffT(policyName)})} disabled={saving} onClick={refresh}><RefreshCw size={18}/></button></div>
+    {error&&<p role="alert" className="record-error">{staffT.error(error)}</p>}{saved&&<p role="status">{isBriefing?staffT("Instruction"):isActivity?staffT("Activity"):isGenerated?staffT("Generated audio"):isCase?staffT("Case"):staffT("Text")} {staffT("retention policy save confirmed.")}</p>}
     {data?<>
-      <p className="muted">Current policy: {data.days===null?'Disabled':`${data.days} days`}</p>
-      <label className="field"><span>{isBriefing?'Keep archived instruction content for':isActivity?'Keep activity actor and item identifiers for':isGenerated?'Keep generated instruction audio for':isCase?'Keep resolved case content for':'Keep worker answer text and transcripts for'}</span><select value={days===null?'disabled':days} disabled={!data.canWrite || loading || saving || !!pending} onChange={event=>{setDays(event.target.value==='disabled'?null:Number(event.target.value));setConfirmed(false);setSaved(false);}}><option value="disabled">Disabled</option>{data.options.map(value=><option key={value} value={value}>{value} days</option>)}</select></label>
-      {pending&&<p role="status">The original policy save is unconfirmed. Refresh checks its receipt without resending.</p>}
-      {data.canWrite&&<><label className="retention-confirm"><input type="checkbox" checked={confirmed} disabled={loading || saving} onChange={event=>setConfirmed(event.target.checked)}/>{displayedConfirmation}</label><button className="button primary" disabled={loading || saving || !confirmed} onClick={()=>void save()}><Save size={18}/>{saving?'Saving...':pending?`Retry ${policyName} policy save`:`Save ${policyName} policy`}</button></>}
-      <dl className="retention-jobs">{isBriefing?<div><dt>Instructions Redacted</dt><dd>{data.completed.briefing || 0}</dd></div>:isActivity?<div><dt>Activity Identities Cleared</dt><dd>{data.completed.activity || 0}</dd></div>:isGenerated?<><div><dt>Bundles Retired</dt><dd>{data.completed.retired || 0}</dd></div><div><dt>Bundles Removed</dt><dd>{data.completed.removed || 0}</dd></div></>:isCase?<div><dt>Cases Redacted</dt><dd>{data.completed.case || 0}</dd></div>:<><div><dt>Answers Redacted</dt><dd>{data.completed.attempt || 0}</dd></div><div><dt>Transcripts Cleared</dt><dd>{data.completed.recording || 0}</dd></div></>}</dl>
-      <p className="muted">{data.limitations}</p>
-    </>:<p role="status">Loading {policyName} retention settings...</p>}
+      <p className="muted">{staffT("Current policy:")} {data.days===null?staffT("Disabled"):staffT("{p0} days",{p0:data.days})}</p>
+      <label className="field"><span>{isBriefing?staffT("Keep archived instruction content for"):isActivity?staffT("Keep activity actor and item identifiers for"):isGenerated?staffT("Keep generated instruction audio for"):isCase?staffT("Keep resolved case content for"):staffT("Keep worker answer text and transcripts for")}</span><select value={days===null?'disabled':days} disabled={!data.canWrite || loading || saving || !!pending} onChange={event=>{setDays(event.target.value==='disabled'?null:Number(event.target.value));setConfirmed(false);setSaved(false);}}><option value="disabled">{staffT("Disabled")}</option>{data.options.map(value=><option key={value} value={value}>{staffT.days(value)}</option>)}</select></label>
+      {pending&&<p role="status">{staffT("The original policy save is unconfirmed. Refresh checks its receipt without resending.")}</p>}
+      {data.canWrite&&<><label className="retention-confirm"><input type="checkbox" checked={confirmed} disabled={loading || saving} onChange={event=>setConfirmed(event.target.checked)}/>{staffT.message(displayedConfirmation)}</label><button className="button primary" disabled={loading || saving || !confirmed} onClick={()=>void save()}><Save size={18}/>{saving?staffT("Saving..."):pending?staffT("Retry {p0} policy save",{p0:staffT(policyName)}):staffT("Save {p0} policy",{p0:staffT(policyName)})}</button></>}
+      <dl className="retention-jobs">{isBriefing?<div><dt>{staffT("Instructions Redacted")}</dt><dd>{staffT.number(data.completed.briefing || 0)}</dd></div>:isActivity?<div><dt>{staffT("Activity Identities Cleared")}</dt><dd>{staffT.number(data.completed.activity || 0)}</dd></div>:isGenerated?<><div><dt>{staffT("Bundles Retired")}</dt><dd>{staffT.number(data.completed.retired || 0)}</dd></div><div><dt>{staffT("Bundles Removed")}</dt><dd>{staffT.number(data.completed.removed || 0)}</dd></div></>:isCase?<div><dt>{staffT("Cases Redacted")}</dt><dd>{staffT.number(data.completed.case || 0)}</dd></div>:<><div><dt>{staffT("Answers Redacted")}</dt><dd>{staffT.number(data.completed.attempt || 0)}</dd></div><div><dt>{staffT("Transcripts Cleared")}</dt><dd>{staffT.number(data.completed.recording || 0)}</dd></div></>}</dl>
+      <p className="muted">{staffT(data.limitations)}</p>
+    </>:<p role="status">{staffT("Loading")} {staffT.message(policyName)} {staffT("retention settings...")}</p>}
   </section>;
 }

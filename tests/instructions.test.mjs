@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {openDatabase} from '../server/db.mjs';
 import {createAppServer} from '../server/index.mjs';
 import {createSession} from '../server/auth.mjs';
 import {seed} from '../server/seed.mjs';
 import {ensureInstructionSchema} from '../server/instruction-schema.mjs';
 import {instructionInput,instructionAudienceOverview,startInstructionSend,completeInstructionSend} from '../server/instructions.mjs';
+import {activityCsv} from '../server/reports.mjs';
 import {recipientDeliveryReadiness} from '../server/delivery-readiness.mjs';
 import {processOne} from '../server/worker.mjs';
 import {ensurePeopleSchema,createWorker} from '../server/people.mjs';
@@ -66,6 +67,11 @@ test('instruction send publishes only prepared languages, freezes modes and supp
     const inbox=await (await call('/worker/briefings?view=todo',worker)).json();
     const item=inbox.items.find(value=>value.publicationId===result.publicationId);
     assert.ok(item);assert.equal(item.responseMode,'question');assert.equal(item.deliveryMode,'both');
+    const targeted=await (await call(`/worker/briefings?view=all&briefing=${requestId}`,worker)).json();
+    assert.equal(targeted.total,1);assert.equal(targeted.items[0].id,item.id);assert.equal(targeted.items[0].briefingId,requestId);
+    assert.equal((await (await call(`/worker/briefings?view=all&briefing=${randomUUID()}`,worker)).json()).total,0);
+    assert.equal((await call(`/worker/briefings?view=all&briefing=${'x'.repeat(101)}`,worker)).status,400);
+    assert.equal((await (await call(`/worker/briefings?view=all&briefing=${requestId}`,arWorker)).json()).total,0);
     const detail=await (await call(`/worker/briefings/${item.id}`,worker)).json();
     assert.equal(detail.responseMode,'question');assert.equal(detail.deliveryMode,'both');
     assert.match(detail.content.question,/red ladder.*when/);assert.equal(detail.content.questionType,'multiple-choice');assert.equal(detail.content.choices.length,4);assert.ok(!JSON.stringify(detail).includes('correctChoiceId'));
@@ -137,6 +143,72 @@ test('acknowledgment-only instructions omit the question, move to Done and recor
     assert.equal(responses.total,1);assert.equal(responses.items[0].status,'acknowledged');
     assert.equal((await call('/instructions/sends/'+requestId,foreign)).status,404);
     assert.equal((await call('/instructions/sends/'+requestId,worker)).status,403);
+  }finally{await new Promise(resolve=>server.close(resolve));db.close();}
+});
+
+test('photo evidence stays private, scoped and immutable on acknowledgment instructions',async()=>{
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const base=`http://127.0.0.1:${server.address().port}/api`;
+  const contexts=new Map();
+  const call=(path,cookie,body,method=body?'POST':'GET')=>fetch(base+path,{method,headers:{...(cookie?{cookie}:{}),...(body?{'content-type':'application/json'}:{}),...(method!=='GET'?{origin}:{}),...(contexts.has(cookie)?{'x-client-session-context':contexts.get(cookie)}:{})},...(body?{body:JSON.stringify(body)}:{})});
+  const login=async principal=>{
+    const cookie=['worker-1','worker-13'].includes(principal)
+      ? `understood_session=${openPrincipalSession(db,db.prepare('SELECT * FROM workers WHERE id=?').get(principal)).token}`
+      : (await call(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
+    const context=(await (await call('/session',cookie)).json()).clientContext;
+    if(context)contexts.set(cookie,context);
+    return cookie;
+  };
+  const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lE3PnAAAAABJRU5ErkJggg==';
+  const sha=createHash('sha256').update(Buffer.from(png,'base64')).digest('hex');
+  try {
+    const maya=await login('maya'),worker=await login('worker-1'),foreign=await login('harbor-owner'),foreignWorker=await login('harbor-worker');
+    const input={requestId:randomUUID(),title:'Scaffold check',source:'Photograph the scaffold tag after checking the north face.',audience:{type:'all'},responseMode:'acknowledge',deliveryMode:'text',evidenceMode:'photo'};
+    assert.equal((await call('/instructions/send',maya,{...input,requestId:randomUUID(),responseMode:'question'})).status,400);
+    const sent=await call('/instructions/send',maya,input);assert.equal(sent.status,201);
+    const result=await sent.json();assert.equal(result.evidenceMode,'photo');
+    const inbox=await (await call('/worker/briefings?view=todo',worker)).json();
+    const item=inbox.items.find(value=>value.publicationId===result.publicationId);assert.ok(item);
+    const detail=await (await call(`/worker/briefings/${item.id}`,worker)).json();
+    assert.equal(detail.responseMode,'acknowledge');assert.equal(detail.evidenceMode,'photo');assert.equal(detail.evidence,null);
+    assert.equal((await call(`/worker/briefings/${item.id}/acknowledge`,worker,{requestId:randomUUID()})).status,400);
+    assert.equal((await call(`/worker/briefings/${item.id}/acknowledge`,foreignWorker,{requestId:randomUUID(),photo:{mimeType:'image/png',data:png}})).status,404);
+    assert.equal((await call(`/worker/briefings/${item.id}/acknowledge`,worker,{requestId:randomUUID(),photo:{mimeType:'image/jpeg',data:png}})).status,400);
+    assert.equal((await call(`/worker/briefings/${item.id}/acknowledge`,worker,{requestId:randomUUID(),photo:{mimeType:'image/png',data:'not-base64'}})).status,400);
+    const ackRequest=randomUUID();
+    const ack=await call(`/worker/briefings/${item.id}/acknowledge`,worker,{requestId:ackRequest,photo:{mimeType:'image/png',data:png}});
+    assert.equal(ack.status,201);
+    const ackBody=await ack.json();assert.equal(ackBody.duplicate,false);assert.equal(ackBody.evidence.mime,'image/png');
+    assert.equal(ackBody.evidence.bytes,70);assert.equal(ackBody.evidence.sha256,sha);assert.ok(ackBody.evidence.receivedAt);
+    const replay=await call(`/worker/briefings/${item.id}/acknowledge`,worker,{requestId:ackRequest});
+    assert.equal(replay.status,200);const replayBody=await replay.json();
+    assert.equal(replayBody.duplicate,true);assert.equal(replayBody.evidence.sha256,sha);
+    assert.equal((await call(`/worker/briefings/${item.id}/acknowledge`,worker,{requestId:randomUUID()})).status,200);
+    assert.equal(db.prepare('SELECT count(*) n FROM acknowledgments WHERE assignment_id=?').get(item.id).n,1);
+    assert.equal(db.prepare('SELECT count(*) n FROM assignment_evidence WHERE assignment_id=?').get(item.id).n,1);
+    assert.equal(db.prepare('SELECT sha256 FROM assignment_evidence WHERE assignment_id=?').get(item.id).sha256,sha);
+    const after=await (await call(`/worker/briefings/${item.id}`,worker)).json();
+    assert.equal(after.evidence.sha256,sha);assert.ok(after.evidence.receivedAt);
+    const image=await call(`/worker/briefings/${item.id}/evidence`,worker);
+    assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/png');
+    assert.equal(image.headers.get('cache-control'),'no-store');assert.equal(Buffer.from(await image.arrayBuffer()).toString('base64'),png);
+    const staffImage=await call(`/publications/${result.publicationId}/responses/${item.id}/evidence`,maya);
+    assert.equal(staffImage.status,200);assert.equal(staffImage.headers.get('content-type'),'image/png');
+    assert.equal(Buffer.from(await staffImage.arrayBuffer()).toString('base64'),png);
+    assert.equal((await call(`/publications/${result.publicationId}/responses/${item.id}/evidence`,foreign)).status,404);
+    assert.equal((await call(`/worker/briefings/${item.id}/evidence`,foreignWorker)).status,404);
+    assert.equal((await call(`/worker/briefings/${item.id}/evidence`)).status,401);
+    const staffDetail=await (await call(`/publications/${result.publicationId}/responses/${item.id}`,maya)).json();
+    assert.equal(staffDetail.evidenceMode,'photo');assert.equal(staffDetail.evidence.sha256,sha);
+    const report=await (await call(`/reports?publicationId=${result.publicationId}`,maya)).json();
+    assert.equal(report.responseMode,'acknowledge');assert.equal(report.evidenceMode,'photo');
+    assert.deepEqual(report.evidence,{required:12,received:1});
+    const received=report.rows.find(row=>row[0]==='Worker 001');assert.equal(received.length,11);
+    assert.equal(received[9],'received');assert.ok(received[10]);
+    const missing=report.rows.find(row=>row[0]==='Worker 002');assert.equal(missing[9],'missing');assert.equal(missing[10],'');
+    const csv=activityCsv(report.rows);
+    assert.match(csv,/"follow_up_status","evidence_status","evidence_received_at"/);assert.match(csv,/"received"/);
   }finally{await new Promise(resolve=>server.close(resolve));db.close();}
 });
 

@@ -1,3 +1,4 @@
+import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {ArrowRight,CheckCircle2,Clock3,Globe2,Languages,RefreshCw,Users} from 'lucide-react';
 import {useArtifactRead} from './useArtifactRead';
@@ -39,6 +40,7 @@ function timezoneOptions(current:string) {
 }
 
 export function FirstRunOnboarding({authority,refresh,onCompleted,onNavigate,onRefresh}:{authority:StaffRequestAuthority;refresh:number;onCompleted:(language:FirstRunLanguage)=>void;onNavigate:(path:string)=>void;onRefresh:()=>void}) {
+  const staffT=useStaffStaticText();
   const [version,setVersion]=useState(0),heading=useRef<HTMLHeadingElement>(null),draft=useRef<FirstRunBody|null>(null),initialized=useRef('');
   const read=useArtifactRead<unknown>(authority,'/api/onboarding/first-run',refresh+version);
   const {request,current}=useStaffRequest(authority);
@@ -79,8 +81,8 @@ export function FirstRunOnboarding({authority,refresh,onCompleted,onNavigate,onR
       if(status===409) {setConflict(true);draft.current=null;}
     } finally {if(current())setBusy(false);}
   }
-  if(read.loading && !state) return <section className="first-run"><p role="status">{language==='ar'?'جارٍ تحميل إعداد مساحة العمل...':'Loading workspace setup...'}</p></section>;
-  if(!state) return <section className="first-run" role="alert"><h1>{language==='ar'?'إعداد مساحة العمل غير متاح':'Workspace setup is unavailable'}</h1><p>{readError}</p><div className="actions"><button type="button" className="button outline" onClick={()=>{setVersion(value=>value+1);onRefresh();}}><RefreshCw size={18}/>{t.errorReload}</button></div></section>;
+  if(read.loading && !state) return <section className="first-run"><p role="status">{language==='ar'?'جارٍ تحميل إعداد مساحة العمل...':staffT("Loading workspace setup...")}</p></section>;
+  if(!state) return <section className="first-run" role="alert"><h1>{language==='ar'?'إعداد مساحة العمل غير متاح':staffT("Workspace setup is unavailable")}</h1><p>{staffT.error(readError)}</p><div className="actions"><button type="button" className="button outline" onClick={()=>{setVersion(value=>value+1);onRefresh();}}><RefreshCw size={18}/>{t.errorReload}</button></div></section>;
   const done=state.completed || saved!==null;
   return <section className="first-run" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     <header className="first-run-heading"><span className="public-kicker">{t.kicker}</span><h1 ref={heading} tabIndex={-1}>{done?t.readyTitle:t.title}</h1><p>{done?t.readyLead:t.lead}</p></header>
@@ -90,8 +92,8 @@ export function FirstRunOnboarding({authority,refresh,onCompleted,onNavigate,onR
     </div> : <form className="panel first-run-form" onSubmit={save}>
       <div className="first-run-step"><Globe2 size={20}/><label className="field">{t.siteName}<input required minLength={2} maxLength={120} disabled={busy} value={siteName} onChange={event=>{setSiteName(event.target.value);touch();}}/></label><p className="field-hint">{t.siteNameHint}</p></div>
       <div className="first-run-step"><Clock3 size={20}/><label className="field">{t.timezone}<select disabled={busy} value={timezone} onChange={event=>{setTimezone(event.target.value);touch();}}>{timezoneOptions(timezone).map(zone=><option key={zone} value={zone}>{zone}</option>)}</select></label><p className="field-hint">{t.timezoneHint}</p></div>
-      <div className="first-run-step"><Languages size={20}/><fieldset className="first-run-language"><legend>{t.language}</legend><label className="billing-confirm"><input type="radio" name="staff-language" checked={language==='en'} disabled={busy} onChange={()=>{setLanguage('en');touch();}}/><span>English</span></label><label className="billing-confirm"><input type="radio" name="staff-language" checked={language==='ar'} disabled={busy} onChange={()=>{setLanguage('ar');touch();}}/><span lang="ar">العربية</span></label></fieldset><p className="field-hint">{t.languageHint}</p></div>
-      {error && <p role="alert" className="record-error">{error}{conflict && <> <button type="button" className="text-link" onClick={()=>{setVersion(value=>value+1);onRefresh();}}>{t.errorReload}</button></>}</p>}
+      <div className="first-run-step"><Languages size={20}/><fieldset className="first-run-language"><legend>{t.language}</legend><label className="billing-confirm"><input type="radio" name="staff-language" checked={language==='en'} disabled={busy} onChange={()=>{setLanguage('en');touch();}}/><span>{staffT("English")}</span></label><label className="billing-confirm"><input type="radio" name="staff-language" checked={language==='ar'} disabled={busy} onChange={()=>{setLanguage('ar');touch();}}/><span lang="ar">العربية</span></label></fieldset><p className="field-hint">{t.languageHint}</p></div>
+      {error && <p role="alert" className="record-error">{staffT.error(error)}{conflict && <> <button type="button" className="text-link" onClick={()=>{setVersion(value=>value+1);onRefresh();}}>{t.errorReload}</button></>}</p>}
       {draft.current && <p role="status" className="muted">{t.pending}</p>}
       <label className="billing-confirm"><input type="checkbox" checked={confirmed} disabled={busy} onChange={event=>setConfirmed(event.target.checked)}/><span>{t.confirm}</span></label>
       <div className="actions"><button className="button primary" disabled={busy || !confirmed}>{busy?t.saving:draft.current?t.retry:t.save}<ArrowRight size={18}/></button></div>

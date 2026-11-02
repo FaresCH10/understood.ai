@@ -14,7 +14,7 @@
 .instruction-question h3,.instruction-language-summary h3{font-size:13px;font-weight:600;color:#607366;margin:0 0 10px}
 .instruction-question>p{font-size:15px;line-height:1.7;color:#2c4034}
 .instruction-secondary-details{margin-top:18px;font-size:13px;line-height:1.7;color:#617568}
-.instruction-secondary-details summary{cursor:pointer;color:#375c46;padding-block:6px}
+.instruction-secondary-details summary{cursor:pointer;color:#375c46;padding-block:11px}
 .instruction-secondary-details li{padding-block:4px}
 .instruction-language-summary{border-top:1px solid #e4eae6;margin-top:24px;padding-top:22px}
 .instruction-language-list{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px}

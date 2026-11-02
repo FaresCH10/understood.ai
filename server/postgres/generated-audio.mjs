@@ -69,9 +69,10 @@ function verifyReference(row,bytes) {
 }
 
 export function generatedManifest(snapshot) {
-  const {artifactBundle,responseMode,deliveryMode,...manifest}=snapshot || {};
+  const {artifactBundle,responseMode,deliveryMode,evidenceMode,...manifest}=snapshot || {};
   if(responseMode!==undefined && !['question','acknowledge'].includes(responseMode)
-    || deliveryMode!==undefined && !['text','voice','both'].includes(deliveryMode))throw Error('Generated bundle unavailable');
+    || deliveryMode!==undefined && !['text','voice','both'].includes(deliveryMode)
+    || evidenceMode!==undefined && (!['none','photo'].includes(evidenceMode) || evidenceMode==='photo' && responseMode!=='acknowledge'))throw Error('Generated bundle unavailable');
   if(!artifactBundle || Object.keys(artifactBundle).sort().join(',')!=='id,manifestHash'
     || !uuid(artifactBundle.id) || artifactBundle.manifestHash!==bundleHash(manifest)) throw Error('Generated bundle unavailable');
   preparedAudioReferences(manifest);

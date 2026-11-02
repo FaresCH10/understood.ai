@@ -1,5 +1,5 @@
 /* The same paper, ink and forest green as the public site, at working-screen scale. */
-.worker-navigation-shell { --worker-ink:#163a31; --worker-muted:#61756c; --worker-line:#dbe5df; background:#f5f7f4; color:var(--worker-ink); min-height:100dvh; }
+.worker-navigation-shell { --worker-ink:#163a31; --worker-muted:#566b5a; --worker-line:#dbe5df; background:#f5f7f4; color:var(--worker-ink); min-height:100dvh; }
 .worker-navigation-shell .worker-header { padding-inline:max(24px,calc((100% - 1120px)/2)); gap:24px; background:#fff; border-bottom:1px solid var(--worker-line); }
 .worker-navigation-shell .worker-header .brand { color:var(--worker-ink); }
 .worker-navigation-shell .worker-site-label { color:var(--worker-muted); font-size:13px; line-height:1.5; }
@@ -8,11 +8,21 @@
 .worker-navigation-shell .worker-identity small { color:var(--worker-muted); }
 .worker-navigation-shell .worker-identity>.icon-button { border-radius:8px; min-height:44px; min-width:44px; color:#49675a; }
 .worker-navigation-shell .worker-identity>.icon-button:hover { background:#f0f4f0; }
+.worker-navigation-shell .worker-identity>.worker-header-action { display:inline-flex; align-items:center; gap:7px; padding-inline:10px; font-size:13px; font-weight:600; white-space:nowrap; }
+.worker-navigation-shell .worker-header-action-label { white-space:nowrap; }
+.worker-navigation-shell .worker-header-action .notification-count.is-inline { position:static; inset:auto; margin-inline-start:-2px; }
+@media(max-width:1000px) {
+  .worker-navigation-shell .worker-identity>.worker-header-action { width:44px; min-width:44px; justify-content:center; padding:9px; }
+  .worker-navigation-shell .worker-header-action-label { display:none; }
+  .worker-navigation-shell .worker-header-action .notification-count.is-inline { position:absolute; inset-block-start:0; inset-inline-end:0; margin:0; }
+}
 .worker-navigation-shell .worker-content { width:100%; max-width:800px; padding:40px 28px calc(128px + env(safe-area-inset-bottom,0px)); }
 .worker-navigation-shell .worker-content:focus { outline:none; }
 .worker-navigation-shell .worker-page-heading { display:flex; align-items:center; gap:14px; padding-bottom:24px; margin-bottom:24px; border-bottom:1px solid var(--worker-line); }
 .worker-navigation-shell .worker-page-heading>svg { flex-shrink:0; color:#26775d; }
 .worker-navigation-shell .worker-page-heading h1 { margin:0; font-size:28px; font-weight:650; line-height:1.35; text-wrap:balance; }
+.worker-navigation-shell .worker-heading-action { margin-inline-start:auto; flex-shrink:0; }
+.worker-navigation-shell .worker-work-status { text-transform:none; }
 .worker-navigation-shell .worker-content h1 { color:var(--worker-ink); }
 .worker-navigation-shell .worker-card { padding:26px; margin-bottom:18px; border:1px solid var(--worker-line); border-radius:12px; background:#fff; box-shadow:none; }
 .worker-navigation-shell .worker-card-head { align-items:center; margin-bottom:22px; }
@@ -54,6 +64,11 @@
 .worker-navigation-shell .device-status dd { font-size:14px; }
 .worker-navigation-shell .device-expiry,.worker-navigation-shell .device-danger-card { border-radius:10px; }
 .worker-navigation-shell .device-expiry-icon { background:transparent; border-radius:0; width:28px; }
+.worker-navigation-shell .device-storage { display:grid; gap:16px; margin-block:24px; }
+.worker-navigation-shell .device-storage>h2 { margin:0; font-size:20px; font-weight:650; }
+.worker-navigation-shell .device-disclosure { border:1px solid #e7ede8; border-radius:10px; padding-inline:14px; background:#fff; }
+.worker-navigation-shell .device-disclosure>summary { cursor:pointer; padding-block:12px; font-size:14px; font-weight:600; color:#4a7361; }
+.worker-navigation-shell .device-disclosure>p { margin:0 0 12px; font-size:14px; line-height:1.6; color:var(--worker-muted); }
 .worker-navigation-shell .empty-state { background:#fff; border:1px dashed #c7d7cc; border-radius:12px; padding:36px 24px; color:var(--worker-muted); line-height:1.65; }
 .worker-navigation-shell .worker-bottom-nav { inset-inline:0; bottom:0; padding:10px 20px calc(10px + env(safe-area-inset-bottom,0px)); border-top:1px solid var(--worker-line); background:#fff; }
 .worker-navigation-shell .worker-bottom-nav>div { max-width:744px; gap:8px; }

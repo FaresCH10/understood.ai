@@ -52,7 +52,7 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} inter
   });
   await new Promise(resolve=>f.server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${f.server.address().port}/api`;
   try{
-    const accepted=await fetch(base+'/auth/worker/redeem',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({token:grant.token,company:'cedar',workerId:'Worker 001',password})});assert.equal(accepted.status,503);
+    const accepted=await fetch(base+'/auth/worker/redeem',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({token:grant.token})});assert.equal(accepted.status,503);
     const cookie=accepted.headers.get('set-cookie').split(';')[0],pending=await prepareWorkerEntry(grant.token,'ur');
     const before=await f.snapshot(),calls=[];
     const request=async(path,options={})=>{calls.push({path,method:options.method??'GET'});const response=await fetch(base+path,{...options,headers:{cookie,...options.headers}});const body=await response.json();if(!response.ok)throw Object.assign(Error(body.error),{status:response.status});return body;};
@@ -70,7 +70,7 @@ for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} inter
     }
     assert.equal(await f.snapshot(),before);assert.equal(redemptions,1);assert.equal(logouts,0);
     beforeCommit=true;
-    const rejected=await fetch(base+'/auth/worker/redeem',{method:'POST',headers:{origin,'content-type':'application/json',cookie},body:JSON.stringify({token:other.token,company:'cedar',workerId:'Worker 002',password})});assert.equal(rejected.status,503);
+    const rejected=await fetch(base+'/auth/worker/redeem',{method:'POST',headers:{origin,'content-type':'application/json',cookie},body:JSON.stringify({token:other.token})});assert.equal(rejected.status,503);
     assert.equal(await recoverWorkerEntry(await prepareWorkerEntry(other.token,'en'),request),null);
     assert.equal(await f.snapshot(),before);assert.equal(redemptions,2);assert.equal(logouts,0);
     if(postgres){f.setFail(true);const failed=await fetch(base+'/auth/worker/redemption',{headers});assert.equal(failed.status,503);assert.doesNotMatch(JSON.stringify(await failed.json()),/PRIVATE_DATABASE_DETAIL/);f.setFail(false);}

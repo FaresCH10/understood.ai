@@ -3,6 +3,7 @@ import {scheduleInput,schedulePage,scheduleCancel,scheduleHash,scheduledContentH
 import {publicationInput} from '../briefing-input.mjs';
 import {dispatchAllowed,dispatchPredicate} from './operations-gates.mjs';
 import {requireWritableEntitlement} from './entitlements.mjs';
+import {instructionModes} from './instruction-schema.mjs';
 
 async function authority(client,session) {
   await requirePrincipal(client,session,'staff');
@@ -88,7 +89,8 @@ export async function processOneSchedule(pool,{schema='public',integrationMode,s
         if(!await dispatchAllowed(client,row.org_id))throw Error('Operational dispatch paused');
         if(scheduleHash(await authority(client,session))!==scheduleHash(current.authority_json))throw Error('Scheduled authority changed');
         if(briefing.next_version!==request.nextVersion || briefing.revision!==request.revision)throw Error('Draft revision changed');
-        if(scheduleHash(briefing.prepared_json)!==current.snapshot_hash && scheduledContentHash(briefing.prepared_json)!==current.snapshot_hash)throw Error('Scheduled content changed');
+        const modes=await instructionModes(client,row.org_id,row.site_id,row.briefing_id);
+        if(scheduleHash(briefing.prepared_json)!==current.snapshot_hash && scheduledContentHash(briefing.prepared_json,modes)!==current.snapshot_hash)throw Error('Scheduled content changed');
       }});
   }catch(error) {
     if(['Operational dispatch paused','Workspace access paused','Workspace is read-only'].includes(error.message))return true;

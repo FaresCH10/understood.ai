@@ -5,6 +5,7 @@ import { DEFAULT_AUDIO_ROOT, ensureRecordingSchema } from './recordings.mjs';
 import {routeNewCase} from './case-routing.mjs';
 import {recordPresentationBinding} from './presentations.mjs';
 import {staffAuditOnce} from './notification-events.mjs';
+import {awardCompetency} from './competencies.mjs';
 
 const MAX_ATTEMPTS = 3;
 
@@ -36,7 +37,7 @@ export async function processOneRecording(db, adapter, root = DEFAULT_AUDIO_ROOT
   if (claimed.exhausted) return true;
 
   try {
-    const assignment = db.prepare(`SELECT a.id,p.snapshot_json,a.language FROM assignments a
+    const assignment = db.prepare(`SELECT a.id,a.worker_id,p.snapshot_json,a.language FROM assignments a
       JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
       JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
       WHERE a.id=? AND a.org_id=? AND a.site_id=? AND w.active=1`).get(claimed.assignment_id, claimed.org_id, claimed.site_id);
@@ -80,6 +81,9 @@ export async function processOneRecording(db, adapter, root = DEFAULT_AUDIO_ROOT
             assignment_id:claimed.assignment_id,target_language:claimed.presentation_language,
             question:claimed.presented_question},now);
         }
+        if (assessment.outcome === 'matched')
+          awardCompetency(db,{orgId:claimed.org_id,siteId:claimed.site_id,workerId:assignment.worker_id,
+            assignmentId:claimed.assignment_id,attemptId,source:'audio'});
         if (assessment.outcome !== 'matched') {
           const caseId=randomUUID();db.prepare('INSERT INTO clarifications VALUES (?,?,?,?,?,?,?,?,?)')
           .run(caseId, claimed.org_id, claimed.assignment_id, attemptId,

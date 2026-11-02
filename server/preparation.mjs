@@ -165,7 +165,7 @@ export function createDraftInTransaction(db,session,input) {
       return {id:old.id,state:old.state,revision:old.revision,duplicate:true};
     }
     const now=NOW();
-    db.prepare('INSERT INTO briefings VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,content.title,content.source,1,1,'draft',null,now,now);
+    db.prepare('INSERT INTO briefings(id,org_id,site_id,title,source,revision,next_version,state,prepared_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,content.title,content.source,1,1,'draft',null,now,now);
     db.prepare('INSERT INTO draft_creations(request_id,org_id,site_id,briefing_id,request_hash,requested_by,occurred_at,generation_languages_json) VALUES(?,?,?,?,?,?,?,?)').run(input.requestId,session.org_id,session.site_id,input.requestId,requestHash,session.principal_id,now,content.generationLanguages?JSON.stringify(content.generationLanguages):null);
     briefingAudit(db,session,'briefing.created',input.requestId);
     return {id:input.requestId,state:'draft',revision:1,requestHash,duplicate:false};
@@ -187,7 +187,7 @@ export function copyDraft(db,session,id,input) {
     const content=draftInput({requestId:change.requestId,title:change.title,source:source.source},'create');
     if(db.prepare('SELECT id FROM briefings WHERE id=?').get(change.requestId)) throw new Error('Draft copy request conflict');
     const now=NOW();
-    db.prepare('INSERT INTO briefings VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(change.requestId,session.org_id,session.site_id,content.title,content.source,1,1,'draft',null,now,now);
+    db.prepare('INSERT INTO briefings(id,org_id,site_id,title,source,revision,next_version,state,prepared_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(change.requestId,session.org_id,session.site_id,content.title,content.source,1,1,'draft',null,now,now);
     db.prepare('INSERT INTO briefing_copies VALUES(?,?,?,?,?,?,?,?,?)').run(change.requestId,session.org_id,session.site_id,id,change.revision,change.requestId,content.title,session.principal_id,now);
     briefingAudit(db,session,'briefing.copied',change.requestId);
     return {id:change.requestId,state:'draft',revision:1,duplicate:false};

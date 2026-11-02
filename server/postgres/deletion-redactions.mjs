@@ -48,6 +48,7 @@ export async function processOneDeletionRedaction(pool,{schema='public'}={}){
       WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1) AND presented_question IS NOT NULL AND presented_question<>'[Deleted]'`,[row.worker_id]);
     await client.query(`UPDATE instruction_deliveries SET content_json='{"title":"[Deleted]","text":"[Deleted]"}'::jsonb,
       updated_at=clock_timestamp() WHERE worker_id=$1 AND content_json IS NOT NULL AND content_json->>'title'<>'[Deleted]'`,[row.worker_id]);
+    await client.query('DELETE FROM assignment_evidence WHERE worker_id=$1 AND org_id=$2',[row.worker_id,row.org_id]);
     await client.query('INSERT INTO worker_deletion_redactions VALUES($1,$2,$3,$4,clock_timestamp())',[row.id,row.org_id,row.site_id,row.worker_id]);
     await domainAudit(client,{...row,principal_type:'system',principal_id:'deletion-worker'},'worker.content.redacted',row.worker_id);
     return true;

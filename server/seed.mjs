@@ -22,9 +22,9 @@ export function seed(db) {
     addWorker.run('harbor-worker', 'harbor', 'harbor-yard', 'Worker 014', 'Harbor Worker', 'en', 1);
     const prepared = syntheticPrepare(CANONICAL_SOURCE);
     const now = NOW();
-    db.prepare('INSERT INTO briefings VALUES (?,?,?,?,?,?,?,?,?,?,?)').run('shelf', 'cedar', 'beirut', prepared.title, CANONICAL_SOURCE, 1, 4, 'draft', null, now, now);
+    db.prepare('INSERT INTO briefings(id,org_id,site_id,title,source,revision,next_version,state,prepared_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run('shelf', 'cedar', 'beirut', prepared.title, CANONICAL_SOURCE, 1, 4, 'draft', null, now, now);
     db.prepare('INSERT INTO publications VALUES (?,?,?,?,?,?,?,?)').run('shelf-v3', 'cedar', 'beirut', 'shelf', 3, JSON.stringify(prepared), now, 'published');
-    db.prepare('INSERT INTO briefings VALUES (?,?,?,?,?,?,?,?,?,?,?)').run('harbor-brief', 'harbor', 'harbor-yard', 'Harbor notice', 'Use the east gate.', 1, 1, 'draft', null, now, now);
+    db.prepare('INSERT INTO briefings(id,org_id,site_id,title,source,revision,next_version,state,prepared_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run('harbor-brief', 'harbor', 'harbor-yard', 'Harbor notice', 'Use the east gate.', 1, 1, 'draft', null, now, now);
     const addAssignment = db.prepare('INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,due_at,created_at,language) VALUES (?,?,?,?,?,?,?,?)');
     for (let n = 1; n <= 30; n++) addAssignment.run(`assignment-${n}`, 'cedar', 'beirut', 'shelf-v3', `worker-${n}`, null, now, n <= 12 ? 'en' : n <= 22 ? 'ar' : 'ur');
     const responding = [...Array.from({ length: 23 }, (_, i) => i + 1), 28];

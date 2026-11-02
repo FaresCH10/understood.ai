@@ -127,7 +127,7 @@ test('standalone rehearsal API verifies schema and scheduled stages prepare and 
     assert.equal((await workerBriefings(pool,worker,config)).items[0].assessmentStatus,'pending');
     await assignWorkerPassword(pool,owner,'w',{expectedCode:(await db.query("SELECT code FROM workers WHERE id='w'")).rows[0].code,workerId:'WORKER-001',password:'Assigned synthetic worker password',confirmed:true},config);
     const grant=await issueWorkerGrant(pool,owner,'w',60,config);
-    const redemption=await fetch(`${base}/api/auth/worker/redeem`,{method:'POST',headers:{origin:config.publicOrigin,'content-type':'application/json'},body:JSON.stringify({token:grant.token,company:'a',workerId:'WORKER-001',password:'Assigned synthetic worker password'})});
+    const redemption=await fetch(`${base}/api/auth/worker/redeem`,{method:'POST',headers:{origin:config.publicOrigin,'content-type':'application/json'},body:JSON.stringify({token:grant.token})});
     assert.equal(redemption.status,200);
     const workerCookie=redemption.headers.get('set-cookie').split(';')[0];
     assert.equal((await fetch(`${base}/api/retention/text`,{headers:{cookie:workerCookie}})).status,403);

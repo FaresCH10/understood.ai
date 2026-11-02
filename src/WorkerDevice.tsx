@@ -3,7 +3,6 @@ import {ArrowLeft,Download,RefreshCw,Wifi,WifiOff,ShieldCheck,Clock3,Trash2,Glob
 import {workerUiLanguageText,workerUiLanguages,workerUiNativeName,type WorkerUiLanguage} from './worker-ui-language';
 import {usePublicShell} from './pwa';
 import {removeTextDraft,textDraftCopy} from './worker-text-draft';
-import {clearAudioDraft} from './worker-audio-draft';
 import {WorkerAudioOutbox,type AudioOutboxProps} from './WorkerAudioOutbox';
 import {WorkerOfflineCache} from './WorkerOffline';
 import {allowPrivateDevice,enableSharedDevice,sharedDeviceText} from './worker-device-policy';
@@ -29,10 +28,27 @@ const labels={
 };
 const offlineLimits={en:'Only explicitly saved instructions can reopen locally in this browser tab. Sending requires a connection and fresh server checks.',ar:'يمكن إعادة فتح التعليمات المحفوظة صراحةً فقط محليًا في علامة التبويب هذه. يتطلب الإرسال اتصالًا وفحوصًا جديدة للخادم.',ur:'صرف واضح طور پر محفوظ ہدایات اسی براؤزر ٹیب میں مقامی طور پر دوبارہ کھل سکتی ہیں۔ بھیجنے کے لیے رابطہ اور سرور کی نئی جانچ درکار ہے۔',hi:'केवल स्पष्ट रूप से सहेजे निर्देश इस ब्राउज़र टैब में स्थानीय रूप से फिर खुल सकते हैं। भेजने के लिए कनेक्शन और सर्वर की नई जाँच चाहिए।',bn:'শুধু স্পষ্টভাবে সংরক্ষিত নির্দেশনাই এই ব্রাউজার ট্যাবে স্থানীয়ভাবে আবার খুলতে পারে। পাঠাতে সংযোগ ও সার্ভারের নতুন যাচাই দরকার।',ml:'വ്യക്തമായി സംരക്ഷിച്ച നിർദ്ദേശങ്ങൾക്ക് മാത്രം ഈ ബ്രൗസർ ടാബിൽ പ്രാദേശികമായി വീണ്ടും തുറക്കാം. അയക്കാൻ കണക്ഷനും സെർവറിന്റെ പുതിയ പരിശോധനയും വേണം.',ta:'வெளிப்படையாகச் சேமித்த அறிவுறுத்தல்கள் மட்டும் இந்த உலாவி தாவலில் உள்ளூராக மீண்டும் திறக்கும். அனுப்ப இணைப்பும் சேவையகத்தின் புதிய சரிபார்ப்பும் தேவை.',te:'స్పష్టంగా సేవ్ చేసిన సూచనలు మాత్రమే ఈ బ్రౌజర్ ట్యాబ్‌లో స్థానికంగా మళ్లీ తెరవబడతాయి. పంపడానికి కనెక్షన్ మరియు సర్వర్ కొత్త తనిఖీలు అవసరం.',ne:'स्पष्ट रूपमा सुरक्षित निर्देशनहरू मात्र यो ब्राउजर ट्याबमा स्थानीय रूपमा फेरि खुल्न सक्छन्। पठाउन जडान र सर्भरको नयाँ जाँच चाहिन्छ।',fil:'Ang mga tahasang naka-save na tagubilin lamang ang muling bubukas nang lokal sa tab na ito. Kailangan ng koneksyon at bagong pagsusuri ng server para magpadala.',si:'පැහැදිලිව සුරකින ලද උපදෙස් පමණක් මෙම බ්‍රව්සර් ටැබයේ දේශීයව නැවත විවෘත වේ. යැවීමට සම්බන්ධතාවය සහ සේවාදායකයේ නව පරීක්ෂා අවශ්‍යයි.',ru:'Только явно сохранённые инструктажи могут снова открыться локально в этой вкладке. Для отправки нужны соединение и свежие проверки сервера.','pa-Guru':'ਸਿਰਫ਼ ਸਪੱਸ਼ਟ ਤੌਰ ਤੇ ਸੰਭਾਲੀਆਂ ਹਦਾਇਤਾਂ ਹੀ ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਟੈਬ ਵਿੱਚ ਸਥਾਨਕ ਤੌਰ ਤੇ ਦੁਬਾਰਾ ਖੁੱਲ੍ਹ ਸਕਦੀਆਂ ਹਨ। ਭੇਜਣ ਲਈ ਕਨੈਕਸ਼ਨ ਅਤੇ ਸਰਵਰ ਦੀ ਨਵੀਂ ਜਾਂਚ ਲੋੜੀਂਦੀ ਹੈ।','pa-Arab':'صرف واضح طور تے محفوظ ہدایات ایس براؤزر ٹیب اچ مقامی طور تے دوبارہ کھل سکدیاں نیں۔ بھیجن لئی کنکشن تے سرور دی نویں جانچ لوڑیندیاں نیں۔',id:'Hanya instruksi yang disimpan secara eksplisit yang dapat dibuka lagi secara lokal di tab browser ini. Mengirim memerlukan koneksi dan pemeriksaan server baru.'};
 const waitingText={en:'App update pending. Close other Understood tabs and reload this tab when your work is saved.',ar:'تحديث التطبيق قيد الانتظار. أغلق علامات Understood الأخرى وأعد تحميل هذه العلامة بعد حفظ عملك.',ur:'ایپ کی تازہ کاری منتظر ہے۔ کام محفوظ کرنے کے بعد Understood کے دوسرے ٹیب بند کریں اور یہ ٹیب دوبارہ لوڈ کریں۔',hi:'ऐप अपडेट लंबित है। काम सहेजने के बाद Understood के अन्य टैब बंद करें और यह टैब रीलोड करें।',bn:'অ্যাপ আপডেট বাকি। কাজ সংরক্ষণের পর Understood-এর অন্য ট্যাব বন্ধ করে এই ট্যাব রিলোড করুন।',ml:'ആപ്പ് അപ്‌ഡേറ്റ് കാത്തിരിക്കുന്നു. ജോലി സംരക്ഷിച്ച ശേഷം Understood-ന്റെ മറ്റ് ടാബുകൾ അടച്ച് ഈ ടാബ് റീലോഡ് ചെയ്യുക.',ta:'செயலி புதுப்பிப்பு நிலுவையில். வேலையைச் சேமித்த பின் Understood-இன் பிற தாவல்களை மூடி இந்தத் தாவலை மீளேற்றவும்.',te:'యాప్ అప్‌డేట్ పెండింగ్‌లో ఉంది. పని సేవ్ చేసిన తర్వాత Understood ఇతర ట్యాబ్‌లను మూసి ఈ ట్యాబ్‌ను రీలోడ్ చేయండి.',ne:'एप अपडेट बाँकी छ। काम सुरक्षित गरेपछि Understood का अन्य ट्याब बन्द गरी यो ट्याब रिलोड गर्नुहोस्।',fil:'Nakabinbin ang app update. Isara ang iba pang tab ng Understood at i-reload ang tab na ito kapag naka-save na ang trabaho.',si:'යෙදුම් යාවත්කාලීනය බලාපොරොත්තුවෙන්. වැඩ සුරැකී පසු Understood හි අනෙක් ටැබ වසා මෙම ටැබය නැවුම් කරන්න.',ru:'Ожидается обновление приложения. Закройте другие вкладки Understood и перезагрузите эту вкладку, когда работа сохранена.','pa-Guru':'ਐਪ ਅੱਪਡੇਟ ਬਾਕੀ ਹੈ। ਕੰਮ ਸੰਭਾਲਣ ਤੋਂ ਬਾਅਦ Understood ਦੀਆਂ ਹੋਰ ਟੈਬਾਂ ਬੰਦ ਕਰੋ ਅਤੇ ਇਹ ਟੈਬ ਦੁਬਾਰਾ ਲੋਡ ਕਰੋ।','pa-Arab':'ایپ اپ ڈیٹ باقی اے۔ کم محفوظ کرن مگروں Understood دے ہور ٹیب بند کرو تے ایہہ ٹیب دوبارہ لوڈ کرو۔',id:'Pembaruan aplikasi tertunda. Tutup tab Understood lain dan muat ulang tab ini setelah pekerjaan tersimpan.'};
+const deviceSectionText={
+  en:{stored:'Stored on this device',learnMore:'Learn more'},
+  ar:{stored:'المحفوظ على هذا الجهاز',learnMore:'اعرف المزيد'},
+  ur:{stored:'اس آلے پر محفوظ',learnMore:'مزید جانیں'},
+  hi:{stored:'इस डिवाइस पर सहेजा गया',learnMore:'और जानें'},
+  bn:{stored:'এই ডিভাইসে সংরক্ষিত',learnMore:'আরও জানুন'},
+  ml:{stored:'ഈ ഉപകരണത്തിൽ സംരക്ഷിച്ചത്',learnMore:'കൂടുതൽ അറിയുക'},
+  ta:{stored:'இந்தச் சாதனத்தில் சேமித்தவை',learnMore:'மேலும் அறிக'},
+  te:{stored:'ఈ పరికరంలో సేవ్ చేసినవి',learnMore:'మరింత తెలుసుకోండి'},
+  ne:{stored:'यो यन्त्रमा सुरक्षित',learnMore:'थप जान्नुहोस्'},
+  fil:{stored:'Naka-save sa device na ito',learnMore:'Matuto pa'},
+  si:{stored:'මෙම උපාංගයේ සුරකින ලද්දේ',learnMore:'තව දැනගන්න'},
+  ru:{stored:'Сохранено на этом устройстве',learnMore:'Подробнее'},
+  'pa-Guru':{stored:'ਇਸ ਡਿਵਾਈਸ ’ਤੇ ਸੰਭਾਲਿਆ',learnMore:'ਹੋਰ ਜਾਣੋ'},
+  'pa-Arab':{stored:'ایس آلے تے محفوظ',learnMore:'ہور جانو'},
+  id:{stored:'Tersimpan di perangkat ini',learnMore:'Pelajari lebih lanjut'},
+};
 export type WorkerDeviceProps=AudioOutboxProps & {onBack:()=>void;languageControl:React.ReactNode;languageError:string;onEndSession:()=>void;onEndSessionAndClear:()=>void};
 export function WorkerDevice({language,session,disabled,current,onOperation,onSessionLost,onBack,languageControl,languageError,onEndSession,onEndSessionAndClear}:WorkerDeviceProps) {
   const expiresAt=session.expiresAt!;
-  const t=labels[language],pwa=usePublicShell(),draftText=textDraftCopy[language];
+  const t=labels[language],pwa=usePublicShell(),draftText=textDraftCopy[language],sectionText=deviceSectionText[language];
   const privateLabel={en:'Private instructions',ar:'التعليمات الخاصة',ur:'نجی ہدایات',hi:'निजी निर्देश',bn:'ব্যক্তিগত নির্দেশনা',ml:'സ്വകാര്യ നിർദ്ദേശങ്ങൾ',ta:'தனிப்பட்ட அறிவுறுத்தல்கள்',te:'వ్యక్తిగత సూచనలు',ne:'निजी निर्देशनहरू',fil:'Pribadong tagubilin',si:'පෞද්ගලික උපදෙස්',ru:'Личные инструктажи','pa-Guru':'ਨਿੱਜੀ ਹਦਾਇਤਾਂ','pa-Arab':'نجی ہدایتاں',id:'Instruksi privat'}[language];
   const languageName=workerUiNativeName(language),sharedLabel={en:'Shared mode · not saved privately',ar:'الوضع المشترك · لا يُحفظ بشكل خاص',ur:'مشترکہ موڈ · نجی طور پر محفوظ نہیں',hi:'साझा मोड · निजी रूप से सहेजा नहीं',bn:'শেয়ার্ড মোড · ব্যক্তিগতভাবে সংরক্ষিত নয়',ml:'പങ്കിട്ട മോഡ് · സ്വകാര്യമായി സംരക്ഷിച്ചിട്ടില്ല',ta:'பகிர்வு பயன்முறை · தனிப்பட்டதாகச் சேமிக்கப்படவில்லை',te:'భాగస్వామ్య మోడ్ · వ్యక్తిగతంగా సేవ్ చేయబడలేదు',ne:'साझा मोड · निजी रूपमा सुरक्षित छैन',fil:'Shared mode · hindi pribadong naka-save',si:'බෙදාගත් ආකාරය · පෞද්ගලිකව සුරැකී නැත',ru:'Общий режим · не сохраняется приватно','pa-Guru':'ਸਾਂਝਾ ਮੋਡ · ਨਿੱਜੀ ਤੌਰ ਤੇ ਸੰਭਾਲਿਆ ਨਹੀਂ','pa-Arab':'سانجھا موڈ · نجی طور تے محفوظ نہیں',id:'Mode berbagi · tidak disimpan secara privat'}[language];
   const [draftStatus,setDraftStatus]=useState('');
@@ -57,16 +73,7 @@ export function WorkerDevice({language,session,disabled,current,onOperation,onSe
   const [online,setOnline]=useState(navigator.onLine);
   useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
   const standalone=window.matchMedia('(display-mode: standalone)').matches;
-  const [audioBusy,setAudioBusy]=useState(false),[audioStatus,setAudioStatus]=useState('');
-  const audioDialog=useRef<HTMLDialogElement>(null),audioTrigger=useRef<HTMLElement|null>(null),dangerDialog=useRef<HTMLDialogElement>(null),dangerTrigger=useRef<HTMLElement|null>(null);
-  async function clearSavedAudio(){
-    if(disabled || audioBusy || !current())return;
-    audioDialog.current?.close();setAudioBusy(true);setAudioStatus('');
-    try {await onOperation(async()=>{if(!current())throw Error();await clearAudioDraft(undefined,session.clientContext);});
-      if(current())setAudioStatus(t.audioCleared);}
-    catch {if(current())setAudioStatus(t.audioFailed);}
-    finally {if(current())setAudioBusy(false);}
-  }
+  const dangerDialog=useRef<HTMLDialogElement>(null),dangerTrigger=useRef<HTMLElement|null>(null);
   const expiry=new Date(expiresAt),sameDay=expiry.toDateString()===new Date().toDateString();
   const expiryHeadline=sameDay?t.expiresToday.replace('{time}',new Intl.DateTimeFormat(language,{timeStyle:'short'}).format(expiry)):`${t.expires}: ${new Intl.DateTimeFormat(language,{dateStyle:'medium',timeStyle:'short'}).format(expiry)}`;
   return <><button className="back-link" disabled={disabled} onClick={onBack}><ArrowLeft size={19}/>{t.back}</button>
@@ -79,11 +86,6 @@ export function WorkerDevice({language,session,disabled,current,onOperation,onSe
       </div>
       {languageError && <p role="alert">{languageError}</p>}
       <div className="device-action-row">
-        <span className="device-action-icon"><Download size={22}/></span>
-        <span className="device-action-copy"><strong>{t.offlineAccess}</strong><small>{t.offlineBody}</small></span>
-        <span className="device-switch"><label className="checkbox-label"><input type="checkbox" role="switch" checked={privateDevice} disabled={disabled || policyBusy} aria-label={t.offlineAccess} onChange={event=>askPolicy(event.target.checked)}/><span>{privateDevice?t.on:t.off}</span></label></span>
-      </div>
-      <div className="device-action-row">
         <span className="device-action-icon"><ShieldCheck size={22}/></span>
         <span className="device-action-copy"><strong>{policyText.title}</strong><small>{policyText.body}</small></span>
         <span className="device-switch"><label className="checkbox-label"><input type="checkbox" role="switch" checked={!privateDevice} disabled={disabled || policyBusy} aria-label={policyText.title} onChange={event=>askPolicy(!event.target.checked)}/><span>{!privateDevice?policyText.on:policyText.off}</span></label></span>
@@ -95,31 +97,31 @@ export function WorkerDevice({language,session,disabled,current,onOperation,onSe
     <dl className="device-status worker-card"><div><dt>{online?<Wifi size={24}/>:<WifiOff size={24}/>}{t.connection}</dt><dd>{online?t.online:t.offline}</dd></div>
       <div><dt><Download size={24}/>{t.shell}</dt><dd role="status">{pwa.status==='removed'?cacheText.removed:pwa.status==='waiting'?waitingText[language]:t[pwa.status]}{(pwa.status==='failed' || pwa.status==='waiting') && <button className="icon-button" onClick={()=>void pwa.recheck()} title={t.recheck} aria-label={t.recheck}><RefreshCw size={20}/></button>}</dd></div>
       <div><dt><ShieldCheck size={24}/>{privateLabel}</dt><dd>{privateDevice?t.private:sharedLabel}</dd></div>
-    </dl><p className="notice notice-amber">{offlineLimits[language]}</p>
+    </dl><details className="device-disclosure"><summary>{sectionText.learnMore}</summary><p>{offlineLimits[language]}</p></details>
     {standalone?<p role="status">{t.installed}</p>:<><button className="button primary full" disabled={!pwa.canInstall || pwa.installing} onClick={()=>void pwa.install()}><Download size={20}/>{t.install}</button>{!pwa.canInstall && <p className="muted">{t.noPrompt}</p>}</>}
     {pwa.installError && <p role="alert">{t.installError}</p>}
-    <section className="device-actions worker-card" aria-label={t.clearAudio}>
-      <button type="button" className="device-action-row" disabled={disabled || audioBusy} onClick={()=>{audioTrigger.current=document.activeElement as HTMLElement;audioDialog.current?.showModal();}}>
-        <span className="device-action-icon"><Trash2 size={22}/></span>
-        <span className="device-action-copy"><strong>{t.clearAudio}</strong><small>{t.clearAudioBody}</small></span>
-        <ChevronRight size={20}/>
-      </button>
+    <section className="device-storage" aria-labelledby="worker-device-storage-title">
+      <h2 id="worker-device-storage-title">{sectionText.stored}</h2>
+      <section className="worker-text-draft worker-offline-controls">
+        <h3>{draftText.title}</h3>
+        <details className="device-disclosure"><summary>{sectionText.learnMore}</summary><p>{draftText.limits}</p></details>
+        <button className="button outline full" onClick={()=>{try {removeTextDraft(sessionStorage);setDraftStatus(draftText.removed);}catch {setDraftStatus(draftText.failed);}}}><Trash2 size={20}/>{draftText.remove}</button>
+        {draftStatus && <p role="status">{draftStatus}</p>}
+      </section>
+      <WorkerOfflineCache session={session} language={language} disabled={disabled} current={current} onOperation={onOperation} learnMore={sectionText.learnMore}/>
+      <WorkerAudioOutbox session={session} language={language} disabled={disabled} current={current} onOperation={onOperation} onSessionLost={onSessionLost} learnMore={sectionText.learnMore}/>
+      {pwa.status==='ready' && <button className="button outline full" onClick={()=>void pwa.remove()}><Trash2 size={20}/>{cacheText.remove}</button>}
+    </section>
+    <section className="device-actions worker-card" aria-label={t.endSession}>
       <button type="button" className="device-action-row" disabled={disabled} onClick={onEndSession}>
         <span className="device-action-icon"><LogOut size={22}/></span>
         <span className="device-action-copy"><strong>{t.endSession}</strong><small>{t.endSessionBody}</small></span>
         <ChevronRight size={20}/>
       </button>
     </section>
-    {audioStatus && <p role="status">{audioStatus}</p>}
     <button type="button" className="device-danger-card" disabled={disabled} onClick={()=>{dangerTrigger.current=document.activeElement as HTMLElement;dangerDialog.current?.showModal();}}>
       <TriangleAlert size={26}/><span><strong>{t.endAndClear}</strong><small>{t.endAndClearBody}</small></span>
     </button>
-    <dialog ref={audioDialog} className="withdraw-dialog" aria-labelledby="worker-device-audio-title" aria-describedby="worker-device-audio-impact" onKeyDown={keepDialogFocus} onClose={()=>{if(audioTrigger.current?.isConnected)audioTrigger.current.focus();}}><h2 id="worker-device-audio-title">{t.clearAudio}</h2><p id="worker-device-audio-impact">{t.clearAudioWarning}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>audioDialog.current?.close()}>{t.cancel}</button><button className="button danger" disabled={audioBusy} onClick={()=>void clearSavedAudio()}>{t.clearAudioConfirm}</button></div></dialog>
     <dialog ref={dangerDialog} className="withdraw-dialog" aria-labelledby="worker-device-end-clear-title" aria-describedby="worker-device-end-clear-impact" onKeyDown={keepDialogFocus} onClose={()=>{if(dangerTrigger.current?.isConnected)dangerTrigger.current.focus();}}><h2 id="worker-device-end-clear-title">{t.endAndClear}</h2><p id="worker-device-end-clear-impact">{t.endAndClearWarning}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>dangerDialog.current?.close()}>{t.cancel}</button><button className="button danger" disabled={disabled} onClick={()=>{dangerDialog.current?.close();onEndSessionAndClear();}}>{t.endAndClear}</button></div></dialog>
-    <p>{draftText.limits}</p><button className="button outline full" onClick={()=>{try {removeTextDraft(sessionStorage);setDraftStatus(draftText.removed);}catch {setDraftStatus(draftText.failed);}}}><Trash2 size={20}/>{draftText.remove}</button>
-    {draftStatus && <p role="status">{draftStatus}</p>}
-    <WorkerOfflineCache session={session} language={language} disabled={disabled} current={current} onOperation={onOperation}/>
-    <WorkerAudioOutbox session={session} language={language} disabled={disabled} current={current} onOperation={onOperation} onSessionLost={onSessionLost}/>
-    {pwa.status==='ready' && <button className="button outline full" onClick={()=>void pwa.remove()}><Trash2 size={20}/>{cacheText.remove}</button>}
   </>;
 }

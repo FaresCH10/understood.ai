@@ -6,7 +6,7 @@ import {readWorkerRequestReceipt,workerReceiptCheckText} from './worker-request'
 import type {PageSession} from './session-state';
 import type {WorkerUiLanguage} from './worker-ui-language';
 
-export type AudioOutboxProps={session:PageSession;language:WorkerUiLanguage;disabled:boolean;current:()=>boolean;onOperation:(work:()=>Promise<void>)=>Promise<void>;onSessionLost:()=>void};
+export type AudioOutboxProps={session:PageSession;language:WorkerUiLanguage;disabled:boolean;current:()=>boolean;onOperation:(work:()=>Promise<void>)=>Promise<void>;onSessionLost:()=>void;learnMore?:string};
 const copy={
   en:{title:'Saved recordings',scope:'Instruction',version:'Version',expires:'Expires',limits:'Up to 10 recordings and 25 MiB on this device. Saved copies remain until removed or expired.',removeAll:'Remove all saved recordings'},
   ar:{title:'التسجيلات المحفوظة',scope:'التعليمات',version:'الإصدار',expires:'تنتهي الصلاحية',limits:'حتى 10 تسجيلات و25 ميبيبايت على هذا الجهاز. تبقى النسخ المحفوظة حتى حذفها أو انتهاء صلاحيتها.',removeAll:'حذف جميع التسجيلات المحفوظة'},
@@ -29,7 +29,7 @@ function Preview({item,label}:{item:AudioOutboxItem;label:string}){
   useEffect(()=>{const next=URL.createObjectURL(new Blob([new Uint8Array(item.draft.bytes)],{type:'audio/wav'}));setUrl(next);return()=>URL.revokeObjectURL(next);},[item]);
   return <audio controls preload="none" src={url || undefined} aria-label={label}/>;
 }
-export function WorkerAudioOutbox({session,language,disabled,current,onOperation,onSessionLost}:AudioOutboxProps){
+export function WorkerAudioOutbox({session,language,disabled,current,onOperation,onSessionLost,learnMore}:AudioOutboxProps){
   const t=copy[language],a=audioDraftCopy[language],r=workerReceiptCheckText[language];
   const [items,setItems]=useState<AudioOutboxItem[]>([]),[loading,setLoading]=useState(true),[tick,setTick]=useState(0),[working,setWorking]=useState(false),[notice,setNotice]=useState(''),[statuses,setStatuses]=useState<Record<string,string>>({});
   const live=useRef(false),revision=useRef(0),inFlight=useRef(false),allowed=useRef(current);allowed.current=current;
@@ -70,7 +70,7 @@ export function WorkerAudioOutbox({session,language,disabled,current,onOperation
   }
   const locked=disabled || working;
   return <section className="worker-audio-outbox"><div className="worker-card-head"><h2><HardDrive size={20}/> {t.title}</h2><button className="icon-button" title={a.reload} aria-label={a.reload} disabled={locked} onClick={()=>{setNotice('');setTick(value=>value+1);}}><RefreshCw size={20}/></button></div>
-    <p>{a.privacy}</p><p className="muted">{t.limits}</p>{notice && <p role="status">{notice}</p>}
+    {learnMore?<details className="device-disclosure"><summary>{learnMore}</summary><p>{a.privacy}</p><p className="muted">{t.limits}</p></details>:<><p>{a.privacy}</p><p className="muted">{t.limits}</p></>}{notice && <p role="status">{notice}</p>}
     {loading?<p role="status">{a.loading}</p>:!items.length?<p>{a.empty}</p>:items.map(item=><article className="worker-card" key={item.key}>
       <h3>{t.scope} <bdi>{item.draft.scope.assignmentId}</bdi></h3><p>{t.version} {item.draft.scope.version} · {item.draft.scope.language.toUpperCase()}</p>
       <p><time dateTime={item.draft.capturedAt}>{new Date(item.draft.capturedAt).toLocaleString(language)}</time></p><p>{t.expires}: <time dateTime={item.draft.expiresAt}>{new Date(item.draft.expiresAt).toLocaleString(language)}</time></p>

@@ -1,3 +1,4 @@
+import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useRef,useState} from 'react';
 import {RefreshCw,X} from 'lucide-react';
 import {keepDialogFocus} from './dialog-focus';
@@ -5,6 +6,7 @@ import type {SourceUploadSession} from './source-audio-upload';
 import {readSourceRetry,saveSourceRetry,clearSourceRetry,checkSourceRetry,sendSourceRetry,type PendingSourceRetry,type SourceRetryReceipt} from './source-audio-retry';
 
 export default function SourceTranscriptionRetry({session,sourceId,sourceHash,retryable,onChanged,canAct=()=>true}:{session:SourceUploadSession;sourceId:string;sourceHash:string;retryable:boolean;onChanged:()=>void;canAct?:()=>boolean}) {
+  const staffT=useStaffStaticText();
   const [saved,setSaved]=useState<{pending:PendingSourceRetry|null;error:string}>(()=>{
     try{return {pending:readSourceRetry(sessionStorage,session,sourceId,sourceHash),error:''};}catch(reason){return {pending:null,error:(reason as Error).message};}
   });
@@ -30,19 +32,19 @@ export default function SourceTranscriptionRetry({session,sourceId,sourceHash,re
   }
   if(!retryable && !saved.pending && !saved.error)return null;
   return <div className="source-retry-control">
-    {(saved.error || error) && <p role="alert" className="record-error">{saved.error || error}</p>}
-    {saved.pending && <p className="staff-recovery-request">Retry {saved.pending.requestId}</p>}
-    {busy && <p role="status">Checking retry outcome...</p>}
-    {receipt && <p role="status">{receipt.found?`Retry accepted at ${new Date(receipt.acceptedAt!).toISOString()}. This receipt confirms queueing only.`:'No retry receipt was found. Nothing has been confirmed as queued.'}</p>}
+    {(saved.error || error) && <p role="alert" className="record-error">{((saved.error?staffT.error(saved.error):staffT.error(error)))}</p>}
+    {saved.pending && <p className="staff-recovery-request">{staffT("Retry")} {saved.pending.requestId}</p>}
+    {busy && <p role="status">{staffT("Checking retry outcome...")}</p>}
+    {receipt && <p role="status">{receipt.found?staffT("Retry accepted at {p0}. This receipt confirms queueing only.",{p0:new Date(receipt.acceptedAt!).toISOString()}):staffT("No retry receipt was found. Nothing has been confirmed as queued.")}</p>}
     <div className="actions">
-      {saved.pending && <button className="button outline" disabled={busy} onClick={()=>void operate(saved.pending!,false)}><RefreshCw size={18}/>Check retry receipt</button>}
-      {receipt?.found && <button className="button outline" disabled={busy} onClick={()=>{if(!canAct())return;try{clearSourceRetry(sessionStorage,saved.pending!);setSaved({pending:null,error:''});setReceipt(null);onChanged();}catch(reason){setError((reason as Error).message);}}}><X size={18}/>Close retry receipt</button>}
-      {retryable && !saved.error && (!saved.pending || receipt?.found===false) && <button ref={trigger} className="button outline" disabled={busy} onClick={()=>{if(!canAct())return;setConfirmed(false);dialog.current?.showModal();}}><RefreshCw size={18}/>{saved.pending?'Resend exact retry':'Retry transcription'}</button>}
+      {saved.pending && <button className="button outline" disabled={busy} onClick={()=>void operate(saved.pending!,false)}><RefreshCw size={18}/>{staffT("Check retry receipt")}</button>}
+      {receipt?.found && <button className="button outline" disabled={busy} onClick={()=>{if(!canAct())return;try{clearSourceRetry(sessionStorage,saved.pending!);setSaved({pending:null,error:''});setReceipt(null);onChanged();}catch(reason){setError((reason as Error).message);}}}><X size={18}/>{staffT("Close retry receipt")}</button>}
+      {retryable && !saved.error && (!saved.pending || receipt?.found===false) && <button ref={trigger} className="button outline" disabled={busy} onClick={()=>{if(!canAct())return;setConfirmed(false);dialog.current?.showModal();}}><RefreshCw size={18}/>{saved.pending?staffT("Resend exact retry"):staffT("Retry transcription")}</button>}
     </div>
     <dialog ref={dialog} className="withdraw-dialog" aria-labelledby={`source-retry-${sourceId}`} onKeyDown={keepDialogFocus} onCancel={event=>{event.preventDefault();close();}}>
-      <h2 id={`source-retry-${sourceId}`}>Retry source transcription?</h2><p>The same saved audio will be queued again. No duplicate upload or published version is created. A permitted provider must be available; this does not enable live processing.</p>
-      <label className="recipient-row publish-confirm"><input autoFocus type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/><span>Queue another transcription attempt for this source</span></label>
-      <div className="actions"><button className="button outline" onClick={close}>Cancel</button><button className="button primary" disabled={!confirmed || busy} onClick={()=>void send()}><RefreshCw size={18}/>Queue retry</button></div>
+      <h2 id={`source-retry-${sourceId}`}>{staffT("Retry source transcription?")}</h2><p>{staffT("The same saved audio will be queued again. No duplicate upload or published version is created. A permitted provider must be available; this does not enable live processing.")}</p>
+      <label className="recipient-row publish-confirm"><input autoFocus type="checkbox" checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/><span>{staffT("Queue another transcription attempt for this source")}</span></label>
+      <div className="actions"><button className="button outline" onClick={close}>{staffT("Cancel")}</button><button className="button primary" disabled={!confirmed || busy} onClick={()=>void send()}><RefreshCw size={18}/>{staffT("Queue retry")}</button></div>
     </dialog>
   </div>;
 }

@@ -1,4 +1,5 @@
 import { ensureRecordingSchema, isCurrentRecording, responseColumns } from "./recordings.mjs";
+import { ensureEvidenceSchema } from './evidence.mjs';
 import {NOW,transaction} from './db.mjs';
 import {ensureReportAudienceSchema,reportScope,selectReport} from './report-scope.mjs';
 import {reportPublicationFilters} from './report-input.mjs';
@@ -56,6 +57,7 @@ export function publicationModes(snapshot) {
   return {
     responseMode:value?.responseMode==='acknowledge'?'acknowledge':value?.responseMode==='question'?'question':'legacy',
     deliveryMode:['text','voice','both'].includes(value?.deliveryMode)?value.deliveryMode:'legacy',
+    evidenceMode:value?.evidenceMode==='photo' && value?.responseMode==='acknowledge'?'photo':'none',
   };
 }
 
@@ -67,13 +69,24 @@ export function reportDelivery(send,states=[]) {
     undelivered:Number(send.undelivered),undeliveredReasons:json(send.undelivered_json,[]),states:counts};
 }
 
+export function openEarlierVersionCases(db,session,publication) {
+  return db.prepare(`SELECT COUNT(*) AS total FROM clarifications c
+    JOIN assignments a ON a.id=c.assignment_id AND a.org_id=c.org_id
+    JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
+    WHERE c.org_id=? AND a.site_id=? AND c.status='open'
+      AND p.briefing_id=? AND p.version<?`)
+    .get(session.org_id,session.site_id,publication.briefing_id,publication.version).total;
+}
+
 export function reportActivity(db,session,publication,input={}) {
   const filters=reportScope(input);
   ensureReportAudienceSchema(db);
   ensureRecordingSchema(db);
+  ensureEvidenceSchema(db);
   const rows = db
     .prepare(
-      `SELECT w.code,a.language,a.id AS assignment_id,${responseColumns}
+      `SELECT w.code,a.language,a.id AS assignment_id,${responseColumns},
+      (SELECT ae.received_at FROM assignment_evidence ae WHERE ae.assignment_id=a.id AND ae.org_id=a.org_id) AS evidence_at
     FROM assignments a JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
     WHERE a.org_id=? AND a.site_id=? AND a.publication_id=? ORDER BY w.code,a.id LIMIT 5001`,
     )
@@ -111,13 +124,17 @@ export function activityRow(row, version, modes={}) {
     currentAudio || (row.attempt_at && !row.outcome) ? 'unassessed' : row.outcome || '', receivedAt instanceof Date ? receivedAt.toISOString() : receivedAt || '', version,
     modes.responseMode || 'legacy', modes.deliveryMode || 'legacy'];
   if(modes.showResolved)cells.push(modes.resolved?'resolved':'');
+  if(modes.evidenceMode==='photo')cells.push(row.evidence_at?'received':'missing',row.evidence_at instanceof Date?row.evidence_at.toISOString():row.evidence_at||'');
   return cells;
 }
 
 const activityHeaders=["worker_id","language","response_status","assessment","received_at","briefing_version"];
+const evidenceHeaders=["evidence_status","evidence_received_at"];
 export function activityColumns(rows) {
   const width=rows.length?rows[0].length:6;
-  if(![6,8,9].includes(width) || rows.some((row)=>!Array.isArray(row) || row.length!==width))throw new Error('Invalid activity rows');
+  if(![6,8,9,10,11].includes(width) || rows.some((row)=>!Array.isArray(row) || row.length!==width))throw new Error('Invalid activity rows');
+  if(width===11)return [...activityHeaders,"response_mode","delivery_mode","follow_up_status",...evidenceHeaders];
+  if(width===10)return [...activityHeaders,"response_mode","delivery_mode",...evidenceHeaders];
   if(width===9)return [...activityHeaders,"response_mode","delivery_mode","follow_up_status"];
   return width===8?[...activityHeaders,"response_mode","delivery_mode"]:activityHeaders;
 }

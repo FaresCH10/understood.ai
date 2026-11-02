@@ -26,7 +26,8 @@ import {receiveSourceAudio,getSourceAudioReceipt,getSourceAudio,listSourceAudio}
 import {retrySourceAudio,getSourceRetryReceipt} from './source-audio-retry.mjs';
 import {DEFAULT_AUDIO_ROOT} from './recordings.mjs';
 import { ensureRecordingSchema, isCurrentRecording, responseColumns } from "./recordings.mjs";
-import { briefingActivityCsv,listReportPublications,reportActivity } from "./reports.mjs";
+import { briefingActivityCsv,listReportPublications,openEarlierVersionCases,reportActivity } from "./reports.mjs";
+import { listCalendar } from "./calendar.mjs";
 import {reportScope} from './report-scope.mjs';
 import {listNotifications,readNotification,notificationReceipt} from './notifications.mjs';
 import {listWorkerNotifications,readWorkerNotification,workerNotificationReceipt,savePushSubscription,revokePushSubscription,pushSubscriptionStatus} from './notification-events.mjs';
@@ -48,12 +49,16 @@ import { ensureBriefingSchema,createDraft,editDraft,queuePreparation,copyDraft,a
 import {ensureInstructionSchema} from './instruction-schema.mjs';
 import {startInstructionSend,completeInstructionSend,instructionSendStatus,instructionAudienceOverview,retryInstructionSend,instructionDeliveryContentForAssignment} from './instructions.mjs';
 import {acknowledgeAssignment} from './acknowledgments.mjs';
+import {handleImprovementRoute} from './self-healing-http.mjs';
+import {improvementHttpError} from './self-healing-input.mjs';
+import {readInstructionImprovement,analyzeInstructionImprovement,createImprovementDraft} from './self-healing.mjs';
 import {createPresentation,listPresentations} from './presentations.mjs';
 import {processOne} from './worker.mjs';
 import { briefingFilters } from './briefing-input.mjs';
 import {listPublicationHistory,getPublicationHistoryDetail} from './publication-history.mjs';
 import {publicationHistoryQuery} from './publication-history-input.mjs';
 import {createSchedule,listSchedules,cancelSchedule} from './schedules.mjs';
+import {listReverificationCandidates} from './reverification.mjs';
 import {scheduleHttpError} from './schedule-input.mjs';
 import {publicationReceipt,publicationReceiptHttpError} from './publication-receipts.mjs';
 import {draftCreationReceipt,draftCreationHttpError} from './draft-creations.mjs';
@@ -77,10 +82,14 @@ import {siteCrewOverview} from './site-crews.mjs';
 import {crewOverviewHttpError} from './crew-overview.mjs';
 import {issueInvitation,changeInvitation,listInvitations,invitationReceipt,previewInvitation,acceptInvitation} from './invitations.mjs';
 import {getDraftReview,saveDraftReview,draftReviewReceipt} from './draft-review.mjs';
-import {ensureTemplateSchema,listTemplates,getTemplate,changeTemplate,templateReceipt} from './templates.mjs';
+import {ensureTemplateSchema,listTemplates,getTemplate,setTemplateFavorite,changeTemplate,templateReceipt} from './templates.mjs';
+import {ensureTranslationFeedbackSchema,listTranslationFeedback,reportTranslationFeedback,decideTranslationFeedback} from './translation-feedback.mjs';
+import {saveCompetencySetting,listCompetencies,workerCompetencies} from './competencies.mjs';
 import {templateRecoveryScope} from './template-input.mjs';
 import {listGlossary,getGlossaryTerm,changeGlossary,glossaryReceipt} from './glossary.mjs';
-import { listPublicationResponses,getPublicationResponse,workerSubmissions,workerSubmission,staffWorkerAssignments,workerBriefings,workerRequestReceipt } from './responses.mjs';
+import { listPublicationResponses,getPublicationResponse,workerSubmissions,workerSubmission,staffWorkerAssignments,workerBriefings,workerRequestReceipt,publicationAssignmentEvidence,workerAssignmentEvidence } from './responses.mjs';
+import {sendPrivateImage} from './audio-response.mjs';
+import {assignmentEvidence,ensureEvidenceSchema} from './evidence.mjs';
 import { ensureExportSchema, requestExport, listExports, retryExport, downloadExport,exportReceipt } from './exports.mjs';
 import {sendInvoiceDownload} from './invoice-download.mjs';
 import {languageReadinessModel,latestPublicationSnapshot} from './language-readiness.mjs';
@@ -97,7 +106,8 @@ import { ensureWorkerImportSchema, readImportBytes, previewWorkerImport, getWork
 import { ensurePeopleSchema, listWorkers, createWorker, updateWorker, disableWorker,reenableWorker,
   listCrews,getCrew,listCrewRecipients, createCrew, moveWorkerToCrew, renameCrew, archiveCrew,restoreCrew,
   workerLanguageState, workerLanguageHistory, selectWorkerLanguage, requestWorkerLanguage,
-  staffWorkerLanguageHistory, listLanguageRequests, decideWorkerLanguageRequest } from './people.mjs';
+  staffWorkerLanguageHistory, listLanguageRequests, decideWorkerLanguageRequest,
+  readWorkerIdSettings, updateWorkerIdPrefix } from './people.mjs';
 import {
   authenticateStaff,
   clearSessionCookie,
@@ -135,6 +145,103 @@ function latestPublication(db, session) {
     .get(session.org_id, session.site_id);
 }
 
+const ATTENTION_LIMIT = 5;
+const ATTENTION_PAGE_SIZE = 20;
+const ATTENTION_GROUPS = new Set(["waiting", "delivery"]);
+const waitingAttentionFrom = `FROM assignments a
+    JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
+    JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
+    WHERE a.org_id=? AND a.site_id=? AND p.state='published'
+      AND NOT EXISTS(SELECT 1 FROM attempts t WHERE t.assignment_id=a.id AND t.org_id=a.org_id)
+      AND NOT EXISTS(SELECT 1 FROM acknowledgments ak WHERE ak.assignment_id=a.id AND ak.org_id=a.org_id)
+      AND NOT EXISTS(SELECT 1 FROM recordings r WHERE r.assignment_id=a.id AND r.org_id=a.org_id AND r.received_at IS NOT NULL)`;
+const deliveryAttentionFrom = `FROM instruction_sends s
+    JOIN briefings b ON b.id=s.briefing_id AND b.org_id=s.org_id AND b.site_id=s.site_id
+    LEFT JOIN publications p ON p.id=s.publication_id AND p.org_id=s.org_id AND p.site_id=s.site_id
+    WHERE s.org_id=? AND s.site_id=? AND (s.state='failed' OR (s.state='published' AND s.undelivered>0))
+      AND NOT EXISTS(SELECT 1 FROM briefing_archives ba
+        WHERE ba.briefing_id=s.briefing_id AND ba.org_id=s.org_id AND ba.site_id=s.site_id)`;
+
+function attentionPageInput(filters = {}) {
+  if (Object.keys(filters).some((key) => !["group", "page", "pageSize"].includes(key)))
+    throw new Error("Invalid attention filter");
+  if (!ATTENTION_GROUPS.has(filters.group))
+    throw new Error("Invalid attention filter");
+  const page = filters.page === undefined ? 1 : Number(filters.page);
+  const pageSize = filters.pageSize === undefined ? ATTENTION_PAGE_SIZE : Number(filters.pageSize);
+  if (!Number.isInteger(page) || page < 1 || page > 100000)
+    throw new Error("Invalid attention filter");
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50)
+    throw new Error("Invalid attention filter");
+  return { group: filters.group, page, pageSize };
+}
+
+function staffAttentionPage(db, session, filters) {
+  const { group, page, pageSize } = attentionPageInput(filters);
+  const offset = (page - 1) * pageSize;
+  if (group === "waiting") {
+    const total = db
+      .prepare(`SELECT COUNT(*) AS total ${waitingAttentionFrom}`)
+      .get(session.org_id, session.site_id).total;
+    const items = db
+      .prepare(
+        `SELECT a.id AS assignmentId,w.code AS worker,a.language,
+        json_extract(p.snapshot_json,'$.title') AS title,p.briefing_id AS briefingId,p.version,
+        a.due_at AS dueAt,a.created_at AS createdAt ${waitingAttentionFrom}
+        ORDER BY CASE WHEN a.due_at IS NULL THEN 1 ELSE 0 END,a.due_at,a.created_at,a.id
+        LIMIT ? OFFSET ?`,
+      )
+      .all(session.org_id, session.site_id, pageSize, offset);
+    return { group, page, pageSize, total, items };
+  }
+  const total = db
+    .prepare(`SELECT COUNT(*) AS total ${deliveryAttentionFrom}`)
+    .get(session.org_id, session.site_id).total;
+  const items = db
+    .prepare(
+      `SELECT s.request_id AS requestId,s.briefing_id AS briefingId,
+      COALESCE(json_extract(p.snapshot_json,'$.title'),b.title) AS title,
+      s.state,s.delivered,s.undelivered,s.undelivered_json AS undeliveredJson,s.updated_at AS updatedAt
+      ${deliveryAttentionFrom} ORDER BY s.updated_at DESC,s.request_id LIMIT ? OFFSET ?`,
+    )
+    .all(session.org_id, session.site_id, pageSize, offset)
+    .map(({ undeliveredJson, ...row }) => ({
+      ...row,
+      reasons: JSON.parse(undeliveredJson).map((reason) => ({
+        reason: reason.reason,
+        language: reason.language ?? null,
+        count: reason.count,
+      })),
+    }));
+  return { group, page, pageSize, total, items };
+}
+
+function staffAttention(db, session, cases) {
+  const needsAttention = db
+    .prepare(
+      `SELECT COUNT(*) AS total FROM clarifications c
+    JOIN assignments a ON a.id=c.assignment_id AND a.org_id=c.org_id
+    WHERE c.org_id=? AND a.site_id=? AND c.status='open'`,
+    )
+    .get(session.org_id, session.site_id).total;
+  const waiting = staffAttentionPage(db, session, {
+    group: "waiting",
+    page: 1,
+    pageSize: ATTENTION_LIMIT,
+  });
+  const delivery = staffAttentionPage(db, session, {
+    group: "delivery",
+    page: 1,
+    pageSize: ATTENTION_LIMIT,
+  });
+  return {
+    total: needsAttention + waiting.total + delivery.total,
+    needsAttention: { total: needsAttention, items: cases },
+    waiting: { total: waiting.total, items: waiting.items },
+    delivery: { total: delivery.total, items: delivery.items },
+  };
+}
+
 function staffOverview(db, session, config) {
   const organization = db
     .prepare("SELECT name FROM organizations WHERE id=?")
@@ -156,12 +263,13 @@ function staffOverview(db, session, config) {
       };
   const cases = db
     .prepare(
-      `SELECT c.id,c.reason,c.status,c.created_at,w.code AS worker,a.language,b.title
+      `SELECT c.id,c.reason,c.status,c.created_at,w.code AS worker,a.language,
+      json_extract(p.snapshot_json,'$.title') AS title
     FROM clarifications c JOIN assignments a ON a.id=c.assignment_id AND a.org_id=c.org_id
     JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id
     JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id
-    JOIN briefings b ON b.id=p.briefing_id AND b.org_id=p.org_id
-    WHERE c.org_id=? AND a.site_id=? AND c.status='open' ORDER BY c.created_at DESC LIMIT 5`,
+    WHERE c.org_id=? AND a.site_id=? AND c.status='open'
+    ORDER BY c.created_at DESC,c.id DESC LIMIT ${ATTENTION_LIMIT}`,
     )
     .all(session.org_id, session.site_id);
   return {
@@ -170,6 +278,7 @@ function staffOverview(db, session, config) {
     date: "Friday, 2 October",
     metrics: counts,
     cases,
+    attention: staffAttention(db, session, cases),
     publication: publication
       ? {
           id: publication.id,
@@ -240,6 +349,7 @@ export function createAppHandler(db, options = {}) {
   ensureBillingSchema(db);
   ensureSettingsSchema(db);
   ensureTemplateSchema(db);
+  ensureTranslationFeedbackSchema(db);
   ensureRecoverySchema(db);
   ensureRegistrationSchema(db);
   ensurePilotSchema(db);
@@ -471,6 +581,10 @@ export function createAppHandler(db, options = {}) {
         staffOnly(session);
         return send(res, 200, staffOverview(db, session, config));
       }
+      if (path === "/api/overview/attention" && req.method === "GET") {
+        staffOnly(session);
+        return send(res, 200, staffAttentionPage(db, session, Object.fromEntries(url.searchParams)));
+      }
       if(await handleWorkspaceRoute(req,res,session,url,(s,op,input)=>sqliteWorkspace(db,s,op,input)))return;
       if(path==='/api/instructions/audience' && req.method==='GET') {
         if(url.search) throw new Error('Invalid instruction request');
@@ -544,6 +658,11 @@ export function createAppHandler(db, options = {}) {
           if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid crew overview request');
           return send(res,200,siteCrewOverview(db,session,Object.fromEntries(url.searchParams)));
         }catch(error){const failure=crewOverviewHttpError(error);return send(res,failure.status,{error:failure.message});}
+      }
+      if (path === '/api/people/worker-id') {
+        if (url.search) throw new Error('Invalid worker ID request');
+        if (req.method === 'GET') return send(res, 200, readWorkerIdSettings(db, session));
+        if (req.method === 'PATCH') return send(res, 200, updateWorkerIdPrefix(db, session, await readJson(req)));
       }
       if (path === '/api/people/workers') {
         if (req.method === 'GET') return send(res, 200, listWorkers(db, session, Object.fromEntries(url.searchParams)));
@@ -651,6 +770,17 @@ export function createAppHandler(db, options = {}) {
       if(responses && req.method==='GET') return send(res,200,responses[2]
         ? getPublicationResponse(db,session,responses[1],responses[2],Object.fromEntries(url.searchParams))
         : listPublicationResponses(db,session,responses[1],Object.fromEntries(url.searchParams)));
+      const responseEvidence=path.match(/^\/api\/publications\/([^/]+)\/responses\/([^/]+)\/evidence$/);
+      if(responseEvidence && req.method==='GET') {
+        if(url.search)throw new Error('Evidence unavailable');
+        const data=publicationAssignmentEvidence(db,session,responseEvidence[1],responseEvidence[2]);
+        sendPrivateImage(res,data.mime,data.dataBase64);
+        return;
+      }
+      if(await handleImprovementRoute(req,res,session,url,{
+        read:(s,id)=>readInstructionImprovement(db,s,id),analyze:(s,id)=>analyzeInstructionImprovement(db,s,id),
+        draft:(s,id,input)=>createImprovementDraft(db,s,id,input),
+      }))return;
       if (path === "/api/briefings" && req.method === "POST") {
         const result=createDraft(db,session,await readJson(req));
         return send(res,result.duplicate ? 200 : 201,result);
@@ -675,6 +805,11 @@ export function createAppHandler(db, options = {}) {
           const result=createSchedule(db,session,id,await readJson(req,600000));return send(res,result.duplicate?200:202,result);
         }
       }
+      const reverificationRoute=path.match(/^\/api\/briefings\/([^/]+)\/reverification$/);
+      if(reverificationRoute && req.method==='GET') {
+        staffOnly(session);
+        return send(res,200,listReverificationCandidates(db,session,decodeURIComponent(reverificationRoute[1]),Object.fromEntries(url.searchParams)));
+      }
       const publicationHistoryRoute=path.match(/^\/api\/briefings\/([^/]+)\/publications(?:\/([^/]+))?$/);
       if(publicationHistoryRoute && req.method==='GET') {
         const [,briefingId,publicationId]=publicationHistoryRoute.map(value=>value?decodeURIComponent(value):value);
@@ -687,6 +822,11 @@ export function createAppHandler(db, options = {}) {
         const [,id,requestId]=preparationRequestMatch;
         if(req.method==='GET')return send(res,200,requestId?getPreparationRequestReceipt(db,session,id,requestId):getPreparationRequestContext(db,session,id));
         if(req.method==='POST' && !requestId)return send(res,202,requestPreparation(db,session,id,await readJson(req)));
+      }
+      const competencySettingMatch=path.match(/^\/api\/briefings\/([^/]+)\/competency$/);
+      if(competencySettingMatch && req.method==='POST') {
+        if(url.search)throw Error('Invalid competency setting');
+        return send(res,200,saveCompetencySetting(db,session,decodeURIComponent(competencySettingMatch[1]),await readJson(req,4096)));
       }
       const briefingMatch = path.match(
         /^\/api\/briefings\/([^/]+)(?:\/(process|publish|withdraw|copy|archive|review))?$/,
@@ -745,6 +885,7 @@ export function createAppHandler(db, options = {}) {
         }
         if (action === 'withdraw' && req.method === 'POST') return send(res,200,withdrawPublication(db,session,id,await readJson(req)));
       }
+      if(path==='/api/competencies' && req.method==='GET') return send(res,200,listCompetencies(db,session,Object.fromEntries(url.searchParams)));
       if(path==='/api/templates' && req.method==='GET') return send(res,200,listTemplates(db,session,Object.fromEntries(url.searchParams)));
       if(path==='/api/glossary' && req.method==='GET') return send(res,200,listGlossary(db,session,Object.fromEntries(url.searchParams)));
       if(path==='/api/glossary' && req.method==='POST') {if(url.search) throw new Error('Invalid glossary request');const result=changeGlossary(db,session,'create',null,await readJson(req));return send(res,result.duplicate ? 200 : 201,result);}
@@ -761,9 +902,15 @@ export function createAppHandler(db, options = {}) {
       if(path==='/api/templates' && req.method==='POST') {if(url.search) throw new Error('Invalid template request');const result=changeTemplate(db,session,'create',null,await readJson(req));return send(res,result.duplicate ? 200 : 201,result);}
       const templateReceiptMatch=path.match(/^\/api\/templates\/receipts\/([^/]+)$/);
       if(templateReceiptMatch && req.method==='GET') {if(url.search) throw new Error('Invalid template request');return send(res,200,templateReceipt(db,session,decodeURIComponent(templateReceiptMatch[1])));}
+      const templateFavoriteMatch=path.match(/^\/api\/templates\/([^/]+)\/favorite$/);
+      if(templateFavoriteMatch && req.method==='POST'){if(url.search) throw new Error('Invalid template favorite request');return send(res,200,setTemplateFavorite(db,session,decodeURIComponent(templateFavoriteMatch[1]),await readJson(req,1024)));}
       const templateMatch=path.match(/^\/api\/templates\/([^/]+)(?:\/(edit|archive|restore|duplicate|use))?$/);
       if(templateMatch && !templateMatch[2] && req.method==='GET') return send(res,200,getTemplate(db,session,templateMatch[1],Object.fromEntries(url.searchParams)));
       if(templateMatch && templateMatch[2] && req.method==='POST') {if(url.search) throw new Error('Invalid template request');return send(res,200,changeTemplate(db,session,templateMatch[2],templateMatch[1],await readJson(req)));}
+      if(path==='/api/translation-feedback' && req.method==='GET') return send(res,200,listTranslationFeedback(db,session,Object.fromEntries(url.searchParams)));
+      if(path==='/api/translation-feedback' && req.method==='POST') {if(url.search) throw new Error('Invalid translation feedback');const result=reportTranslationFeedback(db,session,await readJson(req,4096));return send(res,result.duplicate ? 200 : 201,result);}
+      const translationFeedbackDecision=path.match(/^\/api\/translation-feedback\/([^/]+)\/decision$/);
+      if(translationFeedbackDecision && req.method==='POST') {if(url.search) throw new Error('Invalid translation feedback decision');return send(res,200,decideTranslationFeedback(db,session,decodeURIComponent(translationFeedbackDecision[1]),await readJson(req,4096)));}
       if(path==='/api/settings/staff' && req.method==='GET') return send(res,200,listStaff(db,session,Object.fromEntries(url.searchParams)));
       if(path==='/api/settings/invitations' && req.method==='GET') return send(res,200,listInvitations(db,session,Object.fromEntries(url.searchParams)));
       if(path==='/api/settings/invitations' && req.method==='POST') {
@@ -926,6 +1073,10 @@ export function createAppHandler(db, options = {}) {
         if (action==='assign' && req.method==='POST') return send(res,200,{...assignClarification(db,session,id,await readJson(req)),clientContext:clientSessionContext(session).clientContext});
       }
       if(path==='/api/reports/publications' && req.method==='GET')return send(res,200,listReportPublications(db,session,Object.fromEntries(url.searchParams)));
+      if(path==='/api/calendar' && req.method==='GET') {
+        staffOnly(session);
+        return send(res,200,listCalendar(db,session,Object.fromEntries(url.searchParams)));
+      }
       if (path === "/api/reports" && req.method === "GET") {
         staffOnly(session);
         const {publicationId,...reportFilters}=Object.fromEntries(url.searchParams);
@@ -945,6 +1096,7 @@ export function createAppHandler(db, options = {}) {
                 title: JSON.parse(publication.snapshot_json).title,
                 publicationId: publication.id,
                 version: publication.version,
+                earlierVersionCases: openEarlierVersionCases(db, session, publication),
                 ...reportActivity(db,session,publication,scope),
                 availablePublications, timezone, asOf: NOW(),
                 date: publication.published_at,
@@ -1007,6 +1159,11 @@ export function createAppHandler(db, options = {}) {
         if (session.principal_type !== "worker") throw new Error("Forbidden");
         return send(res, 200, workerBriefings(db, session,Object.fromEntries(url.searchParams)));
       }
+      if (path === "/api/worker/competencies" && req.method === "GET") {
+        if (session.principal_type !== "worker") throw new Error("Forbidden");
+        if(url.search)throw Error('Invalid competency filter');
+        return send(res, 200, workerCompetencies(db, session));
+      }
       if (path === '/api/worker/history' && req.method === 'GET') {
         if (session.principal_type !== 'worker') throw new Error('Forbidden');
         return send(res, 200, workerBriefings(db, session,Object.fromEntries(url.searchParams),true));
@@ -1022,7 +1179,7 @@ export function createAppHandler(db, options = {}) {
       const exactSubmission=path.match(/^\/api\/worker\/briefings\/([^/]+)\/submissions\/([^/]+)$/);
       if(exactSubmission&&req.method==='GET')return send(res,200,{...workerSubmission(db,session,exactSubmission[1],exactSubmission[2],Object.fromEntries(url.searchParams)),clientContext:clientSessionContext(session).clientContext});
       const workerMatch = path.match(
-        /^\/api\/worker\/briefings\/([^/]+)(?:\/(answers|help|submissions|acknowledge|presentations))?$/,
+        /^\/api\/worker\/briefings\/([^/]+)(?:\/(answers|help|submissions|acknowledge|presentations|evidence))?$/,
       );
       if (workerMatch) {
         if (session.principal_type !== "worker") throw new Error("Forbidden");
@@ -1039,8 +1196,14 @@ export function createAppHandler(db, options = {}) {
             {translator:presentationTranslator,generationAllowed:presentationGenerationAllowed}),clientContext:clientSessionContext(session).clientContext});
         }
         if(action==='acknowledge' && req.method==='POST') {
-          const body=await readJson(req),result=acknowledgeAssignment(db,session,id,body.requestId);
+          const body=await readJson(req,7*1024*1024),result=acknowledgeAssignment(db,session,id,body.requestId,body.photo);
           return send(res,result.duplicate?200:201,{...result,assignmentId:id,requestId:body.requestId,clientContext:clientSessionContext(session).clientContext});
+        }
+        if(action==='evidence' && req.method==='GET') {
+          if(url.search)throw new Error('Evidence unavailable');
+          const data=workerAssignmentEvidence(db,session,id);
+          sendPrivateImage(res,data.mime,data.dataBase64);
+          return;
         }
         const row = db
           .prepare(
@@ -1058,7 +1221,9 @@ export function createAppHandler(db, options = {}) {
           if (!content) throw new Error('Assignment language unavailable');
           const currentAudio = isCurrentRecording(row);
           const responseMode=snapshot.responseMode || 'question',deliveryMode=snapshot.deliveryMode || 'both';
+          const evidenceMode=responseMode==='acknowledge' && snapshot.evidenceMode==='photo'?'photo':'none';
           const acknowledgedAt=row.acknowledged_at || null;
+          const evidence=evidenceMode==='photo' && acknowledgedAt?(ensureEvidenceSchema(db),assignmentEvidence(db,session.org_id,session.site_id,id)):null;
           return send(res, 200, {
             id,
             publicationId: row.publication_id,
@@ -1068,6 +1233,8 @@ export function createAppHandler(db, options = {}) {
             language,
             responseMode,
             deliveryMode,
+            evidenceMode,
+            evidence,
             content: {
               title: content.title,
               text: content.text,
@@ -1106,6 +1273,9 @@ export function createAppHandler(db, options = {}) {
       if(/\/publication-receipts\//.test(path)) {const {status,error:message}=publicationReceiptHttpError(error);return send(res,status,{error:message});}
       if(/\/schedules(?:\/|$)/.test(path)) {const {status,error:message}=scheduleHttpError(error);return send(res,status,{error:message});}
       const message = String(error.message || error);
+      if(/^\/api\/publications\/[^/]+\/improvement(?:\/draft)?$/.test(path)) {
+        const result=improvementHttpError(error);return send(res,result.status,{error:result.error});
+      }
       if(path==='/api/entitlement/requests' || /^\/api\/entitlement\/requests\/[^/]+$/.test(path)) {
         if(message==='Sign in required')return send(res,401,{error:message});
         if(['Forbidden','Forbidden origin'].includes(message))return send(res,403,{error:message});
@@ -1121,12 +1291,19 @@ export function createAppHandler(db, options = {}) {
         return send(res,status,{error:message});
       }
       if(/\/worker\/briefings\/[^/]+\/acknowledge$/.test(path)) {
+        const evidenceErrors=['Attach a photo as evidence','Invalid evidence photo','Evidence photo must be a JPEG, PNG or WebP image',
+          'Evidence photo does not match its image type','This instruction does not request photo evidence'];
         const status=message==='Sign in required'?401:['Forbidden','Worker access paused','Site archived','Workspace is read-only'].includes(message)?403
           :message==='Assignment unavailable'?404
           :['This instruction requires an answer','Assignment deadline passed'].includes(message)?409
-          :message==='Invalid acknowledgment request'?400
-          :message==='Request too large'?413:503;
+          :['Invalid acknowledgment request',...evidenceErrors].includes(message)?400
+          :['Request too large','Evidence photo is too large'].includes(message)?413:503;
         return send(res,status,{error:status===503?'Acknowledgment unavailable. Check the receipt before retrying.':message});
+      }
+      if(/\/evidence$/.test(path)) {
+        if(message==='Sign in required')return send(res,401,{error:message});
+        if(['Forbidden','Worker access paused','Site archived'].includes(message))return send(res,403,{error:message});
+        return send(res,404,{error:'Evidence unavailable'});
       }
       if(/\/clarifications\/[^/]+\/(?:messages|followups)(?:\/|$)/.test(path)) {
         const followupUnavailable=['Follow-up translation unavailable','Follow-up generation unavailable','Follow-up language unavailable'].includes(message);
@@ -1210,10 +1387,20 @@ export function createAppHandler(db, options = {}) {
         if(['Invalid notification filter','Invalid notification request','Invalid JSON','Invalid input'].includes(message))return send(res,400,{error:message});
         return send(res,message==='Request too large'?413:503,{error:'Notifications unavailable. Refresh to check before retrying.'});
       }
-      if(path==='/api/reports/publications') {
+      if(path.startsWith('/api/reports/publications')) {
         if(['Sign in required','Forbidden','Forbidden origin'].includes(message))return send(res,message==='Sign in required'?401:403,{error:message});
         if(['Invalid report publication filter','Invalid report publication date','Report publication history exceeds limit; narrow the search or dates'].includes(message))return send(res,400,{error:message});
         return send(res,503,{error:'Publication history unavailable. Refresh after checking the service.'});
+      }
+      if(path==='/api/overview/attention') {
+        if(['Sign in required','Forbidden','Forbidden origin'].includes(message))return send(res,message==='Sign in required'?401:403,{error:message});
+        if(message==='Invalid attention filter')return send(res,400,{error:message});
+        return send(res,503,{error:'Attention queue unavailable. Refresh after checking the service.'});
+      }
+      if(path==='/api/calendar') {
+        if(['Sign in required','Forbidden','Forbidden origin'].includes(message))return send(res,message==='Sign in required'?401:403,{error:message});
+        if(message==='Invalid calendar month'||message==='Invalid calendar request'||/^Calendar .+ exceeds the monthly limit/.test(message))return send(res,400,{error:message});
+        return send(res,503,{error:'Instruction calendar unavailable. Refresh after checking the service.'});
       }
       if(path.startsWith('/api/settings/sites')) {const result=siteHttpError(error);return send(res,result.status,{error:result.error});}
       if(message==='Request too large') return send(res,413,{error:message});
@@ -1222,11 +1409,11 @@ export function createAppHandler(db, options = {}) {
         ? 401
         : /Forbidden/.test(message)
           ? 403
-            : /Staff member unavailable|Glossary term unavailable|Template unavailable|Invoice unavailable|Processing job unavailable|Grant unavailable|Worker unavailable|Crew unavailable|Instruction unavailable|Recording unavailable|Publication unavailable|Briefing unavailable|Export unavailable|Import unavailable|Event unavailable|Clarification unavailable|Clarification owner unavailable|Response unavailable|Language request unavailable|Company not found/.test(
+            : /Staff member unavailable|Glossary term unavailable|Template unavailable|Translation feedback unavailable|Invoice unavailable|Processing job unavailable|Grant unavailable|Worker unavailable|Crew unavailable|Instruction unavailable|Recording unavailable|Publication unavailable|Briefing unavailable|Export unavailable|Import unavailable|Event unavailable|Clarification unavailable|Clarification owner unavailable|Response unavailable|Language request unavailable|Company not found/.test(
                 message,
               )
             ? 404
-            : /Worker deletion pending|Staff request conflict|Staff revision changed|Staff access is revoked|Staff access unchanged|Last active site owner must be retained|Glossary request conflict|Glossary revision changed|Glossary term is removed|Glossary term is active|Glossary term already exists|Glossary dependency changed|Template request conflict|Template revision changed|Template is archived|Template is active|Draft review request conflict|Settings request conflict|Settings revision changed|Settings unchanged|Invoice void request conflict|Invoice details changed|Invoice is voided|Only unpaid invoices can be voided|Invoice request conflict|Payment request conflict|Invoice number already exists|Payment exceeds outstanding balance|Briefing archive request conflict|Briefing is archived|Worker code changed|Worker ID already in use|Worker capacity reached|Reactivation request conflict|Crew name changed|Crew is archived|Instruction request conflict|Instruction retry conflict|Instruction retry limit reached|Instruction deadline passed|Instruction audience exceeds limit|Instruction crew audience exceeds limit|Choose a language for every selected worker in Team before sending.|Select your language first|Language already selected|Language change already pending|Language request already decided|Language request conflict|Language request changed|Worker language changed|Language selection conflict|unavailable|not technically ready|cannot be processed|Export expired|Export is not ready|Import expired|Fix CSV errors|cannot be retried|ID conflict|Help request conflict|Resolution conflict|Draft request conflict|Draft copy request conflict|Draft revision changed|Publication request conflict|Withdrawal request conflict|Publication is no longer current|Assignment deadline passed/.test(
+            : /Worker deletion pending|Staff request conflict|Staff revision changed|Staff access is revoked|Staff access unchanged|Last active site owner must be retained|Glossary request conflict|Glossary revision changed|Glossary term is removed|Glossary term is active|Glossary term already exists|Glossary dependency changed|Template request conflict|Template revision changed|Template is archived|Template is active|Translation feedback request conflict|Translation feedback already open|Translation feedback already decided|Draft review request conflict|Settings request conflict|Settings revision changed|Settings unchanged|Invoice void request conflict|Invoice details changed|Invoice is voided|Only unpaid invoices can be voided|Invoice request conflict|Payment request conflict|Invoice number already exists|Payment exceeds outstanding balance|Briefing archive request conflict|Briefing is archived|Worker code changed|Worker ID already in use|Worker capacity reached|Reactivation request conflict|Crew name changed|Crew is archived|Instruction request conflict|Instruction retry conflict|Instruction retry limit reached|Instruction deadline passed|Instruction audience exceeds limit|Instruction crew audience exceeds limit|Choose a language for every selected worker in Team before sending.|Select your language first|Language already selected|Language change already pending|Language request already decided|Language request conflict|Language request changed|Worker language changed|Language selection conflict|unavailable|not technically ready|cannot be processed|Export expired|Export is not ready|Import expired|Fix CSV errors|cannot be retried|ID conflict|Help request conflict|Resolution conflict|Draft request conflict|Draft copy request conflict|Draft revision changed|Publication request conflict|Withdrawal request conflict|Publication is no longer current|Assignment deadline passed/.test(
                   message,
                 )
               ? 409

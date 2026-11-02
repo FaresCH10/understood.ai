@@ -14,7 +14,7 @@ db.prepare("UPDATE organizations SET name='Disposable Processing QA' WHERE id='c
 const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 for(let index=0;index<45;index++) {
   const id=randomUUID(),now=new Date().toISOString();
-  db.prepare("INSERT INTO briefings VALUES(?,?,?,?,?,1,1,'ready',NULL,?,?)").run(id,'cedar','beirut',`Historical preparation ${String(index).padStart(2,'0')}`,CANONICAL_SOURCE,now,now);
+  db.prepare("INSERT INTO briefings(id,org_id,site_id,title,source,revision,next_version,state,prepared_json,created_at,updated_at) VALUES(?,?,?,?,?,1,1,'ready',NULL,?,?)").run(id,'cedar','beirut',`Historical preparation ${String(index).padStart(2,'0')}`,CANONICAL_SOURCE,now,now);
   db.prepare("INSERT INTO jobs VALUES(?,?,?,?,1,'prepare','ready',1,?,NULL,NULL,?)").run(randomUUID(),'cedar','beirut',id,'2099-10-01T00:00:00.000Z',now);
 }
 const draft=createDraft(db,owner,{requestId:randomUUID(),title:'Retry shelf preparation',source:CANONICAL_SOURCE});

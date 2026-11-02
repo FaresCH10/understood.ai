@@ -5,8 +5,8 @@ import {validPageSession,type PageSession} from './session-state';
 
 export const notificationChanged='understood:notifications-changed';
 
-export function NotificationBell({session,label,locale='en',disabled=false,onOpen,onSessionLost}:{
-  session:PageSession;label:string;locale?:string;disabled?:boolean;onOpen:()=>void;onSessionLost:()=>void;
+export function NotificationBell({session,label,locale='en',disabled=false,onOpen,onSessionLost,showLabel=false}:{
+  session:PageSession;label:string;locale?:string;disabled?:boolean;onOpen:()=>void;onSessionLost:()=>void;showLabel?:boolean;
 }) {
   const binding=session.clientContext || '';
   const latest=useRef({session,onSessionLost});latest.current={session,onSessionLost};
@@ -41,8 +41,9 @@ export function NotificationBell({session,label,locale='en',disabled=false,onOpe
   },[binding]);
   const unread=count?.binding===binding && validPageSession(session)?count.unread:0;
   const display=new Intl.NumberFormat(locale).format(Math.min(unread,99))+(unread>99?'+':'');
-  return <button type="button" className="icon-button bell notification-bell" aria-label={unread?`${label} (${new Intl.NumberFormat(locale).format(unread)})`:label}
+  return <button type="button" className={`icon-button bell notification-bell${showLabel?' worker-header-action':''}`} aria-label={unread?`${label} (${new Intl.NumberFormat(locale).format(unread)})`:label}
     title={label} disabled={disabled} onClick={onOpen}><Bell size={21} aria-hidden="true"/>
-    {unread>0 && <span className="notification-count" aria-hidden="true">{display}</span>}
+    {unread>0 && <span className={`notification-count${showLabel?' is-inline':''}`} aria-hidden="true">{display}</span>}
+    {showLabel && <span className="worker-header-action-label" aria-hidden="true">{label}</span>}
   </button>;
 }

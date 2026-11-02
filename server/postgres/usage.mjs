@@ -6,7 +6,7 @@ import { usageModel,usageEntitlement } from '../usage.mjs';
 import { entitlementState } from './entitlements.mjs';
 import { countActiveWorkers } from './worker-capacity.mjs';
 
-async function readProviderAllowance(client,orgId) {
+async function readProviderAllowance(client,orgId,integrationMode) {
   const day=(await client.query("SELECT (clock_timestamp() AT TIME ZONE 'UTC')::date::text AS day")).rows[0].day;
   const policies=(await client.query('SELECT scope_key,enabled,max_daily_requests FROM provider_policies WHERE scope_key=ANY($1::text[])',[['global',`tenant:${orgId}`]])).rows;
   const global=policies.find(row=>row.scope_key==='global'),tenant=policies.find(row=>row.scope_key===`tenant:${orgId}`);
@@ -23,15 +23,15 @@ async function readProviderAllowance(client,orgId) {
   return {day,timezone:'UTC',resetsAt:new Date(Date.parse(`${day}T00:00:00.000Z`)+86400000).toISOString(),
     state:reason==='quota_closed'?'closed':reason==='available'?'available':reason==='daily_allowance_exhausted'?'exhausted':'paused',reason,
     limit,reserved:usage.tenant,remaining,requests:Object.fromEntries(['started','accepted','rejected','uncertain'].map(state=>[state,requests.find(row=>row.state===state)?.count ?? 0])),
-    jobsPaused:Boolean(controls?.jobs_paused),providerPaused:Boolean(controls?.provider_paused),dataClass:'synthetic',billingVerified:false};
+    jobsPaused:Boolean(controls?.jobs_paused),providerPaused:Boolean(controls?.provider_paused),dataClass:integrationMode==='live'?'real':'synthetic',billingVerified:false};
 }
 
-export function getUsage(pool, session, { schema = 'public' } = {}) {
+export function getUsage(pool, session, { schema = 'public',integrationMode='synthetic' } = {}) {
   return responseRead(pool, schema, async (client) => {
     await requirePrincipal(client, session, 'staff', ['owner', 'administrator', 'supervisor', 'auditor']);
     const publication = (await client.query(`SELECT id,version,state FROM publications WHERE org_id=$1 AND site_id=$2 AND state='published' ORDER BY published_at DESC,id LIMIT 1`, [session.org_id, session.site_id])).rows[0] || null;
     const metrics = publication ? metricsFromResponses(await publicationResponses(client, session, publication.id)) : null;
     const entitlement=usageEntitlement(await entitlementState(client,session.org_id),await countActiveWorkers(client,session.org_id));
-    return {...usageModel({ mode: 'synthetic-credential', metrics, latestPublication: publication,providerAllowance:await readProviderAllowance(client,session.org_id),entitlement }),changeRequestsAvailable:['owner','administrator','supervisor'].includes(session.role)};
+    return {...usageModel({ mode: integrationMode==='live'?'live-credential':'synthetic-credential', metrics, latestPublication: publication,providerAllowance:await readProviderAllowance(client,session.org_id,integrationMode),entitlement }),changeRequestsAvailable:['owner','administrator','supervisor'].includes(session.role)};
   });
 }

@@ -8,10 +8,11 @@ import {cleanVerifyEnvironment,snapshotCleanSource,runCleanVerification,runClean
 async function fixture(t){
   const root=await mkdtemp(join(tmpdir(),'understood-clean-verify-'));
   t.after(async()=>{const {rm}=await import('node:fs/promises');await rm(root,{recursive:true,force:true});});
-  for(const name of ['src','server','scripts','tests','public','evaluation','.github/workflows','data','node_modules','dist'])await mkdir(join(root,name),{recursive:true});
+  for(const name of ['api','src','server','scripts','tests','public','evaluation','.github/workflows','data','node_modules','dist'])await mkdir(join(root,name),{recursive:true});
   for(const name of ['package.json','package-lock.json','index.html','operator.html','tsconfig.json','vite.config.ts','.github/workflows/verify.yml'])await writeFile(join(root,name),'fixture');
   await writeFile(join(root,'package-lock.json'),JSON.stringify({packages:{}}));
   await writeFile(join(root,'src','entry.ts'),'export const fixture=true;');
+  await writeFile(join(root,'api','gateway.mjs'),'export default function gateway(){}');
   for(const name of ['.env','data/private.sqlite','dist/old.js','node_modules/old.js'])await writeFile(join(root,name),'PRIVATE_NOT_FOR_SNAPSHOT');
   const npmCli=join(root,'npm-cli.js');await writeFile(npmCli,'');
   return {root,npmCli};
@@ -27,7 +28,8 @@ test('clean environment excludes cloud, database, provider and injected Node/npm
 
 test('clean snapshot copies only selected source, never dependencies, build, data or environment',async t=>{
   const {root}=await fixture(t),destination=join(root,'snapshot'),result=await snapshotCleanSource(root,destination);
-  assert.equal(result.files,8);assert.match(result.sha256,/^[a-f0-9]{64}$/);
+  assert.equal(result.files,9);assert.match(result.sha256,/^[a-f0-9]{64}$/);
+  assert.equal(await readFile(join(destination,'api/gateway.mjs'),'utf8'),'export default function gateway(){}');
   assert.equal(await readFile(join(destination,'operator.html'),'utf8'),'fixture');
   for(const name of ['.env','data','dist','node_modules'])await assert.rejects(lstat(join(destination,name)),{code:'ENOENT'});
   assert.equal(await readFile(join(destination,'src/entry.ts'),'utf8'),'export const fixture=true;');

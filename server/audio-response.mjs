@@ -24,3 +24,11 @@ export function sendPrivateWav(req,res,bytes){
   }
   res.writeHead(200,{...headers,'content-length':bytes.length});res.end(bytes);
 }
+
+// Call only after the route has authorized and verified the private stored image.
+export function sendPrivateImage(res,mime,dataBase64){
+  const bytes=Buffer.from(dataBase64,'base64');
+  res.writeHead(200,{'content-type':mime,'cache-control':'no-store','x-content-type-options':'nosniff',
+    'referrer-policy':'no-referrer','content-disposition':'inline','content-length':bytes.length});
+  res.end(bytes);
+}

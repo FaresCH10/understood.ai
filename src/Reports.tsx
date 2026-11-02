@@ -16,8 +16,9 @@ type PublicationPage = {items:(Publication & {publishedAt:string})[];total:numbe
 type ReportFilters={crewId:string;responseFrom:string;responseThrough:string};
 type Report = { title: string; publicationId: string; version: number; metrics: Counts | null; timezone: string; asOf: string;
   filters?:ReportFilters;crewSnapshotAvailable?:boolean;availableCrews?:{id:string;name:string}[];
-  responseMode?:string;deliveryMode?:string;delivery?:Delivery|null;
-  availablePublications: Publication[]; languages: { language: string; assigned: number; received: number; completion: number }[] };
+  responseMode?:string;deliveryMode?:string;evidenceMode?:string;evidence?:{required:number;received:number}|null;delivery?:Delivery|null;
+  earlierVersionCases?:number;
+  availablePublications: Publication[]; languages: { language: string; assigned: number; received: number; completion: number; matched: number; clarified: number; acknowledged: number; understanding: number | null }[] };
 type Export = { id: string; status: string; createdAt: string; expiresAt: string; filename: string; attempts: number; error: string | null;filters?:ReportFilters & {timezone?:string} };
 
 const definition:ArtifactDefinition<PendingExport,ExportAccepted>={endpoint:'/api/reports/exports',roles:['owner','supervisor','auditor'],
@@ -58,7 +59,7 @@ function PublicationHistory({onSelect,disabled,authority,language}:{onSelect:(id
   </section>;
 }
 
-export function ReportsPage({refresh,authority,language='en',onLanguageChange}:{refresh:number;authority:StaffRequestAuthority;language?:ReportLocale;onLanguageChange?:(language:ReportLocale)=>void}) {
+export function ReportsPage({refresh,authority,navigate,language='en',onLanguageChange}:{refresh:number;authority:StaffRequestAuthority;navigate:(path:string)=>void;language?:ReportLocale;onLanguageChange?:(language:ReportLocale)=>void}) {
   const {request,current}=useStaffRequest(authority);
   const locale=reportLocale(language),t=(key:ReportTextKey)=>reportText(locale,key);
   const allowed=definition.roles!.includes(authority.session.staffRole || ''),scope=allowed?authority.session.staffScope:null;
@@ -125,13 +126,16 @@ export function ReportsPage({refresh,authority,language='en',onLanguageChange}:{
   };
   const date=(value:string,timezone=report?.timezone||'UTC')=>{const stamp=reportTimestamp(locale,value,timezone);return <time dateTime={value}><bdi>{stamp.text}</bdi> <bdi dir="ltr">{stamp.offset}</bdi></time>;};
   const m = report?.metrics;
+  const assessed = m ? m.matches + m.clarifications : 0;
+  const understanding = assessed && m ? Math.round(m.matches / assessed * 100) : null;
   const windowed=Boolean(filters.responseFrom || filters.responseThrough);
   const width = (count: number) => `${m?.assigned ? count / m.assigned * 100 : 0}%`;
   return <>
     <div className="page-header report-header"><div><h1>{t('Instruction activity')}</h1><p>{report?.title ? <><bdi>{report.title}</bdi> · {reportText(locale,'Published v{version}',{version:report.version})}</> : t('Response activity at this site')}</p></div>
       <div className="actions">{onLanguageChange&&<CaseLocalePicker locale={locale} onChange={onLanguageChange}/>}<button className="button primary" onClick={() => void exportReport()} disabled={loading || busy || !m || !canExport || !!operation.pending.current || !!recovery.error}><Download size={18} />{t(busy?'Working...':'Export CSV')}</button></div>
     </div>
-    {report?.publicationId && <p className="report-mode"><span><strong>{t('Response mode')}:</strong> {report.responseMode==='acknowledge'?t('Acknowledge only'):report.responseMode==='question'?t('Question'):t('Mode not recorded (legacy)')}</span><span><strong>{t('Delivery mode')}:</strong> {report.deliveryMode==='text'?t('Text'):report.deliveryMode==='voice'?t('Voice'):report.deliveryMode==='both'?t('Text and voice'):t('Mode not recorded (legacy)')}</span></p>}
+    {report?.publicationId && <p className="report-mode"><span><strong>{t('Response mode')}:</strong> {report.responseMode==='acknowledge'?t('Acknowledge only'):report.responseMode==='question'?t('Question'):t('Mode not recorded (legacy)')}</span><span><strong>{t('Delivery mode')}:</strong> {report.deliveryMode==='text'?t('Text'):report.deliveryMode==='voice'?t('Voice'):report.deliveryMode==='both'?t('Text and voice'):t('Mode not recorded (legacy)')}</span>{report.responseMode==='acknowledge'&&<span><strong>{t('Photo evidence')}:</strong> {report.evidenceMode==='photo'?t('Required'):t('Not requested')}</span>}</p>}
+    {report?.evidenceMode==='photo'&&report.evidence&&<p className="report-date">{reportText(locale,'{received} of {required} photos received',{received:report.evidence.received,required:report.evidence.required})}</p>}
     <div className="filters"><button ref={historyTrigger} className="button outline" disabled={busy} aria-expanded={historyOpen} aria-controls="report-publication-history" onClick={()=>setHistoryOpen(value=>!value)}><History size={18}/>{t('Instruction version')}<ChevronDown size={18}/></button>
       {report?.asOf && <span className="report-date">{date(report.asOf)} · <bdi>{report.timezone}</bdi></span>}</div>
     {historyOpen && <div id="report-publication-history"><PublicationHistory language={locale} authority={authority} disabled={busy} onSelect={id=>{if(!current())return;setPublicationId(id);setFilters(value=>({...value,crewId:''}));setChosenFilters(value=>({...value,crewId:''}));setHistoryOpen(false);historyTrigger.current?.focus();}}/></div>}
@@ -145,6 +149,7 @@ export function ReportsPage({refresh,authority,language='en',onLanguageChange}:{
     {report?.filters && !report.crewSnapshotAvailable && <p className="muted">{t('Historical crew snapshot unavailable for this version.')}</p>}
     {windowed && <p className="report-date">{t('Latest-response window')}: <bdi dir="ltr">{filters.responseFrom||t('Start')}</bdi> {t('to')} <bdi dir="ltr">{filters.responseThrough||t('Present')}</bdi> · <bdi>{report?.timezone}</bdi></p>}
     {loading ? <p role="status">{t('Loading report...')}</p> : error ? <div className="actions"><p role="alert" className="record-error">{reportErrorText(locale,error,'The report could not be loaded. Try again.')}</p><button className="icon-button" title={t('Retry report')} aria-label={t('Retry report')} disabled={busy} onClick={()=>setReportRefresh(value=>value+1)}><RefreshCw size={18}/></button></div> : !m ? <p>{t('No published instruction is available.')}</p> : <>
+      {report && <div className="report-version-scope"><h2>{reportText(locale,'This version (v{version})',{version:report.version})}</h2>{!!report.earlierVersionCases && <button type="button" className="text-link" onClick={()=>navigate('clarifications')}>{reportText(locale,'{count} open cases relate to earlier versions',{count:report.earlierVersionCases})}{locale==='en'?<ChevronRight size={16}/>:<ChevronLeft size={16}/>}</button>}</div>}
       {report?.delivery && <section className="panel report-delivery" aria-label={t('Delivery')}>
         <div className="people-panel-heading"><h2>{t('Delivery')}</h2><span className={`status status-${report.delivery.state==='published'?'green':report.delivery.state==='failed'?'red':'blue'}`}>{reportState(locale,report.delivery.state)}</span></div>
         <div className="delivery-counts"><div><strong>{report.delivery.captured}</strong><span>{t('Captured audience')}</span></div><div><strong>{report.delivery.delivered}</strong><span>{t('Delivered')}</span></div><div><strong>{report.delivery.undelivered}</strong><span>{t('Not delivered')}</span></div></div>
@@ -152,14 +157,14 @@ export function ReportsPage({refresh,authority,language='en',onLanguageChange}:{
         <p className="muted">{t('Unreleased recipients are not counted as failing to respond.')}</p>
       </section>}
       <div className="metrics">{[
-        { icon: FileText, value: m.assigned, label: t('assigned') }, { icon: Users, value: m.responses, label: t('responses') },
-        { icon: CheckCircle2, value: m.matches, label: t('match key facts') }, { icon: TriangleAlert, value: m.clarifications, label: t('need clarification') },
-        ...(m.acknowledged ? [{ icon: CheckCircle2, value: m.acknowledged, label: t('acknowledged') }] : []),
-        ...(m.resolved ? [{ icon: MessageCircleCheck, value: m.resolved, label: t('resolved after follow-up') }] : []),
-        { icon: Clock3, value: m.pending, label: t(windowed?'no response in window':'awaiting response') },
+        { icon: FileText, value: m.assigned, label: t('Assigned') }, { icon: Users, value: m.responses, label: t('Responses') },
+        { icon: CheckCircle2, value: m.matches, label: t('Match key facts') }, { icon: TriangleAlert, value: m.clarifications, label: t('Need clarification') },
+        ...(m.acknowledged ? [{ icon: CheckCircle2, value: m.acknowledged, label: t('Acknowledged') }] : []),
+        ...(m.resolved ? [{ icon: MessageCircleCheck, value: m.resolved, label: t('Resolved after follow-up') }] : []),
+        { icon: Clock3, value: m.pending, label: t(windowed?'No response in window':'Awaiting response') },
       ].map(({ icon: Icon, value, label }, index) => <div className={`metric ${index === 3 ? 'metric-warn' : ''}`} key={label}><div className="metric-icon"><Icon size={28} /></div><div><strong>{value}</strong><span>{label}</span></div></div>)}</div>
       <section className="panel"><h2>{t('Response status')}</h2><div className="report-bar"><span style={{ width: width(m.matches) }} /><span style={{ width: width(m.clarifications) }} /><span style={{ width: width(m.unassessed) }} /><span style={{ width: width(m.pending) }} />{!!m.acknowledged && <span style={{ width: width(m.acknowledged),background:'#7c5cff' }} />}</div>
-        <div className="report-bottom"><div className="legend"><span><i className="dot green" />{m.matches} {t('match the rubric')}</span><span><i className="dot amber" />{m.clarifications} {t('need clarification')}</span><span><i className="dot blue" />{m.unassessed} {t('awaiting assessment')}</span>{!!m.acknowledged && <span><i className="dot violet" />{m.acknowledged} {t('acknowledged, not assessed')}</span>}<span><i className="dot grey" />{m.pending} {t(windowed?'no response in window':'awaiting response')}</span></div><strong>{m.completion}% <small>{t('response completion')}</small></strong></div>
+        <div className="report-bottom"><div className="legend"><span><i className="dot green" />{m.matches} {t('Match the rubric')}</span><span><i className="dot amber" />{m.clarifications} {t('Need clarification')}</span><span><i className="dot blue" />{m.unassessed} {t('Awaiting assessment')}</span>{!!m.acknowledged && <span><i className="dot violet" />{m.acknowledged} {t('Acknowledged, not assessed')}</span>}<span><i className="dot grey" />{m.pending} {t(windowed?'No response in window':'Awaiting response')}</span></div><strong>{m.completion}% <small>{t('Response completion')}</small></strong></div>
       </section>
     </>}
     {message && <p role="status">{t(message)}</p>}
@@ -175,7 +180,7 @@ export function ReportsPage({refresh,authority,language='en',onLanguageChange}:{
       <div className="actions"><button className="button outline" disabled={busy} onClick={()=>void operation.check()}><RefreshCw size={18}/>{t('Check saved request')}</button>{operation.checked && <button className="button primary" disabled={busy || !canExport} onClick={()=>void operation.write(operation.pending.current!)}><RefreshCw size={18}/>{t('Retry original request')}</button>}</div>
     </section>}
     <div className="report-grid">
-      {m && <section className="panel"><h2>{t('Language breakdown')}</h2><div className="table-wrap"><table className="language-table"><thead><tr><th>{t('Assignment language')}</th><th>{t('Assigned')}</th><th>{t('Received')}</th><th>{t('Completion')}</th></tr></thead><tbody>{report.languages.map((row) => <tr key={row.language}><td><bdi>{reportLanguage(locale,row.language)}</bdi></td><td>{row.assigned}</td><td>{row.received}</td><td><div className="language-completion"><span>{row.completion}%</span><meter min="0" max="100" value={row.completion} aria-label={reportText(locale,'{language} response completion',{language:reportLanguage(locale,row.language)})} /></div></td></tr>)}</tbody></table></div></section>}
+      {m && <section className="panel"><div className="people-panel-heading"><h2>{t('Language breakdown')}</h2>{understanding!==null&&<span className="report-understanding"><strong>{understanding}%</strong> {t('Understood of assessed')}</span>}</div><div className="table-wrap"><table className="language-table"><thead><tr><th>{t('Assignment language')}</th><th>{t('Assigned')}</th><th>{t('Received')}</th><th>{t('Understood')}</th><th>{t('Completion')}</th></tr></thead><tbody>{report.languages.map((row) => <tr key={row.language}><td className="language-name"><bdi>{reportLanguage(locale,row.language)}</bdi></td><td data-label={t('Assigned')}>{row.assigned}</td><td data-label={t('Received')}>{row.received}</td><td data-label={t('Understood')}><div className="language-understanding"><span>{row.understanding===null?'—':`${row.understanding}%`}</span>{row.understanding!==null&&<meter min="0" max="100" value={row.understanding} aria-label={reportText(locale,'{language} understanding rate',{language:reportLanguage(locale,row.language)})} />}{row.clarified>0&&<small>{reportText(locale,'{count} clarified',{count:row.clarified})}</small>}</div></td><td data-label={t('Completion')}><div className="language-completion"><span>{row.completion}%</span><meter min="0" max="100" value={row.completion} aria-label={reportText(locale,'{language} response completion',{language:reportLanguage(locale,row.language)})} /></div></td></tr>)}</tbody></table></div><p className="report-note">{t('Comprehension is matched responses out of assessed responses. Acknowledgements and pending assessments are excluded.')}</p></section>}
       <section className="panel export-history"><div className="people-panel-heading"><h2>{t('Export history')}</h2><button className="icon-button" title={t('Refresh exports')} aria-label={t('Refresh exports')} disabled={exportLoading} onClick={() => setHistoryRefresh((value) => value + 1)}><RefreshCw size={18} /></button></div>
         {exportLoading?<p role="status">{t('Loading export history...')}</p>:exportError?<p role="alert" className="record-error">{reportErrorText(locale,exportError,'Export history cannot be verified.')}</p>:!exports.length ? <p>{t('No exports requested.')}</p> : <ul className="export-list">{exports.map((item) => <li key={item.id}><FileText size={24} /><div className="export-info"><strong><bdi dir="ltr">{item.filename}</bdi></strong><span className={`status status-${item.status === 'ready' ? 'green' : item.status === 'failed' ? 'red' : 'blue'}`}>{reportState(locale,item.status)}</span><small>{date(item.createdAt,item.filters?.timezone||report?.timezone)}</small>{(item.filters?.responseFrom || item.filters?.responseThrough) && <small>{t('Latest responses')}: <bdi dir="ltr">{item.filters.responseFrom||t('Start')}</bdi> {t('to')} <bdi dir="ltr">{item.filters.responseThrough||t('Present')}</bdi> · <bdi>{item.filters.timezone||report?.timezone}</bdi></small>}{item.filters?.crewId && <small>{t('Crew-filtered audience')}</small>}{item.status === 'ready' && <small>{t('Expires')} {date(item.expiresAt,item.filters?.timezone||report?.timezone)}</small>}{item.error && <small>{reportErrorText(locale,item.error,'Export generation failed')}</small>}</div>
           {item.status === 'ready' && <a className="button outline" href={`/api/reports/exports/${item.id}/download`} download={item.filename}><Download size={16} />{t('Download')}</a>}
@@ -183,6 +188,6 @@ export function ReportsPage({refresh,authority,language='en',onLanguageChange}:{
         </li>)}</ul>}
       </section>
     </div>
-    <div className="notice"><TriangleAlert size={22} /><span>{t('Response status is not proof of safe work or internal understanding.')}</span></div>
+    <div className="notice"><TriangleAlert size={22} /><span>{t('A matched response reflects the published check, not proof of safe work.')}</span></div>
   </>;
 }

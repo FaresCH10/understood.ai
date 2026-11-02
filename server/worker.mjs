@@ -32,6 +32,7 @@ import {resolveSourceTranscription} from './ai/source-transcription-config.mjs';
 import {processOnePilot} from './pilot.mjs';
 import {pilotDestination} from './pilot-input.mjs';
 import {expirePushSubscriptions,processOnePushDelivery,sweepOverdueAssignments} from './notification-events.mjs';
+import {processOneInstructionImprovement} from './self-healing.mjs';
 import {resolvePushAdapter} from './push-adapter.mjs';
 import {processOneCaseEscalation} from './case-routing.mjs';
 import {processOneCaseFollowup} from './case-followups.mjs';
@@ -121,6 +122,7 @@ if (process.argv[1]?.endsWith('worker.mjs')) {
       sweepOverdueAssignments(db);
       expirePushSubscriptions(db);
       for(let i=0;i<10 && await processOnePushDelivery(db,pushAdapter);i++) {}
+      for(let i=0;i<5 && processOneInstructionImprovement(db);i++) {}
     }catch {console.error('Worker operation unavailable.');}
     finally {ticking=false;}
   },750);

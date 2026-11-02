@@ -46,14 +46,22 @@ test('attachments validate bytes and become available only to the assigned worke
  await sqliteWorkspace(db,staff,'composition',{id:requestId,content});
  await assert.rejects(sqliteWorkspace(db,staff,'attachments',{requestId,file:{...file,mime:'text/html'}}),/Use a photo/);
  await assert.rejects(sqliteWorkspace(db,staff,'attachments',{requestId,file:{...file,name:'../escape.pdf'}}),/Invalid attachment/);
- const saved=await sqliteWorkspace(db,staff,'attachments',{requestId,file});assert.equal(saved.items.length,1);
+ const saved=await sqliteWorkspace(db,staff,'attachments',{requestId,file});assert.equal(saved.items.length,1);assert.deepEqual(saved.items[0].captions,{});
+ const photo={id:randomUUID(),name:'Shelf.png',mime:'image/png',data:Buffer.from([137,80,78,71,13,10,26,10,1]).toString('base64'),captions:{en:'Items on the blue shelf',ar:'المنتجات على الرف الأزرق'}};
+ await assert.rejects(sqliteWorkspace(db,staff,'attachments',{requestId,file:{...file,captions:{en:'Not a photo'}}}),/only available for photos/);
+ await assert.rejects(sqliteWorkspace(db,staff,'attachments',{requestId,file:{...photo,captions:{zz:'Unknown language'}}}),/Invalid attachment captions/);
+ await assert.rejects(sqliteWorkspace(db,staff,'attachments',{requestId,file:{...photo,captions:{en:'x'.repeat(301)}}}),/Invalid attachment captions/);
+ const withPhoto=await sqliteWorkspace(db,staff,'attachments',{requestId,file:photo});assert.equal(withPhoto.items.length,2);assert.equal(withPhoto.items.find(item=>item.id===photo.id).captions.en,photo.captions.en);
+ const recaptioned=await sqliteWorkspace(db,staff,'attachments',{requestId,file:{id:photo.id,captions:{ur:'نیلی شیلف پر اشیاء'}}});assert.deepEqual(recaptioned.items.find(item=>item.id===photo.id).captions,{ur:'نیلی شیلف پر اشیاء'});
  await assert.rejects(sqliteWorkspace(db,worker,'attachments',{requestId}),/unavailable/);
+ await assert.rejects(sqliteWorkspace(db,worker,'attachments',{requestId,file:{id:photo.id,captions:{en:'Worker edit'}}}),/Forbidden/);
  startInstructionSend(db,staff,{requestId,title:'Attachment test',source:CANONICAL_SOURCE,audience:{type:'members',workerIds:['worker-1']},responseMode:'question',deliveryMode:'text'});await processOne(db);const sent=completeInstructionSend(db,staff,requestId);
  const assignment=db.prepare('SELECT id FROM assignments WHERE publication_id=?').get(sent.publicationId);
- const list=await sqliteWorkspace(db,worker,'assignment-files',{id:assignment.id});assert.equal(list.items[0].name,'Instructions.pdf');
+ const list=await sqliteWorkspace(db,worker,'assignment-files',{id:assignment.id});assert.equal(list.items.find(item=>item.id===saved.items[0].id).name,'Instructions.pdf');assert.deepEqual(list.items.find(item=>item.id===photo.id).captions,{ur:'نیلی شیلف پر اشیاء'});
  const download=await sqliteWorkspace(db,worker,'attachments',{requestId,download:saved.items[0].id});assert.equal(download.data_base64,file.data);
  await assert.rejects(sqliteWorkspace(db,{...worker,principal_id:'worker-2'},'attachments',{requestId}),/unavailable/);
  await assert.rejects(sqliteWorkspace(db,staff,'attachments',{requestId,file:{...file,id:randomUUID()}}),/cannot be changed/);
+ await assert.rejects(sqliteWorkspace(db,staff,'attachments',{requestId,file:{id:photo.id,captions:{en:'Too late'}}}),/cannot be changed/);
  }finally{db.close();}
 });
 test('workspace HTTP requires current session context for staff and workers',async()=>{

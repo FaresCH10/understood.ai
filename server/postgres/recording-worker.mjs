@@ -11,6 +11,7 @@ import {reserveProviderOperation,providerRequestJournal} from './provider-budget
 import {recordingTranscriptionInputHash} from '../ai/audio-provenance.mjs';
 import {assessmentInputHash} from '../ai/assessment-config.mjs';
 import {staffAuditOnce} from './notification-events.mjs';
+import {awardCompetency} from './competencies.mjs';
 
 export async function processOneRecording(pool,adapter,storage,{schema='public'}={}) {
   if (typeof adapter?.transcribe!=='function' || typeof adapter.assess!=='function' || typeof storage?.read!=='function') throw new Error('Recording processor unavailable');
@@ -84,7 +85,7 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
     const result = validatedAssessment(await assessor.assess(transcript,question,facts),transcript,facts);
     await domainTransaction(pool,schema,async (client) => {
       if(!await dispatchAllowed(client,job.org_id,{provider:true}))return;
-      const worker = (await client.query(`SELECT w.active FROM workers w JOIN assignments a ON a.worker_id=w.id AND a.org_id=w.org_id AND a.site_id=w.site_id
+      const worker = (await client.query(`SELECT w.id AS worker_id,w.active FROM workers w JOIN assignments a ON a.worker_id=w.id AND a.org_id=w.org_id AND a.site_id=w.site_id
         WHERE a.id=$1 AND a.org_id=$2 AND a.site_id=$3 FOR SHARE OF w`,[job.assignment_id,job.org_id,job.site_id])).rows[0];
       await client.query('SELECT id FROM assignments WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',[job.assignment_id,job.org_id,job.site_id]);
       const current = (await client.query(`SELECT id FROM recordings WHERE id=$1 AND status='processing' AND lease_token=$2 AND lease_until>clock_timestamp() FOR UPDATE`,[job.id,job.token])).rows[0];
@@ -102,6 +103,9 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
         await recordPresentationBinding(client,attemptId,job.presentation_id && job.presentation_language && job.presented_question
           ? {id:job.presentation_id,org_id:job.org_id,site_id:job.site_id,assignment_id:job.assignment_id,
             target_language:job.presentation_language,question:job.presented_question} : null);
+        if (result.outcome==='matched')
+          await awardCompetency(client,{orgId:job.org_id,siteId:job.site_id,workerId:worker.worker_id,
+            assignmentId:job.assignment_id,attemptId,source:'audio'});
         const repeat=(await client.query(`SELECT case_id FROM case_repeats WHERE assignment_id=$1 AND submission_id=$2
           AND org_id=$3 AND site_id=$4 AND status='submitted'`,[job.assignment_id,job.submission_id,job.org_id,job.site_id])).rows[0];
         if (result.outcome!=='matched' && !repeat) {

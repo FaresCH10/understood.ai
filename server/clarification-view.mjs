@@ -10,7 +10,7 @@ function summary(row){
   return {id:row.id,worker:row.worker,language:row.language,title:row.title??null,reason:row.reason,status:row.status,
     created_at:iso(row.created_at),due_at:iso(row.due_at),case_due_at:iso(row.case_due_at),escalated_at:iso(row.escalated_at),
     owner_name:row.owner_name??null,owner_staff_id:row.owner_staff_id??null,assignment_id:row.assignment_id,
-    publication_id:row.publication_id,version:row.version,attempt_id:row.attempt_id??null};
+    publication_id:row.publication_id,version:row.version,current_version:row.current_version??null,attempt_id:row.attempt_id??null};
 }
 export function clarificationPageView(page,context){
   return {rows:page.rows.map(summary),total:page.total,page:page.page,pageSize:page.pageSize,ownerOptions:page.ownerOptions.map(({id,name})=>({id,name})),clientContext:context};

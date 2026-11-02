@@ -41,7 +41,6 @@ const generationCopy:Record<WorkerUiLanguage,{send:string;audio:string;queued:st
   'pa-Arab':{send:'فالو اپ بنا کے بھیجو',audio:'تیار کیتا آڈیو شامل کرو',queued:'فالو اپ تیاری قطار وچ اے۔',processing:'فالو اپ ترجمہ تے آڈیو تے کم ہو رہیا اے۔',failed:'فالو اپ تیاری ناکام ہوئی۔ کوئی پیغام نہیں بھیجیا گیا۔',play:'فالو اپ آڈیو'},
   id:{send:'Buat dan kirim tindak lanjut',audio:'Sertakan audio yang dibuat',queued:'Pembuatan tindak lanjut dalam antrean.',processing:'Terjemahan dan audio tindak lanjut sedang diproses.',failed:'Pembuatan tindak lanjut gagal. Tidak ada pesan yang terkirim.',play:'Audio tindak lanjut'},
 };
-// Every follow-up adapter today is the synthetic Gemini Free one (server/ai/case-followup-config.mjs).
 const freeTierCopy:Record<WorkerUiLanguage,string>={
   en:'Follow-ups are sent to the free Google Gemini tier. Use test text only, never real worker details.',
   ar:'تُرسل المتابعات إلى الفئة المجانية من Google Gemini. استخدم نصاً تجريبياً فقط، ولا تكتب أبداً تفاصيل عمال حقيقية.',
@@ -80,11 +79,11 @@ const stateCopy:Record<WorkerUiLanguage,{invalid:string;blocked:string;recovery:
   'pa-Arab':{invalid:'گفتگو دے جواب دی تصدیق نہیں ہو سکی۔ دوبارہ کوشش لئی تازہ کرو۔',blocked:'بھیجنا عارضی طور تے دستیاب نہیں اے۔',recovery:'مقامی پیغام دی بازیابی دی تصدیق نہیں ہو سکی۔ دوبارہ کوشش توں پہلاں کوئی وی زیر التوا وصولی چیک کرو۔',clear:'نہ بھیجیا متن صاف کرو',clearTitle:'ایہ نہ بھیجیا متن صاف کرنا اے؟',clearImpact:'ایہ صرف ایس اسکرین دا متن صاف کردا اے۔ زیر التوا درخواست منسوخ یا بھیجیا پیغام حذف نہیں کردا۔',cancel:'منسوخ کرو',confirm:'متن صاف کرو',draft:'تہاڈا نہ بھیجیا متن اجے وی ایتھے اے۔ گفتگو دوبارہ دستیاب ہون تک بھیجنا دستیاب نہیں۔'},
   id:{invalid:'Tidak dapat memverifikasi respons percakapan. Muat ulang untuk mencoba lagi.',blocked:'Pengiriman sementara tidak tersedia.',recovery:'Tidak dapat memverifikasi pemulihan pesan lokal. Periksa tanda terima yang tertunda sebelum mencoba lagi.',clear:'Hapus teks yang belum terkirim',clearTitle:'Hapus teks yang belum terkirim ini?',clearImpact:'Ini hanya menghapus teks di layar ini. Tidak membatalkan permintaan yang tertunda atau menghapus pesan yang sudah terkirim.',cancel:'Batal',confirm:'Hapus teks',draft:'Teks yang belum terkirim masih ada di sini. Pengiriman tidak tersedia sampai percakapan tersedia lagi.'},
 };
-type Props={caseId:string;assignmentId?:string;session:MessageSession;language?:WorkerUiLanguage;worker?:boolean;canWrite?:boolean;current?:()=>boolean;canMutate?:()=>boolean;timezone?:string;onDirtyChange?:(value:boolean)=>void;onSessionLost?:()=>void;afterComposer?:ReactNode};
+type Props={caseId:string;assignmentId?:string;session:MessageSession;language?:WorkerUiLanguage;worker?:boolean;synthetic?:boolean;canWrite?:boolean;current?:()=>boolean;canMutate?:()=>boolean;timezone?:string;onDirtyChange?:(value:boolean)=>void;onSessionLost?:()=>void;afterComposer?:ReactNode};
 export function CaseConversation(props:Props){
   return <ConversationContent key={JSON.stringify([props.caseId,props.session.clientContext,props.session.expiresAt,!!props.worker])} {...props}/>;
 }
-function ConversationContent({caseId,assignmentId,session,language='en',worker=false,canWrite=true,current=()=>true,canMutate=()=>true,timezone,onDirtyChange,onSessionLost,afterComposer}:Props){
+function ConversationContent({caseId,assignmentId,session,language='en',worker=false,synthetic=true,canWrite=true,current=()=>true,canMutate=()=>true,timezone,onDirtyChange,onSessionLost,afterComposer}:Props){
   const locale=language,t=copy[locale],g=generationCopy[locale],s=stateCopy[locale];
   const rtl=workerUiDirection(locale)==='rtl';
   const composerId=useId(),composerCountId=useId(),composerLimitId=useId();
@@ -163,7 +162,7 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
     {data&&!data.canReply&&<p>{t.closed}</p>}{unavailable&&<p role="status">{t.translation}</p>}
     {(replyAvailable||!!text)&&<form id={composerId} onSubmit={event=>{event.preventDefault();void send();}}>
       {!!text&&!replyAvailable&&<p role="status">{s.draft}</p>}
-      {!worker&&data?.canGenerate&&<p className="notice notice-amber">{freeTierCopy[locale]}</p>}
+      {!worker&&data?.canGenerate&&synthetic&&<p className="notice notice-amber">{freeTierCopy[locale]}</p>}
       <label className="field">{t.reply}<textarea ref={composer} aria-describedby={`${composerCountId}${overLimit?` ${composerLimitId}`:''}`} aria-invalid={overLimit} maxLength={composerPolicy.limit} rows={3} value={text} readOnly={!replyAvailable||busy||voiceDirty||recoveryFailed||generationStatus==='queued'||generationStatus==='processing'} onChange={event=>setText(event.target.value)}/></label>
       <p id={composerCountId} className="case-message-count" dir="ltr">{text.length} / {composerPolicy.limit}</p>
       {overLimit&&<p id={composerLimitId} role="alert" className="record-error">{limitCopy[locale]}</p>}

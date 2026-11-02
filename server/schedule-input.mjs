@@ -10,8 +10,9 @@ export function scheduleCancel(input) {
 }
 export const scheduleHash=bundleHash;
 export function scheduledContentHash(value,modes={}) {
-  const responseMode=modes?.responseMode ?? 'question',deliveryMode=modes?.deliveryMode ?? 'both';
-  return scheduleHash({...value,responseMode,deliveryMode});
+  const responseMode=modes?.responseMode ?? 'question',deliveryMode=modes?.deliveryMode ?? 'both',evidenceMode=modes?.evidenceMode ?? 'none';
+  const validityDays=modes?.competency?.validityDays;
+  return scheduleHash({...value,responseMode,deliveryMode,evidenceMode,...(Number.isSafeInteger(validityDays)?{competency:{validityDays,title:value?.title}}:{})});
 }
 export function scheduleReceipt(row) {
   const request=typeof row.request_json==='string'?JSON.parse(row.request_json):row.request_json;

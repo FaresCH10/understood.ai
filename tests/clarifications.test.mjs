@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { openDatabase } from '../server/db.mjs';
 import { createAppServer } from '../server/index.mjs';
 import { seed } from '../server/seed.mjs';
-import { metrics } from '../server/domain.mjs';
+import { metrics,publish } from '../server/domain.mjs';
 import { ensureRecordingSchema } from '../server/recordings.mjs';
 import { ensureClarificationSchema,requestHelp,workerHelpCases,listClarifications,getClarification,assignClarification,resolveClarification } from '../server/clarifications.mjs';
 import {checkedClarificationPage,checkedClarificationDetail,checkedClarificationActionReceipt} from '../src/clarification-contract.ts';
@@ -75,6 +75,22 @@ test('case filters page frozen topics, enforce scope and preserve original asses
     for (const filters of [{page:0},{pageSize:51},{status:'closed'},{overdue:'maybe'},{search:'x'.repeat(81)},{org_id:'harbor'}]) assert.throws(() => listClarifications(db,maya,filters),/Invalid clarification filter/);
     db.prepare("UPDATE staff SET active=0 WHERE id='maya'").run();
     assert.throws(() => getClarification(db,maya,original.id),/Forbidden/);
+  } finally {db.close();}
+});
+
+test('clarification version context names the live instruction and clears when none is published', () => {
+  const db=fixture();
+  try {
+    const caseId=db.prepare("SELECT id FROM clarifications WHERE status='open' ORDER BY created_at,id LIMIT 1").get().id;
+    const before=getClarification(db,maya,caseId);
+    assert.equal(before.version,3);assert.equal(before.current_version,3);
+    db.prepare("UPDATE briefings SET prepared_json=(SELECT snapshot_json FROM publications WHERE id='shelf-v3'),state='ready' WHERE id='shelf'").run();
+    publish(db,maya,'shelf',{requestId:randomUUID(),revision:1,nextVersion:4,workerIds:['worker-30']});
+    const after=getClarification(db,maya,caseId);
+    assert.equal(after.version,3);assert.equal(after.current_version,4);
+    assert.equal(listClarifications(db,maya,{status:'open'}).rows.find((row)=>row.id===caseId).current_version,4);
+    db.prepare("UPDATE publications SET state='withdrawn' WHERE briefing_id='shelf' AND state='published'").run();
+    assert.equal(getClarification(db,maya,caseId).current_version,null);
   } finally {db.close();}
 });
 

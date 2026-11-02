@@ -26,7 +26,7 @@ function fixture() {
   );
   insertWorker.run('harbor-worker', 'harbor', 'harbor-yard', 'Worker 014', 'en', 1);
   const now = new Date().toISOString();
-  db.prepare('INSERT INTO briefings VALUES (?,?,?,?,?,?,?,?,?,?,?)').run('shelf', 'cedar', 'beirut', 'Shelf colour handover', 'Put items on shelves.', 1, 4, 'draft', null, now, now);
+  db.prepare('INSERT INTO briefings(id,org_id,site_id,title,source,revision,next_version,state,prepared_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run('shelf', 'cedar', 'beirut', 'Shelf colour handover', 'Put items on shelves.', 1, 4, 'draft', null, now, now);
   db.prepare('INSERT INTO publications VALUES (?,?,?,?,?,?,?,?)').run('shelf-v3', 'cedar', 'beirut', 'shelf', 3, JSON.stringify({languages:{ar:{title:'Shelf colour handover',text:'ضع الأشياء على الرفوف.',question:'أين ستضع الأشياء؟'}}}), now, 'published');
   db.prepare('INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,due_at,created_at,language) VALUES (?,?,?,?,?,?,?,?)').run('assignment-14', 'cedar', 'beirut', 'shelf-v3', 'worker-14', null, now, 'ar');
   db.prepare('INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?)').run('attempt-14', 'cedar', 'assignment-14', 'seed-14', 'Blue shelf.', 'clarification', '["missing_asked_fact"]', now);

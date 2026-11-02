@@ -6,7 +6,7 @@ import {handleWorkspaceRoute} from '../workspace-http.mjs';
 import {postgresWorkspace} from './workspace.mjs';
 import {assertProductionAdmission} from './production-admission.mjs';
 import { createServer } from 'node:http';
-import {sendPrivateWav} from '../audio-response.mjs';
+import {sendPrivateImage,sendPrivateWav} from '../audio-response.mjs';
 import {withPostgresClient} from './db.mjs';
 import {handleOperationsRoute} from './operations-http.mjs';
 import {siteCrewOverview} from './site-crews.mjs';
@@ -35,7 +35,7 @@ import {requestRecovery,resetPassword} from './account-recovery.mjs';
 import {requestRegistration,resendRegistration,verifyRegistration,verifyRegistrationCode} from './registration.mjs';
 import {listAccountSites,switchAccountSite} from './accounts.mjs';
 import {issueInvitation,changeInvitation,listInvitations,invitationReceipt,previewInvitation,acceptInvitation} from './invitations.mjs';
-import { sessionContext,listBriefings,getBriefing,workerBriefings,workerBriefing,staffOverview,listProcessing,getProcessing } from './read-models.mjs';
+import { sessionContext,listBriefings,getBriefing,workerBriefings,workerBriefing,staffOverview,attentionPage,listProcessing,getProcessing } from './read-models.mjs';
 import {getProcessingRetryContext,getProcessingRetryReceipt,retryProcessing} from './processing-retry.mjs';
 import {handleProcessingRetryRoute} from '../processing-retry-http.mjs';
 import {handleProcessingProvenanceRoute} from '../processing-provenance-http.mjs';
@@ -47,19 +47,24 @@ import {searchQuery} from '../search-input.mjs';
 import { createDraft,editDraft,queuePreparation,copyDraft,archiveBriefing,getPreparationRequestContext,getPreparationRequestReceipt,requestPreparation,processOnePreparation } from './preparation.mjs';
 import { instructionAudienceOverview,startInstructionSend,instructionSendStatus,completeInstructionSend,reconcileInstructionSend,retryInstructionSend } from './instructions.mjs';
 import { acknowledgeAssignment } from './acknowledgments.mjs';
+import {handleImprovementRoute} from '../self-healing-http.mjs';
+import {improvementHttpError} from '../self-healing-input.mjs';
+import {readInstructionImprovement,analyzeInstructionImprovement,createImprovementDraft} from './self-healing.mjs';
 import { publish,submitAnswer,withdrawPublication,domainTransaction } from './domain.mjs';
 import {createSchedule,listSchedules,cancelSchedule} from './schedules.mjs';
+import {listReverificationCandidates} from './reverification.mjs';
 import {scheduleHttpError} from '../schedule-input.mjs';
 import {publicationReceipt} from './publication-receipts.mjs';
 import {draftCreationReceipt} from './draft-creations.mjs';
 import {draftCreationHttpError} from '../draft-creations.mjs';
 import {publicationReceiptHttpError} from '../publication-receipts.mjs';
-import { listPublicationResponses,getPublicationResponse,workerSubmissions,workerSubmission,staffWorkerAssignments,workerRequestReceipt } from './responses.mjs';
+import { listPublicationResponses,getPublicationResponse,workerSubmissions,workerSubmission,staffWorkerAssignments,workerRequestReceipt,publicationAssignmentEvidence,workerAssignmentEvidence } from './responses.mjs';
 import { receiveRecording,getRecording,getRecordingAudio } from './recordings.mjs';
 import { createPresentation,listPresentations } from './presentations.mjs';
 import { readPublicationReport,listReportPublications } from './reports.mjs';
 import { listWorkers,createWorker,updateWorker,disableWorker,reenableWorker,listCrews,getCrew,listCrewRecipients,createCrew,moveWorkerToCrew,renameCrew,archiveCrew,restoreCrew,
-  workerLanguageState,workerLanguageHistory,selectWorkerLanguage,requestWorkerLanguage,staffWorkerLanguageHistory,listLanguageRequests,decideWorkerLanguageRequest } from './people.mjs';
+  workerLanguageState,workerLanguageHistory,selectWorkerLanguage,requestWorkerLanguage,staffWorkerLanguageHistory,listLanguageRequests,decideWorkerLanguageRequest,
+  readWorkerIdSettings,updateWorkerIdPrefix } from './people.mjs';
 import {listNotifications,readNotification,notificationReceipt} from './notifications.mjs';
 import {listWorkerNotifications,readWorkerNotification,workerNotificationReceipt,savePushSubscription,revokePushSubscription,pushSubscriptionStatus} from './notification-events.mjs';
 import {resolvePushAdapter} from '../push-adapter.mjs';
@@ -86,7 +91,9 @@ import {saveDraftLanguages,draftLanguagesReceipt} from './draft-languages.mjs';
 import {listStaff,changeStaff,staffReceipt} from './staff.mjs';
 import {saveDraftReview,draftReviewReceipt,verifyDraftReviewReceipt} from './draft-review.mjs';
 import {regenerateDraftTarget,regenerationReceipt} from './regeneration.mjs';
-import {listTemplates,getTemplate,changeTemplate,templateReceipt} from './templates.mjs';
+import {listTemplates,getTemplate,setTemplateFavorite,changeTemplate,templateReceipt} from './templates.mjs';
+import {listTranslationFeedback,reportTranslationFeedback,decideTranslationFeedback} from './translation-feedback.mjs';
+import {saveCompetencySetting,listCompetencies,workerCompetencies} from './competencies.mjs';
 import {listGlossary,getGlossaryTerm,changeGlossary,glossaryReceipt} from './glossary.mjs';
 import {getAssignmentSpeech,getStaffArtifactSpeech} from './generated-audio.mjs';
 import {getLanguageReadiness,runLanguageReadiness} from './language-readiness.mjs';
@@ -112,6 +119,7 @@ unavailable.add('Follow-up receipt unavailable');
 unavailable.add('Follow-up audio unavailable');
 unavailable.add('Invoice unavailable');
 unavailable.add('Settings unavailable');
+unavailable.add('Evidence unavailable');
 unavailable.add('Template unavailable');
 unavailable.add('Glossary term unavailable');
 unavailable.add('Staff member unavailable');
@@ -120,6 +128,7 @@ unavailable.add('Generated bundle unavailable');
 unavailable.add('Generated audio unavailable');
 unavailable.add('Artifact audio unavailable');
 unavailable.add('Language request unavailable');
+unavailable.add('Translation feedback unavailable');
 unavailable.add('Presentation unavailable');
 unavailable.add('Instruction unavailable');
 unavailable.add('Company not found');
@@ -163,6 +172,7 @@ conflicts.add('Draft regeneration unavailable');
 conflicts.add('Draft version changed');
 for(const message of ['Staff request conflict','Staff revision changed','Staff access is revoked','Staff access unchanged','Last active site owner must be retained']) conflicts.add(message);
 for(const message of ['Template request conflict','Template revision changed','Template is archived','Template is active']) conflicts.add(message);
+for(const message of ['Translation feedback request conflict','Translation feedback already open','Translation feedback already decided'])conflicts.add(message);
 for(const message of ['Glossary request conflict','Glossary revision changed','Glossary term is removed','Glossary term is active','Glossary term already exists','Glossary dependency changed','Live glossary generation unavailable']) conflicts.add(message);
 const badInput = new Set(['Select one of the published choices','Invalid USD amount','Invalid invoice request','Invalid payment request','Invalid invoice filter','Payment date must not be in the future','Invalid JSON','Request too large','Title or source is invalid','Invalid draft request','Invalid draft revision',
   'Invalid search request','Invalid worker','Invalid crew request',
@@ -172,12 +182,14 @@ const badInput = new Set(['Select one of the published choices','Invalid USD amo
   'Invalid invitation input','Invitation unavailable',
   'Invalid processing filter','Invalid briefing filter','Invalid draft copy request','Invalid briefing archive request','Invalid draft review request',
   'Invalid invoice void request','Invalid regeneration request',
-  'Invalid template request','Invalid template filter',
+  'Invalid template request','Invalid template filter','Invalid template favorite request',
+  'Invalid translation feedback','Invalid translation feedback filter','Invalid translation feedback decision',
   'Invalid glossary request','Invalid glossary filter',
   'Invalid settings request','Invalid support email','Invalid site timezone','Invalid site contact',
   'Invalid staff request','Invalid staff filter','Invalid recovery input','Invalid recovery link or input','Invalid credential input','Invalid account site request','Invalid credential request',
   'Invalid worker ID','Invalid password','Invalid setup credential','Invalid setup expiry','Confirmation required',
   'Invalid response filter','Response audience exceeds limit',
+  'Invalid re-verification filter',
   'Invalid report scope',
   'Invalid withdrawal request','Invalid reactivation request',
   'Invalid publication request','Invalid publication version','Invalid briefing ID','Invalid publication ID','Invalid deadline','Deadline must be in the future',
@@ -196,13 +208,16 @@ badInput.add('Invalid activation request');
 badInput.add('Invalid voice request');
 for(const message of ['Invalid push request','Invalid push subscription','Push service unavailable'])badInput.add(message);
 for(const message of ['Invalid conversation request','Invalid conversation filter'])badInput.add(message);
+for(const message of ['Invalid competency setting','Invalid competency filter'])badInput.add(message);
 badInput.add('Invalid generation languages');
 badInput.add('Invalid presentation request');
 badInput.add('Invalid presentation content');
 for(const message of ['Invalid onboarding request','Invalid onboarding briefing'])badInput.add(message);
 for(const message of ['Invalid recording notice request','Invalid recording notice text','Recording notice requires every supported language'])badInput.add(message);
 for(const message of ['Invalid instruction request','Invalid instruction audience','Instruction audience is empty','Instruction preparation unavailable',
-  'Invalid instruction retry request','Invalid acknowledgment request','This instruction only requires confirmation'])badInput.add(message);
+  'Invalid instruction retry request','Invalid acknowledgment request','This instruction only requires confirmation',
+  'Attach a photo as evidence','Invalid evidence photo','Evidence photo must be a JPEG, PNG or WebP image',
+  'Evidence photo does not match its image type','This instruction does not request photo evidence','Evidence photo is too large'])badInput.add(message);
 
 async function readAudio(req) {
   if (req.headers['content-type']!=='audio/wav') throw new Error('Expected WAV audio');
@@ -374,6 +389,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         return send(res,200,{ok:true},{'set-cookie':sessionCookie(next.token,next.maxSeconds,cookieOptions)});
       }
       if (path==='/api/overview' && req.method==='GET') return send(res,200,await staffOverview(pool,session,repository));
+      if(path==='/api/overview/attention' && req.method==='GET') return send(res,200,await attentionPage(pool,session,Object.fromEntries(url.searchParams),repository));
       if(await handleWorkspaceRoute(req,res,session,url,(s,op,input)=>postgresWorkspace(pool,s,op,input,repository)))return;
       if(path==='/api/instructions/audience' && req.method==='GET') {
         if(url.search) throw new Error('Invalid instruction request');
@@ -416,6 +432,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         }
         return send(res,result.state==='failed'?409:result.duplicate?200:201,result);
       }
+      if(path==='/api/competencies' && req.method==='GET') return send(res,200,await listCompetencies(pool,session,Object.fromEntries(url.searchParams),repository));
       if(path==='/api/templates' && req.method==='GET') return send(res,200,await listTemplates(pool,session,Object.fromEntries(url.searchParams),repository));
       if(path==='/api/glossary' && req.method==='GET') return send(res,200,await listGlossary(pool,session,Object.fromEntries(url.searchParams),repository));
       if(path==='/api/glossary' && req.method==='POST') {if(url.search) throw new Error('Invalid glossary request');const result=await changeGlossary(pool,session,'create',null,await readJson(req),repository);return send(res,result.duplicate ? 200 : 201,result);}
@@ -436,9 +453,15 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(path==='/api/templates' && req.method==='POST') {if(url.search) throw new Error('Invalid template request');const result=await changeTemplate(pool,session,'create',null,await readJson(req),repository);return send(res,result.duplicate ? 200 : 201,result);}
       const templateReceiptMatch=path.match(/^\/api\/templates\/receipts\/([^/]+)$/);
       if(templateReceiptMatch && req.method==='GET') {if(url.search) throw new Error('Invalid template request');return send(res,200,await templateReceipt(pool,session,decodeURIComponent(templateReceiptMatch[1]),repository));}
+      const templateFavoriteMatch=path.match(/^\/api\/templates\/([^/]+)\/favorite$/);
+      if(templateFavoriteMatch && req.method==='POST'){if(url.search) throw new Error('Invalid template favorite request');return send(res,200,await setTemplateFavorite(pool,session,decodeURIComponent(templateFavoriteMatch[1]),await readJson(req,1024),repository));}
       const templateMatch=path.match(/^\/api\/templates\/([^/]+)(?:\/(edit|archive|restore|duplicate|use))?$/);
       if(templateMatch && !templateMatch[2] && req.method==='GET') return send(res,200,await getTemplate(pool,session,templateMatch[1],Object.fromEntries(url.searchParams),repository));
       if(templateMatch && templateMatch[2] && req.method==='POST') {if(url.search) throw new Error('Invalid template request');return send(res,200,await changeTemplate(pool,session,templateMatch[2],templateMatch[1],await readJson(req),repository));}
+      if(path==='/api/translation-feedback' && req.method==='GET') return send(res,200,await listTranslationFeedback(pool,session,Object.fromEntries(url.searchParams),repository));
+      if(path==='/api/translation-feedback' && req.method==='POST') {if(url.search) throw new Error('Invalid translation feedback');const result=await reportTranslationFeedback(pool,session,await readJson(req,4096),repository);return send(res,result.duplicate ? 200 : 201,result);}
+      const translationFeedbackDecision=path.match(/^\/api\/translation-feedback\/([^/]+)\/decision$/);
+      if(translationFeedbackDecision && req.method==='POST') {if(url.search) throw new Error('Invalid translation feedback decision');return send(res,200,await decideTranslationFeedback(pool,session,decodeURIComponent(translationFeedbackDecision[1]),await readJson(req,4096),repository));}
       if(path==='/api/settings/staff' && req.method==='GET') return send(res,200,await listStaff(pool,session,Object.fromEntries(url.searchParams),repository));
       if(path==='/api/settings/invitations' && req.method==='GET') return send(res,200,await listInvitations(pool,session,Object.fromEntries(url.searchParams),repository));
       if(path==='/api/settings/invitations' && req.method==='POST') {
@@ -726,6 +749,11 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
           return send(res,200,await siteCrewOverview(pool,session,Object.fromEntries(url.searchParams),repository));
         }catch(error){const failure=crewOverviewHttpError(error);return send(res,failure.status,{error:failure.message});}
       }
+      if (path==='/api/people/worker-id') {
+        if(url.search)throw Error('Invalid worker ID request');
+        if (req.method==='GET') return send(res,200,await readWorkerIdSettings(pool,session,repository));
+        if (req.method==='PATCH') return send(res,200,await updateWorkerIdPrefix(pool,session,await readJson(req),repository));
+      }
       if (path==='/api/people/workers') {
         if (req.method==='GET') return send(res,200,await listWorkers(pool,session,Object.fromEntries(url.searchParams),repository));
         if (req.method==='POST') return send(res,201,await createWorker(pool,session,requiredWorkerCreation(await readJson(req)),repository));
@@ -814,6 +842,17 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(responses && req.method==='GET') return send(res,200,responses[2]
         ? await getPublicationResponse(pool,session,responses[1],responses[2],Object.fromEntries(url.searchParams),repository)
         : await listPublicationResponses(pool,session,responses[1],Object.fromEntries(url.searchParams),repository));
+      const responseEvidence=path.match(/^\/api\/publications\/([^/]+)\/responses\/([^/]+)\/evidence$/);
+      if(responseEvidence && req.method==='GET') {
+        if(url.search)throw new Error('Evidence unavailable');
+        const evidence=await publicationAssignmentEvidence(pool,session,responseEvidence[1],responseEvidence[2],repository);
+        sendPrivateImage(res,evidence.mime,evidence.dataBase64);
+        return;
+      }
+      if(await handleImprovementRoute(req,res,session,url,{
+        read:(s,id)=>readInstructionImprovement(pool,s,id,repository),analyze:(s,id)=>analyzeInstructionImprovement(pool,s,id,repository),
+        draft:(s,id,input)=>createImprovementDraft(pool,s,id,input,repository),
+      }))return;
       const artifactSpeech=path.match(/^\/api\/briefings\/([^/]+)\/artifacts\/(draft|publication)\/([^/]+)\/(en|ar|ur)\/(body|question)$/);
       if(artifactSpeech && req.method==='GET') {
         if(url.search) throw Error('Artifact audio unavailable');
@@ -841,11 +880,20 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
           const result=await createSchedule(pool,session,id,await readJson(req,600000),{...repository,storage});return send(res,result.duplicate?200:202,result);
         }
       }
+      const reverificationRoute=path.match(/^\/api\/briefings\/([^/]+)\/reverification$/);
+      if(reverificationRoute && req.method==='GET') {
+        return send(res,200,await listReverificationCandidates(pool,session,decodeURIComponent(reverificationRoute[1]),Object.fromEntries(url.searchParams),repository));
+      }
       const publicationHistoryRoute=path.match(/^\/api\/briefings\/([^/]+)\/publications(?:\/([^/]+))?$/);
       if(publicationHistoryRoute && req.method==='GET') {
         const [,briefingId,publicationId]=publicationHistoryRoute.map(value=>value?decodeURIComponent(value):value);
         const input=publicationHistoryQuery(url.searchParams,!!publicationId);
         return send(res,200,publicationId?await getPublicationHistoryDetail(pool,session,briefingId,publicationId,repository):await listPublicationHistory(pool,session,briefingId,input,repository));
+      }
+      const competencySettingRoute=path.match(/^\/api\/briefings\/([^/]+)\/competency$/);
+      if(competencySettingRoute && req.method==='POST') {
+        if(url.search)throw Error('Invalid competency setting');
+        return send(res,200,await saveCompetencySetting(pool,session,decodeURIComponent(competencySettingRoute[1]),await readJson(req,4096),repository));
       }
       const briefing=path.match(/^\/api\/briefings\/([^/]+)(?:\/(process|publish|withdraw|copy|archive|review|regenerate))?$/);
       if (briefing) {
@@ -908,6 +956,10 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         return send(res,200,await requestWorkerLanguage(pool,session,await readJson(req),repository));
       }
       if (path==='/api/worker/briefings' && req.method==='GET') return send(res,200,await workerBriefings(pool,session,repository,Object.fromEntries(url.searchParams)));
+      if (path==='/api/worker/competencies' && req.method==='GET') {
+        if(url.search)throw Error('Invalid competency filter');
+        return send(res,200,await workerCompetencies(pool,session,repository));
+      }
       if (path==='/api/worker/history' && req.method==='GET') return send(res,200,await workerBriefings(pool,session,{...repository,history:true},Object.fromEntries(url.searchParams)));
       const speech=path.match(/^\/api\/worker\/briefings\/([^/]+)\/speech\/(body|question)$/);
       if(speech && req.method==='GET') {
@@ -933,12 +985,18 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(helpHistory&&req.method==='GET')return send(res,200,{...await workerHelpHistory(pool,session,helpHistory[1],Object.fromEntries(url.searchParams),repository),clientContext:clientSessionContext(session).clientContext});
       const exactSubmission=path.match(/^\/api\/worker\/briefings\/([^/]+)\/submissions\/([^/]+)$/);
       if(exactSubmission&&req.method==='GET')return send(res,200,{...await workerSubmission(pool,session,exactSubmission[1],exactSubmission[2],Object.fromEntries(url.searchParams),repository),clientContext:clientSessionContext(session).clientContext});
-      const assignment=path.match(/^\/api\/worker\/briefings\/([^/]+)(?:\/(answers|audio|help|submissions|acknowledge|presentations))?$/);
+      const assignment=path.match(/^\/api\/worker\/briefings\/([^/]+)(?:\/(answers|audio|help|submissions|acknowledge|presentations|evidence))?$/);
       if (assignment) {
         const [,id,action]=assignment;
         if(action==='acknowledge' && req.method==='POST') {
-          const body=await readJson(req),result=await acknowledgeAssignment(pool,session,id,body.requestId,repository);
+          const body=await readJson(req,7*1024*1024),result=await acknowledgeAssignment(pool,session,id,body.requestId,{...repository,photo:body.photo});
           return send(res,result.duplicate?200:201,{...result,assignmentId:id,requestId:body.requestId,clientContext:clientSessionContext(session).clientContext});
+        }
+        if(action==='evidence' && req.method==='GET') {
+          if(url.search)throw new Error('Evidence unavailable');
+          const evidence=await workerAssignmentEvidence(pool,session,id,repository);
+          sendPrivateImage(res,evidence.mime,evidence.dataBase64);
+          return;
         }
         if(action==='submissions' && req.method==='GET') return send(res,200,{...await workerSubmissions(pool,session,id,Object.fromEntries(url.searchParams),repository),clientContext:clientSessionContext(session).clientContext});
         if(action==='presentations' && req.method==='GET'){
@@ -991,6 +1049,9 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(/\/schedules(?:\/|$)/.test(requestPath)) {const {status,error:message}=scheduleHttpError(error);return send(res,status,{error:message});}
       const message=error?.message;
       if (res.headersSent) {res.destroy(); return;}
+      if(/^\/api\/publications\/[^/]+\/improvement(?:\/draft)?$/.test(requestPath)) {
+        const result=improvementHttpError(error);return send(res,result.status,{error:result.error});
+      }
       if(requestPath==='/api/onboarding/first-run') {
         if(message==='Invalid onboarding input') return send(res,400,{error:message});
         if(message==='Onboarding already completed') return send(res,409,{error:message});
@@ -1008,12 +1069,13 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if (['Sign in required','Invalid credentials','Invalid or expired setup code','Sign in to accept this invitation','Sign out before creating an account'].includes(message)) return send(res,401,{error:message});
       if (message==='Forbidden' || message==='Forbidden origin' || message==='Forbidden transport' || message==='Workspace access paused' || message==='Workspace is read-only') return send(res,403,{error:message});
       if(['Invalid publication history request','Invalid report publication filter','Invalid report publication date','Report publication history exceeds limit; narrow the search or dates'].includes(message))return send(res,400,{error:message});
+      if(message==='Invalid attention filter')return send(res,400,{error:message});
       if (message==='Email delivery unavailable') return send(res,503,{error:message});
       if(['Follow-up translation unavailable','Follow-up generation unavailable','Follow-up language unavailable'].includes(message))return send(res,503,{error:message});
       if (unavailable.has(message)) return send(res,404,{error:message});
       if (typeof message==='string' && message.startsWith('Worker capacity reached')) return send(res,409,{error:message});
       if (conflicts.has(message)) return send(res,409,{error:message});
-      if (badInput.has(message) || /^Recipient language is unavailable: (?:unknown|[A-Z]{2}(?:-[A-Z]+)?(?:, [A-Z]{2}(?:-[A-Z]+)?)*)$/.test(message)) return send(res,['Request too large','Recording is too large','CSV exceeds 256 KiB limit'].includes(message) ? 413 : 400,{error:message});
+      if (badInput.has(message) || /^Recipient language is unavailable: (?:unknown|[A-Z]{2}(?:-[A-Z]+)?(?:, [A-Z]{2}(?:-[A-Z]+)?)*)$/.test(message)) return send(res,['Request too large','Recording is too large','CSV exceeds 256 KiB limit','Evidence photo is too large'].includes(message) ? 413 : 400,{error:message});
       return send(res,503,{error:'Operation unavailable. Retry after checking the service.'});
     }
   };

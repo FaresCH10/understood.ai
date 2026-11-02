@@ -24,6 +24,7 @@ async function nowOf(client) {
 function requestMatches(saved,request) {
   return saved?.title===request.title && saved?.source===request.source
     && saved?.responseMode===request.responseMode && saved?.deliveryMode===request.deliveryMode
+    && (saved?.evidenceMode ?? 'none')===request.evidenceMode
     && saved?.audience?.type===request.audience.type
     && (saved?.audience?.crewId ?? null)===(request.audience.crewId ?? null)
     && JSON.stringify(saved?.audience?.workerIds||[])===JSON.stringify(request.audience.workerIds||[])
@@ -42,7 +43,7 @@ async function sendView(client,row,duplicate) {
   const states=deliveries.length ? deliveryStateCounts(deliveries) : null;
   const retryCandidates=deliveries.filter((delivery)=>['blocked','failed'].includes(delivery.state) && delivery.reason!=='content_expired');
   return {requestId:row.request_id,briefingId:row.briefing_id,state:row.state,
-    responseMode:row.response_mode,deliveryMode:row.delivery_mode,sourceHash:request.sourceHash ?? null,
+    responseMode:row.response_mode,deliveryMode:row.delivery_mode,evidenceMode:row.evidence_mode ?? 'none',sourceHash:request.sourceHash ?? null,
     dueAt:request.dueAt ?? null,reminderMinutes:request.reminderMinutes ?? null,
     audience:{type:audience.type,count:row.audience_count,...(audience.crewId?{crewId:audience.crewId}:{})},
     delivered:row.delivered,undelivered:row.undelivered,undeliveredReasons:row.undelivered_json,
@@ -164,7 +165,7 @@ async function publishSend(client,session,row,briefing,request,deliverable,prefl
     requestId:row.publication_request_id,revision:briefing.revision,nextVersion:briefing.next_version,
     workerIds:deliverable.map((worker)=>worker.id),
     ...(request.dueAt?{dueAt:request.dueAt}:{}),...(request.reminderMinutes?{reminderMinutes:request.reminderMinutes}:{}),
-  },{integrationMode,preflight,modes:{responseMode:row.response_mode,deliveryMode:row.delivery_mode}});
+  },{integrationMode,preflight,modes:{responseMode:row.response_mode,deliveryMode:row.delivery_mode,evidenceMode:row.evidence_mode ?? 'none'}});
   const assignments=(await client.query('SELECT id,worker_id FROM assignments WHERE publication_id=$1 AND org_id=$2 AND site_id=$3',
     [published.id,session.org_id,session.site_id])).rows;
   const assignmentByWorker=new Map(assignments.map((assignment)=>[assignment.worker_id,assignment.id]));
@@ -366,11 +367,11 @@ export async function startInstructionSend(pool,session,input,{schema='public'}=
     const audience={type:value.audience.type,workers,...(value.audience.crewId?{crewId:value.audience.crewId}:{})};
     const now=await nowOf(client);
     await client.query(`INSERT INTO instruction_sends
-      (request_id,org_id,site_id,briefing_id,publication_request_id,audience_json,response_mode,delivery_mode,state,
+      (request_id,org_id,site_id,briefing_id,publication_request_id,audience_json,response_mode,delivery_mode,evidence_mode,state,
        publication_id,audience_count,delivered,undelivered,undelivered_json,error,request_json,requested_by,created_at,updated_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'preparing',NULL,$9,0,$9,'[]'::jsonb,NULL,$10,$11,$12,$12)`,
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'preparing',NULL,$10,0,$10,'[]'::jsonb,NULL,$11,$12,$13,$13)`,
     [value.requestId,session.org_id,session.site_id,value.requestId,randomUUID(),JSON.stringify(audience),
-      value.responseMode,value.deliveryMode,workers.length,JSON.stringify(value.request),session.principal_id,now]);
+      value.responseMode,value.deliveryMode,value.evidenceMode,workers.length,JSON.stringify(value.request),session.principal_id,now]);
     await insertDeliveries(client,value.requestId,{org_id:session.org_id,site_id:session.site_id},workers,now);
     await domainAudit(client,session,'instruction.send_requested',value.requestId);
     const row=(await client.query('SELECT * FROM instruction_sends WHERE request_id=$1',[value.requestId])).rows[0];

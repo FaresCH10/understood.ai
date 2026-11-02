@@ -48,7 +48,7 @@ test('current MCQ generation and explicit historical written-answer fixtures exe
   assert.equal(report.workerPermissions.hiddenTables,15);assert.equal(report.workerPermissions.nativeAuthentication,'not-tested');
   assert.equal(report.workerPermissions.apiIdentity,'embedded-application-role');
   assert.equal(report.apiPermissions.profile,'application');assert.equal(report.apiPermissions.verified,true);
-  assert.equal(report.apiPermissions.writableTables,138);assert.equal(report.apiPermissions.readOnlyTables,14);assert.equal(report.apiPermissions.hiddenTables,7);
+  assert.equal(report.apiPermissions.writableTables,145);assert.equal(report.apiPermissions.readOnlyTables,14);assert.equal(report.apiPermissions.hiddenTables,7);
   assert.equal(report.apiPermissions.taskExecutions,11);assert.deepEqual(report.apiPermissions.stages,[...stages].sort());
   assert.equal(report.apiPermissions.nativeAuthentication,'not-tested');assert.equal(report.apiPermissions.schemaOwnerUsedForCustomerOperations,false);
   assert.equal(report.apiPermissions.roleRestoredAfterNestedWork,true);

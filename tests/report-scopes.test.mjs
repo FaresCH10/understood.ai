@@ -7,12 +7,12 @@ import {seed} from '../server/seed.mjs';
 import {ensurePeopleSchema} from '../server/people.mjs';
 import {ensureRecordingSchema} from '../server/recordings.mjs';
 import {publish,syntheticPrepare,CANONICAL_SOURCE} from '../server/domain.mjs';
-import {reportActivity} from '../server/reports.mjs';
+import {reportActivity,openEarlierVersionCases} from '../server/reports.mjs';
 import {reportScope,selectReport} from '../server/report-scope.mjs';
 import * as exports from '../server/exports.mjs';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {publish as publishPg} from '../server/postgres/domain.mjs';
-import {readPublicationReport} from '../server/postgres/reports.mjs';
+import {readPublicationReport,openEarlierVersionCases as openEarlierVersionCasesPg} from '../server/postgres/reports.mjs';
 import * as pgExports from '../server/postgres/exports.mjs';
 import {checkedExportResult,checkedExportReceipt} from '../src/export-recovery.ts';
 import {createAppServer} from '../server/index.mjs';
@@ -154,6 +154,29 @@ for(const pg of [false,true]){
   });
 }
 
+for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} report counts only open cases tied to earlier published versions of the same briefing`,async()=>{
+  const f=await fixture(pg);
+  try{
+    const firstAssignment=f.assignments.find(row=>row.worker_id===f.workers[0]).id;
+    const draft=(await f.query('SELECT id,revision,next_version FROM briefings WHERE id=?',[pg?'brief':'shelf']))[0];
+    await f.query("UPDATE briefings SET state='ready' WHERE id=?",[pg?'brief':'shelf']);
+    const second=pg?await publishPg(f.pool,f.owner,draft.id,{requestId:randomUUID(),revision:draft.revision,nextVersion:draft.next_version,workerIds:f.workers},{schema:f.schema,integrationMode:'synthetic'}):publish(f.db,f.owner,draft.id,{requestId:randomUUID(),revision:draft.revision,nextVersion:draft.next_version,workerIds:f.workers});
+    assert.equal(second.version,f.publication.version+1);
+    const row=(await f.query('SELECT id,briefing_id,version FROM publications WHERE id=?',[second.id]))[0];
+    const earlier=async()=>{if(!pg)return openEarlierVersionCases(f.db,f.owner,row);const client=await f.pool.connect();try{return await openEarlierVersionCasesPg(client,f.owner,row);}finally{client.release();}};
+    const baseline=await earlier();
+    if(pg)await f.query("INSERT INTO clarifications(id,org_id,site_id,assignment_id,reason,status) VALUES('case-old',?,?,?, 'Help requested','open'),('case-resolved',?,?,?, 'clarification','resolved')",[f.owner.org_id,f.owner.site_id,firstAssignment,f.owner.org_id,f.owner.site_id,firstAssignment]);
+    else await f.query("INSERT INTO clarifications(id,org_id,assignment_id,reason,status,notes,created_at) VALUES('case-old',?,?,'Help requested','open','',?),('case-resolved',?,?,'clarification','resolved','Done',?)",[f.owner.org_id,firstAssignment,'2026-10-24T09:05:00.000Z',f.owner.org_id,firstAssignment,'2026-10-24T09:06:00.000Z']);
+    assert.equal((await f.query("SELECT 1 FROM clarifications WHERE id='case-resolved' AND status='resolved'")).length,1);
+    const count=await earlier();
+    assert.equal(count,baseline+1);
+    if(pg){
+      const report=await readPublicationReport(f.pool,f.owner,{schema:f.schema,publicationId:second.id});
+      assert.equal(report.earlierVersionCases,count);assert.equal(report.version,f.publication.version+1);
+    }
+  }finally{await f.close();}
+});
+
 test('report scope admits only bounded crew identity and real ordered civil dates',()=>{
   for(const input of [null,[],{orgId:'other'},{crewId:[]},{crewId:'x'.repeat(101)},{crewId:'a/b'},{responseFrom:'2026-02-29'},{responseFrom:'2026-10-03',responseThrough:'2026-10-02'}])assert.throws(()=>reportScope(input),/Invalid/);
   assert.deepEqual(reportScope({responseFrom:'2028-02-29'}),{crewId:'',responseFrom:'2028-02-29',responseThrough:''});
@@ -207,4 +230,13 @@ test('acknowledgment rows are counted as receipts, not awaiting assessment, and 
   assert.match(modes,/"response_mode","delivery_mode"/);assert.match(modes,/"acknowledged"/);
   assert.throws(()=>exports.exportCsv([['worker','en','awaiting_response','','','1'],[...Array(8).fill('x')]]),/Invalid snapshot/);
   assert.throws(()=>exports.exportCsv([['worker','en','acknowledged','',at,'1','acknowledge',true]]),/Invalid snapshot/);
+
+  const photo=selectReport([row],3,reportScope(),'UTC',[],{responseMode:'acknowledge',deliveryMode:'text',evidenceMode:'photo'});
+  assert.equal(photo.rows[0].length,10);assert.deepEqual(photo.evidence,{required:1,received:0});
+  const photoCsv=exports.exportCsv(photo.rows);
+  assert.match(photoCsv,/"response_mode","delivery_mode","evidence_status","evidence_received_at"\r\n/);assert.match(photoCsv,/"missing",""/);
+  const resolvedPhoto=selectReport([row],3,reportScope(),'UTC',[],{responseMode:'acknowledge',deliveryMode:'text',evidenceMode:'photo',resolvedAssignmentIds:['assignment']});
+  assert.equal(resolvedPhoto.rows[0].length,11);
+  assert.match(exports.exportCsv(resolvedPhoto.rows),/"follow_up_status","evidence_status","evidence_received_at"/);
+  assert.throws(()=>exports.exportCsv([['worker','en','awaiting_response','','','1'],[...Array(10)].fill('x')]),/Invalid snapshot/);
 });

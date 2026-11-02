@@ -1,5 +1,5 @@
 import {isWorkerLanguage,type WorkerLocaleCode} from '../server/languages.mjs';
-export type ClarificationSummary={id:string;worker:string;language:WorkerLocaleCode;title:string|null;reason:string;status:'open'|'resolved';created_at:string;due_at:string|null;case_due_at:string|null;escalated_at:string|null;owner_name:string|null;owner_staff_id:string|null;assignment_id:string;publication_id:string;version:number;attempt_id:string|null};
+export type ClarificationSummary={id:string;worker:string;language:WorkerLocaleCode;title:string|null;reason:string;status:'open'|'resolved';created_at:string;due_at:string|null;case_due_at:string|null;escalated_at:string|null;owner_name:string|null;owner_staff_id:string|null;assignment_id:string;publication_id:string;version:number;current_version:number|null;attempt_id:string|null};
 export type ClarificationEvidence={factIndex:number;quote:string};
 export type ClarificationAttempt={id:string;answer_text:string;outcome:'matched'|'clarification'|'unassessable'|null;received_at:string;recording_id:string|null;assessmentReasons:string[];assessmentEvidence:ClarificationEvidence[]};
 export type ClarificationPage={rows:ClarificationSummary[];total:number;page:number;pageSize:number;ownerOptions:{id:string;name:string}[];clientContext:string};
@@ -19,12 +19,12 @@ const date=(value:unknown):value is string=>typeof value==='string'&&/^\d{4}-\d{
 const nullable=(value:unknown,check:(value:unknown)=>boolean)=>value===null||check(value);
 const integer=(value:unknown,min:number,max:number)=>Number.isSafeInteger(value)&&Number(value)>=min&&Number(value)<=max;
 const outcome=(value:unknown)=>value===null||['matched','clarification','unassessable'].includes(value as string);
-const summaryKeys=['id','worker','language','title','reason','status','created_at','due_at','case_due_at','escalated_at','owner_name','owner_staff_id','assignment_id','publication_id','version','attempt_id'];
+const summaryKeys=['id','worker','language','title','reason','status','created_at','due_at','case_due_at','escalated_at','owner_name','owner_staff_id','assignment_id','publication_id','version','current_version','attempt_id'];
 function summary(row:Record<string,unknown>){
   return id(row.id)&&text(row.worker,200)&&isWorkerLanguage(row.language)&&nullable(row.title,value=>text(value,120))&&text(row.reason,4000,true)
     &&['open','resolved'].includes(row.status as string)&&date(row.created_at)&&nullable(row.due_at,date)&&nullable(row.case_due_at,date)&&nullable(row.escalated_at,date)
     &&nullable(row.owner_name,value=>text(value,500))&&nullable(row.owner_staff_id,id)&&!(row.owner_staff_id===null&&row.owner_name!==null)
-    &&id(row.assignment_id)&&id(row.publication_id)&&integer(row.version,1,Number.MAX_SAFE_INTEGER)&&nullable(row.attempt_id,id);
+    &&id(row.assignment_id)&&id(row.publication_id)&&integer(row.version,1,Number.MAX_SAFE_INTEGER)&&nullable(row.current_version,value=>integer(value,1,Number.MAX_SAFE_INTEGER))&&nullable(row.attempt_id,id);
 }
 function reasons(value:unknown){return Array.isArray(value)&&value.length<=20&&value.every(item=>text(item,500));}
 function evidence(value:unknown){return Array.isArray(value)&&value.length<=12&&value.every(row=>exact(row,['factIndex','quote'])&&integer(row.factIndex,0,5)&&text(row.quote,300));}

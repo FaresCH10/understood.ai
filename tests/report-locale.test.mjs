@@ -63,7 +63,7 @@ test('Reports keeps language outside read/intent dependencies and translates sav
   assert.ok(source.includes('operation.write(operation.pending.current!)'));
   assert.ok(source.includes('[publicationId, refresh,filters,reportRefresh,request,current]'));
   assert.ok(source.includes('[filters,page,tick,request,current]'));
-  assert.ok(main.includes('reportsRoute(view)?reportUiLanguage:'));
+  assert.ok(main.includes('caseUiLanguage=siteInterfaceLanguage,reportUiLanguage=siteInterfaceLanguage'));
   assert.ok(main.includes('fallbackCopy={{loading:reportText(language'));
   assert.equal(/key=\{(?:locale|language|reportUiLanguage)\b/.test(source),false);
 });

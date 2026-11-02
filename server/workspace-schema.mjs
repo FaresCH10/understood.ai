@@ -7,11 +7,15 @@ CREATE INDEX IF NOT EXISTS idx_compositions_scope ON instruction_compositions(or
 CREATE TABLE IF NOT EXISTS instruction_attachments (
  id TEXT PRIMARY KEY, request_id TEXT NOT NULL, org_id TEXT NOT NULL, site_id TEXT NOT NULL,
  staff_id TEXT NOT NULL, name TEXT NOT NULL, mime TEXT NOT NULL, bytes INTEGER NOT NULL,
- data_base64 TEXT NOT NULL, created_at TEXT NOT NULL
+ data_base64 TEXT NOT NULL, created_at TEXT NOT NULL, captions_json TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS idx_attachments_request ON instruction_attachments(org_id,site_id,request_id);
 CREATE TABLE IF NOT EXISTS assignment_completions (
  assignment_id TEXT PRIMARY KEY REFERENCES assignments(id), org_id TEXT NOT NULL, site_id TEXT NOT NULL,
  worker_id TEXT NOT NULL, completed_at TEXT NOT NULL
 );`;
-export function ensureWorkspaceSchema(db){db.exec(workspaceSchema);}
+export function ensureWorkspaceSchema(db){
+  db.exec(workspaceSchema);
+  if(!db.prepare('PRAGMA table_info(instruction_attachments)').all().some(column=>column.name==='captions_json'))
+    db.exec("ALTER TABLE instruction_attachments ADD COLUMN captions_json TEXT NOT NULL DEFAULT '{}'");
+}

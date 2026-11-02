@@ -6,9 +6,9 @@ import {openDatabase} from '../server/db.mjs';
 import {seed} from '../server/seed.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {processOne} from '../server/worker.mjs';
-import {ensureTemplateSchema,changeTemplate,listTemplates,getTemplate,templateReceipt} from '../server/templates.mjs';
+import {ensureTemplateSchema,changeTemplate,listTemplates,getTemplate,setTemplateFavorite,templateReceipt} from '../server/templates.mjs';
 import {templateInput,templateFilters,templateHistoryInput} from '../server/template-input.mjs';
-import {changeTemplate as pgChange,listTemplates as pgList,getTemplate as pgGet,templateReceipt as pgReceipt} from '../server/postgres/templates.mjs';
+import {changeTemplate as pgChange,listTemplates as pgList,getTemplate as pgGet,setTemplateFavorite as pgFavorite,templateReceipt as pgReceipt} from '../server/postgres/templates.mjs';
 import {processOnePreparation,editDraft as pgEdit} from '../server/postgres/preparation.mjs';
 import {editDraft} from '../server/preparation.mjs';
 import {runMigrations} from '../server/postgres/migrate.mjs';
@@ -25,20 +25,20 @@ const input=patch=>({requestId:randomUUID(),confirmed:true,...patch});
 test('template inputs strictly bound scope, defaults, history and literal filters',()=>{
   for(const patch of [{confirmed:false},{requestId:'bad'},{source:'short'},{title:'x'},{description:null},{question:null},{facts:['a',' a']},{askedFacts:Array(7).fill('a')},{state:'ready'},{org_id:'foreign'}]) assert.throws(()=>templateInput('create',null,input({...content,...patch})),/Invalid|invalid/);
   assert.equal(templateInput('create',null,input({...content,title:'  Trimmed template  '})).title,'Trimmed template');
-  for(const filter of [{page:0},{pageSize:101},{status:'ready'},{unknown:true},{search:'x'.repeat(81)}]) assert.throws(()=>templateFilters(filter),/Invalid/);
+  for(const filter of [{page:0},{pageSize:101},{status:'ready'},{favorites:'some'},{unknown:true},{search:'x'.repeat(81)}]) assert.throws(()=>templateFilters(filter),/Invalid/);
   for(const filter of [{page:0},{version:0},{version:1.2},{org_id:'foreign'}]) assert.throws(()=>templateHistoryInput(filter),/Invalid/);
 });
 async function fixture(pg) {
   if(!pg) {
     const db=openDatabase(':memory:');seed(db);ensureTemplateSchema(db);db.prepare('INSERT INTO staff VALUES(?,?,?,?,?,1)').run('auditor','cedar','beirut','Auditor','auditor');
-    return {db,change:(s,k,id,v)=>changeTemplate(db,s,k,id,v),list:(s,v)=>listTemplates(db,s,v),get:(s,id,v)=>getTemplate(db,s,id,v),process:()=>processOne(db),edit:(id,v)=>editDraft(db,owner,id,v),raw:async(sql,v=[])=>({rows:db.prepare(sql).all(...v)}),fail(){db.exec("CREATE TRIGGER reject_template_audit BEFORE INSERT ON audit WHEN NEW.action LIKE 'template.%' BEGIN SELECT RAISE(ABORT,'Injected template audit failure'); END");},reset(){db.exec('DROP TRIGGER reject_template_audit');},close:async()=>db.close()};
+    return {db,change:(s,k,id,v)=>changeTemplate(db,s,k,id,v),list:(s,v)=>listTemplates(db,s,v),get:(s,id,v)=>getTemplate(db,s,id,v),favorite:(s,id,v)=>setTemplateFavorite(db,s,id,v),process:()=>processOne(db),edit:(id,v)=>editDraft(db,owner,id,v),raw:async(sql,v=[])=>({rows:db.prepare(sql).all(...v)}),fail(){db.exec("CREATE TRIGGER reject_template_audit BEFORE INSERT ON audit WHEN NEW.action LIKE 'template.%' BEGIN SELECT RAISE(ABORT,'Injected template audit failure'); END");},reset(){db.exec('DROP TRIGGER reject_template_audit');},close:async()=>db.close()};
   }
   const db=new PGlite(),options={schema:'understood_test_templates'};let fail=false,lost=false;
   const pool={async connect(){return {async query(sql,v){if(fail && sql.includes('INSERT INTO audit')) throw new Error('Injected template audit failure');const r=v?.length ? await db.query(sql,v) : (await db.exec(sql)).at(-1) || {rows:[]};if(lost && sql==='COMMIT') {lost=false;throw new Error('Lost template commit receipt');}return r;},release(){}};}};
   await db.exec(`CREATE SCHEMA ${options.schema};SET search_path TO ${options.schema},pg_catalog`);await runMigrations(pool,options);
   await db.query("INSERT INTO organizations VALUES('cedar','Cedar Works'),('foreign','Foreign')");await db.query("INSERT INTO sites VALUES('beirut','cedar','Beirut','Asia/Beirut'),('foreign','foreign','Foreign','UTC')");
   await db.query("INSERT INTO staff(id,org_id,site_id,name,role) VALUES('maya','cedar','beirut','Maya','owner'),('auditor','cedar','beirut','Auditor','auditor'),('foreign','foreign','foreign','Foreign','owner')");
-  return {db,pool,options,change:(s,k,id,v)=>pgChange(pool,s,k,id,v,options),list:(s,v)=>pgList(pool,s,v,options),get:(s,id,v)=>pgGet(pool,s,id,v,options),process:()=>processOnePreparation(pool,{...options,integrationMode:'synthetic'}),edit:(id,v)=>pgEdit(pool,owner,id,v,options),raw:(sql,v)=>db.query(sql,v),fail(){fail=true;},reset(){fail=false;},lose(){lost=true;},close:()=>db.close()};
+  return {db,pool,options,change:(s,k,id,v)=>pgChange(pool,s,k,id,v,options),list:(s,v)=>pgList(pool,s,v,options),get:(s,id,v)=>pgGet(pool,s,id,v,options),favorite:(s,id,v)=>pgFavorite(pool,s,id,v,options),process:()=>processOnePreparation(pool,{...options,integrationMode:'synthetic'}),edit:(id,v)=>pgEdit(pool,owner,id,v,options),raw:(sql,v)=>db.query(sql,v),fail(){fail=true;},reset(){fail=false;},lose(){lost=true;},close:()=>db.close()};
 }
 for(const pg of [false,true]) test(`${pg ? 'PostgreSQL' : 'SQLite'} template lifecycle preserves versions, exact receipts and fresh processing with scoped HTTP`,async()=>{
   const f=await fixture(pg),auditor={...owner,principal_id:'auditor',role:'auditor'};
@@ -48,6 +48,16 @@ for(const pg of [false,true]) test(`${pg ? 'PostgreSQL' : 'SQLite'} template lif
     f.fail();await assert.rejects(async()=>f.change(owner,'create',null,create),/Injected/);f.reset();assert.equal((await f.list(owner)).total,0);
     if(pg) {f.lose();await assert.rejects(f.change(owner,'create',null,create),/Lost template/);}else await f.change(owner,'create',null,create);
     const id=create.requestId;assert.equal((await f.change(owner,'create',null,create)).duplicate,true);assert.equal((await f.get(auditor,id)).revision,1);
+    assert.equal((await f.list(owner)).items[0].favorite,false);assert.equal((await f.get(owner,id)).favorite,false);
+    for(const s of [{...owner,principal_type:'worker'},{...owner,site_id:'foreign'},{...owner,principal_id:'missing'}]) await assert.rejects(async()=>f.favorite(s,id,{favorite:true}),/Forbidden/);
+    await assert.rejects(async()=>f.favorite(owner,id,{favorite:'yes'}),/Invalid/);
+    await assert.rejects(async()=>f.favorite(owner,'missing',{favorite:true}),/unavailable/);
+    assert.deepEqual(await f.favorite(owner,id,{favorite:true}),{id,favorite:true});
+    assert.deepEqual(await f.favorite(owner,id,{favorite:true}),{id,favorite:true});
+    assert.equal((await f.list(owner)).items[0].favorite,true);assert.equal((await f.list(owner,{favorites:'only'})).total,1);assert.equal((await f.get(owner,id)).favorite,true);
+    assert.equal((await f.list(auditor,{favorites:'only'})).total,0);assert.equal((await f.list(auditor)).items[0].favorite,false);
+    assert.equal((await f.favorite(auditor,id,{favorite:true})).favorite,true);assert.equal((await f.list(auditor,{favorites:'only'})).total,1);
+    assert.deepEqual(await f.favorite(owner,id,{favorite:false}),{id,favorite:false});assert.equal((await f.list(owner,{favorites:'only'})).total,0);
     const receipt=(s,requestId)=>pg ? pgReceipt(f.pool,s,requestId,f.options) : templateReceipt(f.db,s,requestId);
     assert.deepEqual(await receipt(owner,randomUUID()),{found:false});await assert.rejects(async()=>receipt(owner,'bad'),/Invalid/);
     for(const s of [auditor,{...owner,principal_type:'worker'},{...owner,site_id:'foreign'}]) await assert.rejects(async()=>receipt(s,id),/Forbidden/);
@@ -98,7 +108,11 @@ for(const pg of [false,true]) test(`${pg ? 'PostgreSQL' : 'SQLite'} template lif
       const list=await call('/templates?page=2&pageSize=20',cookie);assert.equal(list.status,200);assert.match(list.headers.get('cache-control'),/no-store/);
       const saved=await call('/templates/receipts/'+id,cookie);assert.equal(saved.status,200);assert.match(saved.headers.get('cache-control'),/no-store/);assert.equal((await saved.json()).result.revision,1);
       assert.equal((await call('/templates/receipts/bad',cookie)).status,400);assert.equal((await call('/templates/receipts/'+id+'?scope=foreign',cookie)).status,400);
-      assert.equal((await call('/templates?scope=foreign',cookie)).status,400);assert.equal((await call('/templates/'+id+'/archive',cookie,input({revision:1}))).status,409);
+      assert.equal((await call('/templates?scope=foreign',cookie)).status,400);assert.equal((await call('/templates?favorites=some',cookie)).status,400);
+      assert.equal((await call('/templates/'+id+'/favorite',cookie,{favorite:'yes'})).status,400);assert.equal((await call('/templates/missing/favorite',cookie,{favorite:true})).status,404);
+      assert.equal((await call('/templates/'+id+'/favorite',cookie,{favorite:true})).status,200);
+      const favorites=await call('/templates?favorites=only&status=all',cookie);assert.equal(favorites.status,200);assert.equal((await favorites.json()).total,1);
+      assert.equal((await call('/templates/'+id+'/archive',cookie,input({revision:1}))).status,409);
       assert.equal((await call('/templates/'+id+'/use?scope=foreign',cookie,input({revision:26,title:'Blocked query'}))).status,400);
       assert.equal((await call('/templates/'+id+'?version=1',cookie)).status,200);assert.equal((await call('/templates/missing',cookie)).status,404);
       assert.equal((await call('/templates',cookie,{...input(content),confirmed:false})).status,400);

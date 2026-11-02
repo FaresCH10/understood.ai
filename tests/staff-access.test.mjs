@@ -97,7 +97,8 @@ for(const pg of [false,true]) test(`${pg ? 'PostgreSQL' : 'SQLite'} credential H
     assert.equal((await call('/settings/staff')).status,401);assert.equal((await call('/settings/staff',s)).status,403);assert.equal((await call('/settings/staff',r)).status,200);
     assert.equal((await (await call('/session',a)).json()).staffRole,'administrator');
     assert.equal((await call('/recordings/missing/audio',a)).status,403);assert.equal((await call('/recordings/missing/audio',r)).status,403);
-    for(const path of ['/overview','/briefings','/processing','/reports','/audit','/invoices','/people/workers','/glossary','/templates']) assert.equal((await call(path,a)).status,403,path);
+    assert.equal((await call('/audit',a)).status,404);
+    for(const path of ['/overview','/briefings','/processing','/reports','/invoices','/people/workers','/glossary','/templates']) assert.equal((await call(path,a)).status,403,path);
     assert.equal((await call('/settings/staff/maya/revoke',a,input())).status,403);assert.equal((await call('/settings/staff/maya/revoke',o,input())).status,409);
     assert.equal((await call('/settings/staff/other-site/revoke',o,input())).status,404);assert.equal((await call('/settings/staff/rami/revoke',o,input(),'https://foreign.test')).status,403);
     const request=input();assert.equal((await call('/settings/staff/rami/revoke',a,request)).status,200);assert.equal((await (await call('/settings/staff/receipts/'+request.requestId,a)).json()).accepted,true);

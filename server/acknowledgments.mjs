@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {NOW,transaction} from './db.mjs';
 import {requireWorkerSiteAccess} from './site-access.mjs';
 import {requireWritableEntitlement} from './entitlements.mjs';
+import {acknowledgmentEvidence,assignmentEvidence,ensureEvidenceSchema} from './evidence.mjs';
 
 const uuid=(value)=>typeof value==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
@@ -25,11 +26,12 @@ export function ensureAcknowledgementSchema(db) {
     BEGIN SELECT RAISE(ABORT,'Acknowledgment is immutable'); END;`);
 }
 
-export function acknowledgeAssignment(db,session,assignmentId,requestId) {
+export function acknowledgeAssignment(db,session,assignmentId,requestId,photo) {
   if(session?.principal_type!=='worker') throw new Error('Forbidden');
   if(typeof assignmentId!=='string' || !assignmentId || assignmentId.length>100 || !uuid(requestId))
     throw new Error('Invalid acknowledgment request');
   ensureAcknowledgementSchema(db);
+  ensureEvidenceSchema(db);
   return transaction(db,()=>{
     requireWorkerSiteAccess(db,session.org_id,session.site_id);
     if(!db.prepare('SELECT 1 FROM workers WHERE id=? AND org_id=? AND site_id=? AND active=1')
@@ -41,18 +43,25 @@ export function acknowledgeAssignment(db,session,assignmentId,requestId) {
     if(!assignment) throw new Error('Assignment unavailable');
     const old=db.prepare('SELECT request_id,received_at FROM acknowledgments WHERE assignment_id=? AND org_id=?')
       .get(assignmentId,session.org_id);
-    if(old) return {id:old.request_id,receivedAt:old.received_at,duplicate:true};
+    if(old) {
+      const stored=assignmentEvidence(db,session.org_id,session.site_id,assignmentId);
+      return {id:old.request_id,receivedAt:old.received_at,duplicate:true,...(stored?{evidence:stored}:{})};
+    }
     requireWritableEntitlement(db,session.org_id);
     let snapshot;
     try{snapshot=JSON.parse(assignment.snapshot_json);}catch{throw new Error('Assignment unavailable');}
     if(snapshot.responseMode!=='acknowledge') throw new Error('This instruction requires an answer');
     if(assignment.state!=='published') throw new Error('Assignment unavailable');
     if(assignment.due_at && assignment.due_at<=NOW()) throw new Error('Assignment deadline passed');
+    const stored=acknowledgmentEvidence(snapshot,photo);
     const now=NOW();
     db.prepare('INSERT INTO acknowledgments VALUES(?,?,?,?,?,?)')
       .run(requestId,session.org_id,session.site_id,assignmentId,session.principal_id,now);
+    if(stored) db.prepare(`INSERT INTO assignment_evidence(request_id,org_id,site_id,assignment_id,worker_id,mime,bytes,sha256,data_base64,received_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?)`)
+      .run(requestId,session.org_id,session.site_id,assignmentId,session.principal_id,stored.mime,stored.bytes,stored.sha256,stored.dataBase64,now);
     db.prepare('INSERT INTO audit VALUES (?,?,?,?,?,?,?,?)')
       .run(randomUUID(),session.org_id,session.site_id,'worker',session.principal_id,'instruction.acknowledged',assignmentId,now);
-    return {id:requestId,receivedAt:now,duplicate:false};
+    return {id:requestId,receivedAt:now,duplicate:false,...(stored?{evidence:{mime:stored.mime,bytes:stored.bytes,sha256:stored.sha256,receivedAt:now}}:{})};
   });
 }

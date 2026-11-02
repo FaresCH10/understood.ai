@@ -1,15 +1,26 @@
 export const INSTRUCTION_RESPONSE_MODES=['question','acknowledge'];
 export const INSTRUCTION_DELIVERY_MODES=['text','voice','both'];
+export const INSTRUCTION_EVIDENCE_MODES=['none','photo'];
 
 const tableExists=(db,name)=>!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
+const instructionEvidenceColumn=(db)=>tableExists(db,'instruction_sends')
+  && db.prepare('PRAGMA table_info(instruction_sends)').all().some((column)=>column.name==='evidence_mode');
+const competencyColumn=(db)=>tableExists(db,'briefings')
+  && db.prepare('PRAGMA table_info(briefings)').all().some((column)=>column.name==='competency_validity_days');
 
 export function instructionModes(db,briefingId,orgId,siteId) {
-  if(!tableExists(db,'instruction_sends')) return {responseMode:'question',deliveryMode:'both'};
-  const row=db.prepare('SELECT response_mode,delivery_mode FROM instruction_sends WHERE briefing_id=? AND org_id=? AND site_id=?')
-    .get(briefingId,orgId,siteId);
-  return row
-    ? {responseMode:row.response_mode,deliveryMode:row.delivery_mode}
-    : {responseMode:'question',deliveryMode:'both'};
+  const evidence=instructionEvidenceColumn(db);
+  const row=evidence
+    ? db.prepare(`SELECT response_mode,delivery_mode,evidence_mode FROM instruction_sends WHERE briefing_id=? AND org_id=? AND site_id=?`)
+      .get(briefingId,orgId,siteId)
+    : null;
+  const modes=row
+    ? {responseMode:row.response_mode,deliveryMode:row.delivery_mode,evidenceMode:evidence?row.evidence_mode:'none'}
+    : {responseMode:'question',deliveryMode:'both',evidenceMode:'none'};
+  if(!competencyColumn(db)) return modes;
+  const validityDays=db.prepare('SELECT competency_validity_days FROM briefings WHERE id=? AND org_id=? AND site_id=?')
+    .get(briefingId,orgId,siteId)?.competency_validity_days;
+  return Number.isSafeInteger(validityDays) ? {...modes,competency:{validityDays}} : modes;
 }
 
 export function ensureInstructionSchema(db) {
@@ -19,6 +30,8 @@ export function ensureInstructionSchema(db) {
   // A composite worker FK cannot be created without a matching unique index;
   // an empty ledger from such a schema is unusable, so rebuild it in place.
   if(brokenDeliveryFk) db.exec('DROP TABLE instruction_deliveries');
+  if(tableExists(db,'instruction_sends') && !instructionEvidenceColumn(db))
+    db.exec("ALTER TABLE instruction_sends ADD COLUMN evidence_mode TEXT NOT NULL DEFAULT 'none' CHECK(evidence_mode IN ('none','photo'))");
   db.exec(`CREATE TABLE IF NOT EXISTS instruction_sends (
     request_id TEXT PRIMARY KEY,
     org_id TEXT NOT NULL REFERENCES organizations(id),
@@ -28,6 +41,7 @@ export function ensureInstructionSchema(db) {
     audience_json TEXT NOT NULL CHECK(json_valid(audience_json) AND json_type(audience_json)='object'),
     response_mode TEXT NOT NULL CHECK(response_mode IN ('question','acknowledge')),
     delivery_mode TEXT NOT NULL CHECK(delivery_mode IN ('text','voice','both')),
+    evidence_mode TEXT NOT NULL DEFAULT 'none' CHECK(evidence_mode IN ('none','photo')),
     state TEXT NOT NULL CHECK(state IN ('preparing','published','failed')),
     publication_id TEXT REFERENCES publications(id),
     audience_count INTEGER NOT NULL CHECK(audience_count BETWEEN 1 AND 5000),
@@ -51,11 +65,15 @@ export function ensureInstructionSchema(db) {
     WHEN NEW.publication_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM publications p WHERE p.id=NEW.publication_id
       AND p.org_id=NEW.org_id AND p.site_id=NEW.site_id AND p.briefing_id=NEW.briefing_id)
     BEGIN SELECT RAISE(ABORT,'Scope mismatch'); END;
+  CREATE TRIGGER IF NOT EXISTS instruction_send_evidence_requires_ack BEFORE INSERT ON instruction_sends
+    WHEN NEW.evidence_mode='photo' AND NEW.response_mode<>'acknowledge'
+    BEGIN SELECT RAISE(ABORT,'Photo evidence requires acknowledgment'); END;
   CREATE TRIGGER IF NOT EXISTS instruction_send_identity_frozen BEFORE UPDATE ON instruction_sends
     WHEN NEW.request_id IS NOT OLD.request_id OR NEW.org_id IS NOT OLD.org_id OR NEW.site_id IS NOT OLD.site_id
       OR NEW.briefing_id IS NOT OLD.briefing_id OR NEW.publication_request_id IS NOT OLD.publication_request_id
       OR NEW.audience_json IS NOT OLD.audience_json OR NEW.response_mode IS NOT OLD.response_mode
-      OR NEW.delivery_mode IS NOT OLD.delivery_mode OR NEW.audience_count IS NOT OLD.audience_count
+      OR NEW.delivery_mode IS NOT OLD.delivery_mode OR NEW.evidence_mode IS NOT OLD.evidence_mode
+      OR NEW.audience_count IS NOT OLD.audience_count
       OR NEW.request_json IS NOT OLD.request_json OR NEW.requested_by IS NOT OLD.requested_by OR NEW.created_at IS NOT OLD.created_at
     BEGIN SELECT RAISE(ABORT,'Instruction evidence is immutable'); END;
   CREATE TRIGGER IF NOT EXISTS instruction_send_frozen_delete BEFORE DELETE ON instruction_sends

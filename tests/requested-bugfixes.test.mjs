@@ -37,25 +37,25 @@ test('company-assigned IDs and hashed passwords enforce tenant authority, unique
   }finally{db.close();}
 });
 
-test('invitations require the assigned credentials, expire at the boundary, and revoke redeemed sessions',async()=>{
+test('worker grants accept only their resource token, expire at the boundary, and revoke redeemed sessions',async()=>{
   const db=fixture();assign(db);assign(db,'worker-15','Worker 015','TEAM-015');
   const server=createAppServer(db,options);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const redeem=body=>fetch(`http://127.0.0.1:${server.address().port}/api/auth/worker/redeem`,{method:'POST',headers:{origin:options.publicOrigin,'content-type':'application/json'},body:JSON.stringify(body)});
   try{
     const grant=issueWorkerGrant(db,owner,'worker-14',30);
-    assert.ok([400,401].includes((await redeem({token:grant.token})).status));
+    assert.ok([400,401].includes((await redeem({token:grant.token,extra:true})).status));
     assert.equal(db.prepare('SELECT redeemed_at FROM worker_grants WHERE id=?').get(grant.id).redeemed_at,null);
     assert.equal((await redeem({...input('TEAM-015'),token:grant.token})).status,401);
     assert.equal((await redeem({...input(),password:'wrong password',token:grant.token})).status,401);
-    const response=await redeem({...input(),token:grant.token});assert.equal(response.status,200);
+    const response=await redeem({token:grant.token});assert.equal(response.status,200);
     const cookie=response.headers.get('set-cookie').split(';')[0];
     assert.equal(requireSession(db,{headers:{cookie}},options).principal_id,'worker-14');
-    assert.equal((await redeem({...input(),token:grant.token})).status,401);
+    assert.equal((await redeem({token:grant.token})).status,401);
     db.prepare('UPDATE worker_grants SET expires_at=? WHERE id=?').run(new Date().toISOString(),grant.id);
     assert.throws(()=>requireSession(db,{headers:{cookie}},options),/Sign in required/);
     const expired=issueWorkerGrant(db,owner,'worker-14',5);
     db.prepare('UPDATE worker_grants SET expires_at=? WHERE id=?').run(new Date().toISOString(),expired.id);
-    assert.equal((await redeem({...input(),token:expired.token})).status,401);
+    assert.equal((await redeem({token:expired.token})).status,401);
   }finally{await new Promise(resolve=>server.close(resolve));db.close();}
 });
 

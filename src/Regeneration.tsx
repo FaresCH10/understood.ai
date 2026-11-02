@@ -1,3 +1,4 @@
+import {useStaffText as useStaffStaticText} from './staff-language';
 import {WORKER_LOCALES,type WorkerLocaleCode} from '../server/languages.mjs';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {RefreshCw,X} from 'lucide-react';
@@ -11,6 +12,7 @@ class RegenerationError extends Error {constructor(message:string,public uncerta
 const names=Object.fromEntries(WORKER_LOCALES.map(locale=>[locale.code,locale.englishName]));
 
 export function RegenerationRecovery({pending,scope,onResolved,authority}:{pending:PendingRegeneration;scope:string;onResolved:(id:string)=>void;authority:StaffRequestAuthority}) {
+  const staffT=useStaffStaticText();
   const {request,current:sessionCurrent,complete}=useBriefingRequest(authority);
   const [busy,setBusy]=useState(true),[checked,setChecked]=useState(false),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
   const sending=useRef(false),heading=useRef<HTMLHeadingElement>(null),resolved=useRef(onResolved);resolved.current=onResolved;
@@ -28,10 +30,11 @@ export function RegenerationRecovery({pending,scope,onResolved,authority}:{pendi
     catch(reason) {if(sessionCurrent()){setChecked(false);setError((reason as Error).message);}}
     finally {sending.current=false;if(sessionCurrent())setBusy(false);}
   }
-  return <><h1 ref={heading} tabIndex={-1}>Recover regeneration</h1><section className="panel"><h2>{names[pending.body.language]} {pending.body.kind} · source revision {pending.body.revision}</h2><p role="status">{busy ? 'Checking saved regeneration...' : checked ? 'No saved receipt was found. You can retry the original confirmed request.' : 'The pending request has not been resolved.'}</p>{error && <p role="alert" className="record-error">{error}</p>}<div className="actions"><button className="button outline" disabled={busy} onClick={()=>setRefresh(value=>value+1)}><RefreshCw size={18}/>Check saved request</button>{checked && <button className="button primary" disabled={busy} onClick={()=>void retry()}><RefreshCw size={18}/>Retry original request</button>}</div></section></>;
+  return <><h1 ref={heading} tabIndex={-1}>{staffT("Recover regeneration")}</h1><section className="panel"><h2>{staffT.language(pending.body.language)} {staffT.state(pending.body.kind)} {staffT("· source revision")} {staffT.number(pending.body.revision)}</h2><p role="status">{busy?staffT("Checking saved regeneration..."):checked?staffT("No saved receipt was found. You can retry the original confirmed request."):staffT("The pending request has not been resolved.")}</p>{error && <p role="alert" className="record-error">{staffT.error(error)}</p>}<div className="actions"><button className="button outline" disabled={busy} onClick={()=>setRefresh(value=>value+1)}><RefreshCw size={18}/>{staffT("Check saved request")}</button>{checked && <button className="button primary" disabled={busy} onClick={()=>void retry()}><RefreshCw size={18}/>{staffT("Retry original request")}</button>}</div></section></>;
 }
 
 export function RegenerationControl({id,revision,language,scope,disabled,onChanged,onEditingChange,authority}:{id:string;revision:number;language:WorkerLocaleCode;scope?:string|null;disabled:boolean;onChanged:()=>void;onEditingChange:(value:boolean)=>void;authority:StaffRequestAuthority}) {
+  const staffT=useStaffStaticText();
   const {request,current,complete,ensureCompletion}=useBriefingRequest(authority);
   const [kind,setKind]=useState<'translation'|'audio'|null>(null),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[uncertain,setUncertain]=useState(false),[error,setError]=useState('');
   const pending=useRef<PendingRegeneration|null>(null),sending=useRef(false),consent=useRef<HTMLInputElement>(null),trigger=useRef<'translation'|'audio'|null>(null),commands=useRef<Partial<Record<'translation'|'audio',HTMLButtonElement|null>>>({}),focusBack=useRef(false);
@@ -63,9 +66,9 @@ export function RegenerationControl({id,revision,language,scope,disabled,onChang
     catch(reason) {if(current())setError((reason as Error).message);}
     finally {sending.current=false;if(current())setBusy(false);}
   }
-  return <div className="draft-review">{kind ? <form aria-label={`${names[language]} regeneration`} onSubmit={event=>void submit(event)} onKeyDown={event=>{if(event.key==='Escape' && !locked) {event.preventDefault();close();}}}>
-    <h3>Regenerate {names[language]} {kind}</h3><p>{kind==='translation' ? 'Replace the selected translation override with automatic translation and new audio. Other languages and published versions stay unchanged.' : 'Generate new instruction and question audio from the exact selected text. Text, other languages and published versions stay unchanged.'}</p>
-    <label className="recipient-row publish-confirm"><input ref={consent} type="checkbox" checked={confirmed} disabled={locked} onChange={event=>setConfirmed(event.target.checked)}/><span>Regenerate {names[language]} {kind} for this draft</span></label>
-    {error && <p role="alert" className="record-error">{error}</p>}<div className="actions"><button className="button primary" disabled={busy || !confirmed}><RefreshCw size={18}/>{busy ? 'Submitting...' : uncertain ? 'Retry unchanged request' : 'Confirm regeneration'}</button>{uncertain && <button type="button" className="button outline" disabled={busy} onClick={()=>void check()}><RefreshCw size={18}/>Check saved request</button>}<button type="button" className="button outline" disabled={locked} onClick={close}><X size={18}/>Cancel</button></div>
-  </form> : <div className="actions">{(['translation','audio'] as const).filter(value=>value==='audio' || language!=='en').map(value=><button key={value} ref={element=>{commands.current[value]=element;}} className="button outline" disabled={disabled} onClick={()=>{trigger.current=value;setKind(value);setConfirmed(false);setError('');onEditingChange(true);}}><RefreshCw size={18}/>Regenerate {value}</button>)}</div>}</div>;
+  return <div className="draft-review">{kind ? <form aria-label={staffT("{p0} regeneration",{p0:names[language]})} onSubmit={event=>void submit(event)} onKeyDown={event=>{if(event.key==='Escape' && !locked) {event.preventDefault();close();}}}>
+    <h3>{staffT("Regenerate")} {staffT.language(language)} {kind}</h3><p>{kind==='translation'?staffT("Replace the selected translation override with automatic translation and new audio. Other languages and published versions stay unchanged."):staffT("Generate new instruction and question audio from the exact selected text. Text, other languages and published versions stay unchanged.")}</p>
+    <label className="recipient-row publish-confirm"><input ref={consent} type="checkbox" checked={confirmed} disabled={locked} onChange={event=>setConfirmed(event.target.checked)}/><span>{staffT("Regenerate")} {names[language]} {kind} {staffT("for this draft")}</span></label>
+    {error && <p role="alert" className="record-error">{staffT.error(error)}</p>}<div className="actions"><button className="button primary" disabled={busy || !confirmed}><RefreshCw size={18}/>{busy?staffT("Submitting..."):uncertain?staffT("Retry unchanged request"):staffT("Confirm regeneration")}</button>{uncertain && <button type="button" className="button outline" disabled={busy} onClick={()=>void check()}><RefreshCw size={18}/>{staffT("Check saved request")}</button>}<button type="button" className="button outline" disabled={locked} onClick={close}><X size={18}/>{staffT("Cancel")}</button></div>
+  </form> : <div className="actions">{(['translation','audio'] as const).filter(value=>value==='audio' || language!=='en').map(value=><button key={value} ref={element=>{commands.current[value]=element;}} className="button outline" disabled={disabled} onClick={()=>{trigger.current=value;setKind(value);setConfirmed(false);setError('');onEditingChange(true);}}><RefreshCw size={18}/>{staffT("Regenerate")} {value}</button>)}</div>}</div>;
 }

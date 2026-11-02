@@ -205,7 +205,9 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     const intent=await domainTransaction(pool,schema,client=>loadTargetRegeneration(client,job));
     const targets=intent ? intent.evidence.manifest.dependencies.languages : await domainTransaction(pool,schema,client=>readGenerationLanguages(client,job.org_id,job.site_id,languages ?? ['en','ar','ur'],job.briefing_id));
     if(intent && languages && !targets.every(language=>languages.includes(language)))throw Error('Regeneration language configuration changed');
-    const instruction=briefing?.instruction_request_id ? {response_mode:briefing.response_mode,delivery_mode:briefing.delivery_mode} : null;
+    const corrective=await domainTransaction(pool,schema,async client=>(await client.query('SELECT 1 FROM instruction_improvement_drafts WHERE corrective_briefing_id=$1 AND org_id=$2 AND site_id=$3',[job.briefing_id,job.org_id,job.site_id])).rows.length>0);
+    const instruction=briefing?.instruction_request_id ? {response_mode:briefing.response_mode,delivery_mode:briefing.delivery_mode}
+      :corrective?{response_mode:'question',delivery_mode:'both'}:null;
     const recordedSource=!instruction && await domainTransaction(pool,schema,async client=>(await client.query(
       'SELECT 1 FROM source_audio_requests WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',
       [job.briefing_id,job.org_id,job.site_id])).rows.length>0);
@@ -258,7 +260,7 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     const available=targets.filter(language=>prepared.languages[language]);
     prepared.languages=Object.fromEntries(available.map(language=>[language,prepared.languages[language]]));
     readySnapshot({...briefing,state:'ready',prepared_json:prepared},available.map((language) => ({language})),integrationMode,
-      instruction ? {responseMode:instruction.response_mode,deliveryMode:instruction.delivery_mode} : undefined);
+      instruction ? {responseMode:instruction.response_mode,deliveryMode:instruction.delivery_mode,evidenceMode:instruction.evidence_mode ?? 'none'} : undefined);
     await domainTransaction(pool,schema,async (client) => {
       if(!await dispatchAllowed(client,job.org_id,{provider:true}))return;
       await checkPreparationAuthority(client,job);

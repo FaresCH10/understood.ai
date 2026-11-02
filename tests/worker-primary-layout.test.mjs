@@ -21,7 +21,7 @@ test('recorder and lazy-error boundary select message copy only for private Help
 
 test('worker primary flow precedes mounted saved-work tools without hiding recovery controls',async()=>{
   const source=await readFile(new URL('../src/main.tsx',import.meta.url),'utf8');
-  const question=source.indexOf('<section className="worker-card question-card">'),help=source.indexOf('<section className="worker-card" id="worker-help">');
+  const question=source.indexOf('<section className="worker-card question-card" id="worker-question"'),help=source.indexOf('<section className="worker-card" id="worker-help">');
   const tools=['<WorkerOfflineSaveView key=','<WorkerAudioDraftView key=','<WorkerTextDraftView key='].map(value=>source.indexOf(value));
   const submissions=source.indexOf('<WorkerSubmissions ');
   assert.ok(question>0&&help>question);

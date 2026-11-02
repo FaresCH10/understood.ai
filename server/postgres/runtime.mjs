@@ -50,6 +50,7 @@ import {processOneRecording} from './recording-worker.mjs';
 import {resolvePreparationAdapter} from '../ai/preparation-config.mjs';
 import {resolveAssessmentAdapter} from '../ai/assessment-config.mjs';
 import {processOneProviderVerification} from './provider-verification-worker.mjs';
+import {processOneInstructionImprovement} from './self-healing.mjs';
 import {startWorkerHeartbeat} from './worker-heartbeat.mjs';
 
 export function rehearsalConfig(env=process.env) {
@@ -97,6 +98,7 @@ export function rehearsalTasks(pool,storage,config,{verificationSignal}={}) {
     assignmentReminder:() => processOneReminder(pool,options),
     notificationSweep:() => sweepOverdueAssignments(pool,options),
     pushExpiry:() => expirePushSubscriptions(pool,options),
+    instructionImprovement:() => processOneInstructionImprovement(pool,options),
     pushDelivery:() => processOnePushDelivery(pool,config.pushAdapter ?? resolvePushAdapter(),options),
     caseEscalation:() => processOneCaseEscalation(pool,options),
     caseFollowup:()=>config.caseFollowupAdapter?processOneCaseFollowup(pool,config.caseFollowupAdapter,storage,{...options,dataClass:config.dataClass}):false,

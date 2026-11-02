@@ -29,6 +29,9 @@ test('customer usage reports own UTC reservation evidence, closed/pause/exhauste
     await db.exec("UPDATE system_controls SET jobs_paused=true");assert.equal((await read()).providerAllowance.reason,'jobs_paused');
     await db.exec("UPDATE system_controls SET jobs_paused=false,provider_paused=false;UPDATE provider_policies SET max_daily_requests=9 WHERE scope_key='global'");assert.equal((await read()).providerAllowance.state,'exhausted');
     await db.exec("UPDATE provider_policies SET enabled=false WHERE scope_key='tenant:org'");assert.equal((await read()).providerAllowance.state,'closed');
+    const live=checkedUsageModel(await getUsage(pool,session,{schema,integrationMode:'live'}),'live-credential','owner');
+    assert.equal(live.providerAllowance.dataClass,'real');assert.equal(live.providerAllowance.reserved,3);assert.equal(live.spend.actual.amount,null);
+    assert.throws(()=>checkedUsageModel(live,'synthetic-credential','owner'));
     await assert.rejects(getUsage(pool,{...session,org_id:'foreign'},{schema}),/Forbidden/);await assert.rejects(getUsage(pool,{...session,principal_type:'worker'},{schema}),/Forbidden/);
     await db.exec("UPDATE staff SET active=false WHERE id='owner'");await assert.rejects(read(),/Forbidden/);
   }finally{await db.close();}

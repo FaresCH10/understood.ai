@@ -8,7 +8,7 @@ import {staffClarificationContextRequired} from '../server/session-context.mjs';
 
 const session=()=>({authenticated:true,role:'staff',staffRole:'owner',staffScope:'["cedar","beirut","maya"]',siteState:'active',mode:'credential',clientContext:'a'.repeat(64),expiresAt:new Date(Date.now()+60000).toISOString()});
 const store=()=>{const values=new Map();return {values,getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};};
-const summary=()=>({id:'case-14',worker:'Worker 014',language:'en',title:'Synthetic shelf',reason:'Help requested',status:'open',created_at:'2026-10-19T12:00:00.000Z',due_at:null,case_due_at:null,escalated_at:null,owner_name:null,owner_staff_id:null,assignment_id:'assignment-14',publication_id:'publication-3',version:3,attempt_id:null});
+const summary=()=>({id:'case-14',worker:'Worker 014',language:'en',title:'Synthetic shelf',reason:'Help requested',status:'open',created_at:'2026-10-19T12:00:00.000Z',due_at:null,case_due_at:null,escalated_at:null,owner_name:null,owner_staff_id:null,assignment_id:'assignment-14',publication_id:'publication-3',version:3,current_version:4,attempt_id:null});
 const detail=()=>({...summary(),notes:'',clientContext:'a'.repeat(64),snapshot:{source:'Synthetic source',question:'Where?',facts:['Blue shelf'],askedFacts:['Blue shelf']},answer_text:null,outcome:null,recording_id:null,assessmentReasons:[],assessmentEvidence:[],attempts:[],owners:[{id:'maya',name:'Maya'}],helpRequest:{text:'Synthetic help',createdAt:'2026-10-19T12:00:00.000Z'},canRequestRepeat:true,canReview:true,contentExpired:false});
 
 test('staff clarification recovery retains metadata only and matches exact server-normalized intent',async()=>{

@@ -70,6 +70,8 @@ export const caseTranslations={
   'Asked fact {number}':['المعلومة المطلوبة {number}','پوچھی گئی معلومات {number}'],
   'Follow-up needed':['المتابعة مطلوبة','رابطہ درکار ہے'],
   'instruction v{version}':['التعليمات، الإصدار {version}','ہدایات، نسخہ {version}'],
+  'superseded by v{version}':['استُبدل بالإصدار {version}','نسخہ {version} سے تبدیل شدہ'],
+  'This case relates to v{case}. The live instruction is v{current}.':['تتعلق هذه الحالة بالإصدار {case}. التعليمات السارية هي الإصدار {current}.','یہ معاملہ نسخہ {case} سے متعلق ہے۔ رائج ہدایات نسخہ {current} ہیں۔'],
   'Refresh case':['تحديث الحالة','معاملہ تازہ کریں'],
   'Loading case...':['جارٍ تحميل الحالة...','معاملہ لوڈ ہو رہا ہے...'],
   'Refreshing case details. Last loaded details are shown below.':['جارٍ تحديث تفاصيل الحالة. تظهر أدناه آخر تفاصيل حُمّلت.','معاملے کی تفصیلات تازہ ہو رہی ہیں۔ آخری لوڈ شدہ تفصیلات نیچے ہیں۔'],
@@ -318,7 +320,8 @@ export function caseTimeError(locale:CaseLocale,message:string,timezone:string){
 export function caseTimestamp(locale:CaseLocale,value:string,timezone='UTC'){
   const date=new Date(value);if(!Number.isFinite(date.getTime()))throw Error('Invalid case timestamp');
   let zone=timezone;try{new Intl.DateTimeFormat('en',{timeZone:zone});}catch{zone='UTC';}
-  const text=date.toLocaleString(locale,{timeZone:zone});
+  const tag=locale==='ar'?'ar-LB':locale==='ur'?'ur':'en-GB';
+  const text=date.toLocaleString(tag,{timeZone:zone,dateStyle:'medium',timeStyle:'short'});
   const offset=new Intl.DateTimeFormat('en',{timeZone:zone,timeZoneName:'shortOffset',hour:'2-digit'}).formatToParts(date).find(part=>part.type==='timeZoneName')?.value;
   if(!offset)throw Error('Case offset unavailable');return {text,offset:offset==='GMT+0'||offset==='GMT-0'?'GMT':offset};
 }

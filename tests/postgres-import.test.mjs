@@ -593,7 +593,7 @@ test('legacy synthetic backup without captured language imports current preferen
   const sqlite=openDatabase(join(root,'source.sqlite')); seed(sqlite); ensureRecordingSchema(sqlite);
   const pg=new PGlite(),pool=poolFor(pg);
   try {
-    sqlite.exec('DROP TRIGGER assignment_language_frozen; DROP TRIGGER assignment_language_available; ALTER TABLE assignments DROP COLUMN language;');
+    sqlite.exec('DROP TRIGGER assignment_language_frozen; DROP TRIGGER assignment_language_available; DROP TRIGGER worker_competency_award_valid; ALTER TABLE assignments DROP COLUMN language;');
     sqlite.prepare("UPDATE workers SET language='en' WHERE id='worker-30'").run();
     await backupLocal({database:join(root,'source.sqlite'),audioRoot:join(root,'audio'),destination:join(root,'backup')});
     await pg.exec(`CREATE SCHEMA ${schema}`); await runMigrations(pool,{schema});

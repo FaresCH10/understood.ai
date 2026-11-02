@@ -28,7 +28,7 @@ const en = {
   invalidName:'Use 2–80 letters, numbers, spaces, periods, underscores, apostrophes or hyphens; start with a letter or number.',
   changed:'The crew name changed. Refresh the directory before trying again.',crewUnavailable:'The crew is unavailable or archived. Refresh the directory.',
   workerUnavailable:'The worker is unavailable. Refresh the directory.',forbidden:'Your current role or session cannot perform this action.',duplicateName:'That name is already in use in this site.',
-  workerName:'Worker name',namePlaceholder:'Optional display name',chooseLater:'Worker chooses on first use',notSelected:'Not selected',
+  workerName:'Worker name',namePlaceholder:'e.g. Nadia Fares',chooseLater:'Worker chooses on first use',notSelected:'Not selected',
   chosenByWorker:'Chosen by worker',setByStaff:'Set by supervisor',pendingLanguage:'Language change pending',noLanguage:'No language chosen yet',
   languageRequests:'Language change requests',loadingLanguageRequests:'Loading language change requests...',noLanguageRequests:'No pending language change requests.',
   languageRequestFrom:'wants to change from',to:'to',languageRequestReason:'Reason',noReasonGiven:'No reason given.',decisionNote:'Note (optional)',
@@ -37,7 +37,12 @@ const en = {
   languageRequestDecided:'This request was already decided. Refresh the directory.',languageRequestUnavailable:'The language request is unavailable. Refresh the directory.',
   changeAlreadyPending:'A language change is already pending for this worker.',invalidLanguage:'Choose a supported language.',
   pendingChangeTo:'Pending change to',firstUse:'Chooses on first sign-in',directCorrection:'Changing the language here overrides any pending request.',
-  searchPlaceholderName:'Search by name or worker ID',workerLanguageHint:'Used for instructions and spoken audio. The worker can request a change later.',};
+  searchPlaceholderName:'Search by name or worker ID',workerLanguageHint:'Used for instructions and spoken audio. The worker can request a change later.',
+  workerIdSettings:'Company worker IDs',workerIdPrefixLabel:'Prefix',workerIdNextLabel:'Next ID',workerIdFormatLabel:'Format',
+  changePrefix:'Change prefix',changePrefixTitle:'Change worker ID prefix',changePrefixImpact:'New worker IDs will use this prefix. Existing worker IDs stay unchanged.',
+  workerIdPrefix:'Worker ID prefix',workerIdPrefixHint:'2–6 letters or numbers, for example CE.',workerIdSuggested:'Suggested from company name',
+  workerIdPreview:'New IDs will look like',savePrefix:'Save prefix',workerPrefixUpdated:'Worker ID prefix updated. Existing worker IDs are unchanged.',
+  invalidPrefix:'Use 2–6 letters or numbers for the prefix.',};
 
 const ar:typeof en = {
   locale:'لغة دليل العمال',workers:'العمال',intro:'إدارة العمال والفرق في هذا الموقع.',importCsv:'استيراد CSV',addWorker:'إضافة عامل',
@@ -66,7 +71,7 @@ const ar:typeof en = {
   invalidName:'استخدم من حرفين إلى ٨٠ حرفاً من الحروف والأرقام والمسافات والنقاط والشرطات السفلية والفواصل العليا والشرطات، وابدأ بحرف أو رقم.',
   changed:'تغيّر اسم الفريق. حدّث الدليل قبل المحاولة مجدداً.',crewUnavailable:'الفريق غير متاح أو مؤرشف. حدّث الدليل.',
   workerUnavailable:'العامل غير متاح. حدّث الدليل.',forbidden:'لا يسمح دورك أو جلستك الحالية بهذا الإجراء.',duplicateName:'هذا الاسم مستخدم بالفعل في هذا الموقع.',
-  workerName:'اسم العامل',namePlaceholder:'اسم عرض اختياري',chooseLater:'يختار العامل لغته عند أول استخدام',notSelected:'غير محددة',
+  workerName:'اسم العامل',namePlaceholder:'مثال: نادية فارس',chooseLater:'يختار العامل لغته عند أول استخدام',notSelected:'غير محددة',
   chosenByWorker:'اختارها العامل',setByStaff:'حدّدها المشرف',pendingLanguage:'طلب تغيير اللغة قيد الانتظار',noLanguage:'لم تُحدَّد اللغة بعد',
   languageRequests:'طلبات تغيير اللغة',loadingLanguageRequests:'جارٍ تحميل طلبات تغيير اللغة...',noLanguageRequests:'لا توجد طلبات تغيير لغة قيد الانتظار.',
   languageRequestFrom:'يريد التغيير من',to:'إلى',languageRequestReason:'السبب',noReasonGiven:'لم يُذكر سبب.',decisionNote:'ملاحظة (اختياري)',
@@ -76,13 +81,17 @@ const ar:typeof en = {
   changeAlreadyPending:'يوجد طلب تغيير لغة قيد الانتظار لهذا العامل بالفعل.',invalidLanguage:'اختر لغة مدعومة.',
   pendingChangeTo:'تغيير معلّق إلى',firstUse:'يختار عند أول تسجيل دخول',directCorrection:'تغيير اللغة هنا يتجاوز أي طلب معلّق.',
   searchPlaceholderName:'البحث بالاسم أو رقم العامل',workerLanguageHint:'تُستخدم للتعليمات والصوت المسموع. يمكن للعامل طلب تغييرها لاحقاً.',
-};
+  workerIdSettings:'أرقام العاملين في الشركة',workerIdPrefixLabel:'البادئة',workerIdNextLabel:'الرقم التالي',workerIdFormatLabel:'الصيغة',
+  changePrefix:'تغيير البادئة',changePrefixTitle:'تغيير بادئة رقم العامل',changePrefixImpact:'ستستخدم أرقام العمال الجديدة هذه البادئة. تبقى أرقام العمال الحالية دون تغيير.',
+  workerIdPrefix:'بادئة رقم العامل',workerIdPrefixHint:'من حرفين إلى ٦ أحرف أو أرقام، مثل CE.',workerIdSuggested:'مقترحة من اسم الشركة',
+  workerIdPreview:'ستبدو الأرقام الجديدة مثل',savePrefix:'حفظ البادئة',workerPrefixUpdated:'تم تحديث بادئة رقم العامل. لم تتغير أرقام العمال الحالية.',
+  invalidPrefix:'استخدم من حرفين إلى ٦ أحرف أو أرقام للبادئة.',};
 
 export const peopleText = {en,ar};
 export const peopleShellText = {
-  en:{crews:'Crews',navigation:'Main navigation',languageRequests:'Language requests',overview:'Overview',today:'Today',briefings:'Instructions',instructions:'Instructions',clarifications:'Clarifications',people:'People',team:'Team',processing:'AI processing',reports:'Reports',settings:'Settings',more:'More',signOut:'Sign out',notifications:'Notifications',checking:'Checking session...',siteSession:'Site session',checkingSite:'Checking site session...',recheck:'Recheck session',siteError:'The current site could not be verified. Recheck your session before continuing.',archived:'This site is archived. Saved history and privacy controls remain available; new operational work is disabled.',foot:'Design concept · Synthetic data'},
-  ar:{crews:'الفرق',navigation:'التنقل الرئيسي',languageRequests:'طلبات تغيير اللغة',overview:'نظرة عامة',today:'اليوم',briefings:'التعليمات',instructions:'التعليمات',clarifications:'التوضيحات',people:'الأشخاص',team:'الفريق',processing:'معالجة الذكاء الاصطناعي',reports:'التقارير',settings:'الإعدادات',more:'المزيد',signOut:'تسجيل الخروج',notifications:'الإشعارات',checking:'جارٍ التحقق من الجلسة...',siteSession:'جلسة الموقع',checkingSite:'جارٍ التحقق من جلسة الموقع...',recheck:'إعادة التحقق من الجلسة',siteError:'تعذّر التحقق من الموقع الحالي. أعد التحقق من جلستك قبل المتابعة.',archived:'هذا الموقع مؤرشف. يبقى السجل وأدوات الخصوصية متاحين؛ العمل التشغيلي الجديد معطّل.',foot:'تصميم تجريبي · بيانات اصطناعية'},
-  ur:{crews:'ٹیمیں',navigation:'مرکزی نیویگیشن',languageRequests:'زبان کی درخواستیں',overview:'مجموعی جائزہ',today:'آج',briefings:'ہدایات',instructions:'ہدایات',clarifications:'وضاحتیں',people:'افراد',team:'ٹیم',processing:'مصنوعی ذہانت کی پروسیسنگ',reports:'رپورٹس',settings:'ترتیبات',more:'مزید',signOut:'سائن آؤٹ',notifications:'اطلاعات',checking:'سیشن چیک ہو رہا ہے...',siteSession:'مقام کا سیشن',checkingSite:'مقام کا سیشن چیک ہو رہا ہے...',recheck:'سیشن دوبارہ چیک کریں',siteError:'موجودہ مقام کی تصدیق نہیں ہو سکی۔ جاری رکھنے سے پہلے سیشن دوبارہ چیک کریں۔',archived:'یہ مقام محفوظ شدہ ہے۔ محفوظ تاریخ اور رازداری کے اختیارات دستیاب ہیں؛ نیا عملی کام بند ہے۔',foot:'تصوری ڈیزائن · مصنوعی ڈیٹا'},
+  en:{crews:'Crews',navigation:'Main navigation',languageRequests:'Language requests',translationFeedback:'Translation feedback',competencies:'Competencies',overview:'Overview',today:'Today',briefings:'Instructions',instructions:'Instructions',calendar:'Calendar',clarifications:'Clarifications',people:'People',team:'Team',processing:'AI processing',reports:'Reports',settings:'Settings',more:'More',signOut:'Sign out',notifications:'Notifications',checking:'Checking session...',siteSession:'Site session',checkingSite:'Checking site session...',recheck:'Recheck session',siteError:'The current site could not be verified. Recheck your session before continuing.',archived:'This site is archived. Saved history and privacy controls remain available; new operational work is disabled.',foot:'Design concept · Synthetic data'},
+  ar:{crews:'الفرق',navigation:'التنقل الرئيسي',languageRequests:'طلبات تغيير اللغة',translationFeedback:'ملاحظات الترجمة',competencies:'الكفاءات',overview:'نظرة عامة',today:'اليوم',briefings:'التعليمات',instructions:'التعليمات',calendar:'التقويم',clarifications:'التوضيحات',people:'الأشخاص',team:'الفريق',processing:'معالجة الذكاء الاصطناعي',reports:'التقارير',settings:'الإعدادات',more:'المزيد',signOut:'تسجيل الخروج',notifications:'الإشعارات',checking:'جارٍ التحقق من الجلسة...',siteSession:'جلسة الموقع',checkingSite:'جارٍ التحقق من جلسة الموقع...',recheck:'إعادة التحقق من الجلسة',siteError:'تعذّر التحقق من الموقع الحالي. أعد التحقق من جلستك قبل المتابعة.',archived:'هذا الموقع مؤرشف. يبقى السجل وأدوات الخصوصية متاحين؛ العمل التشغيلي الجديد معطّل.',foot:'تصميم تجريبي · بيانات اصطناعية'},
+  ur:{crews:'ٹیمیں',navigation:'مرکزی نیویگیشن',languageRequests:'زبان کی درخواستیں',translationFeedback:'ترجمے کی رائے',competencies:'قابلیتیں',overview:'مجموعی جائزہ',today:'آج',briefings:'ہدایات',instructions:'ہدایات',calendar:'کیلنڈر',clarifications:'وضاحتیں',people:'افراد',team:'ٹیم',processing:'مصنوعی ذہانت کی پروسیسنگ',reports:'رپورٹس',settings:'ترتیبات',more:'مزید',signOut:'سائن آؤٹ',notifications:'اطلاعات',checking:'سیشن چیک ہو رہا ہے...',siteSession:'مقام کا سیشن',checkingSite:'مقام کا سیشن چیک ہو رہا ہے...',recheck:'سیشن دوبارہ چیک کریں',siteError:'موجودہ مقام کی تصدیق نہیں ہو سکی۔ جاری رکھنے سے پہلے سیشن دوبارہ چیک کریں۔',archived:'یہ مقام محفوظ شدہ ہے۔ محفوظ تاریخ اور رازداری کے اختیارات دستیاب ہیں؛ نیا عملی کام بند ہے۔',foot:'تصوری ڈیزائن · مصنوعی ڈیٹا'},
 };
 export function peopleRouteLocale(view:string,preference:PeopleLocale):PeopleLocale {
   return ['people','people/crews','people/new','people/new-crew','language-requests'].includes(view) || /^people\/(worker|crew)\/[^/]+$/.test(view)?preference:'en';
@@ -95,6 +104,10 @@ export function peopleLanguageNames(locale:PeopleLocale):Record<WorkerLocaleCode
 export function peoplePageText(locale:PeopleLocale,page:number,pages:number) {return locale==='ar'?`الصفحة ${page} من ${pages}`:`Page ${page} of ${pages}`;}
 export function peopleShowingText(locale:PeopleLocale,count:number,total:number) {return locale==='ar'?`عرض ${count} من ${total} عامل`:`Showing ${count} of ${total} workers`;}
 export function peopleDisableText(locale:PeopleLocale) {return locale==='ar'?'ستُلغى جلسات العامل وروابط وصوله. تبقى الإجابات الموجودة محفوظة في السجل.':'Their sessions and access links will be revoked. Existing answers remain in history.';}
+export function peopleWorkerIdHint(locale:PeopleLocale,nextCode?:string) {
+  if(locale==='ar')return nextCode?`يُنشأ تلقائياً لشركتك. الرقم التالي: ${nextCode}.`:'يُنشأ تلقائياً لشركتك.';
+  return nextCode?`Generated automatically for your company. Next ID: ${nextCode}.`:'Generated automatically for your company.';
+}
 export function peopleMessageText(locale:PeopleLocale,message:string) {
   const key=(Object.keys(en) as (keyof typeof en)[]).find(key=>en[key]===message || ar[key]===message);
   return key?peopleText[locale][key]:message;
@@ -106,7 +119,9 @@ export function peopleCountText(locale:PeopleLocale,count:number,kind:'workers'|
 export function peopleErrorText(locale:PeopleLocale,error:unknown) {
   const message=error instanceof Error?error.message:'',t=peopleText[locale];
   if(locale==='en')return message || t.requestUnknown;
-  if(/Invalid (crew name|worker code)/.test(message))return t.invalidName;
+  if(message==='Invalid worker ID prefix')return t.invalidPrefix;
+  if(/Invalid (crew name|worker name|worker code)/.test(message))return t.invalidName;
+  if(message==='Worker name is required')return t.invalidName;
   if(message==='Crew name changed')return t.changed;
   if(/Crew (unavailable|is archived)/.test(message))return t.crewUnavailable;
   if(message==='Worker unavailable')return t.workerUnavailable;

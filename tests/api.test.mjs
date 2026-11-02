@@ -144,7 +144,7 @@ test('SQLite library pages past 100 rows with literal search, stable sorting and
     const login=await loginPrincipal(base, 'maya');
     const cookie=login.headers.get('set-cookie').split(';')[0];
     const get=(query='') => fetch(`${base}/api/briefings${query}`,{headers:{cookie}});
-    const insert=db.prepare('INSERT INTO briefings VALUES(?,?,?,?,?,?,?,?,?,?,?)');
+    const insert=db.prepare('INSERT INTO briefings(id,org_id,site_id,title,source,revision,next_version,state,prepared_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
     for(let i=0;i<125;i++) insert.run(`library-${i}`,'cedar','beirut',`Synthetic library ${String(i).padStart(3,'0')}`,'A scoped synthetic source',1,1,'draft',null,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
     insert.run('percent-title','cedar','beirut','100% readiness','A scoped synthetic source',1,1,'draft',null,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
     db.prepare("UPDATE briefings SET state='ready' WHERE id='shelf'").run();

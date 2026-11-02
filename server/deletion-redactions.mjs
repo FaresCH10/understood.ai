@@ -9,6 +9,8 @@ import {ensurePeopleSchema} from './people.mjs';
 import {ensureCaseMessageSchema} from './case-messages.mjs';
 import {ensurePresentationSchema} from './presentation-schema.mjs';
 import {ensureInstructionSchema} from './instruction-schema.mjs';
+import {ensureAcknowledgementSchema} from './acknowledgments.mjs';
+import {ensureEvidenceSchema} from './evidence.mjs';
 
 export function ensureDeletionRedactionSchema(db){
   ensureDeletionSchema(db);ensureRetentionSchema(db);ensureClarificationSchema(db);ensureExportSchema(db);ensureWorkerImportSchema(db);
@@ -16,6 +18,8 @@ export function ensureDeletionRedactionSchema(db){
   ensureCaseMessageSchema(db);
   ensurePresentationSchema(db);
   ensureInstructionSchema(db);
+  ensureAcknowledgementSchema(db);
+  ensureEvidenceSchema(db);
   const receiptGuard=db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='directory_reactivation_frozen_update'").get()?.sql;
   if(!receiptGuard?.includes('worker_deletion_requests'))db.exec(`DROP TRIGGER IF EXISTS directory_reactivation_frozen_update;
     CREATE TRIGGER directory_reactivation_frozen_update BEFORE UPDATE ON directory_reactivations WHEN
@@ -86,6 +90,7 @@ export function processOneDeletionRedaction(db){
       WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=?) AND presented_question IS NOT NULL AND presented_question<>'[Deleted]'`).run(row.worker_id);
     db.prepare(`UPDATE instruction_deliveries SET content_json='{"title":"[Deleted]","text":"[Deleted]"}',updated_at=?
       WHERE worker_id=? AND content_json IS NOT NULL AND json_extract(content_json,'$.title')<>'[Deleted]'`).run(now,row.worker_id);
+    db.prepare('DELETE FROM assignment_evidence WHERE worker_id=? AND org_id=?').run(row.worker_id,row.org_id);
     db.prepare('INSERT INTO worker_deletion_redactions VALUES(?,?,?,?,?)').run(row.id,row.org_id,row.site_id,row.worker_id,now);
     db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),row.org_id,row.site_id,'system','deletion-worker','worker.content.redacted',row.worker_id,now);
     return true;

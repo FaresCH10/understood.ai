@@ -19,7 +19,7 @@ async function fixture(postgres) {
   if(!postgres){
     const db=openDatabase(':memory:');seed(db);
     db.prepare("INSERT INTO sites VALUES('tripoli','cedar','Tripoli','UTC')").run();
-    db.prepare("INSERT INTO briefings VALUES('tripoli-brief','cedar','tripoli','Tripoli','Private',1,1,'draft',NULL,?,?)").run(new Date().toISOString(),new Date().toISOString());
+    db.prepare("INSERT INTO briefings(id,org_id,site_id,title,source,revision,next_version,state,prepared_json,created_at,updated_at) VALUES('tripoli-brief','cedar','tripoli','Tripoli','Private',1,1,'draft',NULL,?,?)").run(new Date().toISOString(),new Date().toISOString());
     db.prepare("INSERT INTO staff VALUES('reader','cedar','beirut','Reader','auditor',1)").run();
     return {db,list:(s,input)=>listReportPublications(db,s,input),exec:async(sql,values=[])=>db.prepare(sql).run(...values),close:()=>db.close()};
   }

@@ -1,6 +1,6 @@
 import {generateWorkerPassword} from './worker-password';
 import React, { createContext,lazy,Suspense,useContext,useEffect,useMemo, useRef, useState } from 'react';
-import { Archive,ArchiveRestore, Check, ChevronLeft, ChevronRight, Languages, Pencil, Plus, Search, Upload, UserRound,UserCheck, UserX, Users, X } from 'lucide-react';
+import { Archive,ArchiveRestore, Check, ChevronLeft, ChevronRight, Hash, Languages, Pencil, Plus, Search, Upload, UserRound,UserCheck, UserX, Users, X } from 'lucide-react';
 import {WorkerWorkHistory} from './WorkProgress';
 import { WorkerAccess } from './WorkerAccess';
 const WorkerDeletion=lazy(()=>import('./WorkerDeletion').then(module=>({default:module.WorkerDeletion})));
@@ -8,7 +8,7 @@ import { keepDialogFocus } from './dialog-focus';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {completeStaffRequest,type StaffRequestMethod} from './staff-request';
 import {readCrewChange} from './crew-overview';
-import {peopleText,peopleLanguageNames,peoplePageText,peopleCountText,peopleShowingText,peopleDisableText,peopleMessageText,peopleErrorText,type PeopleLocale} from './people-locale';
+import {peopleText,peopleLanguageNames,peoplePageText,peopleCountText,peopleShowingText,peopleDisableText,peopleMessageText,peopleErrorText,peopleWorkerIdHint,type PeopleLocale} from './people-locale';
 import {WORKER_LOCALES,type WorkerLocaleCode} from '../server/languages.mjs';
 
 type WorkerLanguage = WorkerLocaleCode;
@@ -33,6 +33,7 @@ type Crew = { id: string; name: string; active: boolean; member_count: number };
 type CrewPage = {items:Crew[];total:number;page:number;pageSize:number};
 type WorkerPage = { items: Worker[]; total: number; page: number; pageSize: number };
 type Props = { refresh?: number; onImport: () => void;canManage:boolean;canDelete:boolean;credentialAccess:boolean;navigate:(path:string)=>void;initialWorkerId?:string;initialCrewId?:string;initialAdd?:boolean;authority:StaffRequestAuthority;locale?:PeopleLocale;onLocaleChange?:(locale:PeopleLocale)=>void };
+type WorkerIdSettings = { prefix: string; suggestedPrefix: string; format: string; nextCode: string; canEdit: boolean };
 
 const PeopleLocaleContext=createContext<PeopleLocale>('en');
 
@@ -219,7 +220,7 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
   const [message, setMessage] = useState('');
   const [form, setForm] = useState<'add' | 'edit' | null>(initialAdd?'add':null);
   const workerDialog=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{if(form && !workerDialog.current?.open){workerDialog.current?.showModal();workerDialog.current?.querySelector('input')?.focus();}else if(!form)workerDialog.current?.close();},[form]);
+  useEffect(()=>{if(form && !workerDialog.current?.open){workerDialog.current?.showModal();workerDialog.current?.querySelector<HTMLInputElement>('input:not([readonly]):not([disabled])')?.focus();}else if(!form)workerDialog.current?.close();},[form]);
   const formRef=useRef(form);formRef.current=form;
   const [code, setCode] = useState('');
   const [newPassword,setNewPassword]=useState('');
@@ -228,6 +229,11 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
   const [workerLanguage, setWorkerLanguage] = useState<'' | WorkerLanguage>('');
   const [confirmDisable, setConfirmDisable] = useState(false);
   const [deletionLocked,setDeletionLocked]=useState(true);
+  const [workerIdSettings,setWorkerIdSettings]=useState<WorkerIdSettings|null>(null);
+  const [prefixDraft,setPrefixDraft]=useState('');
+  const [prefixBusy,setPrefixBusy]=useState(false);
+  const [prefixError,setPrefixError]=useState('');
+  const prefixDialog=useRef<HTMLDialogElement>(null);
   const workerSearchInput=useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -269,6 +275,17 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
     return ()=>controller.abort();
   },[refresh,revision,canManage,peopleApi,current]);
 
+  useEffect(() => {
+    if(!canManage) return;
+    const controller=new AbortController();
+    peopleApi<WorkerIdSettings>('/worker-id','GET',undefined,controller.signal)
+      .then((settings)=>{if(!controller.signal.aborted && current())setWorkerIdSettings(settings);})
+      .catch(()=>{if(!controller.signal.aborted && current())setWorkerIdSettings(null);});
+    return ()=>controller.abort();
+  },[refresh,revision,canManage,peopleApi,current]);
+
+  useEffect(()=>{if(form==='add'&&workerIdSettings)setCode(workerIdSettings.nextCode);},[form,workerIdSettings]);
+
   useEffect(() => { setConfirmDisable(false);setDeletionLocked(true); }, [selected?.id]);
   useEffect(() => { setConfirmDisable(false); }, [selected?.crew_id]);
 
@@ -283,15 +300,36 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
     finally { changing.current=false;if(current())setBusy(false); }
   }
 
-  function startAdd() { setNewPassword('');setShowNewPassword(false);setCode(''); setWorkerName(''); setWorkerLanguage(''); setForm('add'); setConfirmDisable(false); }
+  function startAdd() { setNewPassword('');setShowNewPassword(false);setCode(workerIdSettings?.nextCode ?? ''); setWorkerName(''); setWorkerLanguage(''); setForm('add'); setConfirmDisable(false); }
   function startEdit() {
     if (!selected) return;
     setCode(selected.code); setWorkerName(selected.name || ''); setWorkerLanguage(selected.language_selection_required ? '' : selected.language); setForm('edit'); setConfirmDisable(false);
   }
 
+  function openPrefix() {
+    if (!workerIdSettings?.canEdit) return;
+    setPrefixDraft(workerIdSettings.prefix); setPrefixError(''); prefixDialog.current?.showModal();
+  }
+
+  async function savePrefix(event: React.FormEvent) {
+    event.preventDefault();
+    const prefix = prefixDraft.trim().toUpperCase();
+    if (prefixBusy || !workerIdSettings?.canEdit || !/^[A-Z0-9]{2,6}$/.test(prefix) || !current() || !authority.canMutate()) return;
+    setPrefixBusy(true); setPrefixError('');
+    try {
+      const updated = await peopleApi<WorkerIdSettings>('/worker-id', 'PATCH', { prefix });
+      if (!current()) return;
+      setWorkerIdSettings(updated); setMessage(t.workerPrefixUpdated); prefixDialog.current?.close();
+    } catch (reason) { if (current()) setPrefixError((reason as Error).message); }
+    finally { if (current()) setPrefixBusy(false); }
+  }
+
   async function saveWorker(event: React.FormEvent) {
     event.preventDefault();
-    const payload={code,...(form==='add'?{password:newPassword}:{}),name:workerName.trim() || null,...(workerLanguage ? {language:workerLanguage} : {})};
+    const workerNameValue=workerName.trim();
+    const payload=form==='add'
+      ? {password:newPassword,name:workerNameValue,...(workerLanguage ? {language:workerLanguage} : {})}
+      : {code,name:workerNameValue,...(workerLanguage ? {language:workerLanguage} : {})};
     const worker = form === 'add'
       ? await change(() => peopleApi<Worker>('/workers', 'POST', payload), t.workerAdded)
       : selected && await change(() => peopleApi<Worker>(`/workers/${encodeURIComponent(selected.id)}`, 'PATCH', payload), t.workerUpdated);
@@ -325,6 +363,24 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
     <div className="page-header"><div><h1>{initialWorkerId ? selected?.name || selected?.code || t.workerDetails : t.workers}</h1><p>{initialWorkerId ? selected?.code : t.intro}</p></div>
       {!initialWorkerId && <div className="actions people-header-actions"><button className="button outline" onClick={onImport}><Upload size={19}/>{t.importCsv}</button><button className="button primary" onClick={startAdd}><Plus size={19}/>{t.addWorker}</button></div>}
     </div>
+    {!initialWorkerId && workerIdSettings && <section className="worker-id-settings" aria-label={t.workerIdSettings}>
+      <span className="worker-id-settings-icon"><Hash size={18}/></span>
+      <div className="worker-id-settings-copy"><strong>{t.workerIdSettings}</strong>
+        <p><span>{t.workerIdPrefixLabel}:</span> <bdi>{workerIdSettings.prefix}</bdi> · <span>{t.workerIdNextLabel}:</span> <bdi>{workerIdSettings.nextCode}</bdi> · <span>{t.workerIdFormatLabel}:</span> <bdi>{workerIdSettings.format}</bdi></p>
+      </div>
+      {workerIdSettings.canEdit && <button type="button" className="button subtle" disabled={busy} onClick={openPrefix}><Pencil size={16}/>{t.changePrefix}</button>}
+    </section>}
+    {!initialWorkerId && workerIdSettings?.canEdit && <dialog ref={prefixDialog} className="withdraw-dialog" aria-labelledby="worker-prefix-title" aria-describedby="worker-prefix-impact" onKeyDown={keepDialogFocus} onCancel={(event)=>{if(prefixBusy)event.preventDefault();}}>
+      <form onSubmit={savePrefix}>
+        <div className="withdraw-heading"><h2 id="worker-prefix-title">{t.changePrefixTitle}</h2><button type="button" className="icon-button" title={t.closeForm} aria-label={t.closeForm} disabled={prefixBusy} onClick={()=>prefixDialog.current?.close()}><X size={20}/></button></div>
+        <p id="worker-prefix-impact" className="crew-impact">{t.changePrefixImpact}</p>
+        <label className="field">{t.workerIdPrefix}<input autoFocus dir="ltr" value={prefixDraft} disabled={prefixBusy} minLength={2} maxLength={6} required pattern="[A-Z0-9]{2,6}" title={t.workerIdPrefixHint} onChange={event=>setPrefixDraft(event.target.value.toUpperCase())}/></label>
+        <p className="field-hint">{t.workerIdPrefixHint} {t.workerIdSuggested}: <bdi>{workerIdSettings.suggestedPrefix}</bdi></p>
+        <p className="worker-id-preview">{t.workerIdPreview}: <strong><bdi>{prefixDraft || workerIdSettings.prefix}-001</bdi></strong></p>
+        {prefixError && <p role="alert" className="record-error">{peopleErrorText(locale,new Error(prefixError))}</p>}
+        <div className="actions"><button type="button" className="button outline" disabled={prefixBusy} onClick={()=>prefixDialog.current?.close()}>{t.cancel}</button><button type="submit" className="button primary" disabled={prefixBusy || !/^[A-Z0-9]{2,6}$/.test(prefixDraft) || prefixDraft===workerIdSettings.prefix}><Check size={18}/>{prefixBusy ? t.saving : t.savePrefix}</button></div>
+      </form>
+    </dialog>}
     {!initialWorkerId && <>
     <div className="filters people-filters">
       {(initialWorkerId || initialCrewId) && <button className="button outline" onClick={()=>navigate('people')}><X size={18}/>{t.clearFilter}</button>}
@@ -343,8 +399,8 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
           <thead><tr><th>{t.workerId}</th><th>{t.language}</th><th>{t.accessStatus}</th><th>{t.crew}</th><th><span className="sr-only">{t.details}</span></th></tr></thead>
           <tbody>{workers.items.map((worker) => <tr key={worker.id} className="worker-profile-row" onClick={()=>navigate(`people/worker/${encodeURIComponent(worker.id)}`)}>
             <td><button className="people-row-button" onClick={event => {event.stopPropagation();navigate(`people/worker/${encodeURIComponent(worker.id)}`);}}><UserRound size={18} /> <span className="people-worker-identity"><strong><bdi>{worker.name || worker.code}</bdi></strong>{worker.name && <small><bdi>{worker.code}</bdi></small>}</span></button></td>
-            <td>{worker.language_selected ? <>{languages[worker.language]}{worker.pending_language_request && <small className="language-pending">{t.pendingChangeTo} {languages[worker.pending_language_request.requestedLanguage]}</small>}</> : <span className="status status-amber"><span className="status-dot" />{t.notSelected}</span>}</td><td><span className={`status ${worker.active ? 'status-green' : 'status-amber'}`}><span className="status-dot" />{worker.active ? t.active : t.disabled}</span></td>
-            <td><bdi>{worker.crew_name || '—'}</bdi></td><td><button className="icon-button direction-arrow" aria-label={`${t.details}: ${worker.code}`} onClick={event => {event.stopPropagation();navigate(`people/worker/${encodeURIComponent(worker.id)}`);}}><ChevronRight size={19} /></button></td>
+            <td data-label={t.language}>{worker.language_selected ? <>{languages[worker.language]}{worker.pending_language_request && <small className="language-pending">{t.pendingChangeTo} {languages[worker.pending_language_request.requestedLanguage]}</small>}</> : <span className="status status-amber"><span className="status-dot" />{t.notSelected}</span>}</td><td data-label={t.accessStatus}><span className={`status ${worker.active ? 'status-green' : 'status-amber'}`}><span className="status-dot" />{worker.active ? t.active : t.disabled}</span></td>
+            <td data-label={t.crew}><bdi>{worker.crew_name || '—'}</bdi></td><td><button className="icon-button direction-arrow" aria-label={`${t.details}: ${worker.code}`} onClick={event => {event.stopPropagation();navigate(`people/worker/${encodeURIComponent(worker.id)}`);}}><ChevronRight size={19} /></button></td>
           </tr>)}</tbody>
         </table></div> : <p className="empty-state">{t.noWorkers}</p>}
         <div className="people-pagination"><span>{peopleShowingText(locale,workers?.items.length || 0,workers?.total || 0)}</span><div>
@@ -355,9 +411,10 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
       </section>}
       <div className="worker-profile-content">
         {<dialog ref={workerDialog} className="worker-form-dialog" aria-label={form==='add'?t.addWorker:t.editWorker} onCancel={event=>{if(busy)event.preventDefault();else setForm(null);}}><section className="panel people-form"><div className="people-panel-heading"><h2>{form === 'add' ? t.addWorker : t.editWorker}</h2><button className="icon-button" aria-label={t.closeForm} disabled={busy} onClick={() => setForm(null)}><X size={19} /></button></div>
-          <form onSubmit={saveWorker}>{error&&<p role="alert" className="notice">{peopleErrorText(locale,new Error(error))}</p>}<label className="field">{t.workerId}<input autoFocus disabled={busy} dir="auto" value={code} onChange={(event) => setCode(event.target.value)} minLength={2} maxLength={80} required /></label>
+          <form onSubmit={saveWorker}>{error&&<p role="alert" className="notice">{peopleErrorText(locale,new Error(error))}</p>}<label className="field">{t.workerId}<input autoFocus={form==='edit'} disabled={busy} readOnly={form==='add'} dir="ltr" value={code} onChange={(event) => setCode(event.target.value)} minLength={2} maxLength={80} required={form==='edit'} placeholder={form==='add'?workerIdSettings?.nextCode:undefined} /></label>
+            {form==='add'&&<p className="field-hint">{peopleWorkerIdHint(locale,workerIdSettings?.nextCode)}</p>}
             {form==='add'&&<><label className="field">{locale==='ar'?'كلمة مرور العامل':'Worker password'}<input type={showNewPassword?'text':'password'} autoComplete="new-password" required minLength={8} maxLength={128} value={newPassword} disabled={busy} onChange={event=>setNewPassword(event.target.value)}/></label><div className="actions"><button type="button" className="button outline" disabled={busy} onClick={()=>{setNewPassword(generateWorkerPassword());setShowNewPassword(true);}}>{locale==='ar'?'إنشاء كلمة مرور':'Generate password'}</button><button type="button" className="button subtle" disabled={busy} onClick={()=>setShowNewPassword(value=>!value)}>{showNewPassword?(locale==='ar'?'إخفاء':'Hide'):(locale==='ar'?'إظهار':'Show')}</button></div><p className="muted">{locale==='ar'?'احفظ كلمة المرور وشاركها مع العامل بشكل خاص.':'Save this password and share it privately with the worker.'}</p></>}
-            <label className="field">{t.workerName}<input disabled={busy} dir="auto" value={workerName} onChange={(event) => setWorkerName(event.target.value)} minLength={2} maxLength={80} placeholder={t.namePlaceholder} /></label>
+            <label className="field">{t.workerName}<input autoFocus={form==='add'} disabled={busy} dir="auto" value={workerName} onChange={(event) => setWorkerName(event.target.value)} required minLength={2} maxLength={80} placeholder={t.namePlaceholder} /></label>
             <label className="field">{t.preferred}<select disabled={busy} value={workerLanguage} onChange={(event) => setWorkerLanguage(event.target.value as '' | WorkerLanguage)}>{(form==='add' || selected?.language_selection_required) && <option value="">{t.chooseLater}</option>}{WORKER_LOCALES.map(item=><option key={item.code} value={item.code}>{languages[item.code]}</option>)}</select></label>
             <p className="muted">{t.workerLanguageHint}{form==='edit' && ` ${t.directCorrection}`}</p>
             <button className="button primary full" type="submit" disabled={busy}><Check size={18} />{t.saveWorker}</button></form>

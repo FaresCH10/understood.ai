@@ -5,11 +5,24 @@ import {WORKER_LANGUAGE_CODES} from './languages.mjs';
 const uuid=value=>typeof value==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value);
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 const iso=value=>value instanceof Date?value.toISOString():value;
+const photoMime=mime=>mime==='image/png'||mime==='image/jpeg';
+function attachmentCaptions(value){
+ if(value===undefined)return {};
+ if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>WORKER_LANGUAGE_CODES.length)throw Error('Invalid attachment captions');
+ const captions={};
+ for(const [language,caption] of Object.entries(value)){
+  if(!WORKER_LANGUAGE_CODES.includes(language)||typeof caption!=='string'||caption.length>300)throw Error('Invalid attachment captions');
+  const text=caption.normalize('NFKC').replace(/\s+/g,' ').trim();
+  if(text)captions[language]=text;
+ }
+ return captions;
+}
 export function compositionInput(c){
- if(!c||typeof c!=='object'||Array.isArray(c)||Object.keys(c).some(key=>!['title','source','audience','responseMode','deliveryMode'].includes(key))||typeof c.title!=='string'||c.title.length>120||typeof c.source!=='string'||c.source.length>4000||!['question','acknowledge'].includes(c.responseMode)||!['text','voice','both'].includes(c.deliveryMode))throw Error('Invalid draft');
+ const evidenceMode=c?.evidenceMode??'none';
+ if(!c||typeof c!=='object'||Array.isArray(c)||Object.keys(c).some(key=>!['title','source','audience','responseMode','deliveryMode','evidenceMode'].includes(key))||typeof c.title!=='string'||c.title.length>120||typeof c.source!=='string'||c.source.length>4000||!['question','acknowledge'].includes(c.responseMode)||!['text','voice','both'].includes(c.deliveryMode)||!['none','photo'].includes(evidenceMode)||(evidenceMode==='photo'&&c.responseMode!=='acknowledge'))throw Error('Invalid draft');
  const a=c.audience;
  if(!a||typeof a!=='object'||Array.isArray(a)||!['all','crew','members'].includes(a.type)||Object.keys(a).some(key=>!['type','crewId','workerIds'].includes(key))||a.type==='crew'&&(typeof a.crewId!=='string'||a.crewId.length>100)||a.type==='members'&&(!Array.isArray(a.workerIds)||a.workerIds.length>5000||a.workerIds.some(id=>typeof id!=='string'||!id||id.length>100)||new Set(a.workerIds).size!==a.workerIds.length))throw Error('Invalid draft audience');
- return {title:c.title,source:c.source,audience:a.type==='all'?{type:'all'}:a.type==='crew'?{type:'crew',crewId:a.crewId}:{type:'members',workerIds:[...a.workerIds].sort()},responseMode:c.responseMode,deliveryMode:c.deliveryMode};
+ return {title:c.title,source:c.source,audience:a.type==='all'?{type:'all'}:a.type==='crew'?{type:'crew',crewId:a.crewId}:{type:'members',workerIds:[...a.workerIds].sort()},responseMode:c.responseMode,deliveryMode:c.deliveryMode,evidenceMode};
 }
 export function assignmentWorkStatus(row){
  if(row.open_case || row.outcome==='clarification' || row.outcome==='unassessable')return 'follow-up';
@@ -90,11 +103,22 @@ export async function workspaceOperation(q,session,operation,input={}){
     await q('DELETE FROM instruction_attachments WHERE id=? AND request_id=? AND org_id=? AND site_id=? AND staff_id=?',[f.remove,requestId,...scope,session.principal_id]);
     return workspaceOperation(q,session,'attachments',{requestId});
    }
+   if(f.captions!==undefined && f.data===undefined){
+    if(!uuid(f.id))throw Error('Invalid attachment');
+    const captions=attachmentCaptions(f.captions);
+    if((await q('SELECT 1 FROM instruction_sends WHERE request_id=?',[requestId])).length)throw Error('Sent attachments cannot be changed');
+    const row=(await q('SELECT mime FROM instruction_attachments WHERE id=? AND request_id=? AND org_id=? AND site_id=? AND staff_id=?',[f.id,requestId,...scope,session.principal_id]))[0];
+    if(!row)throw Error('Attachment unavailable');
+    if(!photoMime(row.mime))throw Error('Captions are only available for photos');
+    await q('UPDATE instruction_attachments SET captions_json=? WHERE id=? AND request_id=? AND org_id=? AND site_id=? AND staff_id=?',[JSON.stringify(captions),f.id,requestId,...scope,session.principal_id]);
+    return workspaceOperation(q,session,'attachments',{requestId});
+   }
    if(typeof f.name!=='string'||!f.name.trim()||f.name.length>160||/[\x00-\x1f\/\\]/.test(f.name)||typeof f.data!=='string'||f.data.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(f.data))throw Error('Invalid attachment');
    if(!uuid(f.id))throw Error('Invalid attachment');
-   const bytes=Buffer.from(f.data,'base64'),mime=f.mime;
+   const bytes=Buffer.from(f.data,'base64'),mime=f.mime,captions=attachmentCaptions(f.captions);
+   if(Object.keys(captions).length && !photoMime(mime))throw Error('Captions are only available for photos');
    const duplicate=(await q('SELECT * FROM instruction_attachments WHERE id=?',[f.id]))[0];
-   if(duplicate){if(duplicate.org_id!==session.org_id||duplicate.site_id!==session.site_id||duplicate.staff_id!==session.principal_id||duplicate.request_id!==requestId||duplicate.name!==f.name||duplicate.mime!==mime||duplicate.data_base64!==f.data)throw Error('Attachment request conflict');return workspaceOperation(q,session,'attachments',{requestId});}
+   if(duplicate){if(duplicate.org_id!==session.org_id||duplicate.site_id!==session.site_id||duplicate.staff_id!==session.principal_id||duplicate.request_id!==requestId||duplicate.name!==f.name||duplicate.mime!==mime||duplicate.data_base64!==f.data||duplicate.captions_json!==JSON.stringify(captions))throw Error('Attachment request conflict');return workspaceOperation(q,session,'attachments',{requestId});}
    const extensions={'application/pdf':/\.pdf$/i,'image/png':/\.png$/i,'image/jpeg':/\.jpe?g$/i,'text/plain':/\.txt$/i,'text/csv':/\.csv$/i,'application/vnd.openxmlformats-officedocument.wordprocessingml.document':/\.docx$/i,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':/\.xlsx$/i,'application/vnd.openxmlformats-officedocument.presentationml.presentation':/\.pptx$/i};
    const office=mime?.startsWith('application/vnd.openxmlformats-officedocument.'),text=['text/plain','text/csv'].includes(mime);
    const valid=mime==='application/pdf'&&bytes.subarray(0,5).toString()==='%PDF-'||mime==='image/png'&&bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||mime==='image/jpeg'&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255||text&&!bytes.includes(0)||office&&bytes.subarray(0,4).equals(Buffer.from([80,75,3,4]));
@@ -104,7 +128,7 @@ export async function workspaceOperation(q,session,operation,input={}){
    if(!composition||composition.staff_id!==session.principal_id)throw Error('Save this draft before adding an attachment');
    const existing=await q('SELECT bytes FROM instruction_attachments WHERE request_id=? AND org_id=? AND site_id=?',[requestId,...scope]);
    if(existing.length>=5||existing.reduce((sum,row)=>sum+row.bytes,0)+bytes.length>10*1024*1024)throw Error('Maximum five attachments and 10 MB per instruction');
-   await q('INSERT INTO instruction_attachments(id,request_id,org_id,site_id,staff_id,name,mime,bytes,data_base64,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',[f.id,requestId,...scope,session.principal_id,f.name,mime,bytes.length,bytes.toString('base64'),new Date().toISOString()]);
+   await q('INSERT INTO instruction_attachments(id,request_id,org_id,site_id,staff_id,name,mime,bytes,data_base64,created_at,captions_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)',[f.id,requestId,...scope,session.principal_id,f.name,mime,bytes.length,bytes.toString('base64'),new Date().toISOString(),JSON.stringify(captions)]);
   }
   if(staff){
    if(!['owner','supervisor','auditor'].includes(session.role))throw Error('Forbidden');
@@ -116,9 +140,9 @@ export async function workspaceOperation(q,session,operation,input={}){
    const allowed=(await q(`SELECT 1 FROM assignments a JOIN publications p ON p.id=a.publication_id JOIN instruction_sends s ON s.publication_id=p.id WHERE s.request_id=? AND a.org_id=? AND a.site_id=? AND a.worker_id=? AND p.state='published' AND NOT EXISTS(SELECT 1 FROM briefing_content_purges bp WHERE bp.briefing_id=p.briefing_id)`,[requestId,...scope,session.principal_id])).length;
    if(!allowed)throw Error('Instruction unavailable');
   }
-  const rows=await q('SELECT id,name,mime,bytes FROM instruction_attachments WHERE request_id=? AND org_id=? AND site_id=? ORDER BY created_at,id',[requestId,...scope]);
+  const rows=await q('SELECT id,name,mime,bytes,captions_json FROM instruction_attachments WHERE request_id=? AND org_id=? AND site_id=? ORDER BY created_at,id',[requestId,...scope]);
   if(input.download){if(!rows.some(row=>row.id===input.download))throw Error('Attachment unavailable');return (await q('SELECT name,mime,data_base64 FROM instruction_attachments WHERE id=? AND org_id=? AND site_id=?',[input.download,...scope]))[0];}
-  return {items:rows};
+  return {items:rows.map(row=>({id:row.id,name:row.name,mime:row.mime,bytes:row.bytes,captions:parse(row.captions_json||'{}')}))};
  }
  if(operation==='assignment-files'){
   if(staff)throw Error('Forbidden');

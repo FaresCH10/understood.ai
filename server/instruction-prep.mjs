@@ -8,9 +8,11 @@ work worker workers team item items thing things instruction instructions follow
 const tableExists=(db,name)=>!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
 
 export function instructionSendForBriefing(db,briefingId,orgId,siteId) {
-  if(!tableExists(db,'instruction_sends')) return null;
-  return db.prepare('SELECT * FROM instruction_sends WHERE briefing_id=? AND org_id=? AND site_id=?')
-    .get(briefingId,orgId,siteId) || null;
+  const send=tableExists(db,'instruction_sends')?db.prepare('SELECT * FROM instruction_sends WHERE briefing_id=? AND org_id=? AND site_id=?')
+    .get(briefingId,orgId,siteId):null;
+  if(send)return send;
+  return tableExists(db,'instruction_improvement_drafts')&&db.prepare('SELECT 1 FROM instruction_improvement_drafts WHERE corrective_briefing_id=? AND org_id=? AND site_id=?')
+    .get(briefingId,orgId,siteId)?{response_mode:'question',delivery_mode:'both'}:null;
 }
 
 export function instructionKeywordGroups(text) {

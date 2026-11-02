@@ -2,6 +2,7 @@ import {passwordRecordSync} from './auth-crypto.mjs';
 import { randomUUID } from 'node:crypto';
 import { NOW, transaction } from './db.mjs';
 import {workerPassword,normalizeWorkerLogin} from './worker-credentials-input.mjs';
+import {nextWorkerId,normalizeWorkerPrefix,suggestWorkerPrefix,workerIdFormat} from './worker-ids.mjs';
 import {isWorkerLanguage,WORKER_LANGUAGE_CODES,sqlLanguageList} from './languages.mjs';
 import {requireWritableEntitlement} from './entitlements.mjs';
 import {requireWorkerCapacity} from './worker-capacity.mjs';
@@ -119,6 +120,11 @@ function expandWorkerLanguageRequestLocales(db) {
 export function ensurePeopleSchema(db) {
   expandWorkerLanguageRequestLocales(db);
   db.exec(`
+    CREATE TABLE IF NOT EXISTS organization_worker_ids (
+      org_id TEXT PRIMARY KEY REFERENCES organizations(id),
+      prefix TEXT NOT NULL CHECK(length(prefix) BETWEEN 2 AND 6 AND prefix NOT GLOB '*[^A-Z0-9]*'),
+      updated_at TEXT NOT NULL
+    ) STRICT;
     CREATE TABLE IF NOT EXISTS crews (
       id TEXT PRIMARY KEY, org_id TEXT NOT NULL REFERENCES organizations(id),
       site_id TEXT NOT NULL REFERENCES sites(id), name TEXT NOT NULL,
@@ -288,23 +294,78 @@ export function workerFilters(filters={}) {
 export function createWorkerInput(input) {
   inputKeys(input, ['code', 'name', 'language', 'password']);
   const workerName = input.name === undefined || input.name === null ? null : name(input.name, 'worker name');
+  const generatedCode = input.code === undefined || input.code === null
+    || (typeof input.code === 'string' && !input.code.trim());
+  const code = generatedCode ? null : name(input.code, 'worker code');
   return {
-    code: name(input.code, 'worker code'),
-    ...(input.password===undefined?{}:{password:workerPassword(input.password,{login:normalizeWorkerLogin(input.code)})}),
+    code,
+    ...(input.password===undefined?{}:{password:workerPassword(input.password,code ? {login:normalizeWorkerLogin(code)} : {})}),
     name: workerName,
     ...(input.language === undefined ? {} : { language: language(input.language) }),
   };
 }
 
+function companyWorkerCodes(db, orgId, prefix) {
+  const pattern = `${prefix}-%`;
+  return db.prepare(`SELECT code AS value FROM workers WHERE org_id=? AND upper(code) LIKE ?
+    UNION SELECT login_id AS value FROM worker_credentials WHERE org_id=? AND upper(login_id) LIKE ?`)
+    .all(orgId, pattern, orgId, pattern).map((row) => row.value);
+}
+
+export function nextCompanyWorkerCode(db, orgId) {
+  let stored = db.prepare('SELECT prefix FROM organization_worker_ids WHERE org_id=?').get(orgId);
+  if (!stored) {
+    const organization = db.prepare('SELECT name FROM organizations WHERE id=?').get(orgId);
+    if (!organization) throw new Error('Forbidden');
+    db.prepare(`INSERT INTO organization_worker_ids(org_id,prefix,updated_at) VALUES(?,?,?)
+      ON CONFLICT(org_id) DO NOTHING`).run(orgId, suggestWorkerPrefix(organization.name), NOW());
+    stored = db.prepare('SELECT prefix FROM organization_worker_ids WHERE org_id=?').get(orgId);
+  }
+  return nextWorkerId(stored.prefix, companyWorkerCodes(db, orgId, stored.prefix));
+}
+
+export function readWorkerIdSettings(db, session) {
+  requirePeopleStaff(db,session);
+  const organization = db.prepare('SELECT name FROM organizations WHERE id=?').get(session.org_id);
+  if (!organization) throw new Error('Forbidden');
+  const suggestedPrefix = suggestWorkerPrefix(organization.name);
+  const stored = db.prepare('SELECT prefix FROM organization_worker_ids WHERE org_id=?').get(session.org_id);
+  const prefix = stored?.prefix ?? suggestedPrefix;
+  return {
+    prefix,
+    suggestedPrefix,
+    format: workerIdFormat(prefix),
+    nextCode: nextWorkerId(prefix, companyWorkerCodes(db, session.org_id, prefix)),
+    canEdit: session.role === 'owner',
+  };
+}
+
+export function updateWorkerIdPrefix(db, session, input) {
+  requirePeopleStaff(db,session);
+  if (session.role !== 'owner') throw new Error('Forbidden');
+  inputKeys(input, ['prefix']);
+  const prefix = normalizeWorkerPrefix(input.prefix);
+  transaction(db, () => {
+    const before = db.prepare('SELECT prefix FROM organization_worker_ids WHERE org_id=?').get(session.org_id);
+    if (before?.prefix === prefix) return;
+    db.prepare(`INSERT INTO organization_worker_ids(org_id,prefix,updated_at) VALUES(?,?,?)
+      ON CONFLICT(org_id) DO UPDATE SET prefix=excluded.prefix,updated_at=excluded.updated_at`)
+      .run(session.org_id, prefix, NOW());
+    audit(db, session, 'organization.worker_prefix_updated', session.org_id);
+  });
+  return readWorkerIdSettings(db, session);
+}
+
 export function createWorker(db, session, input) {
   requirePeopleStaff(db,session);
   const value = createWorkerInput(input);
-  const login = normalizeWorkerLogin(value.code);
   const id = randomUUID();
-  const credential=value.password===undefined?null:passwordRecordSync(workerPassword(value.password,{login,company:session.org_id}));
   transaction(db, () => {
     const now = NOW();
     requireWritableEntitlement(db,session.org_id);
+    const code = value.code ?? nextCompanyWorkerCode(db, session.org_id);
+    const login = normalizeWorkerLogin(code);
+    const credential=value.password===undefined?null:passwordRecordSync(workerPassword(value.password,{login,company:session.org_id}));
     if (db.prepare('SELECT id FROM workers WHERE org_id=? AND upper(code)=?').get(session.org_id, login)
       || db.prepare('SELECT worker_id FROM worker_credentials WHERE org_id=? AND login_id=?').get(session.org_id, login)) {
       throw new Error('Worker ID already in use');
@@ -313,11 +374,11 @@ export function createWorker(db, session, input) {
     if (value.language === undefined) {
       db.prepare(`INSERT INTO workers (id,org_id,site_id,code,name,language,active,language_selection_required)
         VALUES (?,?,?,?,?,'en',1,1)`)
-        .run(id, session.org_id, session.site_id, value.code, value.name);
+        .run(id, session.org_id, session.site_id, code, value.name);
     } else {
       db.prepare(`INSERT INTO workers (id,org_id,site_id,code,name,language,active,language_selection_required,
           language_selected_at,language_selected_by) VALUES (?,?,?,?,?,?,1,0,?,'staff')`)
-        .run(id, session.org_id, session.site_id, value.code, value.name, value.language, now);
+        .run(id, session.org_id, session.site_id, code, value.name, value.language, now);
     }
     if(credential)db.prepare(`INSERT INTO worker_credentials(worker_id,org_id,site_id,login_id,state,password_salt,password_hash,credential_revision,password_changed_at,created_at,updated_at) VALUES(?,?,?,?,'active',?,?,1,?,?,?)`).run(id,session.org_id,session.site_id,login,credential.salt,credential.derived,now,now,now);
     audit(db, session, 'worker.created', id);
@@ -761,7 +822,8 @@ export function moveWorkerToCrew(db, session, workerId, crewId) {
 }
 
 export function requiredWorkerCreation(input){
-  const value=createWorkerInput(input);
+  const value=createWorkerInput({...input,code:undefined});
   if(value.password===undefined)throw Error('Invalid password');
-  return input;
+  if(value.name===null)throw Error('Worker name is required');
+  return value;
 }

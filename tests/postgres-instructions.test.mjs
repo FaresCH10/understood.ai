@@ -2,7 +2,7 @@ import {processOneAssessment} from '../server/postgres/assessment-worker.mjs';
 import {assignWorkerPassword} from '../server/postgres/worker-credentials.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {startInstructionSend,instructionAudienceOverview,instructionSendStatus,completeInstructionSend,
@@ -12,6 +12,7 @@ import {workerBriefings,workerBriefing} from '../server/postgres/read-models.mjs
 import {acknowledgeAssignment} from '../server/postgres/acknowledgments.mjs';
 import {workerRequestReceipt,listPublicationResponses,getPublicationResponse} from '../server/postgres/responses.mjs';
 import {readPublicationReport} from '../server/postgres/reports.mjs';
+import {requestExport,processOneExport,downloadExport} from '../server/postgres/exports.mjs';
 import {submitAnswer} from '../server/postgres/domain.mjs';
 import {receiveRecording} from '../server/postgres/recordings.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
@@ -161,6 +162,48 @@ test('PostgreSQL acknowledgment-only sends hide the question, reject answers and
 
     await db.query("UPDATE assignments SET due_at=clock_timestamp()-interval '1 minute' WHERE id=$1",[second.id]);
     await assert.rejects(acknowledgeAssignment(pool,{...worker,principal_id:'w2'},second.id,randomUUID(),scope),/deadline passed/);
+  }finally{await db.close();}
+});
+
+test('PostgreSQL photo evidence is validated, double-scoped, immutable and reported with the acknowledgment',async()=>{
+  const f=await fixture(),{db,pool}=f;
+  const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lE3PnAAAAABJRU5ErkJggg==';
+  const sha=createHash('sha256').update(Buffer.from(png,'base64')).digest('hex');
+  try {
+    const input={...instruction(),responseMode:'acknowledge',deliveryMode:'text',evidenceMode:'photo'};
+    await startInstructionSend(pool,owner,input,scope);
+    await prepare(pool);
+    const result=await completeInstructionSend(pool,owner,input.requestId,scope);
+    assert.equal(result.state,'published');assert.equal(result.evidenceMode,'photo');
+    const assignment=(await db.query("SELECT id FROM assignments WHERE publication_id=$1 AND worker_id='w1'",[result.publicationId])).rows[0];
+    const detail=await workerBriefing(pool,worker,assignment.id,scope);
+    assert.equal(detail.responseMode,'acknowledge');assert.equal(detail.evidenceMode,'photo');assert.equal(detail.evidence,null);
+    await assert.rejects(acknowledgeAssignment(pool,worker,assignment.id,randomUUID(),scope),/Attach a photo as evidence/);
+    await assert.rejects(acknowledgeAssignment(pool,worker,assignment.id,randomUUID(),{...scope,photo:{mimeType:'image/jpeg',data:png}}),/does not match/);
+    await assert.rejects(acknowledgeAssignment(pool,worker,assignment.id,randomUUID(),{...scope,photo:{mimeType:'image/gif',data:png}}),/JPEG, PNG or WebP/);
+    const requestId=randomUUID();
+    const ack=await acknowledgeAssignment(pool,worker,assignment.id,requestId,{...scope,photo:{mimeType:'image/png',data:png}});
+    assert.equal(ack.duplicate,false);assert.equal(ack.evidence.mime,'image/png');assert.equal(ack.evidence.bytes,70);assert.equal(ack.evidence.sha256,sha);
+    const replay=await acknowledgeAssignment(pool,worker,assignment.id,randomUUID(),scope);
+    assert.equal(replay.duplicate,true);assert.equal(replay.evidence.sha256,sha);
+    assert.equal((await db.query('SELECT COUNT(*)::int n FROM assignment_evidence WHERE assignment_id=$1',[assignment.id])).rows[0].n,1);
+    assert.equal((await db.query('SELECT data_base64 FROM assignment_evidence WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3',[assignment.id,owner.org_id,owner.site_id])).rows[0].data_base64,png);
+    assert.equal((await db.query('SELECT COUNT(*)::int n FROM assignment_evidence WHERE assignment_id=$1 AND org_id=$2',[assignment.id,'b'])).rows[0].n,0);
+    await assert.rejects(db.query('UPDATE assignment_evidence SET sha256=$1 WHERE assignment_id=$2',['0'.repeat(64),assignment.id]),/immutable/);
+    await assert.rejects(db.query('DELETE FROM assignment_evidence WHERE assignment_id=$1',[assignment.id]),/immutable/);
+    const detailDone=await workerBriefing(pool,worker,assignment.id,scope);
+    assert.equal(detailDone.evidence.sha256,sha);assert.equal(detailDone.evidenceUrl,`/api/worker/briefings/${encodeURIComponent(assignment.id)}/evidence`);
+    const staffDetail=await getPublicationResponse(pool,owner,result.publicationId,assignment.id,{},scope);
+    assert.equal(staffDetail.evidenceMode,'photo');assert.equal(staffDetail.evidence.sha256,sha);
+    const report=await readPublicationReport(pool,owner,{schema:options.schema,publicationId:result.publicationId,filters:{}});
+    assert.equal(report.evidenceMode,'photo');assert.deepEqual(report.evidence,{required:2,received:1});
+    const received=report.rows.find(row=>row[0]==='001');assert.equal(received[9],'received');assert.ok(received[10]);
+    const missing=report.rows.find(row=>row[0]==='002');assert.equal(missing[9],'missing');assert.equal(missing[10],'');
+    const exported=await requestExport(pool,owner,{requestId:randomUUID(),publicationId:result.publicationId},{schema:options.schema});
+    assert.equal(exported.status,'queued');assert.equal(await processOneExport(pool,{schema:options.schema}),true);
+    const file=await downloadExport(pool,owner,exported.id,{schema:options.schema});
+    assert.match(file.csv,/"delivery_mode","follow_up_status","evidence_status","evidence_received_at"\r\n/);
+    assert.match(file.csv,/"received","2026-/);assert.match(file.csv,/"missing",""/);
   }finally{await db.close();}
 });
 
@@ -390,7 +433,7 @@ test('PostgreSQL instruction and acknowledgment HTTP routes enforce session cont
       assert.equal(afterRetry.delivered,3);assert.equal(afterRetry.undelivered,0);assert.equal(afterRetry.retryable,false);
 
       const grant=await issueWorkerGrant(pool,owner,'w1',30,scope);
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       const workerContext=(await (await request('/session',member)).json()).clientContext;
       assert.equal((await request('/instructions/send',member,{...post({...payload,requestId:randomUUID()}),headers:{'x-client-session-context':workerContext}})).status,403);
       assert.equal((await request('/instructions/audience',member,{headers:{'x-client-session-context':workerContext}})).status,403);

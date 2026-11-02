@@ -20,6 +20,12 @@ test('PostgreSQL supports persisted drafts, selected members, attachments and ex
   assert.equal((await postgresWorkspace(pool,staff,'composition',{id},scope)).content.source,CANONICAL_SOURCE);
   const file={id:randomUUID(),name:'Safety.txt',mime:'text/plain',data:Buffer.from('Synthetic safety attachment').toString('base64')};
   await postgresWorkspace(pool,staff,'attachments',{requestId:id,file},scope);
+  const photo={id:randomUUID(),name:'Shelf.png',mime:'image/png',data:Buffer.from([137,80,78,71,13,10,26,10,1]).toString('base64'),captions:{en:'Items on the blue shelf',ar:'المنتجات على الرف الأزرق'}};
+  const uploaded=await postgresWorkspace(pool,staff,'attachments',{requestId:id,file:photo},scope);
+  assert.deepEqual(uploaded.items.find(row=>row.id===photo.id).captions,photo.captions);
+  const recaptioned=await postgresWorkspace(pool,staff,'attachments',{requestId:id,file:{id:photo.id,captions:{ur:'نیلی شیلف پر اشیاء'}}},scope);
+  assert.deepEqual(recaptioned.items.find(row=>row.id===photo.id).captions,{ur:'نیلی شیلف پر اشیاء'});
+  await assert.rejects(postgresWorkspace(pool,staff,'attachments',{requestId:id,file:{id:randomUUID(),captions:{en:'Missing photo'}}},scope),/unavailable/);
   const library=await postgresWorkspace(pool,staff,'library',{status:'draft'},scope);assert.ok(library.items.some(row=>row.id===id));
   await startInstructionSend(pool,staff,{requestId:id,...content},scope);await processOnePreparation(pool,scope);const sent=await completeInstructionSend(pool,staff,id,scope);assert.equal(sent.delivered,1);
   const assignment=(await db.query('SELECT id FROM assignments WHERE publication_id=$1',[sent.publicationId])).rows[0];
@@ -27,7 +33,7 @@ test('PostgreSQL supports persisted drafts, selected members, attachments and ex
   await acknowledgeAssignment(pool,worker,assignment.id,randomUUID(),scope);
   assert.equal((await postgresWorkspace(pool,worker,'work',{complete:assignment.id},scope)).status,'done');
   const doneLibrary=await postgresWorkspace(pool,staff,'library',{status:'done'},scope);assert.equal(doneLibrary.items[0].workCounts.done,1);
-  const files=await postgresWorkspace(pool,worker,'assignment-files',{id:assignment.id},scope);assert.equal(files.items[0].name,file.name);
+  const files=await postgresWorkspace(pool,worker,'assignment-files',{id:assignment.id},scope);assert.equal(files.items.find(row=>row.id===file.id).name,file.name);assert.deepEqual(files.items.find(row=>row.id===photo.id).captions,{ur:'نیلی شیلف پر اشیاء'});
   await assert.rejects(postgresWorkspace(pool,{...worker,principal_id:'w2'},'attachments',{requestId:id},scope),/unavailable/);
   assert.equal((await postgresWorkspace(pool,staff,'work',{workerId:'w1'},scope)).items[0].status,'done');
  }finally{await db.close();}

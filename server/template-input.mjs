@@ -29,11 +29,15 @@ export function templateContent(value) {
   return Object.fromEntries(['title','description','source','question','facts','askedFacts'].map(key=>[key,value[key]]));
 }
 export function templateFilters(input={}) {
-  if(!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).some(key=>!['search','status','page','pageSize'].includes(key))) throw new Error('Invalid template filter');
-  const {search='',status='active'}=input,page=Number(input.page ?? 1),pageSize=Number(input.pageSize ?? 20);
-  if(typeof search!=='string' || search.length>80 || !['active','archived','all'].includes(status) || !Number.isSafeInteger(page) || page<1 || page>5000
-    || !Number.isInteger(pageSize) || pageSize<1 || pageSize>100) throw new Error('Invalid template filter');
-  return {search:search.trim(),status,page,pageSize};
+  if(!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).some(key=>!['search','status','favorites','page','pageSize'].includes(key))) throw new Error('Invalid template filter');
+  const {search='',status='active',favorites='all'}=input,page=Number(input.page ?? 1),pageSize=Number(input.pageSize ?? 20);
+  if(typeof search!=='string' || search.length>80 || !['active','archived','all'].includes(status) || !['all','only'].includes(favorites)
+    || !Number.isSafeInteger(page) || page<1 || page>5000 || !Number.isInteger(pageSize) || pageSize<1 || pageSize>100) throw new Error('Invalid template filter');
+  return {search:search.trim(),status,favorites,page,pageSize};
+}
+export function templateFavoriteInput(input) {
+  if(!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).length!==1 || typeof input.favorite!=='boolean') throw new Error('Invalid template favorite request');
+  return input.favorite;
 }
 export function templateHistoryInput(input={}) {
   if(!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).some(key=>!['page','version'].includes(key))) throw new Error('Invalid template filter');

@@ -32,7 +32,7 @@ test('translated-view copy covers every worker locale without implying translate
   assertWorkerDictionary(workerPresentationText,'workerPresentationText');
   assert.deepEqual(Object.keys(workerPresentationText.en).sort(),['answer','answerNote','boundNote','check','conflict','deferred','failed',
     'hide','live','loading','notRequired','pending','prepared','providerLabel','question','ready','title','unavailable','unknown','view']);
-  assert.match(workerPresentationText.en.ready,/original briefing remains the record/);
+  assert.match(workerPresentationText.en.ready,/original instruction remains the record/);
   assert.match(workerPresentationText.en.notRequired,/already in your approved language/);
   assert.match(workerPresentationText.en.answerNote,/audio above is your original recording/);
   assert.match(workerPresentationText.en.conflict,/original is still available/);

@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
+import {evidencePhoto} from '../evidence.mjs';
 import {checkedPresentationChoices} from '../presentation-choice-input.mjs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,7 +14,7 @@ import {inspectCaseWorkflowRuntimeGuards} from './case-workflow-permissions.mjs'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const columns = {
   pilot_inquiries:'id receipt_hash request_hash content_json destination state created_at expires_at next_at attempts lease_token lease_until provider_id',
-  organizations: 'id name', sites: 'id org_id name timezone', staff: 'id org_id site_id name role active',
+  organizations: 'id name', organization_worker_ids: 'org_id prefix updated_at', sites: 'id org_id name timezone', staff: 'id org_id site_id name role active',
   staff_accounts:'id credential_staff_id active revision',staff_account_memberships:'staff_id account_id org_id site_id',
   staff_invitations:'id org_id site_id name role email_hash email_hint email_payload issuer_id issuer_revision issuer_account_revision state revision created_at expires_at',
   staff_invitation_tokens:'token_hash invitation_id generation expires_at used_at revoked_at',
@@ -22,7 +23,7 @@ const columns = {
   staff_invitation_acceptances:'token_hash request_id account_id staff_id org_id site_id kind created_at',
   workers: 'id org_id site_id code language active', crews: 'id org_id site_id name active',
   crew_memberships: 'worker_id org_id site_id crew_id joined_at',
-  briefings: 'id org_id site_id title source revision next_version state prepared_json created_at updated_at',
+  briefings: 'id org_id site_id title source revision next_version state prepared_json competency_validity_days created_at updated_at',
   draft_creations:'request_id org_id site_id briefing_id request_hash requested_by occurred_at',
   source_audio_requests:'request_id org_id site_id requested_by request_hash title generation_languages_json id sha256 bytes duration_seconds original_id original_sha256 original_bytes original_type authority_json status created_at received_at briefing_id lease_token lease_until error attempts retry_at',
   publications: 'id org_id site_id briefing_id version snapshot_json published_at state',
@@ -88,6 +89,7 @@ const columns = {
   templates:'id org_id site_id revision status created_at updated_at',
   template_versions:'template_id org_id site_id revision status content_json created_by created_at',
   template_requests:'request_id org_id site_id template_id briefing_id request_json result_json created_by created_at',
+  template_favorites:'staff_id org_id site_id template_id created_at',
   glossary_terms:'id org_id site_id term term_key source_lang target_lang revision status created_at updated_at',
   glossary_versions:'term_id org_id site_id revision status content_json created_by created_at',
   glossary_requests:'request_id org_id site_id term_id request_json result_json created_by created_at',
@@ -100,14 +102,18 @@ const columns = {
   instruction_compositions:'id org_id site_id staff_id content_json updated_at',
   instruction_attachments:'id request_id org_id site_id staff_id name mime bytes data_base64 created_at',
   assignment_completions:'assignment_id org_id site_id worker_id completed_at',
-  instruction_sends:'request_id org_id site_id briefing_id publication_request_id audience_json response_mode delivery_mode state publication_id audience_count delivered undelivered undelivered_json error request_json requested_by created_at updated_at',
+  instruction_sends:'request_id org_id site_id briefing_id publication_request_id audience_json response_mode delivery_mode evidence_mode state publication_id audience_count delivered undelivered undelivered_json error request_json requested_by created_at updated_at',
   instruction_deliveries:'request_id org_id site_id worker_id language state reason attempts assignment_id content_json content_hash updated_at',
   instruction_retries:'request_id send_request_id org_id site_id requested_by generation request_json created_at',
   acknowledgments:'request_id org_id site_id assignment_id worker_id received_at',
+  assignment_evidence:'request_id org_id site_id assignment_id worker_id mime bytes sha256 data_base64 received_at',
+  instruction_improvements:'publication_id org_id site_id briefing_id assessed matched clarification created_at',
+  instruction_improvement_drafts:'publication_id request_id org_id site_id corrective_briefing_id request_hash requested_by created_at',
   worker_language_requests:'id org_id site_id worker_id current_language requested_language reason state requested_at decided_at decided_by decision_note',
   organization_entitlements:'org_id state started_at ends_at worker_limit plan terms_reference revision updated_by updated_at',
   organization_entitlement_transitions:'org_id revision state started_at ends_at worker_limit plan terms_reference reason actor_type actor_id request_id created_at',
   organization_activation_requests:'request_id org_id site_id requested_by note entitlement_revision state created_at decided_at decided_by decision_ref',
+  worker_competencies:'id org_id site_id worker_id briefing_id publication_id assignment_id attempt_id title language source awarded_at expires_at',
 };
 const tables = Object.keys(columns);
 const omitted = ['staff_credentials', 'auth_attempts', 'push_subscriptions', 'push_deliveries'];
@@ -138,17 +144,20 @@ optional.add('assignment_reminders');
 optional.add('draft_creations');
 optional.add('source_audio_requests');
 for(const table of ['retention_policies','retention_requests','recording_purges','source_audio_purges','source_audio_retries','worker_deletion_requests','worker_deletion_redactions','worker_deletion_pseudonyms','worker_deletion_completions'])optional.add(table);
-for(const table of ['templates','template_versions','template_requests']) optional.add(table);
+for(const table of ['templates','template_versions','template_requests','template_favorites']) optional.add(table);
 for(const table of ['glossary_terms','glossary_versions','glossary_requests']) optional.add(table);
 for(const table of ['staff_access_revisions','staff_access_requests']) optional.add(table);
 for(const table of ['staff_accounts','staff_account_memberships']) optional.add(table);
 for(const table of ['staff_invitations','staff_invitation_tokens','staff_invitation_mail','staff_invitation_requests','staff_invitation_acceptances']) optional.add(table);
 optional.add('instruction_compositions');optional.add('instruction_attachments');optional.add('assignment_completions');
-optional.add('instruction_sends');optional.add('instruction_deliveries');optional.add('instruction_retries');optional.add('acknowledgments');
+optional.add('instruction_sends');optional.add('instruction_deliveries');optional.add('instruction_retries');optional.add('acknowledgments');optional.add('assignment_evidence');
 optional.add('worker_language_requests');
 optional.add('organization_entitlements');optional.add('organization_entitlement_transitions');optional.add('organization_activation_requests');
 optional.add('worker_credentials');optional.add('worker_setup_tokens');
+optional.add('organization_worker_ids');
+optional.add('instruction_improvements');optional.add('instruction_improvement_drafts');
 optional.add('presentation_artifacts');optional.add('answer_presentation_bindings');
+optional.add('worker_competencies');
 
 function snapshotRows(path) {
   const db = new DatabaseSync(path, { readOnly: true });
@@ -164,6 +173,7 @@ function snapshotRows(path) {
       }
       const fields = columns[table].split(' ');
       const actual = db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name);
+      if(table==='instruction_attachments' && actual.includes('captions_json')) fields.push('captions_json');
       if (table === 'workers') for (const field of ['name','language_selection_required','language_selected_at','language_selected_by','language_selection_request_id'])
         if (actual.includes(field)) fields.push(field);
       if (table === 'assignments' && actual.includes('language')) fields.push('language');
@@ -176,8 +186,11 @@ function snapshotRows(path) {
       if(table==='report_exports' && actual.includes('filters_json'))fields.push('filters_json');
       if(table==='recordings')for(const field of ['presentation_id','presentation_language','presented_question'])if(actual.includes(field))fields.push(field);
       if(table==='presentation_artifacts' && actual.includes('choices_json'))fields.push('choices_json');
+      if(table==='briefings' && !actual.includes('competency_validity_days'))fields.splice(fields.indexOf('competency_validity_days'),1);
+      if(table==='instruction_sends' && !actual.includes('evidence_mode'))fields.splice(fields.indexOf('evidence_mode'),1);
       if (actual.length !== fields.length || actual.some((field) => !fields.includes(field))) throw new Error('Unsupported source columns');
       result[table] = db.prepare(`SELECT ${fields.join(',')} FROM ${table} LIMIT 100001`).all();
+      if(table==='instruction_sends')for(const row of result[table])row.evidence_mode ??= 'none';
       total += result[table].length;
       if (total > 100_000) throw new Error('Synthetic migration row limit exceeded');
     }
@@ -220,6 +233,23 @@ function snapshotRows(path) {
         : (!row.decided_at || !row.decided_by || !staffIds.has(row.decided_by))) throw new Error('Invalid source language decision');
     }
     const briefings = new Map(result.briefings.map((row) => [row.id, row]));
+    const importedAttempts = new Map(result.attempts.map((row) => [row.id, row]));
+    for (const row of result.worker_competencies) {
+      const assignment=assignments.get(row.assignment_id),attempt=importedAttempts.get(row.attempt_id);
+      const publication=publications.get(row.publication_id),briefing=briefings.get(row.briefing_id);
+      const worker=workers.get(row.worker_id);
+      if(!assignment || assignment.org_id!==row.org_id || assignment.site_id!==row.site_id
+        || assignment.worker_id!==row.worker_id || assignment.language!==row.language
+        || !worker || worker.org_id!==row.org_id || worker.site_id!==row.site_id
+        || !attempt || attempt.outcome!=='matched' || attempt.assignment_id!==row.assignment_id
+        || attempt.org_id!==row.org_id || attempt.received_at!==row.awarded_at
+        || !publication || publication.org_id!==row.org_id || publication.site_id!==row.site_id
+        || publication.briefing_id!==row.briefing_id || publication.id!==assignment.publication_id
+        || !briefing || briefing.org_id!==row.org_id || briefing.site_id!==row.site_id) throw new Error('Source scope mismatch');
+      if(!['typed','audio'].includes(row.source) || typeof row.title!=='string' || !row.title.trim() || row.title.length>120
+        || !Number.isFinite(Date.parse(row.awarded_at)) || !Number.isFinite(Date.parse(row.expires_at)) || row.expires_at<=row.awarded_at)
+        throw new Error('Invalid source competency');
+    }
     const sends = new Map(result.instruction_sends.map((row) => [row.request_id, row]));
     for (const row of result.instruction_sends) {
       const briefing = briefings.get(row.briefing_id);
@@ -228,8 +258,19 @@ function snapshotRows(path) {
         const publication = publications.get(row.publication_id);
         if (!publication || publication.org_id !== row.org_id || publication.site_id !== row.site_id || publication.briefing_id !== row.briefing_id) throw new Error('Source scope mismatch');
       }
-      if (!['question','acknowledge'].includes(row.response_mode) || !['text','voice','both'].includes(row.delivery_mode)) throw new Error('Unsupported source instruction mode');
+      if (!['question','acknowledge'].includes(row.response_mode) || !['text','voice','both'].includes(row.delivery_mode)
+        || !['none','photo'].includes(row.evidence_mode) || (row.evidence_mode==='photo' && row.response_mode!=='acknowledge')) throw new Error('Unsupported source instruction mode');
       if (!Number.isSafeInteger(row.delivered) || !Number.isSafeInteger(row.undelivered) || row.delivered < 0 || row.undelivered < 0 || row.delivered + row.undelivered !== row.audience_count) throw new Error('Invalid source delivery count');
+    }
+    const acknowledgmentsByAssignment=new Map(result.acknowledgments.map((row)=>[row.assignment_id,row]));
+    for (const row of result.assignment_evidence) {
+      const acknowledgment=acknowledgmentsByAssignment.get(row.assignment_id);
+      if (!acknowledgment || acknowledgment.request_id!==row.request_id || acknowledgment.org_id!==row.org_id
+        || acknowledgment.site_id!==row.site_id || acknowledgment.worker_id!==row.worker_id) throw new Error('Source scope mismatch');
+      if (typeof row.received_at!=='string' || !row.received_at) throw new Error('Invalid source evidence photo');
+      let checked;
+      try{checked=evidencePhoto({mimeType:row.mime,data:row.data_base64});}catch{throw new Error('Invalid source evidence photo');}
+      if (!Number.isSafeInteger(row.bytes) || checked.bytes!==row.bytes || checked.sha256!==row.sha256) throw new Error('Source evidence photo mismatch');
     }
     for (const row of result.instruction_deliveries) {
       const send = sends.get(row.request_id);
@@ -345,6 +386,7 @@ function valuesFor(table, row, now) {
   if (table === 'report_exports' && copy.status === 'processing') {
     copy.status = 'queued'; copy.lease_token = null; copy.lease_until = null;
   }
+  if(table==='instruction_sends')copy.evidence_mode ??= 'none';
   if (['report_exports','worker_imports'].includes(table) && copy.expires_at <= now) {
     copy.status = 'expired';
     if (table === 'report_exports') { copy.snapshot_json = null; copy.csv = null; copy.checksum = null; copy.lease_token = null; copy.lease_until = null; copy.error = null; }

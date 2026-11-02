@@ -13,10 +13,7 @@
 .dashboard-sidebar .sidebar-link:hover{background:#233b32;color:#fff}
 .dashboard-sidebar .sidebar-link.active{background:#344b42;color:#fff;font-weight:600}
 .dashboard-sidebar .sidebar-link svg{flex:none;stroke-width:1.7}
-.sidebar-more{margin-top:24px;border-top:1px solid #34483f;padding-top:14px}
-.sidebar-more>summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:#afc3b8;padding:10px 12px;font-size:13px;list-style:none}
-.sidebar-more>summary::-webkit-details-marker,.account-disclosure>summary::-webkit-details-marker{display:none}
-.sidebar-more[open]>summary svg{transform:rotate(180deg)}
+.account-disclosure>summary::-webkit-details-marker{display:none}
 .account-disclosure{position:relative;margin-top:18px;padding-top:10px;border-top:1px solid #34483f;flex:none}
 .dashboard-sidebar .profile{display:flex;align-items:center;margin:0;padding:12px 8px;color:#f0f4f1;border:0;cursor:pointer;list-style:none;border-radius:6px}
 .dashboard-sidebar .profile:hover,.account-disclosure[open]>.profile{background:#263e34}
@@ -41,8 +38,8 @@
 .account-menu-identity{flex:1;min-width:0}
 .account-menu-name{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .account-address .account-menu-name strong{font-size:13px;line-height:1.4;color:#203a2c}
-.account-role{padding:2px 5px;background:#f0f4f1;border-radius:4px;color:#617467;font-size:10px;line-height:1.4;font-weight:500}
-.account-address .account-menu-identity small{margin-top:6px;font-size:11px;line-height:1.5;color:#6b7b71;overflow-wrap:anywhere}
+.account-role{padding:2px 5px;background:#f0f4f1;border-radius:4px;color:#52665a;font-size:11px;line-height:1.4;font-weight:500}
+.account-address .account-menu-identity small{margin-top:6px;font-size:12px;line-height:1.5;color:#5a6a60;overflow-wrap:anywhere}
 .account-actions{padding:6px}
 .account-options .account-action{gap:10px;min-height:42px;border-radius:6px;padding:10px;font-size:13px;line-height:1.4}
 .account-action>svg{stroke-width:1.6;flex:none;color:#526f5e}

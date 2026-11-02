@@ -10,9 +10,9 @@ export function selectReport(responses,version,filters,timezone,audience=[],opti
   const crews=[...new Map(audience.filter(row=>row.crew_id!==null).map(row=>[row.crew_id,{id:row.crew_id,name:row.crew_name}])).values()].sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id));
   if(filters.crewId && filters.crewId!=='@unassigned' && !crews.some(row=>row.id===filters.crewId))throw Error('Report crew unavailable');
   const assigned=responses.filter(row=>!filters.crewId || (filters.crewId==='@unassigned' ? members.get(row.assignment_id)?.crew_id===null : members.get(row.assignment_id)?.crew_id===filters.crewId));
-  const responseMode=options.responseMode || 'legacy',deliveryMode=options.deliveryMode || 'legacy',delivery=options.delivery ?? null;
+  const responseMode=options.responseMode || 'legacy',deliveryMode=options.deliveryMode || 'legacy',evidenceMode=options.evidenceMode==='photo'?'photo':'none',delivery=options.delivery ?? null;
   const resolvedIds=Array.isArray(options.resolvedAssignmentIds)?new Set(options.resolvedAssignmentIds):null;
-  const all=assigned.map(row=>activityRow(row,version,{responseMode,deliveryMode,showResolved:!!resolvedIds,resolved:!!resolvedIds?.has(row.assignment_id)})),windowed=Boolean(filters.responseFrom || filters.responseThrough);
+  const all=assigned.map(row=>activityRow(row,version,{responseMode,deliveryMode,evidenceMode,showResolved:!!resolvedIds,resolved:!!resolvedIds?.has(row.assignment_id)})),windowed=Boolean(filters.responseFrom || filters.responseThrough);
   const formatter=new Intl.DateTimeFormat('en',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'});
   const rows=windowed?all.filter(row=>{
     if(!row[4])return false;
@@ -26,8 +26,17 @@ export function selectReport(responses,version,filters,timezone,audience=[],opti
   const metrics={assigned:assigned.length,responses:received.length,matches,clarifications,unassessed:received.length-matches-clarifications-acknowledged,pending:assigned.length-received.length,completion:assigned.length?Math.round(received.length/assigned.length*100):0};
   if(acknowledged)metrics.acknowledged=acknowledged;
   if(resolved)metrics.resolved=resolved;
-  return {filters,crewSnapshotAvailable:complete,availableCrews:complete?crews:[],rows,responseMode,deliveryMode,delivery,metrics,
-    languages:WORKER_LANGUAGE_CODES.map(language=>{const count=all.filter(row=>row[1]===language).length,n=received.filter(row=>row[1]===language).length;return {language,assigned:count,received:n,completion:count?Math.round(n/count*100):0};}).filter(row=>row.assigned)};
+  const languages=WORKER_LANGUAGE_CODES.map(language=>{
+    const group=all.filter(row=>row[1]===language),answered=received.filter(row=>row[1]===language);
+    const matched=answered.filter(row=>row[3]==='matched').length;
+    const clarified=answered.filter(row=>['clarification','unassessable'].includes(row[3])).length;
+    const acknowledged=answered.filter(row=>row[2]==='acknowledged').length;
+    const assessed=matched+clarified;
+    return {language,assigned:group.length,received:answered.length,completion:group.length?Math.round(answered.length/group.length*100):0,
+      matched,clarified,acknowledged,understanding:assessed?Math.round(matched/assessed*100):null};
+  }).filter(row=>row.assigned);
+  const evidence=evidenceMode==='photo'?{required:rows.length,received:rows.filter(row=>row[row.length-2]==='received').length}:null;
+  return {filters,crewSnapshotAvailable:complete,availableCrews:complete?crews:[],rows,responseMode,deliveryMode,evidenceMode,evidence,delivery,metrics,languages};
 }
 
 export function ensureReportAudienceSchema(db) {

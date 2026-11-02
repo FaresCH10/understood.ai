@@ -6,7 +6,8 @@ import {configureRuntimePermissions,verifyRuntimePermissions,runtimeRoleName,run
 import {withTransaction} from '../server/postgres/db.mjs';
 import {databaseInventory} from '../server/postgres/backup.mjs';
 import {submitAnswer,domainTransaction} from '../server/postgres/domain.mjs';
-import {runRehearsalWorker,rehearsalTasks,runWorkerCycle} from '../server/postgres/runtime.mjs';
+import {runRehearsalWorker,rehearsalTasks,runWorkerCycle,syntheticAssessmentAdapter} from '../server/postgres/runtime.mjs';
+import {processOneInstructionImprovement} from '../server/postgres/self-healing.mjs';
 import {randomUUID} from 'node:crypto';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {changeTemplate} from '../server/postgres/templates.mjs';
@@ -186,7 +187,7 @@ test('application SQL role cannot read operator password/session material or cre
 
 test('application role retains required control reads but cannot suspend tenants, pause dispatch, change quotas or forge operator evidence',async()=>{
   const f=await fixture();try {
-    const configured=await f.configure();assert.equal(configured.writableTables,141);assert.equal(configured.readOnlyTables,14);assert.equal(configured.hiddenTables,7);
+    const configured=await f.configure();assert.equal(configured.writableTables,147);assert.equal(configured.readOnlyTables,15);assert.equal(configured.hiddenTables,7);
     const columns=(await f.db.query('SELECT table_name,column_name FROM information_schema.columns WHERE table_schema=$1 AND ordinal_position=1',[schema])).rows;
     await f.runtime();assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema}),configured);
     for(const table of ['operator_requests','provider_verifications','tenant_controls','system_controls','provider_policies','operator_audit']) {
@@ -203,7 +204,7 @@ test('worker policy is explicit and independent, never granting hidden tables or
   const application=runtimeTablePolicy(),worker=runtimeTablePolicy('worker');
   assert.equal(runtimeProfile(),'application');assert.equal(runtimeProfile('worker'),'worker');
   assert.ok(worker.every(row=>row.readable || !row.writable));
-  assert.equal(worker.filter(row=>!row.readable).length,15);
+  assert.equal(worker.filter(row=>!row.readable).length,17);
   assert.deepEqual(worker.find(row=>row.table==='clarification_action_receipts'),{table:'clarification_action_receipts',readable:false,writable:false,insertable:false});
   assert.deepEqual(worker.find(row=>row.table==='clarification_creations'),{table:'clarification_creations',readable:false,writable:false,insertable:false});
   assert.deepEqual(worker.find(row=>row.table==='worker_credentials'),{table:'worker_credentials',readable:false,writable:false,insertable:false});
@@ -219,7 +220,7 @@ test('worker policy is explicit and independent, never granting hidden tables or
 
 test('worker role rejects billing/operator reads and policy/control/admin DML using actual SQL permissions',async()=>{
   const f=await fixture();try{
-    const configured=await f.configure('worker');assert.equal(configured.profile,'worker');assert.equal(configured.hiddenTables,15);
+    const configured=await f.configure('worker');assert.equal(configured.profile,'worker');assert.equal(configured.hiddenTables,17);
     const columns=(await f.db.query('SELECT table_name,column_name FROM information_schema.columns WHERE table_schema=$1 AND ordinal_position=1',[schema])).rows;
     await f.runtime();assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema,profile:'worker'}),configured);
     await assert.rejects(verifyRuntimePermissions(f.pool,{schema}),/privileges/);
@@ -227,7 +228,8 @@ test('worker role rejects billing/operator reads and policy/control/admin DML us
       if(!policy.readable)await assert.rejects(f.db.query(`SELECT * FROM "${policy.table}"`),error=>error.code==='42501',policy.table);
       if(policy.writable)continue;
       const column=columns.find(row=>row.table_name===policy.table).column_name;
-      for(const sql of [`DELETE FROM "${policy.table}" WHERE false`,`INSERT INTO "${policy.table}" DEFAULT VALUES`,
+      if(policy.insertable)await assert.rejects(f.db.query(`INSERT INTO "${policy.table}" DEFAULT VALUES`),policy.table==='assignment_completions'?error=>error.code==='23502':policy.table==='worker_competencies'?/Competency award is invalid/:/Improvement scope or evidence mismatch/);
+      for(const sql of [`DELETE FROM "${policy.table}" WHERE false`,...(!policy.insertable?[`INSERT INTO "${policy.table}" DEFAULT VALUES`]:[]),
         `UPDATE "${policy.table}" SET "${column}"="${column}" WHERE false`])await assert.rejects(f.db.query(sql),error=>error.code==='42501',sql);
     }
     for(const table of ['provider_policies','system_controls','tenant_controls','organization_settings'])await f.db.query(`SELECT * FROM ${table}`);
@@ -236,6 +238,33 @@ test('worker role rejects billing/operator reads and policy/control/admin DML us
     await f.owner();await f.db.exec(`GRANT SELECT(id) ON invoices TO ${role}`);await f.runtime();
     await assert.rejects(verifyRuntimePermissions(f.pool,{schema,profile:'worker'}),/privileges/);
     await f.owner();await f.db.exec(`REVOKE SELECT(id) ON invoices FROM ${role};GRANT UPDATE(revision) ON provider_policies TO ${role}`);await f.runtime();
+    await assert.rejects(verifyRuntimePermissions(f.pool,{schema,profile:'worker'}),/privileges/);
+  }finally{await f.close();}
+});
+
+test('restricted worker inserts only validated improvement findings and cannot alter findings or create corrective drafts',async()=>{
+  const f=await fixture({publicationSnapshot:{question:'Where will finished and unfinished items go?',rubric:{askedFacts:['finished -> blue shelf','unfinished -> yellow shelf']}}});
+  try{
+    for(const id of ['worker-2','worker-3']){
+      await f.db.query("INSERT INTO workers(id,org_id,site_id,code,language) VALUES($1,'org','site',$1,'en')",[id]);
+      await f.db.query("INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES($1,'org','site','pub',$2,'en')",[`assignment-${id}`,id]);
+    }
+    for(const [id,assignment,text] of [
+      ['worker','assignment','Finished items go on the yellow shelf and unfinished items on the blue shelf.'],
+      ['worker-2','assignment-worker-2','Finished items go on the yellow shelf and unfinished items on the blue shelf.'],
+      ['worker-3','assignment-worker-3','Finished items go on the blue shelf and unfinished items on the yellow shelf.'],
+    ]){
+      await submitAnswer(f.pool,{principal_type:'worker',principal_id:id,org_id:'org',site_id:'site'},assignment,randomUUID(),text,{schema});
+      assert.equal(await processOneAssessment(f.pool,syntheticAssessmentAdapter,{schema}),true);
+    }
+    await f.configure('worker');await f.runtime();
+    assert.equal(await processOneInstructionImprovement(f.pool,{schema}),true);
+    assert.equal(await processOneInstructionImprovement(f.pool,{schema}),false);
+    assert.deepEqual((await f.db.query('SELECT assessed,matched,clarification FROM instruction_improvements')).rows,[{assessed:3,matched:1,clarification:2}]);
+    for(const sql of ["UPDATE instruction_improvements SET matched=0","DELETE FROM instruction_improvements","INSERT INTO instruction_improvement_drafts DEFAULT VALUES"])
+      await assert.rejects(f.db.query(sql),error=>error.code==='42501');
+    await assert.rejects(f.db.query("INSERT INTO instruction_improvements VALUES('pub','org','site','brief',3,0,3,clock_timestamp())"),/scope or evidence mismatch/);
+    await f.owner();await f.db.exec(`GRANT UPDATE ON instruction_improvements TO ${role}`);await f.runtime();
     await assert.rejects(verifyRuntimePermissions(f.pool,{schema,profile:'worker'}),/privileges/);
   }finally{await f.close();}
 });
@@ -253,7 +282,7 @@ test('worker cannot edit customer template or glossary libraries but prepares a 
     const draft=await changeTemplate(f.pool,owner,'use',template.id,{requestId:randomUUID(),confirmed:true,revision:1,title:'Synthetic library draft'},options);
     const before=await inventory();assert.ok(before.every(rows=>rows.length===1));
     await f.owner();const configured=await f.configure('worker');
-    assert.equal(configured.writableTables,111);assert.equal(configured.readOnlyTables,36);
+    assert.equal(configured.writableTables,112);assert.equal(configured.readOnlyTables,40);
     await f.runtime();assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema,profile:'worker'}),configured);
     const glossary=await withTransaction(f.pool,client=>readGlossarySnapshot(client,'org','site'));
     assert.equal(glossary.terms.length,1);
@@ -462,7 +491,7 @@ test('identity-lock migration upgrades a populated preceding schema without rewr
 test('worker identity locks preserve all staff, credentials, revisions and memberships while denying direct business writes',async()=>{
   const f=await fixture();try{
     await seedStaffIdentity(f);const before=await identityInventory(f.db);await f.configure('worker');await f.runtime();
-    assert.equal((await verifyRuntimePermissions(f.pool,{schema,profile:'worker'})).readOnlyTables,35);
+    assert.equal((await verifyRuntimePermissions(f.pool,{schema,profile:'worker'})).readOnlyTables,40);
     for(const [table,key] of Object.entries(identityLocks)){
       for(const lock of ['SHARE','UPDATE'])await withTransaction(f.pool,client=>client.query(`SELECT ${key} FROM ${table} FOR ${lock}`));
       await f.db.query(`UPDATE ${table} SET ${key}=${key}`);
@@ -554,7 +583,7 @@ test('worker organization/site row-lock grants cannot create, rename, delete or 
   try{
     await f.db.exec("INSERT INTO organizations VALUES('empty-org','Unused synthetic');INSERT INTO sites VALUES('empty-site','empty-org','Unused site','UTC')");
     const before=await inventory();await f.configure('worker');await f.runtime();
-    const configured=await verifyRuntimePermissions(f.pool,{schema,profile:'worker'});assert.equal(configured.writableTables,111);
+    const configured=await verifyRuntimePermissions(f.pool,{schema,profile:'worker'});assert.equal(configured.writableTables,112);
     await domainTransaction(f.pool,schema,async client=>{await requireTenantActive(client,'org');await requireWorkerSiteAccess(client,'org','site');});
     for(const table of ['organizations','sites']){
       await withTransaction(f.pool,client=>client.query(`SELECT id FROM ${table} ORDER BY id FOR UPDATE`));

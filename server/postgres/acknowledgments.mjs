@@ -1,9 +1,11 @@
 import {domainAudit,domainTransaction,requirePrincipal} from './domain.mjs';
 import {requireWritableEntitlement} from './entitlements.mjs';
+import {acknowledgmentEvidence} from '../evidence.mjs';
+import {assignmentEvidence} from './evidence.mjs';
 
 const uuid=(value)=>typeof value==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
-export async function acknowledgeAssignment(pool,session,assignmentId,requestId,{schema='public'}={}) {
+export async function acknowledgeAssignment(pool,session,assignmentId,requestId,{schema='public',photo}={}) {
   if(typeof assignmentId!=='string' || !assignmentId || assignmentId.length>100 || !uuid(requestId))
     throw new Error('Invalid acknowledgment request');
   return domainTransaction(pool,schema,async client=>{
@@ -15,19 +17,29 @@ export async function acknowledgeAssignment(pool,session,assignmentId,requestId,
     if(!assignment) throw new Error('Assignment unavailable');
     const old=(await client.query('SELECT request_id,received_at FROM acknowledgments WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3',
       [assignmentId,session.org_id,session.site_id])).rows[0];
-    if(old) return {id:old.request_id,receivedAt:old.received_at.toISOString(),duplicate:true};
+    if(old) {
+      const stored=await assignmentEvidence(client,session.org_id,session.site_id,assignmentId);
+      return {id:old.request_id,receivedAt:old.received_at.toISOString(),duplicate:true,...(stored?{evidence:stored}:{})};
+    }
     await requireWritableEntitlement(client,session.org_id);
     if(assignment.snapshot_json?.responseMode!=='acknowledge') throw new Error('This instruction requires an answer');
     if(assignment.state!=='published') throw new Error('Assignment unavailable');
     const now=(await client.query('SELECT clock_timestamp() AS now')).rows[0].now;
     if(assignment.due_at && assignment.due_at<=now) throw new Error('Assignment deadline passed');
+    const stored=acknowledgmentEvidence(assignment.snapshot_json,photo);
     await client.query(`INSERT INTO acknowledgments(request_id,org_id,site_id,assignment_id,worker_id,received_at)
       VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(assignment_id) DO NOTHING`,
     [requestId,session.org_id,session.site_id,assignmentId,session.principal_id,now]);
     const saved=(await client.query('SELECT request_id,received_at FROM acknowledgments WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3',
       [assignmentId,session.org_id,session.site_id])).rows[0];
-    if(saved.request_id!==requestId) return {id:saved.request_id,receivedAt:saved.received_at.toISOString(),duplicate:true};
+    if(saved.request_id!==requestId) {
+      return {id:saved.request_id,receivedAt:saved.received_at.toISOString(),duplicate:true};
+    }
+    if(stored) await client.query(`INSERT INTO assignment_evidence(request_id,org_id,site_id,assignment_id,worker_id,mime,bytes,sha256,data_base64,received_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [requestId,session.org_id,session.site_id,assignmentId,session.principal_id,stored.mime,stored.bytes,stored.sha256,stored.dataBase64,now]);
     await domainAudit(client,session,'instruction.acknowledged',assignmentId);
-    return {id:requestId,receivedAt:saved.received_at.toISOString(),duplicate:false};
+    return {id:requestId,receivedAt:saved.received_at.toISOString(),duplicate:false,
+      ...(stored?{evidence:{mime:stored.mime,bytes:stored.bytes,sha256:stored.sha256,receivedAt:saved.received_at.toISOString()}}:{})};
   });
 }

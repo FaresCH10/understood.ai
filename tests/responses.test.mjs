@@ -107,7 +107,7 @@ test('SQLite worker inbox pages all assigned versions with exact scoped todo/sen
     for(const query of ['?view=unknown','?pageSize=51','?worker_id=worker-14','?history=true']) assert.equal((await fetch(`${base}/worker/history${query}`,{headers:{cookie}})).status,400);
     const http=await (await fetch(`${base}/worker/history?page=7&pageSize=20`,{headers:{cookie}})).json();assert.equal(http.total,126);assert.equal(http.items.length,6);
     assert.equal((await (await fetch(`${base}/worker/briefings?view=sent`,{headers:{cookie}})).json()).total,2);
-    assert.equal(db.prepare('SELECT COUNT(*) n FROM audit').get().n,audit);assert.deepEqual(db.prepare('SELECT * FROM submission_receipts ORDER BY sequence').all(),before);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM audit').get().n,audit+1);assert.deepEqual(db.prepare('SELECT * FROM submission_receipts ORDER BY sequence').all(),before);
     db.prepare("UPDATE workers SET active=0 WHERE id='worker-30'").run();assert.throws(() => workerBriefings(db,worker),/Forbidden/);
   } finally {await new Promise((resolve) => server.close(resolve));db.close();await rm(root,{recursive:true,force:true});}
 });

@@ -2,7 +2,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import {NOW,transaction} from './db.mjs';
 import {briefingAuthority,briefingAudit} from './preparation.mjs';
 import {createDraftInTransaction,queuePreparationInTransaction} from './preparation.mjs';
-import {ensureInstructionSchema,INSTRUCTION_DELIVERY_MODES,INSTRUCTION_RESPONSE_MODES} from './instruction-schema.mjs';
+import {ensureInstructionSchema,INSTRUCTION_DELIVERY_MODES,INSTRUCTION_EVIDENCE_MODES,INSTRUCTION_RESPONSE_MODES} from './instruction-schema.mjs';
 import {validDeadline} from './briefing-input.mjs';
 import {generationLanguages} from './settings-input.mjs';
 import {CANONICAL_SOURCE,publishInTransaction} from './domain.mjs';
@@ -24,10 +24,11 @@ export function instructionInput(input) {
   if(!input || typeof input!=='object' || Array.isArray(input) || !uuid(input.requestId)
     || typeof input.title!=='string' || input.title.trim().length<3 || input.title.length>120
     || typeof input.source!=='string' || input.source.trim().length<10 || input.source.length>4000
-    || Object.keys(input).some((key)=>!['requestId','title','source','audience','responseMode','deliveryMode','dueAt','reminderMinutes'].includes(key)))
+    || Object.keys(input).some((key)=>!['requestId','title','source','audience','responseMode','deliveryMode','evidenceMode','dueAt','reminderMinutes'].includes(key)))
     throw new Error('Invalid instruction request');
-  const responseMode=input.responseMode ?? 'question',deliveryMode=input.deliveryMode ?? 'both';
-  if(!INSTRUCTION_RESPONSE_MODES.includes(responseMode) || !INSTRUCTION_DELIVERY_MODES.includes(deliveryMode))
+  const responseMode=input.responseMode ?? 'question',deliveryMode=input.deliveryMode ?? 'both',evidenceMode=input.evidenceMode ?? 'none';
+  if(!INSTRUCTION_RESPONSE_MODES.includes(responseMode) || !INSTRUCTION_DELIVERY_MODES.includes(deliveryMode)
+    || !INSTRUCTION_EVIDENCE_MODES.includes(evidenceMode) || (evidenceMode==='photo' && responseMode!=='acknowledge'))
     throw new Error('Invalid instruction request');
   const raw=input.audience;
   if(!raw || typeof raw!=='object' || Array.isArray(raw) || !['all','crew','members'].includes(raw.type)
@@ -43,17 +44,18 @@ export function instructionInput(input) {
   if(![0,60,1440].includes(reminderMinutes) || (reminderMinutes && dueAt===null)) throw new Error('Invalid instruction reminder');
   const audience=raw.type==='all' ? {type:'all'} : raw.type==='members'?{type:'members',workerIds:[...raw.workerIds].sort()}:{type:'crew',crewId:raw.crewId.trim()};
   const source=input.source.trim();
-  const request={title:input.title.trim(),source,audience,responseMode,deliveryMode,
+  const request={title:input.title.trim(),source,audience,responseMode,deliveryMode,evidenceMode,
     sourceHash:createHash('sha256').update(source).digest('hex')};
   if(dueAt!==null) request.dueAt=new Date(dueAt).toISOString();
   if(reminderMinutes) request.reminderMinutes=reminderMinutes;
-  return {requestId:input.requestId,audience,responseMode,deliveryMode,
+  return {requestId:input.requestId,audience,responseMode,deliveryMode,evidenceMode,
     dueAt:dueAt===null?null:new Date(dueAt).toISOString(),reminderMinutes,sourceHash:request.sourceHash,request};
 }
 
 function requestMatches(saved,request) {
   return saved?.title===request.title && saved?.source===request.source
     && saved?.responseMode===request.responseMode && saved?.deliveryMode===request.deliveryMode
+    && (saved?.evidenceMode ?? 'none')===request.evidenceMode
     && saved?.audience?.type===request.audience.type
     && (saved?.audience?.crewId ?? null)===(request.audience.crewId ?? null)
     && JSON.stringify(saved?.audience?.workerIds||[])===JSON.stringify(request.audience.workerIds||[])
@@ -91,7 +93,7 @@ function sendView(db,row,duplicate) {
   const states=deliveries.length ? deliveryStateCounts(deliveries) : null;
   const retryCandidates=deliveries.filter((delivery)=>['blocked','failed'].includes(delivery.state) && delivery.reason!=='content_expired');
   return {requestId:row.request_id,briefingId:row.briefing_id,state:row.state,
-    responseMode:row.response_mode,deliveryMode:row.delivery_mode,sourceHash:request.sourceHash ?? null,
+    responseMode:row.response_mode,deliveryMode:row.delivery_mode,evidenceMode:row.evidence_mode ?? 'none',sourceHash:request.sourceHash ?? null,
     dueAt:request.dueAt ?? null,reminderMinutes:request.reminderMinutes ?? null,
     audience:{type:audience.type,count:row.audience_count,...(audience.crewId?{crewId:audience.crewId}:{})},
     delivered:row.delivered,undelivered:row.undelivered,undeliveredReasons:JSON.parse(row.undelivered_json),
@@ -157,10 +159,10 @@ export function startInstructionSend(db,session,input) {
     queuePreparationInTransaction(db,session,value.requestId,1);
     const now=NOW(),audience={type:value.audience.type,workers,...(value.audience.crewId?{crewId:value.audience.crewId}:{})};
     db.prepare(`INSERT INTO instruction_sends
-      (request_id,org_id,site_id,briefing_id,publication_request_id,audience_json,response_mode,delivery_mode,state,
+      (request_id,org_id,site_id,briefing_id,publication_request_id,audience_json,response_mode,delivery_mode,evidence_mode,state,
        publication_id,audience_count,delivered,undelivered,undelivered_json,error,request_json,requested_by,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(value.requestId,session.org_id,session.site_id,value.requestId,
-      randomUUID(),JSON.stringify(audience),value.responseMode,value.deliveryMode,'preparing',null,workers.length,0,workers.length,'[]',null,
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(value.requestId,session.org_id,session.site_id,value.requestId,
+      randomUUID(),JSON.stringify(audience),value.responseMode,value.deliveryMode,value.evidenceMode,'preparing',null,workers.length,0,workers.length,'[]',null,
       JSON.stringify(value.request),session.principal_id,now,now);
     const insertDelivery=db.prepare(`INSERT INTO instruction_deliveries
       (request_id,org_id,site_id,worker_id,language,state,reason,attempts,assignment_id,content_json,content_hash,updated_at)

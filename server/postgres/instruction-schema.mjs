@@ -1,5 +1,9 @@
 export async function instructionModes(client,orgId,siteId,briefingId) {
-  const row=(await client.query('SELECT response_mode,delivery_mode FROM instruction_sends WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',
-    [briefingId,orgId,siteId])).rows[0];
-  return row ? {responseMode:row.response_mode,deliveryMode:row.delivery_mode} : {responseMode:'question',deliveryMode:'both'};
+  const row=(await client.query(`SELECT s.response_mode,s.delivery_mode,s.evidence_mode,b.competency_validity_days
+    FROM briefings b LEFT JOIN instruction_sends s ON s.briefing_id=b.id AND s.org_id=b.org_id AND s.site_id=b.site_id
+    WHERE b.id=$1 AND b.org_id=$2 AND b.site_id=$3`,[briefingId,orgId,siteId])).rows[0];
+  const modes=row?.response_mode
+    ? {responseMode:row.response_mode,deliveryMode:row.delivery_mode,evidenceMode:row.evidence_mode}
+    : {responseMode:'question',deliveryMode:'both',evidenceMode:'none'};
+  return Number.isSafeInteger(row?.competency_validity_days) ? {...modes,competency:{validityDays:row.competency_validity_days}} : modes;
 }

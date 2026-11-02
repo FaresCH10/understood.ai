@@ -11,7 +11,10 @@ const roles=['owner','supervisor','auditor'];
 const iso=(value) => value instanceof Date ? value.toISOString() : value;
 const id=(value) => typeof value==='string' && value.length>0 && value.length<=100;
 const caseQuery=`SELECT c.id,c.reason,c.status,c.notes,c.created_at,c.owner_staff_id,c.assignment_id,c.attempt_id,
-  w.code AS worker,a.language,a.due_at,COALESCE(${caseDeadlineOverride},r.due_at) AS case_due_at,r.escalated_at,p.id AS publication_id,p.version,p.snapshot_json->>'title' AS title,
+  w.code AS worker,a.language,a.due_at,COALESCE(${caseDeadlineOverride},r.due_at) AS case_due_at,r.escalated_at,p.id AS publication_id,p.version,
+  (SELECT p2.version FROM publications p2 WHERE p2.briefing_id=p.briefing_id AND p2.org_id=p.org_id
+    AND p2.site_id=p.site_id AND p2.state='published' ORDER BY p2.version DESC LIMIT 1) AS current_version,
+  p.snapshot_json->>'title' AS title,
   s.name AS owner_name
   FROM clarifications c JOIN assignments a ON a.id=c.assignment_id AND a.org_id=c.org_id AND a.site_id=c.site_id
   JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id

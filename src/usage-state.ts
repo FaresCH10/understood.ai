@@ -1,4 +1,5 @@
 import {usageModel,type UsageModel,type ProviderAllowance,type UsageEntitlement} from '../server/usage.mjs';
+import {isCredentialMode} from './session-state.ts';
 export type {UsageEntitlement} from '../server/usage.mjs';
 const keys=(row:unknown,list:string)=>!!row && typeof row==='object' && !Array.isArray(row) && Object.keys(row).sort().join(',')===list;
 const count=(value:unknown):value is number=>Number.isSafeInteger(value) && (value as number)>=0;
@@ -8,10 +9,10 @@ function same(a:unknown,b:unknown):boolean {
   if(!a || !b || typeof a!=='object' || typeof b!=='object' || Object.keys(a).sort().join(',')!==Object.keys(b).sort().join(','))return false;
   return Object.keys(a).every(key=>same((a as Record<string,unknown>)[key],(b as Record<string,unknown>)[key]));
 }
-export function checkedProviderAllowance(raw:unknown):ProviderAllowance {
+export function checkedProviderAllowance(raw:unknown,dataClass:'synthetic'|'real'='synthetic'):ProviderAllowance {
   const row=raw as ProviderAllowance;
   if(!keys(row,'billingVerified,dataClass,day,jobsPaused,limit,providerPaused,reason,remaining,requests,reserved,resetsAt,state,timezone')
-    || row.timezone!=='UTC' || row.dataClass!=='synthetic' || row.billingVerified!==false || !/^\d{4}-\d{2}-\d{2}$/.test(row.day)
+    || row.timezone!=='UTC' || !['synthetic','real'].includes(dataClass) || row.dataClass!==dataClass || row.billingVerified!==false || !/^\d{4}-\d{2}-\d{2}$/.test(row.day)
     || !Number.isFinite(Date.parse(`${row.day}T00:00:00.000Z`)) || new Date(`${row.day}T00:00:00.000Z`).toISOString().slice(0,10)!==row.day
     || row.resetsAt!==new Date(Date.parse(`${row.day}T00:00:00.000Z`)+86400000).toISOString()
     || ![row.limit,row.reserved,row.remaining].every(count) || row.remaining!==Math.max(0,row.limit-row.reserved)
@@ -57,7 +58,7 @@ export function checkedEntitlement(raw:unknown):UsageEntitlement {
 }
 export function checkedUsageModel(raw:unknown,mode:string|undefined,role:string|null|undefined):UsageModel {
   const row=raw as UsageModel,base='controls,denominator,entitlement,mode,period,plan,providerAllowance,publication,spend,units';
-  if(!(keys(row,base) || keys(row,'changeRequestsAvailable,'+base)) || row.mode!==mode || row.mode!=='synthetic-credential'
+  if(!(keys(row,base) || keys(row,'changeRequestsAvailable,'+base)) || row.mode!==mode || !isCredentialMode(row.mode)
     || !['owner','administrator','supervisor','auditor'].includes(role || '') || !Array.isArray(row.units) || row.units.length!==5
     || row.changeRequestsAvailable!==undefined && (typeof row.changeRequestsAvailable!=='boolean' || row.changeRequestsAvailable!==['owner','administrator','supervisor'].includes(role || '')))throw Error('Plan and usage cannot be verified.');
   const units=row.units,assigned=units[0]?.used;
@@ -65,7 +66,7 @@ export function checkedUsageModel(raw:unknown,mode:string|undefined,role:string|
   const publication=row.publication;
   if(publication!==null && (!keys(publication,'id,state,version') || typeof publication.id!=='string' || !publication.id || publication.id.length>100 || /[\x00-\x1f\x7f]/.test(publication.id)
     || !Number.isSafeInteger(publication.version) || publication.version<1 || publication.state!=='published'))throw Error('Usage publication cannot be verified.');
-  const providerAllowance=row.providerAllowance===null?null:checkedProviderAllowance(row.providerAllowance);
+  const providerAllowance=row.providerAllowance===null?null:checkedProviderAllowance(row.providerAllowance,row.mode==='live-credential'?'real':'synthetic');
   const entitlement=checkedEntitlement(row.entitlement);
   const expected=usageModel({mode:row.mode,metrics:{assigned,responses:units[1].used,matches:units[2].used,clarifications:units[3].used,pending:units[4].used},latestPublication:publication,providerAllowance,entitlement});
   if(row.changeRequestsAvailable!==undefined)expected.changeRequestsAvailable=row.changeRequestsAvailable;

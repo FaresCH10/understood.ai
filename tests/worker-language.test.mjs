@@ -170,7 +170,7 @@ test('worker language HTTP routes persist first selection, fence stale contexts 
     const session=await (await call('/session',cookie)).json();contexts.set(cookie,session.clientContext);return {cookie,session};};
   try{
     const ownerLogin=await login(db.prepare("SELECT * FROM staff WHERE id='maya'").get());
-    const createdResponse=await call('/people/workers',ownerLogin.cookie,{code:'Worker 500',name:'Nadia Fares'});
+    const createdResponse=await call('/people/workers',ownerLogin.cookie,{code:'Worker 500',name:'Nadia Fares',password:'Assigned synthetic password 500'});
     assert.equal(createdResponse.status,201);
     const created=await createdResponse.json();
     assert.equal(created.name,'Nadia Fares');assert.equal(created.language_selected,false);

@@ -15,6 +15,7 @@ import {instructionModes} from './instruction-schema.mjs';
 import {checkedPresentationBinding,recordPresentationBinding} from './presentations.mjs';
 import {requireWritableEntitlement} from './entitlements.mjs';
 import {recordWorkerEvent,staffAuditOnce} from './notification-events.mjs';
+import {awardCompetency} from './competencies.mjs';
 
 export const CANONICAL_SOURCE = 'Put finished items on the blue shelf. Put unfinished items on the yellow shelf. Leave the walkway clear.';
 export const QUESTION = 'Where will you put finished and unfinished items?';
@@ -247,6 +248,8 @@ export function submitAnswer(db, session, assignmentId, submissionId, answerText
       .run(session.org_id, assignmentId, submissionId, 'typed', now);
     db.prepare('INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?)').run(id, session.org_id, assignmentId, submissionId, answerText.trim(), result.outcome, JSON.stringify(result.reasons), now);
     recordPresentationBinding(db,id,presentation,now);
+    if (result.outcome === 'matched')
+      awardCompetency(db,{orgId:session.org_id,siteId:session.site_id,workerId:session.principal_id,assignmentId,attemptId:id,source:'typed'});
     if (result.outcome !== 'matched') {
       const caseId=randomUUID();
       db.prepare('INSERT INTO clarifications VALUES (?,?,?,?,?,?,?,?,?)').run(caseId, session.org_id, assignmentId, id, result.reasons[0], null, 'open', '', now);

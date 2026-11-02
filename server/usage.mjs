@@ -40,9 +40,9 @@ export function usageModel({ mode = 'synthetic-credential', metrics = null, late
     period: { label: 'Latest published briefing activity', startsAt: null, endsAt: null, reset: 'Not configured' },
     denominator: 'Assigned workers in this publication; these counts are not plan quotas.',
     units,
-    spend: { estimated: { state: 'unknown', currency: 'USD', amount: null, evidence: 'No provider rate card or billable inference was used.' }, actual: { state: 'unknown', amount: null, evidence: 'Actual provider spend is unavailable until a verified provider and budget are configured.' } },
+    spend: { estimated: { state: 'unknown', currency: 'USD', amount: null, evidence: synthetic?'No provider rate card or billable inference was used.':'Provider rate-card estimates are not configured.' }, actual: { state: 'unknown', amount: null, evidence: synthetic?'Actual provider spend is unavailable until a verified provider and budget are configured.':'Verified provider invoices have not been connected.' } },
     controls: { quota: providerAllowance ? {state:'enforced',evidence:'Default-closed global and organization UTC request-slot admission policies are enforced; reservations are not invoices.'}
-      : { state: 'not_configured', evidence: 'No live quota is enforced in this synthetic environment.' },
+      : { state: 'not_configured', evidence: synthetic?'No live quota is enforced in this synthetic environment.':'No provider request-slot policy is configured.' },
       pause: providerAllowance ? {state:'operator_managed',jobsPaused:providerAllowance.jobsPaused,providerPaused:providerAllowance.providerPaused,evidence:'Pause decisions are operator-managed. Customer access is read-only.'}
       : { state: 'unavailable', evidence: 'Provider job pause controls require a configured production integration.' } },
     publication: latestPublication ? { id: latestPublication.id, version: latestPublication.version, state: latestPublication.state } : null,

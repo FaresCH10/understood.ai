@@ -188,7 +188,7 @@ test('PostgreSQL worker language HTTP routes persist selection, fence stale cont
     const grant=await issueWorkerGrant(pool,owner,created.id,30,options);
     await withHttp(f,async({request,base})=>{
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password})));
-      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'HTTP 500',password:'Assigned synthetic worker password'})));
+      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       const before=await (await request('/session',workerCookie)).json();
       assert.equal(before.name,'Nadia Fares');
       assert.equal(before.role,'worker');
@@ -254,7 +254,7 @@ test('PostgreSQL worker language HTTP routes persist selection, fence stale cont
         headers:{'x-client-session-context':beforeDecision.clientContext}});
       assert.equal(staleAfterApproval.status,409);
       assert.equal((await request('/worker/language/requests',workerCookie,post({requestId:randomUUID(),language:'en'}))).status,200);
-      const createdByStaff=await request('/people/workers',staff,post({code:'HTTP 502',name:'No Language'}));
+      const createdByStaff=await request('/people/workers',staff,post({code:'HTTP 502',name:'No Language',password:'Synthetic 502 password'}));
       assert.equal(createdByStaff.status,201);
       const createdBody=await createdByStaff.json();
       assert.equal(createdBody.language_selection_required,true);assert.equal(createdBody.language_selected,false);

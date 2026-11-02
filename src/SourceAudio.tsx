@@ -1,9 +1,11 @@
+import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useRef,useState} from 'react';
 import {Mic,Pause,Play,Square,Upload,Trash2,X} from 'lucide-react';
 import {checkSourceAudio,prepareSourceAudio,SOURCE_AUDIO_MAX_BYTES,type PreparedSourceAudio} from './source-audio';
 
 type Phase='idle'|'requesting'|'recording'|'preparing'|'preview';
 export default function SourceAudio({disabled,onChange,onActivityChange,mode='record'}:{disabled:boolean;onChange:(value:PreparedSourceAudio|null)=>void;onActivityChange:(active:boolean)=>void;mode?:'record'|'upload'}) {
+  const staffT=useStaffStaticText();
   const [phase,setPhase]=useState<Phase>('idle'),[error,setError]=useState(''),[url,setUrl]=useState(''),[seconds,setSeconds]=useState(0),[paused,setPaused]=useState(false);
   const current=useRef<Phase>('idle'),mounted=useRef(false),generation=useRef(0),recorder=useRef<MediaRecorder|null>(null),stream=useRef<MediaStream|null>(null);
   const preview=useRef(''),prepared=useRef<PreparedSourceAudio|null>(null),decode=useRef<AbortController|null>(null),started=useRef(0),elapsedBefore=useRef(0);
@@ -100,16 +102,16 @@ export default function SourceAudio({disabled,onChange,onActivityChange,mode='re
   const stopRecording=useRef<()=>void>(()=>{}),locked=disabled || !['idle','preview'].includes(phase);
   const clock=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
   return <div className={`source-audio source-audio-${mode}`}>
-    {url && <label className="field">Source audio preview<audio controls src={url}/><span>{prepared.current?.durationSeconds.toFixed(1)} seconds</span></label>}
-    {error && <p className="record-error" role="alert">{error}</p>}
-    {phase==='requesting' && <p role="status">Waiting for microphone permission...</p>}{phase==='preparing' && <p role="status">Preparing source audio...</p>}
-    {phase==='recording' && <div className="source-recording" role="status"><span className="source-wave" aria-hidden="true">{[9,16,25,34,19,28,40,22,31,17,26,38,20,12,24,33,18,27,14,21,10].map((height,index)=><i key={index} style={{height}} className={paused||index>13?'muted':''}/>)}</span><strong>{clock}</strong><small>{paused?'Paused':'Recording...'} · 90s maximum</small></div>}
+    {url && <label className="field">{staffT("Source audio preview")}<audio controls src={url}/><span>{prepared.current?.durationSeconds.toFixed(1)} {staffT("seconds")}</span></label>}
+    {error && <p className="record-error" role="alert">{staffT.error(error)}</p>}
+    {phase==='requesting' && <p role="status">{staffT("Waiting for microphone permission...")}</p>}{phase==='preparing' && <p role="status">{staffT("Preparing source audio...")}</p>}
+    {phase==='recording' && <div className="source-recording" role="status"><span className="source-wave" aria-hidden="true">{[9,16,25,34,19,28,40,22,31,17,26,38,20,12,24,33,18,27,14,21,10].map((height,index)=><i key={index} style={{height}} className={paused||index>13?'muted':''}/>)}</span><strong>{clock}</strong><small>{paused?staffT("Paused"):staffT("Recording...")} {staffT("· 90s maximum")}</small></div>}
     <div className="actions">
-      {phase==='recording'?<>{paused?<button type="button" className="button outline" onClick={resume}><Play size={18}/>Resume</button>:<button type="button" className="button outline" onClick={pause}><Pause size={18}/>Pause</button>}<button type="button" className="button primary" onClick={()=>stopRecording.current()}><Square size={18}/>Finish recording</button></>:mode==='record'?<button type="button" className="button primary" disabled={locked} onClick={()=>void start()}><Mic size={18}/>Record source</button>:<label className={`button primary source-file${locked?' disabled':''}`}><Upload size={18}/>Choose audio file<input aria-label="Choose source audio file" type="file" accept="audio/*" disabled={locked} onChange={event=>{const file=event.target.files?.[0];event.target.value='';void upload(file);}}/></label>}
-      {mode==='record' && phase!=='recording' && <label className={`button outline source-file${locked?' disabled':''}`}><Upload size={18}/>Choose a file instead<input aria-label="Choose source audio file" type="file" accept="audio/*" disabled={locked} onChange={event=>{const file=event.target.files?.[0];event.target.value='';void upload(file);}}/></label>}
-      {['requesting','recording','preparing'].includes(phase) && <button type="button" className="button outline" onClick={cancel}><X size={18}/>Cancel audio capture</button>}
-      {url && !locked && <button type="button" className="button outline" onClick={discard}><Trash2 size={18}/>Discard source audio</button>}
+      {phase==='recording'?<>{paused?<button type="button" className="button outline" onClick={resume}><Play size={18}/>{staffT("Resume")}</button>:<button type="button" className="button outline" onClick={pause}><Pause size={18}/>{staffT("Pause")}</button>}<button type="button" className="button primary" onClick={()=>stopRecording.current()}><Square size={18}/>{staffT("Finish recording")}</button></>:mode==='record'?<button type="button" className="button primary" disabled={locked} onClick={()=>void start()}><Mic size={18}/>{staffT("Record source")}</button>:<label className={`button primary source-file${locked?' disabled':''}`}><Upload size={18}/>{staffT("Choose audio file")}<input aria-label={staffT("Choose source audio file")} type="file" accept="audio/*" disabled={locked} onChange={event=>{const file=event.target.files?.[0];event.target.value='';void upload(file);}}/></label>}
+      {mode==='record' && phase!=='recording' && <label className={`button outline source-file${locked?' disabled':''}`}><Upload size={18}/>{staffT("Choose a file instead")}<input aria-label={staffT("Choose source audio file")} type="file" accept="audio/*" disabled={locked} onChange={event=>{const file=event.target.files?.[0];event.target.value='';void upload(file);}}/></label>}
+      {['requesting','recording','preparing'].includes(phase) && <button type="button" className="button outline" onClick={cancel}><X size={18}/>{staffT("Cancel audio capture")}</button>}
+      {url && !locked && <button type="button" className="button outline" onClick={discard}><Trash2 size={18}/>{staffT("Discard source audio")}</button>}
     </div>
-    {mode==='record' && !url && phase!=='recording' && <p className="source-audio-hint">You can edit the transcript before AI processing.</p>}
+    {mode==='record' && !url && phase!=='recording' && <p className="source-audio-hint">{staffT("You can edit the transcript before AI processing.")}</p>}
   </div>;
 }

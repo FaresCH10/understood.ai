@@ -21,3 +21,7 @@ artifacts/
 !.env.*.example
 deploy/runtime/
 .neon
+
+privacy-site/
+scripts/.ui-*
+scripts/.vite-audit.config.ts

@@ -1,3 +1,4 @@
+import {useStaffText as useStaffStaticText} from './staff-language';
 import {lazy,Suspense,useState} from 'react';
 import {RefreshCw,Save,TriangleAlert} from 'lucide-react';
 import {readPendingRetention,storePendingRetention,clearPendingRetention,verifyRetentionReceipt,type RetentionChange} from './retention-recovery';
@@ -23,6 +24,7 @@ const policy:PolicyDefinition<Retention,Change>={
   }
 };
 export function RetentionSettings({authority}:{authority:StaffRequestAuthority}){
+  const staffT=useStaffStaticText();
   const [days,setDays]=useState(30),[confirmed,setConfirmed]=useState(false);
   const {data,pending,saving,loading:recoveryBlocked,error,saved,setSaved,refresh,save:savePolicy}=usePolicySettings(authority,policy,(value,restored)=>{setDays(restored?.audioDays ?? value.audioDays ?? 30);setConfirmed(false);});
   async function save(){
@@ -31,25 +33,25 @@ export function RetentionSettings({authority}:{authority:StaffRequestAuthority})
     setConfirmed(false);await savePolicy(change);
   }
   return <>
-    <div className="page-header"><div><h1>Privacy &amp; retention</h1><p>Manage server data retention for this site.</p></div><button className="icon-button" title="Refresh retention status" aria-label="Refresh retention status" disabled={saving} onClick={refresh}><RefreshCw size={20}/></button></div>
-    {error&&<p className="record-error" role="alert">{error}</p>}
-    {saved&&<p role="status">Audio retention policy saved. Cleanup runs through scheduled jobs.</p>}
-    {!data?<p role="status">Loading retention settings...</p>:<>
-      <section className="panel"><h2>Audio retention</h2><p className="muted">Current policy: {data.audioDays===null?'Not configured':`${data.audioDays} days`}</p>
-        <label className="field"><span>Keep server audio for</span><select value={days} disabled={!data.canWrite || saving || recoveryBlocked || !!pending} onChange={event=>{setDays(Number(event.target.value));setConfirmed(false);setSaved(false);}}>{data.audioOptions.map(value=><option key={value} value={value}>{value} days</option>)}</select></label>
-        {pending&&<p role="status">The original policy save is unconfirmed. Refresh checks its receipt without resending.</p>}
-        {data.canWrite&&<><label className="retention-confirm"><input type="checkbox" checked={confirmed} disabled={saving || recoveryBlocked} onChange={event=>setConfirmed(event.target.checked)}/>I understand that expired worker recordings and supervisor source audio will be removed from the current application storage view, including existing audio. Provider history, backups and device caches are not verified as erased.</label><button className="button primary" disabled={saving || !confirmed || recoveryBlocked} onClick={()=>void save()}><Save size={18}/>{saving?'Saving...':pending?'Retry policy save':'Save policy'}</button></>}
+    <div className="page-header"><div><h1>{staffT("Privacy & retention")}</h1><p>{staffT("Manage server data retention for this site.")}</p></div><button className="icon-button" title={staffT("Refresh retention status")} aria-label={staffT("Refresh retention status")} disabled={saving} onClick={refresh}><RefreshCw size={20}/></button></div>
+    {error&&<p className="record-error" role="alert">{staffT.error(error)}</p>}
+    {saved&&<p role="status">{staffT("Audio retention policy saved. Cleanup runs through scheduled jobs.")}</p>}
+    {!data?<p role="status">{staffT("Loading retention settings...")}</p>:<>
+      <section className="panel"><h2>{staffT("Audio retention")}</h2><p className="muted">{staffT("Current policy:")} {data.audioDays===null?staffT("Not configured"):staffT("{p0} days",{p0:data.audioDays})}</p>
+        <label className="field"><span>{staffT("Keep server audio for")}</span><select value={days} disabled={!data.canWrite || saving || recoveryBlocked || !!pending} onChange={event=>{setDays(Number(event.target.value));setConfirmed(false);setSaved(false);}}>{data.audioOptions.map(value=><option key={value} value={value}>{value} {staffT("days")}</option>)}</select></label>
+        {pending&&<p role="status">{staffT("The original policy save is unconfirmed. Refresh checks its receipt without resending.")}</p>}
+        {data.canWrite&&<><label className="retention-confirm"><input type="checkbox" checked={confirmed} disabled={saving || recoveryBlocked} onChange={event=>setConfirmed(event.target.checked)}/>{staffT("I understand that expired worker recordings and supervisor source audio will be removed from the current application storage view, including existing audio. Provider history, backups and device caches are not verified as erased.")}</label><button className="button primary" disabled={saving || !confirmed || recoveryBlocked} onClick={()=>void save()}><Save size={18}/>{saving?staffT("Saving..."):pending?staffT("Retry policy save"):staffT("Save policy")}</button></>}
       </section>
-      <section className="panel"><h2>Audio cleanup jobs</h2><dl className="retention-jobs"><div><dt>Queued</dt><dd>{data.jobs.queued || 0}</dd></div><div><dt>Processing</dt><dd>{data.jobs.processing || 0}</dd></div><div><dt>Completed</dt><dd>{data.jobs.complete || 0}</dd></div></dl></section>
-      <section className="panel"><h2>Source audio cleanup jobs</h2><dl className="retention-jobs"><div><dt>Queued</dt><dd>{data.sourceJobs?.queued || 0}</dd></div><div><dt>Processing</dt><dd>{data.sourceJobs?.processing || 0}</dd></div><div><dt>Completed</dt><dd>{data.sourceJobs?.complete || 0}</dd></div></dl></section>
-      {data.textRetentionAvailable&&<Suspense fallback={<p role="status">Loading text retention settings...</p>}><TextRetentionSettings authority={authority}/></Suspense>}
-      {data.caseRetentionAvailable&&<Suspense fallback={<p role="status">Loading case retention settings...</p>}><TextRetentionSettings authority={authority} category="case"/></Suspense>}
-      {data.generatedRetentionAvailable&&<Suspense fallback={<p role="status">Loading generated audio retention settings...</p>}><TextRetentionSettings authority={authority} category="generated"/></Suspense>}
-      {data.activityRetentionAvailable&&<Suspense fallback={<p role="status">Loading activity retention settings...</p>}><TextRetentionSettings authority={authority} category="activity"/></Suspense>}
-      {data.briefingRetentionAvailable&&<Suspense fallback={<p role="status">Loading instruction retention settings...</p>}><TextRetentionSettings authority={authority} category="briefing"/></Suspense>}
-      <Suspense fallback={<p role="status">Loading recording notice...</p>}><RecordingNoticeSettings authority={authority}/></Suspense>
-      {data.canWrite&&<Suspense fallback={<p role="status">Loading worker data requests...</p>}><PrivacyWorkers authority={authority}/></Suspense>}
-      <div className="notice notice-amber"><TriangleAlert size={22}/><span>{data.limitations}</span></div>
+      <section className="panel"><h2>{staffT("Audio cleanup jobs")}</h2><dl className="retention-jobs"><div><dt>{staffT("Queued")}</dt><dd>{data.jobs.queued || 0}</dd></div><div><dt>{staffT("Processing")}</dt><dd>{data.jobs.processing || 0}</dd></div><div><dt>{staffT("Completed")}</dt><dd>{data.jobs.complete || 0}</dd></div></dl></section>
+      <section className="panel"><h2>{staffT("Source audio cleanup jobs")}</h2><dl className="retention-jobs"><div><dt>{staffT("Queued")}</dt><dd>{data.sourceJobs?.queued || 0}</dd></div><div><dt>{staffT("Processing")}</dt><dd>{data.sourceJobs?.processing || 0}</dd></div><div><dt>{staffT("Completed")}</dt><dd>{data.sourceJobs?.complete || 0}</dd></div></dl></section>
+      {data.textRetentionAvailable&&<Suspense fallback={<p role="status">{staffT("Loading text retention settings...")}</p>}><TextRetentionSettings authority={authority}/></Suspense>}
+      {data.caseRetentionAvailable&&<Suspense fallback={<p role="status">{staffT("Loading case retention settings...")}</p>}><TextRetentionSettings authority={authority} category="case"/></Suspense>}
+      {data.generatedRetentionAvailable&&<Suspense fallback={<p role="status">{staffT("Loading generated audio retention settings...")}</p>}><TextRetentionSettings authority={authority} category="generated"/></Suspense>}
+      {data.activityRetentionAvailable&&<Suspense fallback={<p role="status">{staffT("Loading activity retention settings...")}</p>}><TextRetentionSettings authority={authority} category="activity"/></Suspense>}
+      {data.briefingRetentionAvailable&&<Suspense fallback={<p role="status">{staffT("Loading instruction retention settings...")}</p>}><TextRetentionSettings authority={authority} category="briefing"/></Suspense>}
+      <Suspense fallback={<p role="status">{staffT("Loading recording notice...")}</p>}><RecordingNoticeSettings authority={authority}/></Suspense>
+      {data.canWrite&&<Suspense fallback={<p role="status">{staffT("Loading worker data requests...")}</p>}><PrivacyWorkers authority={authority}/></Suspense>}
+      <div className="notice notice-amber"><TriangleAlert size={22}/><span>{staffT(data.limitations)}</span></div>
     </>}
   </>;
 }

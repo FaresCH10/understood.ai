@@ -12,7 +12,7 @@ import { processOneAssessment } from '../server/postgres/assessment-worker.mjs';
 import { receiveRecording,getRecording,getRecordingAudio,expireStagedRecording } from '../server/postgres/recordings.mjs';
 import { processOneRecording } from '../server/postgres/recording-worker.mjs';
 import { createDraft,editDraft,queuePreparation,processOnePreparation,copyDraft,archiveBriefing } from '../server/postgres/preparation.mjs';
-import { listBriefings,getBriefing,workerBriefings,workerBriefing,sessionContext,staffOverview,listProcessing,getProcessing } from '../server/postgres/read-models.mjs';
+import { listBriefings,getBriefing,workerBriefings,workerBriefing,sessionContext,staffOverview,attentionPage,listProcessing,getProcessing } from '../server/postgres/read-models.mjs';
 import {listPublicationHistory,getPublicationHistoryDetail} from '../server/postgres/publication-history.mjs';
 import { createPostgresRehearsalServer } from '../server/postgres/http.mjs';
 import { provisionStaffCredential,issueWorkerGrant,redeemWorkerGrant,requireSession } from '../server/postgres/auth.mjs';
@@ -103,7 +103,7 @@ test('PostgreSQL exact worker receipt lookup reauthorizes, minimizes fields and 
     await assert.rejects(workerRequestReceipt(pool,worker,assignment,'other',typedId,options),/Invalid response filter/);
     assert.equal(await snapshot(),before);
     await withHttp(f,async({request})=>{
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       const clientContext=(await (await request('/session',member)).json()).clientContext;
       const beforeReads=await snapshot();
       for(const [kind,requestId] of [['answer',typedId],['help',helpId],['audio',audioId]]){
@@ -158,7 +158,7 @@ test('PostgreSQL draft copy preserves evidence, rolls back, and replays after lo
     await provisionStaffCredential(pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password:'long-enough-password'},options);
     await withHttp(f,async({request})=>{
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const grant=await issueWorkerGrant(pool,owner,'w1',30,options),workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const grant=await issueWorkerGrant(pool,owner,'w1',30,options),workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       const payload={requestId:randomUUID(),revision:2,title:'HTTP draft copy',confirmed:true};
       assert.equal((await request('/briefings/brief/copy',null,post(payload))).status,401);
       assert.equal((await request('/briefings/brief/copy',workerCookie,post(payload))).status,403);
@@ -289,7 +289,7 @@ test('PostgreSQL archive preserves received answers, closes new work and safely 
     await provisionStaffCredential(pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password:'long-enough-password'},options);
     await withHttp(f,async({request})=>{
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const grant=await issueWorkerGrant(pool,owner,'w1',30,options),workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const grant=await issueWorkerGrant(pool,owner,'w1',30,options),workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       const payload={requestId:randomUUID(),revision:1,nextVersion:1,reason:'HTTP archive',confirmed:true},path=`/briefings/${copy.id}/archive`;
       assert.equal((await request(path,null,post(payload))).status,401);assert.equal((await request(path,workerCookie,post(payload))).status,403);
       assert.equal((await request('/briefings/missing/archive',staff,post(payload))).status,404);
@@ -385,7 +385,7 @@ test('PostgreSQL response drilldown isolates exact publication and paged receipt
       assert.equal((await request(`${directoryPath}?status=all`,staff)).status,400);assert.equal((await request(`${directoryPath}?pageSize=51`,staff)).status,400);
       assert.equal((await (await request(`${directoryPath}?page=2&pageSize=1`,staff)).json()).items[0].publicationId,pub.id);
       const grant=await issueWorkerGrant(pool,owner,'w1',60,options);
-      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       const ownPath=`/worker/briefings/${assignment}/submissions`;
       assert.equal((await request(ownPath,staff)).status,403);assert.equal((await request(`${ownPath}?status=all`,workerCookie)).status,400);
       const result=await (await request(`${ownPath}?pageSize=1`,workerCookie)).json();assert.equal(result.total,3);assert.equal(result.assignment.state,'superseded');assert.ok(!/rubric|reasons|evidence|notes|sequence/.test(JSON.stringify(result)));
@@ -464,7 +464,7 @@ test('PostgreSQL worker inbox pages beyond 100 versions, keeps closed sent answe
     await assert.rejects(workerBriefings(pool,{...worker,access_mode:'credential',grant_id:'revoked'},options),/Sign in required/);
     const grant=await issueWorkerGrant(pool,owner,'w1',60,options);
     await withHttp(f,async ({request}) => {
-      const cookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const cookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       for(const query of ['?view=unknown','?pageSize=51','?worker_id=wb','?history=true']) assert.equal((await request(`/worker/history${query}`,cookie)).status,400);
       const result=await (await request('/worker/history?page=7&pageSize=20',cookie)).json();assert.equal(result.total,126);assert.equal(result.items.length,6);
       assert.equal((await (await request('/worker/briefings?view=sent',cookie)).json()).total,2);
@@ -511,7 +511,7 @@ test('PostgreSQL withdrawal is scoped, atomic, exactly replayed and preserves pe
     const grant=await issueWorkerGrant(pool,owner,'w1',30,options);
     await withHttp(f,async ({request}) => {
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       assert.equal((await request('/briefings/brief/withdraw',null,post(input))).status,401);
       assert.equal((await request('/briefings/brief/withdraw',member,post(input))).status,403);
       assert.equal((await request('/briefings/brief/withdraw',staff,post({...input,reason:''}))).status,400);
@@ -528,13 +528,59 @@ test('PostgreSQL withdrawal is scoped, atomic, exactly replayed and preserves pe
 test('PostgreSQL overview and preparation queue report scoped live evidence, exact frozen titles and current civil date',async () => {
   const f=await fixture(),{db,pool}=f;
   try {
-    assert.equal((await staffOverview(pool,owner,options)).metrics.assigned,0);
+    const empty=await staffOverview(pool,owner,options);
+    assert.equal(empty.metrics.assigned,0); assert.equal(empty.attention.total,0);
     const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id);
+    let overview=await staffOverview(pool,owner,options);
+    assert.equal(overview.attention.total,2); assert.equal(overview.attention.waiting.total,2);
+    assert.equal(overview.attention.needsAttention.total,0); assert.equal(overview.attention.delivery.total,0);
+    assert.deepEqual(overview.attention.waiting.items.map((item)=>item.worker).sort(),['001','002']);
+    assert.ok(overview.attention.waiting.items.every((item)=>item.title===overview.publication.title && item.briefingId==='brief'));
+    const waitingFirst=await attentionPage(pool,owner,{group:'waiting',page:1,pageSize:1},options);
+    const waitingSecond=await attentionPage(pool,owner,{group:'waiting',page:2,pageSize:1},options);
+    assert.equal(waitingFirst.total,2);
+    assert.equal(waitingFirst.items.length,1);
+    assert.equal(waitingSecond.items.length,1);
+    assert.notEqual(waitingFirst.items[0].assignmentId,waitingSecond.items[0].assignmentId);
+    assert.equal(waitingFirst.items[0].title,overview.publication.title);
+    await assert.rejects(attentionPage(pool,worker,{group:'waiting',page:1},options),/Forbidden/);
+    await assert.rejects(attentionPage(pool,owner,{group:'clarifications',page:1},options),/Invalid attention filter/);
+    assert.equal((await attentionPage(pool,{...owner,principal_id:'other',org_id:'b',site_id:'b'},{group:'waiting',page:1},options)).total,0);
     await submitAnswer(pool,worker,assignment,'overview-answer','Finished blue',options);
-    let overview=await staffOverview(pool,owner,options); assert.equal(overview.metrics.responses,1); assert.equal(overview.metrics.unassessed,1); assert.equal(overview.metrics.pending,1);
+    overview=await staffOverview(pool,owner,options); assert.equal(overview.metrics.responses,1); assert.equal(overview.metrics.unassessed,1); assert.equal(overview.metrics.pending,1);
+    assert.equal(overview.attention.waiting.total,1);
     await processOneAssessment(pool,{async assess() {return {outcome:'clarification',reasons:['missing_asked_fact'],evidence:[]};}},options);
     await db.query("UPDATE briefings SET title='Changed draft' WHERE id='brief'");
     overview=await staffOverview(pool,owner,options); assert.equal(overview.metrics.clarifications,1); assert.equal(overview.cases.length,1); assert.notEqual(overview.cases[0].title,'Changed draft');
+    assert.equal(overview.attention.needsAttention.total,1);
+    assert.equal(overview.attention.needsAttention.items[0].title,overview.cases[0].title);
+    assert.equal(overview.attention.waiting.total,1); assert.equal(overview.attention.total,2);
+    const frozenTitle=overview.attention.needsAttention.items[0].title,sendId=randomUUID();
+    await db.query(`INSERT INTO instruction_sends(request_id,org_id,site_id,briefing_id,publication_request_id,audience_json,
+      response_mode,delivery_mode,state,publication_id,audience_count,delivered,undelivered,undelivered_json,request_json,
+      requested_by,created_at,updated_at) VALUES($1,'a','a','brief',$2,$3,'question','text','published',$4,2,1,1,$5,$6,'owner',now(),now())`,
+      [sendId,randomUUID(),JSON.stringify({type:'all'}),pub.id,JSON.stringify([{reason:'language_unavailable',language:'ur',count:1}]),JSON.stringify({briefingId:'brief'})]);
+    overview=await staffOverview(pool,owner,options);
+    assert.equal(overview.attention.delivery.total,1); assert.equal(overview.attention.total,3);
+    assert.equal(overview.attention.delivery.items[0].requestId,sendId);
+    assert.equal(overview.attention.delivery.items[0].title,frozenTitle);
+    assert.deepEqual(overview.attention.delivery.items[0].reasons,[{reason:'language_unavailable',language:'ur',count:1}]);
+    assert.ok(!/error|request_json|undelivered_json|requested_by/.test(JSON.stringify(overview.attention.delivery)));
+    const deliveryPage=await attentionPage(pool,owner,{group:'delivery',page:1},options);
+    assert.equal(deliveryPage.total,1);
+    assert.equal(deliveryPage.items[0].requestId,sendId);
+    assert.equal(deliveryPage.items[0].title,frozenTitle);
+    assert.deepEqual(deliveryPage.items[0].reasons,[{reason:'language_unavailable',language:'ur',count:1}]);
+    assert.ok(!/error|request_json|undelivered_json|requested_by/.test(JSON.stringify(deliveryPage)));
+    const queuedDraft=await createDraft(pool,owner,{requestId:randomUUID(),title:'Queued send draft',source:CANONICAL_SOURCE},options);
+    const preparingSend=randomUUID();
+    await db.query(`INSERT INTO instruction_sends(request_id,org_id,site_id,briefing_id,publication_request_id,audience_json,
+      response_mode,delivery_mode,state,publication_id,audience_count,delivered,undelivered,undelivered_json,request_json,
+      requested_by,created_at,updated_at) VALUES($1,'a','a',$2,$3,$4,'question','text','preparing',NULL,2,0,2,'[]',$5,'owner',now(),now())`,
+      [preparingSend,queuedDraft.id,randomUUID(),JSON.stringify({type:'all'}),JSON.stringify({briefingId:queuedDraft.id})]);
+    overview=await staffOverview(pool,owner,options);
+    assert.equal(overview.attention.delivery.total,1);
+    assert.deepEqual(overview.attention.delivery.items.map((item)=>item.requestId),[sendId]);
     assert.equal(overview.date,new Intl.DateTimeFormat('en',{timeZone:'UTC',weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date(overview.asOf)));
     assert.equal(overview.publication.id,pub.id); assert.equal(overview.demo,false);
     assert.equal((await getBriefing(pool,owner,'brief',options)).publications[0].metrics.assigned,2);
@@ -547,13 +593,19 @@ test('PostgreSQL overview and preparation queue report scoped live evidence, exa
     await assert.rejects(staffOverview(pool,worker,options),/Forbidden/);
     await assert.rejects(listProcessing(pool,worker,{},options),/Forbidden/);
     const foreign={...owner,principal_id:'other',org_id:'b',site_id:'b'};
-    assert.equal((await staffOverview(pool,foreign,options)).metrics.assigned,0); assert.equal((await listProcessing(pool,foreign,{},options)).total,0);
+    const foreignOverview=await staffOverview(pool,foreign,options);
+    assert.equal(foreignOverview.metrics.assigned,0); assert.equal(foreignOverview.attention.total,0);
+    assert.equal((await listProcessing(pool,foreign,{},options)).total,0);
     await provisionStaffCredential(pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password:'long-enough-password'},options);
     const grant=await issueWorkerGrant(pool,owner,'w1',30,options);
     await withHttp(f,async ({request}) => {
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       assert.equal((await request('/overview',staff)).status,200); assert.equal((await request('/processing',staff)).status,200);
+      const attentionDetail=await request('/overview/attention?group=waiting&page=1',staff); assert.equal(attentionDetail.status,200); assert.equal((await attentionDetail.json()).total,1);
+      assert.equal((await request('/overview/attention?group=waiting&page=1',member)).status,403);
+      assert.equal((await request('/overview/attention?group=bad&page=1',staff)).status,400);
+      assert.equal((await request('/overview/attention?group=waiting&page=1')).status,401);
       const checkedDetail=await request(`/processing/${encodeURIComponent(checkJob.id)}`,staff);assert.equal(checkedDetail.status,200);assert.equal((await checkedDetail.json()).id,checkJob.id);
       assert.equal((await request('/overview',member)).status,403); assert.equal((await request('/processing',member)).status,403);
     });
@@ -774,7 +826,7 @@ test('PostgreSQL HTTP import/export contracts enforce scope, raw body limits and
     const pub=await publish(pool,owner,'brief',request(),options),grant=await issueWorkerGrant(pool,owner,'w1',30,options);
     await withHttp(f,async ({request}) => {
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       const importId=randomUUID(),path=`/people/imports/preview?requestId=${importId}&filename=crew.csv`,upload={method:'POST',headers:{'content-type':'text/csv; charset=utf-8'},body:'worker_id,language\nNew import,ar\n'};
       assert.equal((await request(path,member,upload)).status,403);
       assert.equal((await request(path+'&org_id=b',staff,upload)).status,400);
@@ -917,7 +969,7 @@ test('PostgreSQL clarification ownership and resolution preserve original assess
   } finally {await db.close();}
 });
 
-test('PostgreSQL HTTP activity and help enforce credentials, scope, filter bounds and private-note isolation',async () => {
+test('PostgreSQL removed activity endpoints stay unavailable and help enforces scope and private-note isolation',async () => {
   const f=await fixture(),{db,pool}=f;
   try {
     await provisionStaffCredential(pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password:'long-enough-password'},options);
@@ -927,10 +979,14 @@ test('PostgreSQL HTTP activity and help enforce credentials, scope, filter bound
       assert.equal((await request('/audit')).status,401);
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
       const foreign=cookieOf(await request('/auth/staff/login',null,post({email:'other@example.test',password:'long-enough-password'})));
-      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
-      assert.equal((await request('/audit?org_id=b',staff)).status,400);
+      const member=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
+      assert.equal((await request('/audit?org_id=b',staff)).status,404);
       assert.equal((await request('/clarifications?status=closed',staff)).status,400);
-      for (const path of ['/audit','/audit.csv','/clarifications']) assert.equal((await request(path,member)).status,403);
+      for (const path of ['/audit','/audit.csv']) {
+        assert.equal((await request(path,staff)).status,404);
+        assert.equal((await request(path,member)).status,404);
+      }
+      assert.equal((await request('/clarifications',member)).status,403);
       const input={requestId:randomUUID(),text:'Not sure about the second shelf'},path=`/worker/briefings/${assignment}/help`;
       const clientContext=(await (await request('/session',member)).json()).clientContext;
       for(const duplicate of [false,true]){
@@ -951,11 +1007,11 @@ test('PostgreSQL HTTP activity and help enforce credentials, scope, filter bound
       assert.equal((await request(`${path}-history?pageSize=50`,member)).status,400);
       assert.equal((await request(`${path}-history`,staff)).status,403);
       assert.equal((await request('/worker/briefings/missing/help-history',member)).status,404);
-      const events=await (await request('/audit?action=help.requested',staff)).json(); assert.equal(events.total,1);
+      const events=await listAuditEvents(pool,owner,{action:'help.requested'},options); assert.equal(events.total,1);
       assert.equal((await request(`/audit/${events.rows[0].id}`,foreign)).status,404);
-      assert.equal((await request(`/audit/${events.rows[0].id}`,member)).status,403);
-      const csv=await request('/audit.csv?action=help.requested',staff); assert.equal(csv.status,200); assert.equal(csv.headers.get('cache-control'),'no-store');
-      const body=await csv.text(); assert.ok(body.includes('help.requested')); assert.ok(!body.includes(input.text)); assert.ok(!body.includes(notes));
+      assert.equal((await request(`/audit/${events.rows[0].id}`,member)).status,404);
+      const csv=await request('/audit.csv?action=help.requested',staff); assert.equal(csv.status,404); assert.equal(csv.headers.get('cache-control'),'no-store');
+      const body=await exportAuditEvents(pool,owner,{action:'help.requested'},options); assert.ok(body.includes('help.requested')); assert.ok(!body.includes(input.text)); assert.ok(!body.includes(notes));
       await db.query("UPDATE staff SET active=false WHERE id='owner'");
       assert.equal((await request('/audit',staff)).status,401);
     });
@@ -1335,7 +1391,8 @@ test('PostgreSQL HTTP rehearsal denies production/demo/public schema and exercis
   const f=await fixture();
   try {
     assert.throws(() => createPostgresRehearsalServer(f.pool,{...credentialOptions,tier:'production'}),/Production startup blocked/);
-    for (const changed of [{dataClass:'real'},{accessMode:'demo'},{schema:'public'}]) assert.throws(() => createPostgresRehearsalServer(f.pool,{...credentialOptions,...changed}),/isolated synthetic/);
+    for (const changed of [{dataClass:'real'},{schema:'public'}]) assert.throws(() => createPostgresRehearsalServer(f.pool,{...credentialOptions,...changed}),/isolated synthetic/);
+    assert.throws(() => createPostgresRehearsalServer(f.pool,{...credentialOptions,accessMode:'demo'}),/Set UNDERSTOOD_TIER=local, UNDERSTOOD_AI_MODE=synthetic and UNDERSTOOD_ACCESS_MODE=credential/);
     const password='Synthetic HTTP credential password';
     await provisionStaffCredential(f.pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password},options);
     await withHttp(f,async ({request}) => {
@@ -1352,9 +1409,9 @@ test('PostgreSQL HTTP rehearsal denies production/demo/public schema and exercis
       const publication=await publicationResponse.json();
       assert.equal((await request('/briefings/brief/publish',staff,post(publicationInput))).status,200);
       const issued=await request('/worker-grants',staff,post({workerId:'w1'})); assert.equal(issued.status,201);
-      const grant=await issued.json(),redeemed=await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})); assert.equal(redeemed.status,200);
+      const grant=await issued.json(),redeemed=await request('/auth/worker/redeem',null,post({token:grant.token})); assert.equal(redeemed.status,200);
       const workerCookie=cookieOf(redeemed);
-      assert.equal((await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'}))).status,401);
+      assert.equal((await request('/auth/worker/redeem',null,post({token:grant.token}))).status,401);
       assert.equal((await request('/briefings',workerCookie)).status,403);
       assert.equal((await request('/reports',workerCookie)).status,403);
       const inbox=await (await request('/worker/briefings',workerCookie)).json(); assert.equal(inbox.items.length,1);
@@ -1414,7 +1471,7 @@ test('PostgreSQL HTTP rehearsal bounds JSON/audio, redacts internal failures and
       assert.equal((await request(`${accessPath}?org_id=b`,staff)).status,400);
       assert.equal((await request('/people/workers/wb/access',staff)).status,404);
       assert.equal((await request('/worker-grants',staff,post({workerId:'w1',expiresInMinutes:null}))).status,400);
-      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       assert.equal((await request(accessPath,workerCookie)).status,403);
       assert.equal((await (await request(accessPath,staff)).json()).items[0].status,'redeemed');
       assert.equal((await request(`/worker-grants/${grant.id}/revoke`,staff,post({workerId:'w1'}))).status,400);
@@ -1626,7 +1683,7 @@ test('PostgreSQL HTTP directory routes use the existing people contract and deny
     await provisionStaffCredential(f.pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password},options);
     await withHttp(f,async ({request}) => {
       const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password})));
-      const created=await request('/people/workers',staff,post({code:'HTTP Worker',language:'en'})); assert.equal(created.status,201);
+      const created=await request('/people/workers',staff,post({code:'HTTP Worker',name:'HTTP Worker',language:'en',password:'Synthetic directory password'})); assert.equal(created.status,201);
       const person=await created.json();
       const crew=await (await request('/people/crews',staff,post({name:'HTTP Crew'}))).json();
       assert.equal((await request(`/people/workers/${person.id}/crew`,staff,post({crewId:crew.id}))).status,200);
@@ -1638,9 +1695,9 @@ test('PostgreSQL HTTP directory routes use the existing people contract and deny
       assert.equal((await request('/people/workers?crewId=missing',staff)).status,404);assert.equal((await request('/people/workers?crewId=',staff)).status,400);
       assert.equal((await request(`/people/workers/${person.id}`,staff,{method:'PATCH',body:JSON.stringify({language:'ur'})})).status,200);
       const rows=await (await request('/people/workers?search=HTTP&pageSize=5',staff)).json(); assert.equal(rows.total,1); assert.equal(rows.items[0].language,'ur');
-      assert.equal((await request('/people/workers',staff,post({code:'HTTP Worker',language:'en'}))).status,409);
+      const secondCreated=await request('/people/workers',staff,post({code:person.code,name:'HTTP Worker Two',language:'en',password:'Synthetic directory password'})); assert.equal(secondCreated.status,201); assert.notEqual((await secondCreated.json()).code,person.code);
       const grant=await (await request('/worker-grants',staff,post({workerId:'w1'}))).json();
-      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token,company:'a',workerId:'001',password:'Assigned synthetic worker password'})));
+      const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       assert.equal((await request('/people/workers',workerCookie)).status,403);
       assert.equal((await request('/people/crews',workerCookie)).status,403);
       const crewPath=`/people/crews/${crew.id}`,rename={name:'HTTP Renamed',expectedName:crew.name};

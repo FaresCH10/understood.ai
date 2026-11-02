@@ -4,6 +4,7 @@ import { schemaName } from './migrate.mjs';
 import { publicationResponses } from './reports.mjs';
 import { responseRequest,responsePage,receiptRow,workerReceiptRow,submissionFilters,assignmentRequest,workerAssignmentRow,workerRequestReceiptInput,workerRequestReceiptRow } from '../responses.mjs';
 import { postgresResponseColumns as responseColumns } from '../recordings.mjs';
+import {assignmentEvidence,assignmentEvidenceData} from './evidence.mjs';
 
 export function responseRead(pool,schema,fn) {
   schemaName(schema);
@@ -116,12 +117,43 @@ export async function getPublicationResponse(pool,session,publicationId,assignme
     const acknowledgment=(await client.query('SELECT received_at FROM acknowledgments WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3',[assignmentId,session.org_id,session.site_id])).rows[0];
     const cases=(await client.query('SELECT id,status,reason FROM clarifications WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 ORDER BY created_at DESC,id DESC LIMIT 100',[assignmentId,session.org_id,session.site_id])).rows;
     const responseMode=snapshot.responseMode || 'question',deliveryMode=snapshot.deliveryMode || 'both';
+    const evidenceMode=responseMode==='acknowledge' && snapshot.evidenceMode==='photo'?'photo':'none';
+    const evidence=evidenceMode==='photo'?await assignmentEvidence(client,session.org_id,session.site_id,assignmentId):null;
     return {publication,assignment:{id:row.id,worker:row.worker,language:row.language,dueAt:row.due_at?.toISOString() || null},
       question:responseMode==='acknowledge'?null:snapshot.question,facts:snapshot.facts,
       workerQuestion:responseMode==='acknowledge'?null:snapshot.languages?.[row.language]?.question || null,
-      responseMode,deliveryMode,
+      responseMode,deliveryMode,evidenceMode,evidence,
       ...(snapshot.rubric?.mode==='multiple-choice'?{questionType:'multiple-choice',choices:snapshot.languages?.[row.language]?.choices || snapshot.languages?.en?.choices}:{}),
       acknowledgedAt:acknowledgment?.received_at?.toISOString() || null,
       ...await submissionHistory(client,session,assignmentId,page,pageSize,true),cases};
+  });
+}
+
+export async function publicationAssignmentEvidence(pool,session,publicationId,assignmentId,{schema='public'}={}) {
+  if(typeof publicationId!=='string' || !publicationId || publicationId.length>100
+    || typeof assignmentId!=='string' || !assignmentId || assignmentId.length>100) throw new Error('Evidence unavailable');
+  return responseRead(pool,schema,async client=>{
+    await requirePrincipal(client,session,'staff',['owner','supervisor','auditor']);
+    const row=(await client.query('SELECT id FROM assignments WHERE id=$1 AND publication_id=$2 AND org_id=$3 AND site_id=$4',
+      [assignmentId,publicationId,session.org_id,session.site_id])).rows[0];
+    if(!row) throw new Error('Evidence unavailable');
+    const evidence=await assignmentEvidenceData(client,session.org_id,session.site_id,assignmentId);
+    if(!evidence) throw new Error('Evidence unavailable');
+    return evidence;
+  });
+}
+
+export async function workerAssignmentEvidence(pool,session,assignmentId,{schema='public'}={}) {
+  if(typeof assignmentId!=='string' || !assignmentId || assignmentId.length>100) throw new Error('Evidence unavailable');
+  return responseRead(pool,schema,async client=>{
+    await requirePrincipal(client,session,'worker');
+    const row=(await client.query(`SELECT a.id FROM assignments a JOIN publications p
+      ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
+      WHERE a.id=$1 AND a.org_id=$2 AND a.site_id=$3 AND a.worker_id=$4 AND p.state='published'`,
+    [assignmentId,session.org_id,session.site_id,session.principal_id])).rows[0];
+    if(!row) throw new Error('Evidence unavailable');
+    const evidence=await assignmentEvidenceData(client,session.org_id,session.site_id,assignmentId);
+    if(!evidence) throw new Error('Evidence unavailable');
+    return evidence;
   });
 }
