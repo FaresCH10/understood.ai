@@ -3,6 +3,8 @@ import {createSessionContextFetch} from './helpers/session-http.mjs';
 const fetch=createSessionContextFetch();
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
 import {PGlite} from '@electric-sql/pglite';
 import {pipelineStatus} from '../server/ai/pipeline-status.mjs';
 import {languageReadinessModel} from '../server/language-readiness.mjs';
@@ -18,7 +20,7 @@ import {CANONICAL_SOURCE,syntheticPrepare} from '../server/domain.mjs';
 const secret='private-synthetic-provider-key',hash='ab'.repeat(32);
 const env={UNDERSTOOD_TIER:'local',UNDERSTOOD_AI_MODE:'synthetic',UNDERSTOOD_ACCESS_MODE:'credential',
   UNDERSTOOD_DATA_CLASS:'synthetic',UNDERSTOOD_PUBLIC_ORIGIN:'http://127.0.0.1:3030',
-  UNDERSTOOD_POSTGRES_SCHEMA:'understood_test_readiness',UNDERSTOOD_REHEARSAL_AUDIO_ROOT:'D:/understod/data/readiness-fixture',
+  UNDERSTOOD_POSTGRES_SCHEMA:'understood_test_readiness',UNDERSTOOD_REHEARSAL_AUDIO_ROOT:join(tmpdir(),'understood-readiness-fixture'),
   UNDERSTOOD_OPERATOR_ACCESS:'true',GEMINI_API_KEY:secret,
   UNDERSTOOD_PREPARATION_ADAPTER:'gemini-free',UNDERSTOOD_SYNTHETIC_PREPARATION_HASHES:JSON.stringify([hash]),
   UNDERSTOOD_SOURCE_TRANSCRIPTION:'gemini-free',UNDERSTOOD_RECORDING_ADAPTER:'gemini-free',UNDERSTOOD_SYNTHETIC_AUDIO_HASHES:JSON.stringify([hash]),

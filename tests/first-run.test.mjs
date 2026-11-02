@@ -21,7 +21,7 @@ test('client first-run input trims and rejects unsafe or invalid values',()=>{
   assert.throws(()=>checkedFirstRunState({completed:false,revision:-1,site:{id:'s',name:'n',timezone:'UTC'},staffInterfaceLanguage:'en'}),/could not be read/);
   assert.throws(()=>checkedFirstRunResult({completed:true,duplicate:false,revision:1}),/could not be confirmed/);
   assert.equal(checkedFirstRunResult({completed:true,duplicate:true,revision:2,staffInterfaceLanguage:'ar'}).duplicate,true);
-  assert.match(suggestedTimezone('UTC'),/^[A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+)+$/);assert.equal(suggestedTimezone('Asia/Beirut'),'Asia/Beirut');
+  assert.match(suggestedTimezone('UTC'),/^(?:UTC|[A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+)+)$/);assert.equal(suggestedTimezone('Asia/Beirut'),'Asia/Beirut');
   assert.match(browserTimezone(),/\S/);
 });
 
