@@ -90,6 +90,7 @@ const columns = {
   template_versions:'template_id org_id site_id revision status content_json created_by created_at',
   template_requests:'request_id org_id site_id template_id briefing_id request_json result_json created_by created_at',
   template_favorites:'staff_id org_id site_id template_id created_at',
+  translation_feedback:'id org_id site_id publication_id briefing_id language field note status reported_by reported_at resolved_by resolved_at resolution_note',
   glossary_terms:'id org_id site_id term term_key source_lang target_lang revision status created_at updated_at',
   glossary_versions:'term_id org_id site_id revision status content_json created_by created_at',
   glossary_requests:'request_id org_id site_id term_id request_json result_json created_by created_at',
@@ -158,6 +159,7 @@ optional.add('organization_worker_ids');
 optional.add('instruction_improvements');optional.add('instruction_improvement_drafts');
 optional.add('presentation_artifacts');optional.add('answer_presentation_bindings');
 optional.add('worker_competencies');
+optional.add('translation_feedback');
 
 function snapshotRows(path) {
   const db = new DatabaseSync(path, { readOnly: true });
