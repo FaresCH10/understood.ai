@@ -164,3 +164,17 @@ fix in later Git-triggered deployments.
 - Realtime initially lacked `ws`; it passed after installing that optional peer dependency.
 - Production dependency audit: 0 vulnerabilities. Full install audit: 8 high-severity development/tooling findings remain; no forced dependency upgrades were applied.
 - Existing secrets stay in ignored `.env`. CLI-managed values were pulled there; they must never be copied into public Vite variables.
+
+### Hosted schema release check (3 November 2026)
+
+The pulled application included eight unapplied migrations (115–123; there is no
+117 migration file). The hosted database has now been migrated from 114 to 122
+verified migration files. The same migration run first passed on an expiring
+child branch of production; existing account and work-record counts were unchanged.
+
+Vercel now builds with `npm run build:vercel`. Before compiling the frontend,
+`scripts/vercel-schema-check.mjs` checks the hosted migration ledger and checksums
+using a read-only transaction. A missing database configuration, pending migration,
+or checksum mismatch fails the build before the deployment can replace production.
+This check never applies migrations. Review and rehearse migrations, apply them
+as an explicit release step, then deploy. `npm run build` remains the local build.

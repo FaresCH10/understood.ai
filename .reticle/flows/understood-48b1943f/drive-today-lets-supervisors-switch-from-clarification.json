@@ -1,0 +1,191 @@
+{
+  "version": 2,
+  "name": "drive-today-lets-supervisors-switch-from-clarification",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793710775630,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "tab",
+        "name": "Waiting for replies 12"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/TodayQueue.tsx",
+        "line": 41
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "View all waiting replies"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 693
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "button",
+          "name": "Show less"
+        }
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "tab",
+        "name": "Needs attention 3"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/TodayQueue.tsx",
+        "line": 41
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "tabpanel",
+          "name": "Needs attention 3"
+        },
+        "state": "visible"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "tab",
+        "name": "Waiting for replies 12"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/TodayQueue.tsx",
+        "line": 41
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "tabpanel",
+          "name": "Waiting for replies 12"
+        },
+        "state": "visible"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "tab",
+        "name": "Delivery problems 1"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/TodayQueue.tsx",
+        "line": 41
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "tabpanel",
+          "name": "Delivery problems 1"
+        },
+        "state": "visible"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Worker 028 · UR Shelf colour handover · Help requested"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 679
+      },
+      "expect": {
+        "kind": "route",
+        "contains": "#clarifications/"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Naddif 2el Joura",
+        "nth": 0,
+        "of": 2
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 672
+      },
+      "expect": {
+        "kind": "route",
+        "contains": "#briefings/"
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "View all instructions"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/main.tsx",
+        "line": 715
+      },
+      "expect": {
+        "kind": "route",
+        "contains": "#briefings"
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "Today lets supervisors switch from clarifications to outstanding replies.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-today-lets-supervisors-switch-from-clarification"
+}

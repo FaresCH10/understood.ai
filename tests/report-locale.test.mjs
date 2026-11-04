@@ -75,6 +75,6 @@ test('publication paging retains a persistent focus target while unverified hist
   assert.ok(source.includes('aria-busy={loading}'));
   assert.ok(source.includes('onClick={()=>changePage(page+1)}'));
   assert.ok(source.includes('setExports([]);setExportError((err as Error).message)'));
-  assert.ok(source.includes('exportLoading?<p role="status">'));
+  assert.match(source,/exportLoading\?<p\b[^>]*role="status"/);
   assert.ok(source.includes('date(item.createdAt,item.filters?.timezone||report?.timezone)'));
 });

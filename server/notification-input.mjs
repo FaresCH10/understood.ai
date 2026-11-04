@@ -39,3 +39,11 @@ export function notificationWindow() {
   const asOf=new Date().toISOString();
   return {asOf,since:new Date(Date.parse(asOf)-90*86400000).toISOString()};
 }
+// A fixed snapshot makes retries safe: notifications arriving afterwards stay unread.
+export function notificationReadBefore(input) {
+  if(!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).join(',')!=='before'
+    || typeof input.before!=='string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(input.before)
+    || !Number.isFinite(Date.parse(input.before)) || new Date(input.before).toISOString()!==input.before
+    || Date.parse(input.before)>Date.now())throw Error('Invalid notification request');
+  return input.before;
+}

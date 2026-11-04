@@ -64,7 +64,7 @@ export function TranslationFeedbackPage({authority,refresh,canManage}:{authority
     {message && <p className="notice notice-green" role="status">{staffT.message(message)}</p>}
     <nav className="briefing-status-tabs" aria-label={staffT("Translation feedback views")}>{tabs.map(value=><button key={value} type="button" aria-pressed={status===value} onClick={()=>{setStatus(value);setPage(1);}}>{staffT(value==='all'?'All':value[0].toUpperCase()+value.slice(1))}</button>)}</nav>
     {error && <p role="alert" className="record-error">{staffT.error(error)}</p>}
-    {loading ? <p role="status">{staffT("Loading translation feedback...")}</p> : data?.items.length ? <div className="translation-feedback-list">{data.items.map(item=><article className="panel translation-feedback-card" key={item.id}>
+    {loading ? <p data-page-loading role="status">{staffT("Loading translation feedback...")}</p> : data?.items.length ? <div className="translation-feedback-list">{data.items.map(item=><article className="panel translation-feedback-card" key={item.id}>
       <div className="translation-feedback-head"><div><h2>{item.briefingTitle}</h2><span className="template-chips"><i>{staffT.language(item.language)}</i><i>{staffT(item.field==='text'?'Instruction':item.field[0].toUpperCase()+item.field.slice(1))}</i><i>{staffT(item.status[0].toUpperCase()+item.status.slice(1))}</i></span></div><small>{staffT.date(item.createdAt)}</small></div>
       {item.translation && <blockquote className="translation-feedback-text" lang={item.language} dir={['ar','ur','fa','he'].includes(item.language)?'rtl':'ltr'}>{item.translation}</blockquote>}
       <p><strong>{staffT("Reported issue")}:</strong> {item.note}</p>

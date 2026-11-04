@@ -91,6 +91,12 @@
       "subject": "drive-first-time-setup-opens-the-existin"
     },
     {
+      "id": "flow:drive-help-search-finds-guides-by-troubleshooting-deta",
+      "statement": "Help search finds guides by troubleshooting details inside the article.",
+      "status": "proposed",
+      "subject": "drive-help-search-finds-guides-by-troubl"
+    },
+    {
       "id": "flow:drive-leaving-send-cancels-future-preparation-status-c",
       "statement": "Leaving Send cancels future preparation-status checks even while prepar…",
       "status": "proposed",
@@ -107,6 +113,18 @@
       "statement": "Send status continues polling unchanged preparation responses until pub…",
       "status": "proposed",
       "subject": "drive-send-status-continues-polling-unch"
+    },
+    {
+      "id": "flow:drive-settings-navigation-opens-the-plan-and-usage-sec",
+      "statement": "Settings navigation opens the plan and usage section with current activ…",
+      "status": "proposed",
+      "subject": "drive-settings-navigation-opens-the-plan"
+    },
+    {
+      "id": "flow:drive-the-account-help-menu-opens-the-searchable-help",
+      "statement": "The account help menu opens the searchable help center with eight proje…",
+      "status": "proposed",
+      "subject": "drive-the-account-help-menu-opens-the-se"
     },
     {
       "id": "flow:drive-the-arabic-hero-trial-cta-opens-company-registra",
@@ -161,6 +179,12 @@
       "statement": "The worker directory crew filter lists active crews that are not on the…",
       "status": "proposed",
       "subject": "drive-the-worker-directory-crew-filter-l"
+    },
+    {
+      "id": "flow:drive-today-lets-supervisors-switch-from-clarification",
+      "statement": "Today lets supervisors switch from clarifications to outstanding replie…",
+      "status": "proposed",
+      "subject": "drive-today-lets-supervisors-switch-from"
     },
     {
       "id": "flow:drive-unread-notifications-remain-visible-when-the-wor",
@@ -343,8 +367,20 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:clearing-help-filters-restores-all-eight-guides-c0fdaaf2",
+      "statement": "Clearing help filters restores all eight guides.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:company-registration-switches-to-arabic-while-ke-69e28176",
       "statement": "Company registration switches to Arabic while keeping the original regi…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:contact-support-in-the-account-menu-opens-the-co-4804924e",
+      "statement": "Contact support in the account menu opens the contact page.",
       "status": "proved",
       "subject": "unsorted"
     },
@@ -363,6 +399,18 @@
     {
       "id": "inline:first-time-setup-opens-the-existing-company-regi-d2264744",
       "statement": "First-time setup opens the existing company registration flow.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:help-search-finds-guides-by-troubleshooting-deta-4492907e",
+      "statement": "Help search finds guides by troubleshooting details inside the article.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:help-search-shows-an-empty-state-when-the-select-a6e31e5c",
+      "statement": "Help search shows an empty state when the selected audience has no matc…",
       "status": "proved",
       "subject": "unsorted"
     },
@@ -397,6 +445,60 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:selecting-an-attention-row-opens-that-worker-cla-fd6e1a22",
+      "statement": "Selecting an attention row opens that worker clarification.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:settings-navigation-opens-invoices-payment-recor-7d0e7f20",
+      "statement": "Settings navigation opens Invoices & payment records.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:settings-navigation-opens-organization-site-edb2d79d",
+      "statement": "Settings navigation opens Organization & site.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:settings-navigation-opens-privacy-policies-and-a-cc3dd87d",
+      "statement": "Settings navigation opens privacy policies and audio retention controls.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:settings-navigation-opens-staff-access-7630f4d5",
+      "statement": "Settings navigation opens Staff & access.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:settings-navigation-opens-staff-invitations-f7e44bd3",
+      "statement": "Settings navigation opens Staff invitations.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:settings-navigation-opens-the-plan-and-usage-sec-da9c8667",
+      "statement": "Settings navigation opens the plan and usage section with current activ…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-account-help-and-support-menu-opens-the-inte-1b39bb6a",
+      "statement": "The account Help and support menu opens the interactive walkthrough.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-account-help-menu-opens-the-searchable-help-9bc4b376",
+      "statement": "The account help menu opens the searchable help center with eight proje…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:the-arabic-hero-trial-cta-opens-company-registra-cd3c30f2",
       "statement": "The Arabic hero trial CTA opens company registration",
       "status": "proved",
@@ -415,8 +517,20 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:the-help-center-provides-a-complete-plans-and-in-31eda4f8",
+      "statement": "The help center provides a complete plans and invoices guide on its own…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:the-hero-text-and-instruction-examples-remain-av-805967fc",
       "statement": "The hero text and instruction examples remain available with reduced mo…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-invoice-settings-action-opens-the-new-invoic-12166ddc",
+      "statement": "The invoice settings action opens the new invoice form.",
       "status": "proved",
       "subject": "unsorted"
     },
@@ -429,6 +543,12 @@
     {
       "id": "inline:the-landing-page-remains-readable-with-reduced-m-a3fd65a1",
       "statement": "The landing page remains readable with reduced motion enabled",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-latest-instruction-summary-opens-the-publica-d5e0f1c6",
+      "statement": "The latest instruction summary opens the publication it describes.",
       "status": "proved",
       "subject": "unsorted"
     },
@@ -457,6 +577,30 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:the-settings-workspace-reloads-with-organization-177483ed",
+      "statement": "The settings workspace reloads with organization and site details avail…",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-sign-in-recovery-link-opens-the-account-reco-fe1dcca1",
+      "statement": "The sign-in recovery link opens the account recovery form.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-staff-invitation-form-opens-as-a-dialog-with-4b1bdb02",
+      "statement": "The staff invitation form opens as a dialog with its required fields.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-staff-table-opens-the-selected-staff-member-b7ff7640",
+      "statement": "The staff table opens the selected staff member details.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:the-supervisor-dashboard-identifies-a-worker-s-w-fc9ea577",
       "statement": "The supervisor dashboard identifies a worker's wrong choice for follow-…",
       "status": "proved",
@@ -465,6 +609,18 @@
     {
       "id": "inline:the-supervisor-sees-the-worker-s-incorrect-choic-97d81670",
       "statement": "The supervisor sees the worker's incorrect choice as a clarification.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-today-needs-attention-3-tab-shows-its-own-qu-793c5297",
+      "statement": "The Today Needs attention 3 tab shows its own queue.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:the-today-waiting-for-replies-12-tab-shows-its-o-4a9dd947",
+      "statement": "The Today Waiting for replies 12 tab shows its own queue.",
       "status": "proved",
       "subject": "unsorted"
     },
@@ -493,6 +649,30 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:today-expands-the-outstanding-replies-and-keeps-4b928f88",
+      "statement": "Today expands the outstanding replies and keeps the list paginated.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:today-lets-supervisors-switch-from-clarification-2b193456",
+      "statement": "Today lets supervisors switch from clarifications to outstanding replie…",
+      "status": "proposed",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:today-opens-the-instruction-library-from-the-rec-e53d648d",
+      "statement": "Today opens the instruction library from the recent instructions panel.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:today-shows-delivery-failures-separately-from-ou-6dbb4680",
+      "statement": "Today shows delivery failures separately from outstanding replies.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:unread-notifications-remain-visible-when-the-wor-ffbb6f8b",
       "statement": "Unread notifications remain visible when the worker filters the list.",
       "status": "proposed",
@@ -511,6 +691,12 @@
       "subject": "unsorted"
     },
     {
+      "id": "inline:worker-sign-in-help-can-be-opened-directly-and-s-4e813069",
+      "statement": "Worker sign-in help can be opened directly and survives a page reload.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
       "id": "inline:worker-sign-in-keeps-the-full-language-picker-av-8fe63def",
       "statement": "Worker sign-in keeps the full language picker available in the redesign…",
       "status": "proved",
@@ -519,6 +705,12 @@
     {
       "id": "inline:worker-sign-in-switches-its-credential-labels-an-d096a5e8",
       "statement": "Worker sign-in switches its credential labels and navigation to Arabic.",
+      "status": "proved",
+      "subject": "unsorted"
+    },
+    {
+      "id": "inline:workers-can-switch-to-the-access-link-form-and-e-a57c01ff",
+      "statement": "Workers can switch to the access link form and enter a one-time token.",
       "status": "proved",
       "subject": "unsorted"
     },

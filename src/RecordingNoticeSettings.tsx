@@ -1,3 +1,4 @@
+import {SettingsPolicy} from './SettingsLayout';
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {WORKER_LOCALES,workerLocale} from '../server/languages.mjs';
 import {useState} from 'react';
@@ -30,13 +31,13 @@ export function RecordingNoticeSettings({authority}:{authority:StaffRequestAutho
     const change=pending || {requestId:crypto.randomUUID(),revision:data.revision,notices,confirmed:true as const,scope:data.recoveryScope};
     setConfirmed(false);await savePolicy(change);
   }
-  return <section className="panel" aria-label={staffT("Recording notice settings")}>
-    <div className="people-panel-heading"><h2>{staffT("Recording notice")}</h2><button className="icon-button" title={staffT("Refresh recording notice")} aria-label={staffT("Refresh recording notice")} disabled={saving} onClick={refresh}><RefreshCw size={18}/></button></div>
+  return <SettingsPolicy title={staffT("Recording notice")} needsAttention={!!pending||!!error}><section className="panel" aria-label={staffT("Recording notice settings")}>
+    <div className="people-panel-heading"><span className="sr-only">{staffT("Recording notice")}</span><button className="icon-button" title={staffT("Refresh recording notice")} aria-label={staffT("Refresh recording notice")} disabled={saving} onClick={refresh}><RefreshCw size={18}/></button></div>
     {error&&<p role="alert" className="record-error">{staffT.error(error)}</p>}{saved&&<p role="status">{staffT("Recording notice saved.")}</p>}
     <p className="muted">{staffT("Site wording supplements the standard recording information. It is not legal-consent certification.")}</p>
     {data? <><div className="notice-language-list">{noticeLanguages.map(language=><details className="notice-language" key={language}><summary>{staffT.language(language)}</summary><label className="field"><span className="sr-only">{staffT.language(language)}</span><textarea rows={4} lang={language} dir={workerLocale(language)!.direction} maxLength={2000} value={notices[language as keyof Notices]} disabled={!data.canWrite || saving || !!pending || loading} onChange={event=>{setNotices({...notices,[language]:event.target.value});setConfirmed(false);setSaved(false);}}/></label></details>)}</div>
       {pending&&<p role="status">{staffT("The original notice save is pending. Refresh checks its receipt without resending.")}</p>}
       {data.canWrite&&<><label className="retention-confirm"><input type="checkbox" checked={confirmed} disabled={saving || loading} onChange={event=>setConfirmed(event.target.checked)}/>{staffT("I have reviewed the notices for this site. Add a notice in each language your workers use. Empty text removes that language’s custom notice; the standard recording information remains available.")}</label><button className="button primary" disabled={!confirmed || saving || loading} onClick={()=>void save()}><Save size={18}/>{saving?staffT("Saving..."):pending?staffT("Retry notice save"):staffT("Save notice")}</button></>}
     </>:<p role="status">{staffT("Loading recording notice...")}</p>}
-  </section>;
+  </section></SettingsPolicy>;
 }

@@ -1,5 +1,5 @@
 import {domainTransaction,requirePrincipal} from './domain.mjs';
-import {notificationKinds,notificationRoles,notificationFilters,notificationId,notificationRow,notificationWindow} from '../notification-input.mjs';
+import {notificationKinds,notificationRoles,notificationFilters,notificationId,notificationRow,notificationWindow,notificationReadBefore} from '../notification-input.mjs';
 
 const kinds=Object.keys(notificationKinds);
 const join=`FROM audit e LEFT JOIN notification_reads r ON r.event_id=e.id AND r.staff_id=$1 AND r.org_id=e.org_id AND r.site_id=e.site_id`;
@@ -35,5 +35,18 @@ export async function notificationReceipt(pool,session,id,{schema='public'}={}) 
       JOIN audit e ON e.id=r.event_id AND e.org_id=r.org_id AND e.site_id=r.site_id
       WHERE r.event_id=$1 AND r.staff_id=$2 AND r.org_id=$3 AND r.site_id=$4 AND e.action=ANY($5::text[]) AND NOT (e.actor_type='staff' AND e.actor_id=$2)`,[id,session.principal_id,session.org_id,session.site_id,kinds])).rows[0];
     return row?{found:true,item:notificationRow(row)}:{found:false};
+  });
+}
+export async function readAllNotifications(pool,session,input,{schema='public'}={}) {
+  const before=notificationReadBefore(input);
+  return domainTransaction(pool,schema,async client=>{
+    await requirePrincipal(client,session,'staff',notificationRoles);
+    const {asOf,since}=notificationWindow();
+    const result=await client.query(`INSERT INTO notification_reads(event_id,staff_id,org_id,site_id,read_at)
+      SELECT e.id,$1,e.org_id,e.site_id,$2 FROM audit e
+      WHERE e.org_id=$3 AND e.site_id=$4 AND e.occurred_at>=$5 AND e.occurred_at<=$6
+      AND e.action=ANY($7::text[]) AND NOT (e.actor_type='staff' AND e.actor_id=$1)
+      ON CONFLICT(event_id,staff_id) DO NOTHING RETURNING event_id`,[session.principal_id,asOf,session.org_id,session.site_id,since,before,kinds]);
+    return {before,readAt:asOf,marked:result.rows.length};
   });
 }

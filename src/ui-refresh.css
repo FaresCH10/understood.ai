@@ -34,8 +34,6 @@ p { text-wrap: pretty; }
 input::placeholder, textarea::placeholder { color: var(--ui-muted); opacity: 1; }
 .muted, .item-main small, .page-foot { color: var(--ui-muted); }
 .brand { font-size: 23px; font-weight: 650; gap: 10px; }
-.brand-wave { color: var(--ui-accent); height: 23px; gap: 3px; }
-.brand-wave i { width: 3px; }
 
 /* Desktop arithmetic: 224px navigation + flexible sheet; the sheet has equal
    40px gutters and a 1240px maximum working area. */

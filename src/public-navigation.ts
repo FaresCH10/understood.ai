@@ -1,3 +1,5 @@
+export function isHelpView(view:string){return view==='support'||view.startsWith('support/');}
+
 export const PUBLIC_SECTIONS=[
   {id:'platform',en:'Platform',ar:'المنصة'},
   {id:'how-it-works',en:'How it works',ar:'كيف تعمل'},
@@ -7,7 +9,7 @@ export const PUBLIC_SECTIONS=[
 ] as const;
 
 export function isPublicLandingView(view:string){
-  return view==='contact'||view==='home'||view==='platform/worker'||view==='platform/supervisor'||view==='company-controls'||PUBLIC_SECTIONS.some(section=>section.id===view);
+  return isHelpView(view)||view==='contact'||view==='home'||view==='platform/worker'||view==='platform/supervisor'||view==='company-controls'||PUBLIC_SECTIONS.some(section=>section.id===view);
 }
 
 export function publicLandingTarget(view:string){

@@ -1,0 +1,129 @@
+{
+  "version": 2,
+  "name": "drive-help-search-finds-guides-by-troubleshooting-deta",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793707688234,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "searchbox",
+        "name": "Search help articles"
+      },
+      "args": {
+        "value": "microphone"
+      },
+      "action": "fill",
+      "source": {
+        "file": "src/HelpCenter.tsx",
+        "line": 22
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "text",
+            "contains": "guide",
+            "satisfies": {
+              "property": "matchesPattern",
+              "pattern": "\\d[\\d,.]* guide"
+            }
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "heading",
+              "name": "Troubleshoot languages and audio"
+            }
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "For workers"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/HelpCenter.tsx",
+        "line": 23
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "heading",
+          "name": "No guides found"
+        }
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Clear filters"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/HelpCenter.tsx",
+        "line": 27
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "text",
+            "contains": "guides",
+            "satisfies": {
+              "property": "matchesPattern",
+              "pattern": "\\d[\\d,.]* guides"
+            }
+          },
+          {
+            "kind": "allOf",
+            "predicates": [
+              {
+                "kind": "route",
+                "contains": "#support/plans-and-invoices"
+              },
+              {
+                "kind": "element",
+                "query": {
+                  "role": "heading",
+                  "name": "Use invoice records"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "Help search finds guides by troubleshooting details inside the article.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-help-search-finds-guides-by-troubleshooting-deta"
+}

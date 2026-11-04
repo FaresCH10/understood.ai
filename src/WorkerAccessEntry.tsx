@@ -24,8 +24,8 @@ export function WorkerAccessEntry({language,onLanguage,token,linkSignal,onToken,
   const disabled=busy || blocked || !supported;
   const attempted=useRef('');
   useEffect(()=>{if(/^[A-Za-z0-9_-]{43}$/.test(token) && !busy && !blocked && supported && attempted.current!==token){attempted.current=token;onSubmit();}},[token,busy,blocked,supported,onSubmit]);
-  const memory=<label className="signin-remember"><input type="checkbox" checked={remember} disabled={disabled} onChange={event=>{setRemember(event.target.checked);if(!event.target.checked)keepCompany(false,'');}}/><span>{m.remember}</span></label>;
-  const memoryHint=<p className="muted">{m.hint}</p>;
+  const memory=<label className="signin-remember"><input type="checkbox" aria-describedby="worker-company-memory-hint" checked={remember} disabled={disabled} onChange={event=>{setRemember(event.target.checked);if(!event.target.checked)keepCompany(false,'');}}/><span>{m.remember}</span></label>;
+  const memoryHint=<p className="muted" id="worker-company-memory-hint">{m.hint}</p>;
   // Only hash-arrived links reopen the link form; typing into it must not collapse the input.
   useEffect(()=>{if(token){setMode('link');setLinkOpen(false);}},[linkSignal]);
   function chooseMode(next:'login'|'link'){
@@ -49,18 +49,19 @@ export function WorkerAccessEntry({language,onLanguage,token,linkSignal,onToken,
         <button type="button" className={`button ${mode==='login'?'primary':'outline'}`} aria-pressed={mode==='login'} disabled={busy} onClick={()=>chooseMode('login')}>{c.loginMode}</button>
         <button type="button" className={`button ${mode==='link'?'primary':'outline'}`} aria-pressed={mode==='link'} disabled={busy} onClick={()=>chooseMode('link')}>{c.linkMode}</button>
       </div>
-      {mode==='login' && <form className="entry-form" onSubmit={login}>
-        <label className="field">{c.company}<input dir="ltr" autoComplete="organization" value={company} disabled={disabled} onChange={event=>setCompany(event.target.value)} required maxLength={64}/></label>
-        {memory}{memoryHint}
+      {mode==='login' && <form className="entry-form worker-entry-form" onSubmit={login}>
+        <label className="field">{c.company}<input dir="ltr" autoComplete="organization" aria-describedby="worker-company-hint" value={company} disabled={disabled} onChange={event=>setCompany(event.target.value)} required maxLength={64}/></label>
+        <p className="muted" id="worker-company-hint">{c.companyHint}</p>
+        <div className="worker-company-memory">{memory}{memoryHint}</div>
         <label className="field">{c.workerId}<input dir="ltr" autoComplete="username" autoCapitalize="none" spellCheck={false} value={workerId} disabled={disabled} onChange={event=>setWorkerId(event.target.value)} required maxLength={80}/></label>
-        <label className="field">{c.password}<input type="password" dir="ltr" autoComplete="current-password" value={password} disabled={disabled} onChange={event=>setPassword(event.target.value)} required minLength={8} maxLength={128}/></label>
-        <p className="muted">{c.passwordShort} {c.companyHint}</p>
+        <label className="field">{c.password}<input type="password" dir="ltr" autoComplete="current-password" aria-describedby="worker-password-hint" value={password} disabled={disabled} onChange={event=>setPassword(event.target.value)} required minLength={8} maxLength={128}/></label>
+        <p className="muted" id="worker-password-hint">{c.passwordShort}</p>
         {formError && <p role="alert">{formError}</p>}
         {failed && <p role="alert">{c.failedLogin}</p>}
         {authenticated && <p className="notice notice-amber">{t.handoff}</p>}
         <button className="button primary full worker-entry-continue" type="submit" disabled={disabled || !company.trim() || !workerId.trim() || !password}>{busy?t.busy:c.login}<Forward size={24} aria-hidden="true"/></button>
       </form>}
-      {mode==='link' && <form onSubmit={event=>{event.preventDefault();if(!disabled && token.trim())onSubmit();}}>
+      {mode==='link' && <form className="entry-form worker-entry-form" onSubmit={event=>{event.preventDefault();if(!disabled && token.trim())onSubmit();}}>
         <details className="worker-entry-link" open={linkOpen} onToggle={event=>setLinkOpen(event.currentTarget.open)}><summary>{t.link}</summary>{token && <p>{t.provided}</p>}<label className="field">{t.token}<input ref={tokenInput} type="password" dir="ltr" autoComplete="off" autoCapitalize="none" spellCheck={false} value={token} disabled={busy || blocked} onChange={event=>onToken(event.target.value)} required maxLength={256}/></label></details>
         {authenticated && <p className="notice notice-amber">{t.handoff}</p>}
         {failed && <p role="alert">{t.failed}</p>}

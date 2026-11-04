@@ -30,7 +30,7 @@ export default function PublicationSchedules({id,refresh,onChanged,authority,tim
   const pages=Math.max(1,Math.ceil((data?.total || 0)/20));
   const date=(value:string)=>`${new Date(value).toLocaleString('en-GB',{timeZone:timezone,timeZoneName:'shortOffset'})} ${timezone}`;
   return <section className="panel publication-schedules"><div className="panel-heading"><h2 ref={title} tabIndex={-1}>{staffT("Delivery schedules")}</h2><button className="icon-button" title={staffT("Refresh delivery schedules")} aria-label={staffT("Refresh delivery schedules")} disabled={loading || busy} onClick={()=>setTick(value=>value+1)}><RefreshCw size={18}/></button></div>
-    {loading?<p role="status">{staffT("Loading delivery schedules...")}</p>:data?.items.length ? <ul className="schedule-list">{data.items.map(row=><li key={row.id}>
+    {loading?<p data-page-loading role="status">{staffT("Loading delivery schedules...")}</p>:data?.items.length ? <ul className="schedule-list">{data.items.map(row=><li key={row.id}>
       <CalendarClock size={20}/><div><strong>v{staffT.number(row.version)} · {(row.state==='queued'?staffT("Scheduled"):row.state)}</strong><p><time dateTime={row.publishAt}>{date(row.publishAt)}</time> · {row.recipientCount} {staffT("selected workers")}</p>
       <small>{staffT("Revision")} {staffT.number(row.revision)}{(row.dueAt?staffT(" · Response deadline {p0}",{p0:date(row.dueAt)}):'')}</small>{row.error && <p role="status" className="record-error">{staffT.error(row.error)}</p>}
       {!!row.reminderMinutes && <p>{staffT("In-app reminder · up to")} {row.reminderMinutes/60} {(row.reminderMinutes===60?staffT("hour"):staffT("hours"))} {staffT("before deadline")}</p>}

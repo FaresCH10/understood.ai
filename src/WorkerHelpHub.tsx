@@ -10,7 +10,7 @@ export function WorkerHelpHub({language,items,loading,failed,disabled,onOpen,onF
     <p className="notice notice-amber worker-help-contact"><TriangleAlert size={22} aria-hidden="true"/>{t.urgent}</p>
     <button type="button" className="button outline full" disabled={disabled} onClick={onFollowup}><MessageCircle size={20} aria-hidden="true"/>{t.followup}</button>
     <h2>{t.currentBriefings}</h2>
-    {loading?<p role="status">{t.loading}</p>:failed?<p role="alert">{t.listFailed}</p>:!items.length?<p>{t.empty}</p>:items.map(item=><article className="worker-card" key={item.id}>
+    {loading?<p data-page-loading role="status">{t.loading}</p>:failed?<p role="alert">{t.listFailed}</p>:!items.length?<p>{t.empty}</p>:items.map(item=><article className="worker-card" key={item.id}>
       <h2 lang={item.language} dir={item.language==='en'?'ltr':'rtl'}>{item.title}</h2>
       <p>{t.version} v{item.version} · <bdi>{item.language.toUpperCase()}</bdi></p>
       {item.dueAt && <p className="worker-deadline"><Clock3 size={18} aria-hidden="true"/><span>{dueLabel}: <time dateTime={item.dueAt}>{new Date(item.dueAt).toLocaleString(language,{timeZone:timezone,dateStyle:'medium',timeStyle:'short'})}</time>{timezone?` · ${timezone}`:''}</span></p>}

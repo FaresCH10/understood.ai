@@ -367,6 +367,30 @@
       "subject": "unsorted",
       "updatedAt": 1793186383681
     },
+    "inline:clearing-help-filters-restores-all-eight-guides-c0fdaaf2": {
+      "binding": {
+        "contains": "8 guides",
+        "kind": "text"
+      },
+      "declaredAt": 1793707622351,
+      "id": "inline:clearing-help-filters-restores-all-eight-guides-c0fdaaf2",
+      "provenBy": {
+        "at": 1793707623047,
+        "grade": "presence",
+        "runId": "drive-44286cad1879ac97",
+        "verdictId": "reticle_act_and_wait:1793707623047"
+      },
+      "state": "proved",
+      "statement": "Clearing help filters restores all eight guides.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/HelpCenter.tsx"
+        ]
+      },
+      "updatedAt": 1793707623133
+    },
     "inline:company-registration-switches-to-arabic-while-ke-69e28176": {
       "binding": {
         "contains": "الاسم الكامل",
@@ -390,6 +414,25 @@
         ]
       },
       "updatedAt": 1793177177795
+    },
+    "inline:contact-support-in-the-account-menu-opens-the-co-4804924e": {
+      "binding": {
+        "contains": "#contact",
+        "kind": "route"
+      },
+      "declaredAt": 1793703460695,
+      "id": "inline:contact-support-in-the-account-menu-opens-the-co-4804924e",
+      "provenBy": {
+        "at": 1793703461057,
+        "grade": "presence",
+        "runId": "drive-674862d34ecbf224",
+        "verdictId": "reticle_wait_for:1793703461056"
+      },
+      "state": "proved",
+      "statement": "Contact support in the account menu opens the contact page.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793703461109
     },
     "inline:credential-is-the-production-access-mode-so-the-c5dfb270": {
       "binding": {
@@ -470,6 +513,69 @@
         ]
       },
       "updatedAt": 1793177032939
+    },
+    "inline:help-search-finds-guides-by-troubleshooting-deta-4492907e": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "1 guide",
+            "kind": "text"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Troubleshoot languages and audio",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793707590545,
+      "id": "inline:help-search-finds-guides-by-troubleshooting-deta-4492907e",
+      "provenBy": {
+        "at": 1793707591177,
+        "grade": "presence",
+        "runId": "drive-44286cad1879ac97",
+        "verdictId": "reticle_act_and_wait:1793707591177"
+      },
+      "state": "proved",
+      "statement": "Help search finds guides by troubleshooting details inside the article.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/HelpCenter.tsx"
+        ]
+      },
+      "updatedAt": 1793707591278
+    },
+    "inline:help-search-shows-an-empty-state-when-the-select-a6e31e5c": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "No guides found",
+          "role": "heading"
+        }
+      },
+      "declaredAt": 1793707621335,
+      "id": "inline:help-search-shows-an-empty-state-when-the-select-a6e31e5c",
+      "provenBy": {
+        "at": 1793707621947,
+        "grade": "presence",
+        "runId": "drive-44286cad1879ac97",
+        "verdictId": "reticle_act_and_wait:1793707621947"
+      },
+      "state": "proved",
+      "statement": "Help search shows an empty state when the selected audience has no matching guide.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/HelpCenter.tsx"
+        ]
+      },
+      "updatedAt": 1793707621999
     },
     "inline:reduced-motion-authentication-stays-static-while-24976d17": {
       "binding": {
@@ -632,6 +738,324 @@
       },
       "updatedAt": 1793085325926
     },
+    "inline:selecting-an-attention-row-opens-that-worker-cla-fd6e1a22": {
+      "binding": {
+        "contains": "#clarifications/",
+        "kind": "route"
+      },
+      "declaredAt": 1793710580942,
+      "id": "inline:selecting-an-attention-row-opens-that-worker-cla-fd6e1a22",
+      "provenBy": {
+        "at": 1793710581653,
+        "grade": "presence",
+        "runId": "drive-dbba5c1edab686d4",
+        "verdictId": "reticle_act_and_wait:1793710581653"
+      },
+      "state": "proved",
+      "statement": "Selecting an attention row opens that worker clarification.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793710581848
+    },
+    "inline:settings-navigation-opens-invoices-payment-recor-7d0e7f20": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#settings/invoices",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Invoices & payment records",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793704588730,
+      "id": "inline:settings-navigation-opens-invoices-payment-recor-7d0e7f20",
+      "provenBy": {
+        "at": 1793704589528,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_act_and_wait:1793704589528"
+      },
+      "state": "proved",
+      "statement": "Settings navigation opens Invoices & payment records.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/SettingsLayout.tsx"
+        ]
+      },
+      "updatedAt": 1793704589651
+    },
+    "inline:settings-navigation-opens-organization-site-edb2d79d": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#settings",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Organization & site",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793704584702,
+      "id": "inline:settings-navigation-opens-organization-site-edb2d79d",
+      "provenBy": {
+        "at": 1793704585454,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_act_and_wait:1793704585454"
+      },
+      "state": "proved",
+      "statement": "Settings navigation opens Organization & site.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/SettingsLayout.tsx"
+        ]
+      },
+      "updatedAt": 1793704585549
+    },
+    "inline:settings-navigation-opens-privacy-policies-and-a-cc3dd87d": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#settings/retention",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Audio retention",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793704535773,
+      "id": "inline:settings-navigation-opens-privacy-policies-and-a-cc3dd87d",
+      "provenBy": {
+        "at": 1793704536755,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_act_and_wait:1793704536755"
+      },
+      "state": "proved",
+      "statement": "Settings navigation opens privacy policies and audio retention controls.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/SettingsLayout.tsx"
+        ]
+      },
+      "updatedAt": 1793704536831
+    },
+    "inline:settings-navigation-opens-staff-access-7630f4d5": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#settings/staff",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Staff & access",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793704585973,
+      "id": "inline:settings-navigation-opens-staff-access-7630f4d5",
+      "provenBy": {
+        "at": 1793704586702,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_act_and_wait:1793704586702"
+      },
+      "state": "proved",
+      "statement": "Settings navigation opens Staff & access.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/SettingsLayout.tsx"
+        ]
+      },
+      "updatedAt": 1793704586857
+    },
+    "inline:settings-navigation-opens-staff-invitations-f7e44bd3": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#settings/invitations",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Staff invitations",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793704587135,
+      "id": "inline:settings-navigation-opens-staff-invitations-f7e44bd3",
+      "provenBy": {
+        "at": 1793704588210,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_act_and_wait:1793704588210"
+      },
+      "state": "proved",
+      "statement": "Settings navigation opens Staff invitations.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/SettingsLayout.tsx"
+        ]
+      },
+      "updatedAt": 1793704588321
+    },
+    "inline:settings-navigation-opens-the-plan-and-usage-sec-da9c8667": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#settings/usage",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Plan & usage",
+              "role": "heading"
+            }
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Instruction activity",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793704507292,
+      "id": "inline:settings-navigation-opens-the-plan-and-usage-sec-da9c8667",
+      "provenBy": {
+        "at": 1793704508246,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_act_and_wait:1793704508246"
+      },
+      "state": "proved",
+      "statement": "Settings navigation opens the plan and usage section with current activity.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/SettingsLayout.tsx"
+        ]
+      },
+      "updatedAt": 1793704508412
+    },
+    "inline:the-account-help-and-support-menu-opens-the-inte-1b39bb6a": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#walkthrough",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "From an instruction to a response.",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793703486130,
+      "id": "inline:the-account-help-and-support-menu-opens-the-inte-1b39bb6a",
+      "provenBy": {
+        "at": 1793703494415,
+        "grade": "presence",
+        "runId": "drive-674862d34ecbf224",
+        "verdictId": "reticle_assert:1793703494415"
+      },
+      "state": "proved",
+      "statement": "The account Help and support menu opens the interactive walkthrough.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793703494460
+    },
+    "inline:the-account-help-menu-opens-the-searchable-help-9bc4b376": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#support",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Help for every workday.",
+              "role": "heading"
+            }
+          },
+          {
+            "contains": "8 guides",
+            "kind": "text"
+          }
+        ]
+      },
+      "declaredAt": 1793707718018,
+      "id": "inline:the-account-help-menu-opens-the-searchable-help-9bc4b376",
+      "provenBy": {
+        "at": 1793707718733,
+        "grade": "presence",
+        "runId": "drive-44286cad1879ac97",
+        "verdictId": "reticle_act_and_wait:1793707718733"
+      },
+      "state": "proved",
+      "statement": "The account help menu opens the searchable help center with eight project guides.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/DashboardSidebar.tsx"
+        ]
+      },
+      "updatedAt": 1793707718830
+    },
     "inline:the-arabic-hero-trial-cta-opens-company-registra-cd3c30f2": {
       "binding": {
         "kind": "allOf",
@@ -730,6 +1154,42 @@
       "subject": "unsorted",
       "updatedAt": 1793186026174
     },
+    "inline:the-help-center-provides-a-complete-plans-and-in-31eda4f8": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#support/plans-and-invoices",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Use invoice records",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793707640323,
+      "id": "inline:the-help-center-provides-a-complete-plans-and-in-31eda4f8",
+      "provenBy": {
+        "at": 1793707640424,
+        "grade": "presence",
+        "runId": "drive-44286cad1879ac97",
+        "verdictId": "reticle_assert:1793707640424"
+      },
+      "state": "proved",
+      "statement": "The help center provides a complete plans and invoices guide on its own URL.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/HelpCenter.tsx"
+        ]
+      },
+      "updatedAt": 1793707640511
+    },
     "inline:the-hero-text-and-instruction-examples-remain-av-805967fc": {
       "binding": {
         "kind": "allOf",
@@ -764,6 +1224,42 @@
       "status": "proved",
       "subject": "unsorted",
       "updatedAt": 1793183734626
+    },
+    "inline:the-invoice-settings-action-opens-the-new-invoic-12166ddc": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#settings/invoices/new",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Invoice number",
+              "role": "textbox"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793704596981,
+      "id": "inline:the-invoice-settings-action-opens-the-new-invoic-12166ddc",
+      "provenBy": {
+        "at": 1793704597693,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_act_and_wait:1793704597693"
+      },
+      "state": "proved",
+      "statement": "The invoice settings action opens the new invoice form.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/Billing.tsx"
+        ]
+      },
+      "updatedAt": 1793704597798
     },
     "inline:the-landing-navigation-dropdown-closes-with-esca-104f6a2d": {
       "binding": {
@@ -822,6 +1318,30 @@
       "status": "proved",
       "subject": "unsorted",
       "updatedAt": 1793181067741
+    },
+    "inline:the-latest-instruction-summary-opens-the-publica-d5e0f1c6": {
+      "binding": {
+        "contains": "#briefings/",
+        "kind": "route"
+      },
+      "declaredAt": 1793710618698,
+      "id": "inline:the-latest-instruction-summary-opens-the-publica-d5e0f1c6",
+      "provenBy": {
+        "at": 1793710619525,
+        "grade": "presence",
+        "runId": "drive-dbba5c1edab686d4",
+        "verdictId": "reticle_act_and_wait:1793710619525"
+      },
+      "state": "proved",
+      "statement": "The latest instruction summary opens the publication it describes.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793710619643
     },
     "inline:the-public-landing-page-supports-arabic-copy-and-9709629b": {
       "binding": {
@@ -958,6 +1478,129 @@
       },
       "updatedAt": 1793085493557
     },
+    "inline:the-settings-workspace-reloads-with-organization-177483ed": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#settings",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Organization & site",
+              "role": "heading"
+            }
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Edit site",
+              "role": "button"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793705042228,
+      "id": "inline:the-settings-workspace-reloads-with-organization-177483ed",
+      "provenBy": {
+        "at": 1793705042342,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_wait_for:1793705042342"
+      },
+      "state": "proved",
+      "statement": "The settings workspace reloads with organization and site details available.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793705042365
+    },
+    "inline:the-sign-in-recovery-link-opens-the-account-reco-fe1dcca1": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#account-recovery",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Account recovery",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793702136797,
+      "id": "inline:the-sign-in-recovery-link-opens-the-account-reco-fe1dcca1",
+      "provenBy": {
+        "at": 1793702137529,
+        "grade": "presence",
+        "runId": "drive-672144cff8e03f9e",
+        "verdictId": "reticle_assert:1793702137529"
+      },
+      "state": "proved",
+      "statement": "The sign-in recovery link opens the account recovery form.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793702137568
+    },
+    "inline:the-staff-invitation-form-opens-as-a-dialog-with-4b1bdb02": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Invite staff",
+          "role": "dialog"
+        }
+      },
+      "declaredAt": 1793704666672,
+      "id": "inline:the-staff-invitation-form-opens-as-a-dialog-with-4b1bdb02",
+      "provenBy": {
+        "at": 1793704666813,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_assert:1793704666813"
+      },
+      "state": "proved",
+      "statement": "The staff invitation form opens as a dialog with its required fields.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/Billing.tsx"
+        ]
+      },
+      "updatedAt": 1793704666903
+    },
+    "inline:the-staff-table-opens-the-selected-staff-member-b7ff7640": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Close staff details",
+          "role": "button"
+        }
+      },
+      "declaredAt": 1793704866891,
+      "id": "inline:the-staff-table-opens-the-selected-staff-member-b7ff7640",
+      "provenBy": {
+        "at": 1793704867559,
+        "grade": "presence",
+        "runId": "drive-312e42125e8e29ef",
+        "verdictId": "reticle_act_and_wait:1793704867559"
+      },
+      "state": "proved",
+      "statement": "The staff table opens the selected staff member details.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/StaffAccess.tsx"
+        ]
+      },
+      "updatedAt": 1793704867623
+    },
     "inline:the-supervisor-dashboard-identifies-a-worker-s-w-fc9ea577": {
       "binding": {
         "contains": "QA shelf handover · incorrect choice",
@@ -1000,6 +1643,62 @@
         ]
       },
       "updatedAt": 1793085726291
+    },
+    "inline:the-today-needs-attention-3-tab-shows-its-own-qu-793c5297": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Needs attention 3",
+          "role": "tabpanel"
+        },
+        "state": "visible"
+      },
+      "declaredAt": 1793710320261,
+      "id": "inline:the-today-needs-attention-3-tab-shows-its-own-qu-793c5297",
+      "provenBy": {
+        "at": 1793710320932,
+        "grade": "presence",
+        "runId": "drive-dbba5c1edab686d4",
+        "verdictId": "reticle_act_and_wait:1793710320932"
+      },
+      "state": "proved",
+      "statement": "The Today Needs attention 3 tab shows its own queue.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/TodayQueue.tsx"
+        ]
+      },
+      "updatedAt": 1793710321020
+    },
+    "inline:the-today-waiting-for-replies-12-tab-shows-its-o-4a9dd947": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Waiting for replies 12",
+          "role": "tabpanel"
+        },
+        "state": "visible"
+      },
+      "declaredAt": 1793710321424,
+      "id": "inline:the-today-waiting-for-replies-12-tab-shows-its-o-4a9dd947",
+      "provenBy": {
+        "at": 1793710322059,
+        "grade": "presence",
+        "runId": "drive-dbba5c1edab686d4",
+        "verdictId": "reticle_act_and_wait:1793710322059"
+      },
+      "state": "proved",
+      "statement": "The Today Waiting for replies 12 tab shows its own queue.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/TodayQueue.tsx"
+        ]
+      },
+      "updatedAt": 1793710322132
     },
     "inline:the-worker-language-picker-can-close-while-prese-9e1cd367": {
       "binding": {
@@ -1097,6 +1796,101 @@
         ]
       },
       "updatedAt": 1793177487752
+    },
+    "inline:today-expands-the-outstanding-replies-and-keeps-4b928f88": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Show less",
+          "role": "button"
+        }
+      },
+      "declaredAt": 1793710267550,
+      "id": "inline:today-expands-the-outstanding-replies-and-keeps-4b928f88",
+      "provenBy": {
+        "at": 1793710268224,
+        "grade": "presence",
+        "runId": "drive-dbba5c1edab686d4",
+        "verdictId": "reticle_act_and_wait:1793710268224"
+      },
+      "state": "proved",
+      "statement": "Today expands the outstanding replies and keeps the list paginated.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793710268387
+    },
+    "inline:today-lets-supervisors-switch-from-clarification-2b193456": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Waiting for replies 12",
+          "role": "tabpanel"
+        }
+      },
+      "declaredAt": 1793710266606,
+      "id": "inline:today-lets-supervisors-switch-from-clarification-2b193456",
+      "state": "bound",
+      "statement": "Today lets supervisors switch from clarifications to outstanding replies.",
+      "status": "proposed",
+      "subject": "unsorted",
+      "updatedAt": 1793710266660
+    },
+    "inline:today-opens-the-instruction-library-from-the-rec-e53d648d": {
+      "binding": {
+        "contains": "#briefings",
+        "kind": "route"
+      },
+      "declaredAt": 1793710684696,
+      "id": "inline:today-opens-the-instruction-library-from-the-rec-e53d648d",
+      "provenBy": {
+        "at": 1793710685413,
+        "grade": "presence",
+        "runId": "drive-dbba5c1edab686d4",
+        "verdictId": "reticle_act_and_wait:1793710685413"
+      },
+      "state": "proved",
+      "statement": "Today opens the instruction library from the recent instructions panel.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/main.tsx"
+        ]
+      },
+      "updatedAt": 1793710685508
+    },
+    "inline:today-shows-delivery-failures-separately-from-ou-6dbb4680": {
+      "binding": {
+        "kind": "element",
+        "query": {
+          "name": "Delivery problems 1",
+          "role": "tabpanel"
+        },
+        "state": "visible"
+      },
+      "declaredAt": 1793710387514,
+      "id": "inline:today-shows-delivery-failures-separately-from-ou-6dbb4680",
+      "provenBy": {
+        "at": 1793710388177,
+        "grade": "presence",
+        "runId": "drive-dbba5c1edab686d4",
+        "verdictId": "reticle_act_and_wait:1793710388177"
+      },
+      "state": "proved",
+      "statement": "Today shows delivery failures separately from outstanding replies.",
+      "status": "proved",
+      "subject": "unsorted",
+      "surface": {
+        "files": [
+          "src/TodayQueue.tsx"
+        ]
+      },
+      "updatedAt": 1793710388261
     },
     "inline:unread-notifications-remain-visible-when-the-wor-ffbb6f8b": {
       "binding": {
@@ -1196,6 +1990,44 @@
       },
       "updatedAt": 1793094868505
     },
+    "inline:worker-sign-in-help-can-be-opened-directly-and-s-4e813069": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#support/worker-sign-in",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Sign in as a worker",
+              "role": "heading"
+            }
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "If sign-in does not work",
+              "role": "heading"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793707693139,
+      "id": "inline:worker-sign-in-help-can-be-opened-directly-and-s-4e813069",
+      "provenBy": {
+        "at": 1793707693238,
+        "grade": "presence",
+        "runId": "drive-44286cad1879ac97",
+        "verdictId": "reticle_wait_for:1793707693238"
+      },
+      "state": "proved",
+      "statement": "Worker sign-in help can be opened directly and survives a page reload.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793707693284
+    },
     "inline:worker-sign-in-keeps-the-full-language-picker-av-8fe63def": {
       "binding": {
         "kind": "element",
@@ -1251,6 +2083,44 @@
         ]
       },
       "updatedAt": 1793177756713
+    },
+    "inline:workers-can-switch-to-the-access-link-form-and-e-a57c01ff": {
+      "binding": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "contains": "#worker-access",
+            "kind": "route"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "One-time access token",
+              "role": "textbox"
+            }
+          },
+          {
+            "kind": "element",
+            "query": {
+              "name": "Continue",
+              "role": "button"
+            }
+          }
+        ]
+      },
+      "declaredAt": 1793702323983,
+      "id": "inline:workers-can-switch-to-the-access-link-form-and-e-a57c01ff",
+      "provenBy": {
+        "at": 1793702324417,
+        "grade": "presence",
+        "runId": "drive-5dc8072baeeb0e89",
+        "verdictId": "reticle_assert:1793702324417"
+      },
+      "state": "proved",
+      "statement": "Workers can switch to the access link form and enter a one-time token.",
+      "status": "proved",
+      "subject": "unsorted",
+      "updatedAt": 1793702324535
     },
     "pilot-languages": {
       "declaredAt": 1793107273971,

@@ -6,7 +6,7 @@ export function ProcessingSourceRetry({authority,sourceId,refresh,retryable,onCh
   const staffT=useStaffStaticText();
   const {current}=useStaffRequest(authority);
   const {data,error,loading}=useArtifactRead<unknown>(authority,`/api/source-audio/${encodeURIComponent(sourceId)}`,refresh);
-  if(loading)return <p role="status">{staffT("Loading source request...")}</p>;
+  if(loading)return <p data-page-loading role="status">{staffT("Loading source request...")}</p>;
   if(error)return <p role="alert">{staffT.error(error)}</p>;
   const value=data as {found:boolean;requestId:string;requestHash:string;status:string;receivedAt:string;briefingId:string|null;audioStatus?:string}|null;
   if(!value || !value.found || value.requestId!==sourceId || !/^[a-f0-9]{64}$/.test(value.requestHash) || !['received','processing','transcribed','failed','blocked'].includes(value.status)

@@ -12,10 +12,6 @@ p{line-height:1.5}
 .muted{color:#657087;font-size:.9rem}
 .loading-page{min-height:100vh;display:grid;place-items:center}
 .brand{display:inline-flex;align-items:center;gap:8px;color:inherit;font-size:1.55rem;font-weight:750;white-space:nowrap}
-.brand-wave{height:22px;display:inline-flex;align-items:center;gap:3px}
-.brand-wave i{display:block;width:2px;background:currentColor;border-radius:3px;height:8px}
-.brand-wave i:nth-child(2),.brand-wave i:nth-child(4){height:15px}
-.brand-wave i:nth-child(3){height:21px}
 .staff-shell{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
 .recipient-controls{border:0;min-width:0;margin:0;padding:0}
 .publish-crews{border-bottom:1px solid #e4e7e7;margin-bottom:20px;padding-bottom:20px;min-width:0}

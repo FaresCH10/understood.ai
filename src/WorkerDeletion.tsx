@@ -52,7 +52,7 @@ export function WorkerDeletion({workerId,code,refresh=0,onQueued,onLocked,author
   const stages=[['Request accepted',receipt?.createdAt],['Content redacted',receipt?.contentRedactedAt],['Identity pseudonymized',receipt?.identityPseudonymizedAt],['Application cleanup verified',receipt?.completedAt]];
   return <section className="panel worker-deletion" aria-label="Worker data request">
     <div className="people-panel-heading"><h2>Worker data</h2><button type="button" className="icon-button" title="Refresh deletion status" aria-label="Refresh deletion status" disabled={busy || loading} onClick={()=>void read()}><RefreshCw size={18}/></button></div>
-    {loading ? <p role="status">Checking deletion status...</p> : receipt ? <>
+    {loading ? <p data-page-loading role="status">Checking deletion status...</p> : receipt ? <>
       <p className={`status ${receipt.status==='complete'?'status-green':'status-amber'}`} role="status">{receipt.status==='complete'?<CheckCircle2 size={17}/>:<Clock3 size={17}/>} {receipt.status==='complete'?'Application cleanup complete':'Application cleanup queued'}</p>
       <dl className="people-facts">{stages.map(([label,date])=><React.Fragment key={label}><dt>{label}</dt><dd>{date?<time dateTime={date}>{new Date(date).toLocaleString()}</time>:'Pending'}</dd></React.Fragment>)}</dl>
       <p className="muted">Request: <bdi>{receipt.id}</bdi></p>

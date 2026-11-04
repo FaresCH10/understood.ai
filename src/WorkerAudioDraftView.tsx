@@ -22,6 +22,6 @@ const copy:Record<WorkerUiLanguage,{loading:string;failed:string}>={
 export class WorkerAudioDraftView extends React.Component<AudioDraftProps,{failed:boolean}>{
   state={failed:false};static getDerivedStateFromError(){return {failed:true};}
   render(){const t=copy[this.props.interfaceLanguage ?? workerUiFallbackLanguage(this.props.session)];
-    return this.state.failed?<p role="alert">{t.failed}</p>:<Suspense fallback={<p role="status">{t.loading}</p>}><Draft {...this.props}/></Suspense>;
+    return this.state.failed?<p role="alert">{t.failed}</p>:<Suspense fallback={<p data-page-loading role="status">{t.loading}</p>}><Draft {...this.props}/></Suspense>;
   }
 }

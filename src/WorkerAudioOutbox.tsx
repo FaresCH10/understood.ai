@@ -71,7 +71,7 @@ export function WorkerAudioOutbox({session,language,disabled,current,onOperation
   const locked=disabled || working;
   return <section className="worker-audio-outbox"><div className="worker-card-head"><h2><HardDrive size={20}/> {t.title}</h2><button className="icon-button" title={a.reload} aria-label={a.reload} disabled={locked} onClick={()=>{setNotice('');setTick(value=>value+1);}}><RefreshCw size={20}/></button></div>
     {learnMore?<details className="device-disclosure"><summary>{learnMore}</summary><p>{a.privacy}</p><p className="muted">{t.limits}</p></details>:<><p>{a.privacy}</p><p className="muted">{t.limits}</p></>}{notice && <p role="status">{notice}</p>}
-    {loading?<p role="status">{a.loading}</p>:!items.length?<p>{a.empty}</p>:items.map(item=><article className="worker-card" key={item.key}>
+    {loading?<p data-page-loading role="status">{a.loading}</p>:!items.length?<p>{a.empty}</p>:items.map(item=><article className="worker-card" key={item.key}>
       <h3>{t.scope} <bdi>{item.draft.scope.assignmentId}</bdi></h3><p>{t.version} {item.draft.scope.version} · {item.draft.scope.language.toUpperCase()}</p>
       <p><time dateTime={item.draft.capturedAt}>{new Date(item.draft.capturedAt).toLocaleString(language)}</time></p><p>{t.expires}: <time dateTime={item.draft.expiresAt}>{new Date(item.draft.expiresAt).toLocaleString(language)}</time></p>
       {!locked && <Preview item={item} label={a.title}/>}

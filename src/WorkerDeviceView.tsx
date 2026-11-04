@@ -26,6 +26,6 @@ export class WorkerDeviceView extends React.Component<WorkerDeviceProps,{failed:
   render(){
     const t=text[this.props.language];
     return this.state.failed?<section role="alert"><p>{t.failed}</p><button className="back-link" onClick={this.props.onBack}>{workerUiDirection(this.props.language)==='rtl'?<ArrowRight size={18}/>:<ArrowLeft size={18}/>}{t.back}</button><button className="button outline" onClick={()=>location.reload()}><RefreshCw size={18}/>{t.reload}</button></section>
-      :<Suspense fallback={<p role="status">{t.loading}</p>}><Device {...this.props}/></Suspense>;
+      :<Suspense fallback={<p data-page-loading role="status">{t.loading}</p>}><Device {...this.props}/></Suspense>;
   }
 }

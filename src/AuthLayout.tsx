@@ -1,5 +1,6 @@
+import {BrandLogo} from './BrandLogo';
 import {useRef,type ReactNode} from 'react';
-import {AudioLines,Globe2,Smartphone,Zap} from 'lucide-react';
+import {Globe2,Smartphone,Zap} from 'lucide-react';
 import {gsap,useGSAP} from './gsap';
 import './auth-layout.css';
 
@@ -50,7 +51,7 @@ export function AuthLayout({children,variant='sign-in',note}:AuthLayoutProps){
       <div className="auth-background-wash"/>
     </div>
     <div className="auth-story" ref={story}>
-      <a className="auth-brand" href="#home" aria-label="Understood home">Understood<AudioLines size={25} strokeWidth={2}/></a>
+      <a className="auth-brand" href="#home" aria-label="Understood home"><BrandLogo/></a>
       <div className="auth-copy">
         <p className="auth-eyebrow">Built for the Arabian Gulf</p>
         <p className="auth-headline">Frontline teams<br/>keep things moving.<span>Clear instructions.<br/>Stronger operations.</span></p>
@@ -64,6 +65,6 @@ export function AuthLayout({children,variant='sign-in',note}:AuthLayoutProps){
       </ul>
       <div className="auth-story-footer"><span>One team. Every language.</span></div>
     </div>
-    <div className="auth-form-column"><a className="auth-mobile-brand" href="#home" aria-label="Understood home">Understood<AudioLines size={22}/></a><section className="auth-card" id="auth-form" tabIndex={-1} aria-label={variant==='register'?'Create your workspace':variant==='worker'?'Worker sign in':'Supervisor sign in'}>{children}</section><p className="auth-card-footnote">{note??<>Clear communication starts here.<span lang="ar" dir="rtl">التواصل الواضح يبدأ هنا.</span></>}</p></div>
+    <div className="auth-form-column"><a className="auth-mobile-brand" href="#home" aria-label="Understood home"><BrandLogo/></a><section className="auth-card" id="auth-form" tabIndex={-1} aria-label={variant==='register'?'Create your workspace':variant==='worker'?'Worker sign in':'Supervisor sign in'}>{children}</section><p className="auth-card-footnote">{note??<>Clear communication starts here.<span lang="ar" dir="rtl">التواصل الواضح يبدأ هنا.</span></>}</p></div>
   </main>;
 }

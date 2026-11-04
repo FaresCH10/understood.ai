@@ -5,6 +5,7 @@ import {OPERATOR_COOKIE,HOSTED_OPERATOR_COOKIE,authenticateOperator,requireOpera
 import {operationsOverview,operationsTenants,operationsAudit,saveOperatorControl,operatorReceipt,operationsJobs,retryOperationsJob} from './operations.mjs';
 import {readProviderControls,saveProviderPolicy,runProviderVerification} from './provider-controls.mjs';
 import {operationsTenantAccess} from './operator-tenant-access.mjs';
+import {operationsSupportAccounts,revokeOperationsAccountSessions} from './operator-support.mjs';
 import {operationsEntitlements,saveOperatorEntitlement,saveActivationDecision} from './entitlement-operations.mjs';
 
 export async function handleOperationsRoute(pool,req,res,url,{enabled=false,schema='public',providerVerification,workerVerification=false,pipeline,secure=false,clientAddress=req.socket.remoteAddress}={}) {
@@ -43,6 +44,15 @@ export async function handleOperationsRoute(pool,req,res,url,{enabled=false,sche
     if(path==='/api/ops/tenant-access' && req.method==='GET') {
       if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid operator filters');
       send(res,200,await operationsTenantAccess(pool,actor,Object.fromEntries(url.searchParams),options));return true;
+    }
+    if(path==='/api/ops/support/accounts' && req.method==='GET') {
+      if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid operator filters');
+      send(res,200,await operationsSupportAccounts(pool,actor,Object.fromEntries(url.searchParams),options));return true;
+    }
+    if(path==='/api/ops/support/revoke-sessions' && req.method==='POST') {
+      if(url.search)throw Error('Invalid operator command');
+      const body=await readJson(req,4096),result=await revokeOperationsAccountSessions(pool,actor,body,options);
+      send(res,200,{requestId:body.requestId,clientContext:operatorSession(actor).clientContext,...result});return true;
     }
     if(path==='/api/ops/jobs' && req.method==='GET') {
       send(res,200,await operationsJobs(pool,actor,Object.fromEntries(url.searchParams),options));return true;

@@ -70,7 +70,7 @@ export function WorkerNotifications({session,language,navigate,refresh,current,o
     </div>
     {actionFailed && <p className="notice notice-amber" role="alert">{text.markFailed}</p>}
     <section className="notification-list" aria-label={text.title} aria-busy={loading}>
-      {loading ? <p role="status">{text.loading}</p> : failed ? <p className="notice notice-amber" role="alert">{text.loadFailed}</p> : data?.items.length ? data.items.map(item=>{
+      {loading ? <p data-page-loading role="status">{text.loading}</p> : failed ? <p className="notice notice-amber" role="alert">{text.loadFailed}</p> : data?.items.length ? data.items.map(item=>{
         const label=text.kinds[item.kind] || text.kindOther,read=!!item.readAt;
         return <article className="notification-row" key={item.id}>
           <Bell size={20} aria-hidden="true"/>
@@ -87,7 +87,7 @@ export function WorkerNotifications({session,language,navigate,refresh,current,o
     <details className="worker-card worker-push-setup">
       <summary><BellRing size={20} aria-hidden="true"/>{text.pushTitle}</summary>
       <p>{text.pushBody}</p>
-      {push.loading && <p role="status">{text.pushLoading}</p>}
+      {push.loading && <p data-page-loading role="status">{text.pushLoading}</p>}
       {push.status?.adapter==='synthetic' && <p className="notice notice-amber" role="status">{text.pushSynthetic}</p>}
       {push.status && !pushConfigured && push.status.adapter!=='synthetic' && <p className="muted">{text.pushDisabled}</p>}
       {pushConfigured && !push.supported && <p className="muted">{text.pushUnsupported}</p>}

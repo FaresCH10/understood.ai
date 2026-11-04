@@ -23,7 +23,7 @@ const copy:Record<WorkerUiLanguage,{loading:string;failed:string;retry:string}>=
 };
 class Boundary extends React.Component<{language:WorkerUiLanguage;children:React.ReactNode},{failed:boolean}>{
   state={failed:false};static getDerivedStateFromError(){return {failed:true};}
-  render(){const t=copy[this.props.language];return this.state.failed?<section role="alert"><p>{t.failed}</p><button className="button outline" onClick={()=>location.reload()}><RefreshCw size={18}/>{t.retry}</button></section>:<Suspense fallback={<p role="status">{t.loading}</p>}>{this.props.children}</Suspense>;}
+  render(){const t=copy[this.props.language];return this.state.failed?<section role="alert"><p>{t.failed}</p><button className="button outline" onClick={()=>location.reload()}><RefreshCw size={18}/>{t.retry}</button></section>:<Suspense fallback={<p data-page-loading role="status">{t.loading}</p>}>{this.props.children}</Suspense>;}
 }
 export function WorkerOfflineEntryView(props:React.ComponentProps<typeof WorkerOfflineEntry>){return <Boundary language={workerBrowserLanguage()}><Entry {...props}/></Boundary>;}
 export function WorkerOfflineSaveView(props:React.ComponentProps<typeof WorkerOfflineSave>){return <Boundary language={props.language}><Save {...props}/></Boundary>;}

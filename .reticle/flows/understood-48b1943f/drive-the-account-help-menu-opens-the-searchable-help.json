@@ -1,0 +1,65 @@
+{
+  "version": 2,
+  "name": "drive-the-account-help-menu-opens-the-searchable-help",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793707761288,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Help center"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/DashboardSidebar.tsx",
+        "line": 125
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "route",
+            "contains": "#support"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "heading",
+              "name": "Help for every workday."
+            }
+          },
+          {
+            "kind": "text",
+            "contains": "guides",
+            "satisfies": {
+              "property": "matchesPattern",
+              "pattern": "\\d[\\d,.]* guides"
+            }
+          }
+        ]
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "The account help menu opens the searchable help center with eight project guides.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-the-account-help-menu-opens-the-searchable-help"
+}

@@ -39,7 +39,7 @@ export function WorkerCredentials({workerId,workerCode,active,enabled,authority}
     finally{inFlight.current=false;if(current())setBusy(false);}
   }
   return <section className="panel worker-access-panel worker-credentials-panel"><h2>{staffT("Worker sign-in")}</h2>
-    {!enabled ? <p>{staffT("Worker passwords are unavailable in profile-demo mode.")}</p> : loading && !status ? <p role="status">{staffT("Loading sign-in status...")}</p> : status ? <>
+    {!enabled ? <p>{staffT("Worker passwords are unavailable in profile-demo mode.")}</p> : loading && !status ? <p data-page-loading role="status">{staffT("Loading sign-in status...")}</p> : status ? <>
       <dl className="billing-details"><dt>{staffT("Status")}</dt><dd>{status.state==='active'?staffT("Password assigned"):staffT("Password required")}</dd><dt>{staffT("Company ID")}</dt><dd><bdi>{status.companyId}</bdi></dd><dt>{staffT("Worker ID")}</dt><dd><bdi>{status.loginId || status.workerCode}</bdi></dd></dl>
       {saved && <p role="status" className="notice notice-green">{staffT("Worker ID and password assigned. Share them privately with this worker.")}</p>}
       <button className="button outline full" disabled={busy || !active || !status.workerActive} onClick={()=>{clear();setLogin(status.loginId || workerCode);setSaved(false);dialog.current?.showModal();}}><KeyRound size={18}/>{status.state==='active'?staffT("Reset worker password"):staffT("Assign ID and password")}</button>

@@ -27,6 +27,6 @@ export class WorkerTextDraftView extends React.Component<{session:PageSession;in
   render(){
     const t=copy[this.props.interfaceLanguage ?? workerUiFallbackLanguage(this.props.session)];
     return this.state.failed ? <section role="alert"><p>{t.failed}</p><button className="button outline" onClick={()=>location.reload()}><RefreshCw size={18}/>{t.reload}</button></section>
-      : <Suspense fallback={<p role="status">{t.loading}</p>}><Draft {...this.props}/></Suspense>;
+      : <Suspense fallback={<p data-page-loading role="status">{t.loading}</p>}><Draft {...this.props}/></Suspense>;
   }
 }

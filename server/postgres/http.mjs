@@ -65,7 +65,7 @@ import { readPublicationReport,listReportPublications } from './reports.mjs';
 import { listWorkers,createWorker,updateWorker,disableWorker,reenableWorker,listCrews,getCrew,listCrewRecipients,createCrew,moveWorkerToCrew,renameCrew,archiveCrew,restoreCrew,
   workerLanguageState,workerLanguageHistory,selectWorkerLanguage,requestWorkerLanguage,staffWorkerLanguageHistory,listLanguageRequests,decideWorkerLanguageRequest,
   readWorkerIdSettings,updateWorkerIdPrefix } from './people.mjs';
-import {listNotifications,readNotification,notificationReceipt} from './notifications.mjs';
+import {listNotifications,readNotification,notificationReceipt,readAllNotifications} from './notifications.mjs';
 import {listWorkerNotifications,readWorkerNotification,workerNotificationReceipt,savePushSubscription,revokePushSubscription,pushSubscriptionStatus} from './notification-events.mjs';
 import {resolvePushAdapter} from '../push-adapter.mjs';
 import { requestHelp,listClarifications,getClarification,resolveClarification,assignClarification,clarificationActionReceipt,workerHelpCases,workerHelpHistory } from './clarifications.mjs';
@@ -640,6 +640,10 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(path==='/api/notifications' && req.method==='GET')return send(res,200,session.principal_type==='worker'
         ?await listWorkerNotifications(pool,session,Object.fromEntries(url.searchParams),repository)
         :await listNotifications(pool,session,Object.fromEntries(url.searchParams),repository));
+      if(path==='/api/notifications/read-all' && req.method==='POST') {
+        if(url.search)throw Error('Invalid notification request');
+        return send(res,200,await readAllNotifications(pool,session,await readJson(req),repository));
+      }
       const notificationReceiptMatch=path.match(/^\/api\/notifications\/([^/]+)\/receipt$/);
       if(notificationReceiptMatch && req.method==='GET') {
         if(url.search)throw Error('Invalid notification request');return send(res,200,session.principal_type==='worker'

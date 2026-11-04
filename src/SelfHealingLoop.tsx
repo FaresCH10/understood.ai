@@ -38,7 +38,7 @@ export function SelfHealingLoop({publicationId,authority,navigate}:{publicationI
         {canWrite&&data?.eligible&&!data.signal&&<button className="button" disabled={busy||loading} onClick={()=>void act()}>{ui.t('Analyze responses')}</button>}
       </div>
       {error&&<p role="alert" className="notice notice-amber">{ui.error(error,'Improvement unavailable. Refresh to check before retrying.')}</p>}
-      {loading?<p role="status">{ui.t('Loading instruction analysis...')}</p>:data&&<>
+      {loading?<p data-page-loading role="status">{ui.t('Loading instruction analysis...')}</p>:data&&<>
         <p>{ui.t('Latest assessed responses: {assessed} · Need clarification: {clarification} · {match}',{assessed:ui.number(data.current.assessed),clarification:ui.number(data.current.clarification),match:data.current.matchRate===null?ui.t('No assessed answers yet'):ui.t('{rate} match the checked facts',{rate:ui.percent(data.current.matchRate)})})}</p>
         {data.languages.length>0&&<ul className="improvement-languages">{data.languages.map(group=><li key={group.language}><strong>{ui.language(group.language)}</strong>: {ui.t('Matches: {matched} / {assessed} · Need clarification: {clarification}',{matched:ui.number(group.matched),assessed:ui.number(group.assessed),clarification:ui.number(group.clarification)})}</li>)}</ul>}
         {!data.signal&&<p>{ui.t(data.eligible?'Repeated clarification detected. Analyze now or wait for the local background check.':'No repeated-clarification signal at this threshold. Acknowledgments are excluded from assessment counts.')}</p>}

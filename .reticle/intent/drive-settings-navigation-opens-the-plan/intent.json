@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-settings-navigation-opens-the-plan-and-usage-sec": {
+      "declaredAt": 1793705023216,
+      "id": "flow:drive-settings-navigation-opens-the-plan-and-usage-sec",
+      "state": "declared",
+      "statement": "Settings navigation opens the plan and usage section with current activity.",
+      "status": "proposed",
+      "subject": "drive-settings-navigation-opens-the-plan",
+      "surface": {
+        "flow": "drive-settings-navigation-opens-the-plan-and-usage-sec"
+      },
+      "updatedAt": 1793705023226
+    }
+  },
+  "subject": "drive-settings-navigation-opens-the-plan",
+  "version": 1
+}

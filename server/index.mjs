@@ -29,7 +29,7 @@ import { ensureRecordingSchema, isCurrentRecording, responseColumns } from "./re
 import { briefingActivityCsv,listReportPublications,openEarlierVersionCases,reportActivity } from "./reports.mjs";
 import { listCalendar } from "./calendar.mjs";
 import {reportScope} from './report-scope.mjs';
-import {listNotifications,readNotification,notificationReceipt} from './notifications.mjs';
+import {listNotifications,readNotification,notificationReceipt,readAllNotifications} from './notifications.mjs';
 import {listWorkerNotifications,readWorkerNotification,workerNotificationReceipt,savePushSubscription,revokePushSubscription,pushSubscriptionStatus} from './notification-events.mjs';
 import {resolvePushAdapter} from './push-adapter.mjs';
 import {searchSite} from './search.mjs';
@@ -640,6 +640,10 @@ export function createAppHandler(db, options = {}) {
       if(path==='/api/notifications' && req.method==='GET')return send(res,200,session.principal_type==='worker'
         ?listWorkerNotifications(db,session,Object.fromEntries(url.searchParams))
         :listNotifications(db,session,Object.fromEntries(url.searchParams)));
+      if(path==='/api/notifications/read-all' && req.method==='POST') {
+        if(url.search)throw Error('Invalid notification request');
+        return send(res,200,readAllNotifications(db,session,await readJson(req)));
+      }
       const notificationReceiptMatch=path.match(/^\/api\/notifications\/([^/]+)\/receipt$/);
       if(notificationReceiptMatch && req.method==='GET') {
         if(url.search)throw Error('Invalid notification request');return send(res,200,session.principal_type==='worker'

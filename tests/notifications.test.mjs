@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
 import {openDatabase} from '../server/db.mjs';
 import {seed} from '../server/seed.mjs';
-import {listNotifications,readNotification,notificationReceipt} from '../server/notifications.mjs';
+import {listNotifications,readNotification,notificationReceipt,readAllNotifications} from '../server/notifications.mjs';
 import * as pg from '../server/postgres/notifications.mjs';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {createAppServer} from '../server/index.mjs';
@@ -22,7 +22,7 @@ async function fixture(postgres) {
     const db=openDatabase(':memory:');seed(db);
     db.prepare("INSERT INTO staff VALUES('reader','cedar','beirut','Reader','auditor',1)").run();
     db.prepare("INSERT INTO sites VALUES('tripoli','cedar','Tripoli','UTC')").run();
-    return {db,list:(session,filters)=>listNotifications(db,session,filters),read:(session,id)=>readNotification(db,session,id),receipt:(session,id)=>notificationReceipt(db,session,id),
+    return {db,all:(session,input)=>readAllNotifications(db,session,input),list:(session,filters)=>listNotifications(db,session,filters),read:(session,id)=>readNotification(db,session,id),receipt:(session,id)=>notificationReceipt(db,session,id),
       sql:async(sql,values=[])=>db.prepare(sql).all(...values),exec:async(sql,values=[])=>db.prepare(sql).run(...values),close:()=>db.close()};
   }
   const db=new PGlite(),schema='understood_test_notifications';let failure=false,loseCommit=false;
@@ -30,7 +30,7 @@ async function fixture(postgres) {
   const pool={async connect(){return client;}};
   await db.exec(`CREATE SCHEMA ${schema}; SET search_path TO ${schema},pg_catalog`);await runMigrations(pool,{schema});
   await db.exec("INSERT INTO organizations VALUES('cedar','Cedar'),('harbor','Harbor'); INSERT INTO sites VALUES('beirut','cedar','Beirut','UTC'),('tripoli','cedar','Tripoli','UTC'),('harbor-yard','harbor','Harbor','UTC'); INSERT INTO staff(id,org_id,site_id,name,role) VALUES('maya','cedar','beirut','Maya','owner'),('reader','cedar','beirut','Reader','auditor');");
-  return {db,pool,schema,list:(session,filters)=>pg.listNotifications(pool,session,filters,{schema}),read:(session,id)=>pg.readNotification(pool,session,id,{schema}),receipt:(session,id)=>pg.notificationReceipt(pool,session,id,{schema}),
+  return {db,pool,schema,all:(session,input)=>pg.readAllNotifications(pool,session,input,{schema}),list:(session,filters)=>pg.listNotifications(pool,session,filters,{schema}),read:(session,id)=>pg.readNotification(pool,session,id,{schema}),receipt:(session,id)=>pg.notificationReceipt(pool,session,id,{schema}),
     sql:async(sql,values=[])=>{let n=0;return (await db.query(sql.replaceAll('?',()=>`$${++n}`),values)).rows;},
     exec:async(sql,values=[])=>{let n=0;return db.query(sql.replaceAll('?',()=>`$${++n}`),values);},setFail:value=>{failure=value;},loseNextCommit:()=>{loseCommit=true;},close:()=>db.close()};
 }
@@ -114,6 +114,11 @@ test('PostgreSQL credential notification HTTP scopes metadata and read receipts,
     assert.deepEqual(await (await fetch(`${base}/notifications/http-pg-notice/read`,post({},cookie))).json(),receipt);
     const saved=await fetch(`${base}/notifications/http-pg-notice/receipt`,{headers:{cookie}});assert.equal(saved.headers.get('cache-control'),'no-store');assert.deepEqual(await saved.json(),{found:true,item:receipt});
     assert.equal((await fetch(`${base}/notifications/http-pg-notice/receipt?staff_id=reader`,{headers:{cookie}})).status,400);
+    await event(f,'http-bulk','export.ready',new Date(Date.now()-1000).toISOString());
+    const before=new Date().toISOString();
+    assert.equal((await fetch(`${base}/notifications/read-all`,post({before,staffId:'reader'},cookie))).status,400);
+    assert.equal((await fetch(`${base}/notifications/read-all`,{...post({before},cookie),headers:{cookie,origin:'https://foreign.invalid','content-type':'application/json'}})).status,403);
+    const bulk=await fetch(`${base}/notifications/read-all`,post({before},cookie));assert.equal(bulk.status,200);assert.equal((await bulk.json()).marked,1);
     const list=await fetch(`${base}/notifications`,{headers:{cookie}});assert.equal(list.headers.get('cache-control'),'no-store');assert.equal((await list.json()).unread,0);
     await f.exec("UPDATE staff SET active=false WHERE id='maya'");assert.equal((await fetch(`${base}/notifications`,{headers:{cookie}})).status,401);
   }finally {await new Promise(resolve=>server.close(resolve));await f.close();}
@@ -140,7 +145,35 @@ test('SQLite notification HTTP reauthorizes, requires local origin, keeps reads 
     assert.deepEqual(await (await request(other,'/notifications/http-notice/receipt')).json(),{found:false});
     assert.deepEqual(await (await request(worker,'/notifications/http-notice/receipt')).json(),{found:false});
     assert.equal((await request(staff,'/notifications/http-notice/receipt?scope=foreign')).status,400);
+    db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run('http-bulk','cedar','beirut','system','pipeline','export.ready','private',new Date(Date.now()-1000).toISOString());
+    const before=new Date().toISOString();
+    assert.equal((await request(worker,'/notifications/read-all',{before})).status,403);
+    assert.equal((await request(staff,'/notifications/read-all',{before,staffId:'reader'})).status,400);
+    const bulk=await request(staff,'/notifications/read-all',{before});assert.equal(bulk.status,200);assert.equal((await bulk.json()).marked,1);
     assert.equal((await (await request(staff,'/notifications?status=unread')).json()).total,0);
     db.prepare("UPDATE staff SET active=0 WHERE id='maya'").run();assert.equal((await request(staff,'/notifications')).status,401);
   }finally {await new Promise(resolve=>server.close(resolve));db.close();}
+});
+
+for(const postgres of [false,true])test(`${postgres?'PostgreSQL':'SQLite'} mark all read covers every page, is personal and scoped, and leaves newer events unread`,async()=>{
+  const f=await fixture(postgres),before=new Date(Date.now()-2000).toISOString(),old=new Date(Date.now()-3000).toISOString();
+  const reader={...owner,principal_id:'reader',role:'auditor'};
+  try {
+    for(let i=0;i<25;i++)await event(f,`bulk-${i}`,'export.ready',old);
+    await event(f,'bulk-new','export.ready',new Date(Date.now()-1000).toISOString());
+    await event(f,'bulk-foreign','export.ready',old,'harbor','harbor-yard');
+    await event(f,'bulk-other-site','export.ready',old,'cedar','tripoli');
+    await event(f,'bulk-old','export.ready',new Date(Date.now()-91*86400000).toISOString());
+    await event(f,'bulk-private','private.credential',old);
+    await f.exec("INSERT INTO audit(id,org_id,site_id,actor_type,actor_id,action,object_id,occurred_at) VALUES(?,?,?,?,?,?,?,?)",['bulk-self','cedar','beirut','staff','maya','export.ready','private',old]);
+    await f.read(owner,'bulk-0');
+    const result=await f.all(owner,{before});assert.equal(result.marked,24);assert.equal(result.before,before);
+    assert.equal((await f.all(owner,{before})).marked,0);
+    const unread=await f.list(owner,{status:'unread'});assert.equal(unread.total,1);assert.equal(unread.items[0].id,'bulk-new');
+    assert.equal((await f.list(reader,{status:'unread'})).total,27);
+    assert.equal((await f.sql('SELECT * FROM notification_reads')).length,25);
+    for(const input of [null,{},[],{before,staffId:'reader'},{before:'bad'},{before:new Date(Date.now()+60000).toISOString()}])await assert.rejects(async()=>f.all(owner,input),/Invalid/);
+    for(const session of [{...owner,principal_type:'worker'},{...owner,site_id:'tripoli'},{...owner,org_id:'harbor'}])await assert.rejects(async()=>f.all(session,{before}),/Forbidden/);
+    if(postgres){f.setFail(true);await assert.rejects(f.all(reader,{before}),/Injected/);f.setFail(false);assert.equal((await f.list(reader,{status:'unread'})).total,27);}
+  }finally{await f.close();}
 });

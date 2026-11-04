@@ -1,5 +1,6 @@
+import {BrandLogo} from './BrandLogo';
 import {useRef,useState} from 'react';
-import {AudioLines,Check,CheckCheck,Globe2,ArrowUpRight} from 'lucide-react';
+import {Check,CheckCheck,Globe2,ArrowUpRight} from 'lucide-react';
 import {WORKER_LOCALES} from '../server/languages.mjs';
 import {workerWorkText} from './worker-work-text';
 import {landingCopy,type LandingLocale} from './landing-content';
@@ -41,7 +42,7 @@ export function LandingLanguages({locale}:{locale:LandingLocale}){
         <div className="language-live-content" aria-live="polite" aria-atomic="true">
           <div className="language-native-heading"><span lang={language.code} dir={language.direction}>{language.name}</span><span>{language.englishName}</span></div>
           <figure className="language-interface-preview">
-            <div className="language-preview-brand"><span>Understood<AudioLines size={19} aria-hidden="true"/></span><span lang={language.code} dir={language.direction}>{language.name}</span></div>
+            <div className="language-preview-brand"><span><BrandLogo/></span><span lang={language.code} dir={language.direction}>{language.name}</span></div>
             <div lang={language.code} dir={language.direction} className="language-preview-body"><h3>{labels.title}</h3><div className="language-preview-progress"><span aria-hidden="true"/><span>{labels.progress}</span></div><div className="language-preview-done"><CheckCheck size={20} aria-hidden="true"/><span>{labels.done}</span><Check size={17} aria-hidden="true"/></div></div>
             <figcaption>{c.preview}</figcaption>
           </figure>

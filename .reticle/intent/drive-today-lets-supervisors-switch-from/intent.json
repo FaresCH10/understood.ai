@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-today-lets-supervisors-switch-from-clarification": {
+      "declaredAt": 1793710775670,
+      "id": "flow:drive-today-lets-supervisors-switch-from-clarification",
+      "state": "declared",
+      "statement": "Today lets supervisors switch from clarifications to outstanding replies.",
+      "status": "proposed",
+      "subject": "drive-today-lets-supervisors-switch-from",
+      "surface": {
+        "flow": "drive-today-lets-supervisors-switch-from-clarification"
+      },
+      "updatedAt": 1793710775684
+    }
+  },
+  "subject": "drive-today-lets-supervisors-switch-from",
+  "version": 1
+}

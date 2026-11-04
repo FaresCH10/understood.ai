@@ -1,0 +1,279 @@
+{
+  "version": 2,
+  "name": "drive-settings-navigation-opens-the-plan-and-usage-sec",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1793705023196,
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Plan & usage"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SettingsLayout.tsx",
+        "line": 47
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "route",
+            "contains": "#settings/usage"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "heading",
+              "name": "Plan & usage"
+            }
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "heading",
+              "name": "Instruction activity"
+            }
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Privacy & retention"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SettingsLayout.tsx",
+        "line": 47
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "route",
+            "contains": "#settings/retention"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "heading",
+              "name": "Audio retention"
+            }
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Organization & site"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SettingsLayout.tsx",
+        "line": 47
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "route",
+            "contains": "#settings"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "heading",
+              "name": "Organization & site"
+            }
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Staff & access"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SettingsLayout.tsx",
+        "line": 47
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "route",
+            "contains": "#settings/staff"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "heading",
+              "name": "Staff & access"
+            }
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Invitations"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SettingsLayout.tsx",
+        "line": 47
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "route",
+            "contains": "#settings/invitations"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "heading",
+              "name": "Staff invitations"
+            }
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Invoices"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SettingsLayout.tsx",
+        "line": 47
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "route",
+            "contains": "#settings/invoices"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "heading",
+              "name": "Invoices & payment records"
+            }
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "New invoice"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/Billing.tsx",
+        "line": 136
+      },
+      "expect": {
+        "kind": "allOf",
+        "predicates": [
+          {
+            "kind": "route",
+            "contains": "#settings/invoices/new"
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "textbox",
+              "name": "Invoice number"
+            }
+          },
+          {
+            "kind": "element",
+            "query": {
+              "role": "dialog",
+              "name": "Invite staff"
+            }
+          }
+        ]
+      },
+      "page": "/"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Open Test Owner"
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/StaffAccess.tsx",
+        "line": 64
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "button",
+          "name": "Close staff details"
+        }
+      },
+      "page": "/"
+    }
+  ],
+  "startPath": "/",
+  "intent": "Settings navigation opens the plan and usage section with current activity.",
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  },
+  "intentId": "flow:drive-settings-navigation-opens-the-plan-and-usage-sec"
+}

@@ -1,5 +1,5 @@
 import {transaction,NOW} from './db.mjs';
-import {notificationKinds,notificationRoles,notificationFilters,notificationId,notificationRow,notificationWindow} from './notification-input.mjs';
+import {notificationKinds,notificationRoles,notificationFilters,notificationId,notificationRow,notificationWindow,notificationReadBefore} from './notification-input.mjs';
 
 function authority(db,session) {
   if(session?.principal_type!=='staff' || !notificationRoles.includes(session.role))throw Error('Forbidden');
@@ -40,5 +40,18 @@ export function notificationReceipt(db,session,id) {
       JOIN audit e ON e.id=r.event_id AND e.org_id=r.org_id AND e.site_id=r.site_id
       WHERE r.event_id=? AND r.staff_id=? AND r.org_id=? AND r.site_id=? AND e.action IN (${placeholders}) AND NOT (e.actor_type='staff' AND e.actor_id=?)`).get(id,session.principal_id,session.org_id,session.site_id,...kinds,session.principal_id);
     return row?{found:true,item:notificationRow(row)}:{found:false};
+  });
+}
+export function readAllNotifications(db,session,input) {
+  const before=notificationReadBefore(input);
+  return transaction(db,()=>{
+    authority(db,session);
+    const {asOf,since}=notificationWindow();
+    const result=db.prepare(`INSERT INTO notification_reads(event_id,staff_id,org_id,site_id,read_at)
+      SELECT e.id,?,e.org_id,e.site_id,? FROM audit e
+      WHERE e.org_id=? AND e.site_id=? AND e.occurred_at>=? AND e.occurred_at<=?
+      AND e.action IN (${placeholders}) AND NOT (e.actor_type='staff' AND e.actor_id=?)
+      ON CONFLICT(event_id,staff_id) DO NOTHING`).run(session.principal_id,asOf,session.org_id,session.site_id,since,before,...kinds,session.principal_id);
+    return {before,readAt:asOf,marked:Number(result.changes)};
   });
 }

@@ -29,6 +29,17 @@ export function operatorRetryInput(input) {
   reviewRequestId(input.requestId);
   return {kind:input.kind,jobId:input.jobId,attempts:input.attempts,confirmed:true};
 }
+export function operatorSessionRevocationInput(input) {
+  if(!input || typeof input!=='object' || Array.isArray(input)
+    || Object.keys(input).sort().join(',')!=='confirmed,expectedSessionCount,kind,orgId,principalId,principalType,reason,requestId,siteId'
+    || input.kind!=='session-revocation' || input.confirmed!==true || !operatorUuid(input.requestId)
+    || !entitlementText(input.orgId,100) || !entitlementText(input.siteId,100) || !entitlementText(input.principalId,100)
+    || !['staff','worker'].includes(input.principalType) || !['security_review','owner_request','maintenance'].includes(input.reason)
+    || !Number.isSafeInteger(input.expectedSessionCount) || input.expectedSessionCount<1 || input.expectedSessionCount>100000)
+    throw Error('Invalid operator command');
+  return {kind:'session-revocation',orgId:input.orgId,siteId:input.siteId,principalType:input.principalType,
+    principalId:input.principalId,expectedSessionCount:input.expectedSessionCount,reason:input.reason,confirmed:true};
+}
 export function operatorEntitlementInput(input) {
   if(!input || typeof input!=='object' || Array.isArray(input) || input.confirmed!==true || !operatorUuid(input.requestId) || !entitlementText(input.orgId,100))
     throw Error('Invalid operator command');
@@ -64,10 +75,10 @@ export function operatorHttpError(error) {
   if(message==='Invalid credentials')return {status:401,error:message};
   if(message==='Operator context changed')return {status:409,error:message};
   if(['Operator request conflict','Operator revision changed','Job is not retryable','Workspace access paused','Provider verification configuration changed',
-    'Activation request revision changed','Activation request is closed'].includes(message))return {status:409,error:message};
+    'Activation request revision changed','Activation request is closed','Account sessions changed'].includes(message))return {status:409,error:message};
   if(['Invalid operator command','Invalid operator filters','Invalid operator login','Invalid entitlement expiry','Invalid JSON','Unsupported provider stage test'].includes(message))return {status:400,error:message};
   if(message==='Request too large')return {status:413,error:message};
-  if(['Tenant unavailable','Activation request unavailable'].includes(message))return {status:404,error:message};
+  if(['Tenant unavailable','Activation request unavailable','Account unavailable'].includes(message))return {status:404,error:message};
   if(['Provider quota is closed','Provider request quota reached','Provider dispatch paused','Provider verification unavailable','Provider verification worker unavailable'].includes(message))return {status:409,error:message};
   return {status:503,error:'Operations are temporarily unavailable'};
 }

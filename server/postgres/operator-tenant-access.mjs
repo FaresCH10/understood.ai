@@ -30,13 +30,19 @@ export function operationsTenantAccess(pool,identity,input,{schema='public'}={})
         AND ($3='all' OR w.active=($3='enabled'))),paged AS (
       SELECT * FROM filtered ORDER BY lower(reference),id LIMIT $4 OFFSET $5),observed AS (
       SELECT p.*,
-        (SELECT MAX(g.redeemed_at) FROM worker_grants g WHERE g.org_id=$1 AND g.site_id=p."siteId"
-          AND g.worker_id=p.id) AS "lastSignInAt",
-        CASE WHEN EXISTS(SELECT 1 FROM sessions se JOIN worker_grants g ON g.id=se.grant_id
-          AND g.org_id=se.org_id AND g.site_id=se.site_id AND g.worker_id=se.principal_id
+        GREATEST((SELECT MAX(g.redeemed_at) FROM worker_grants g WHERE g.org_id=$1 AND g.site_id=p."siteId"
+          AND g.worker_id=p.id),(SELECT MAX(se.created_at) FROM sessions se WHERE se.org_id=$1
+          AND se.site_id=p."siteId" AND se.principal_id=p.id AND se.principal_type='worker'
+          AND se.access_mode='credential')) AS "lastSignInAt",
+        CASE WHEN EXISTS(SELECT 1 FROM sessions se
           WHERE se.org_id=$1 AND se.site_id=p."siteId" AND se.principal_id=p.id AND se.principal_type='worker'
             AND se.access_mode='credential' AND se.revoked_at IS NULL AND se.expires_at>CURRENT_TIMESTAMP
-            AND g.redeemed_at IS NOT NULL AND g.revoked_at IS NULL AND g.expires_at>CURRENT_TIMESTAMP)
+            AND ((se.grant_id IS NOT NULL AND EXISTS(SELECT 1 FROM worker_grants g WHERE g.id=se.grant_id
+              AND g.org_id=se.org_id AND g.site_id=se.site_id AND g.worker_id=se.principal_id
+              AND g.redeemed_at IS NOT NULL AND g.revoked_at IS NULL AND g.expires_at>CURRENT_TIMESTAMP))
+            OR (se.grant_id IS NULL AND se.credential_revision IS NOT NULL AND EXISTS(SELECT 1 FROM worker_credentials c
+              WHERE c.worker_id=se.principal_id AND c.org_id=se.org_id AND c.site_id=se.site_id
+              AND c.state='active' AND c.credential_revision=se.credential_revision))))
           THEN 'session_active'
           WHEN EXISTS(SELECT 1 FROM worker_grants g WHERE g.org_id=$1 AND g.site_id=p."siteId" AND g.worker_id=p.id
             AND g.redeemed_at IS NULL AND g.revoked_at IS NULL AND g.expires_at>CURRENT_TIMESTAMP) THEN 'link_available'

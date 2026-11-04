@@ -1,0 +1,6 @@
+/* Subsequent navigation keeps the working shell visible and loads content in place. */
+.page-loading-content p[data-page-loading],.page-loading-content p.loading{position:relative;min-height:220px;margin:20px 0;overflow:hidden;font-size:0!important;color:transparent!important;border-radius:8px}
+.page-loading-content p[data-page-loading]::before,.page-loading-content p.loading::before{content:'';position:absolute;inset-block-start:4px;inset-inline-start:0;width:38%;height:23px;border-radius:5px;background:#e3eae4;animation:page-placeholder-pulse 1.2s ease-in-out infinite alternate}
+.page-loading-content p[data-page-loading]::after,.page-loading-content p.loading::after{content:'';position:absolute;inset-block-start:55px;inset-inline:0;height:18px;border-radius:5px;background:#e8ede8;box-shadow:0 40px #e8ede8,0 80px #e8ede8,0 120px #e8ede8;animation:page-placeholder-pulse 1.2s ease-in-out .15s infinite alternate}
+@keyframes page-placeholder-pulse{from{opacity:.45}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.page-loading-content p[data-page-loading]::before,.page-loading-content p[data-page-loading]::after,.page-loading-content p.loading::before,.page-loading-content p.loading::after{animation:none}}

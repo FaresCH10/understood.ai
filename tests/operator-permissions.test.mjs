@@ -12,6 +12,7 @@ import {requestExport} from '../server/postgres/exports.mjs';
 import {provisionOperator,authenticateOperator,revokeOperator} from '../server/postgres/operators.mjs';
 import {operationsOverview,operationsTenants,operationsJobs,operationsAudit,saveOperatorControl,retryOperationsJob,operatorReceipt} from '../server/postgres/operations.mjs';
 import {operationsTenantAccess} from '../server/postgres/operator-tenant-access.mjs';
+import {assignWorkerPassword,authenticateWorker} from '../server/postgres/worker-credentials.mjs';
 import {readProviderControls,saveProviderPolicy,runProviderVerification} from '../server/postgres/provider-controls.mjs';
 import {withTransaction} from '../server/postgres/db.mjs';
 import {databaseInventory} from '../server/postgres/backup.mjs';
@@ -49,10 +50,13 @@ async function fixture() {
   await db.query("INSERT INTO briefings(id,org_id,site_id,title,source,state,prepared_json) VALUES('retry-draft','cedar','beirut','Private draft',$1,'failed',$2)",[CANONICAL_SOURCE,JSON.stringify({private:'Private preparation content'})]);
   await db.exec("INSERT INTO jobs(id,org_id,site_id,briefing_id,revision,kind,status,attempts,due_at) VALUES('retry-preparation','cedar','beirut','retry-draft',1,'prepare','failed',3,clock_timestamp())");
   await db.exec("INSERT INTO sessions(token_hash,org_id,site_id,principal_type,principal_id,expires_at,access_mode) VALUES(repeat('b',64),'cedar','beirut','staff','maya',clock_timestamp()+interval '1 hour','credential')");
+  await assignWorkerPassword(pool,owner,'worker',{expectedCode:'Worker 001',workerId:'Worker 001',password:'Synthetic worker column password',confirmed:true},{schema});
+  await authenticateWorker(pool,{company:'cedar',workerId:'Worker 001',password:'Synthetic worker column password'},'synthetic-worker',{schema});
+  const authAttempts=JSON.stringify((await db.query('SELECT * FROM auth_attempts ORDER BY key_hash')).rows);
   const configure=(profile='operator',target=role)=>configureRuntimePermissions(pool,{schema,role:target,profile,dedicatedDatabase:true,writersStopped:true});
   const runtime=()=>db.exec(`SET SESSION AUTHORIZATION ${role};SET search_path TO ${schema},pg_catalog`);
   const maintenance=()=>db.exec('SET SESSION AUTHORIZATION postgres;RESET ROLE');
-  return {db,pool,options,assessmentId:assessment.id,exportId:exported.id,configure,runtime,maintenance,
+  return {db,pool,options,authAttempts,assessmentId:assessment.id,exportId:exported.id,configure,runtime,maintenance,
     login:()=>authenticateOperator(pool,{email:'operator@example.test',password},'synthetic-operator',{schema}),close:()=>db.close()};
 }
 
@@ -63,7 +67,20 @@ test('operator policy is positive, copied and content-minimized rather than an a
   for(const table of ['publications','recordings','case_messages','staff_credentials','generated_audio'])assert.equal(tables.find(row=>row.table===table).readable,false);
   assert.equal(columns.find(row=>row.table==='briefings').select.includes('source'),false);
   assert.equal(columns.find(row=>row.table==='report_exports').select.includes('snapshot_json'),false);
+  assert.deepEqual(columns.find(row=>row.table==='worker_credentials'),{table:'worker_credentials',select:['worker_id','org_id','site_id','state','credential_revision'],insert:[],update:[],remove:false});
+  assert.ok(columns.find(row=>row.table==='sessions').select.includes('created_at'));
+  assert.ok(columns.find(row=>row.table==='sessions').select.includes('credential_revision'));
   columns[0].select.push('unapproved');assert.equal(operatorColumnPolicy()[0].select.includes('unapproved'),false);
+});
+
+test('session observation migration preserves unknown historical dates and timestamps future sessions',async()=>{
+  const db=new PGlite();try{
+    await db.exec("CREATE TABLE sessions(id text PRIMARY KEY);INSERT INTO sessions VALUES('historical')");
+    await db.exec(await readFile(new URL('../server/postgres/migrations/124_operator_worker_access_observation.sql',import.meta.url),'utf8'));
+    assert.equal((await db.query("SELECT created_at FROM sessions WHERE id='historical'")).rows[0].created_at,null);
+    await db.exec("INSERT INTO sessions(id) VALUES('new')");
+    assert.ok((await db.query("SELECT created_at FROM sessions WHERE id='new'")).rows[0].created_at instanceof Date);
+  }finally{await db.close();}
 });
 
 test('hosted service commands select an exact fixed profile without application fallback',()=>{
@@ -75,12 +92,13 @@ test('hosted service commands select an exact fixed profile without application 
 
 test('actual operator column role authenticates and runs metadata, control and all three retries without content grants',async()=>{
   const f=await fixture();try {
-    const configured=await f.configure();await f.runtime();assert.equal((await verifyMigrations(f.pool,{schema})).migrations,122);
+    const configured=await f.configure();await f.runtime();assert.equal((await verifyMigrations(f.pool,{schema})).migrations,123);
     assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema,profile:'operator'}),configured);
     await assert.rejects(verifyRuntimePermissions(f.pool,{schema,profile:'application'}),/privileges/);
     const login=await f.login(),actor=login.session;
     assert.equal((await operationsTenants(f.pool,actor,{},f.options)).total,2);
-    assert.equal((await operationsTenantAccess(f.pool,actor,{orgId:'cedar'},f.options)).total,1);
+    const access=await operationsTenantAccess(f.pool,actor,{orgId:'cedar'},f.options);
+    assert.equal(access.total,1);assert.equal(access.items[0].credentialState,'session_active');assert.ok(access.items[0].lastSignInAt);
     assert.equal((await operationsOverview(f.pool,actor,f.options)).backend,'postgres');
     assert.ok((await operationsJobs(f.pool,actor,{},f.options)).total>=3);
     assert.equal((await readProviderControls(f.pool,actor,undefined,{},f.options)).productionReady,false);
@@ -99,7 +117,7 @@ test('actual operator column role authenticates and runs metadata, control and a
     assert.equal((await f.db.query("SELECT revoked_at IS NOT NULL AS revoked FROM sessions WHERE principal_id='maya'")).rows[0].revoked,true);
     assert.ok((await operationsAudit(f.pool,actor,{},f.options)).total>=6);
     await revokeOperator(f.pool,actor,f.options);await assert.rejects(operationsOverview(f.pool,actor,f.options),/Operator sign in required/);
-    await f.maintenance();assert.deepEqual((await f.db.query('SELECT count FROM auth_attempts')).rows,[{count:7}]);
+    await f.maintenance();assert.equal(JSON.stringify((await f.db.query('SELECT * FROM auth_attempts ORDER BY key_hash')).rows),f.authAttempts);
     assert.equal((await f.db.query('SELECT COUNT(*)::int AS count FROM operator_auth_attempts')).rows[0].count,3);
   }finally{await f.close();}
 });
@@ -110,6 +128,9 @@ test('operator SQL cannot read private content, forge worker outcomes, change cr
     for(const sql of ['SELECT source FROM briefings','SELECT prepared_json FROM briefings','SELECT answer_text FROM attempts',
       'SELECT snapshot_json FROM publications','SELECT snapshot_json FROM report_exports','SELECT csv FROM report_exports',
       'SELECT token_hash FROM sessions','SELECT token_hash FROM worker_grants','SELECT * FROM staff_credentials',
+      'SELECT * FROM worker_credentials','SELECT password_hash FROM worker_credentials','SELECT password_salt FROM worker_credentials',
+      'SELECT login_id FROM worker_credentials','SELECT * FROM worker_setup_tokens',
+      'UPDATE worker_credentials SET credential_revision=credential_revision+1','UPDATE sessions SET created_at=clock_timestamp()',
       'SELECT * FROM auth_attempts','DELETE FROM auth_attempts',"UPDATE attempts SET outcome='matched'",
       "UPDATE platform_operators SET password_hash='forged'","INSERT INTO platform_operators(id) VALUES('forged')",
       'DELETE FROM organizations','TRUNCATE jobs','CREATE TABLE operator_escape(id text)',
@@ -136,6 +157,7 @@ test('operator admission rejects whole-table, hidden/future-column, delegate and
       [`GRANT SELECT ON briefings TO ${role}`,`REVOKE SELECT ON briefings FROM ${role}`],
       [`GRANT SELECT(source) ON briefings TO ${role}`,`REVOKE SELECT(source) ON briefings FROM ${role}`],
       [`GRANT UPDATE(source) ON briefings TO ${role}`,`REVOKE UPDATE(source) ON briefings FROM ${role}`],
+      [`GRANT SELECT(password_hash) ON worker_credentials TO ${role}`,`REVOKE SELECT(password_hash) ON worker_credentials FROM ${role}`],
       [`GRANT SELECT(id) ON sites TO ${role} WITH GRANT OPTION`,`REVOKE GRANT OPTION FOR SELECT(id) ON sites FROM ${role}`],
       ['GRANT SELECT(id) ON sites TO PUBLIC','REVOKE SELECT(id) ON sites FROM PUBLIC'],
     ]) {

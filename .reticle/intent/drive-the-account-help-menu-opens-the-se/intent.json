@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-the-account-help-menu-opens-the-searchable-help": {
+      "declaredAt": 1793707761318,
+      "id": "flow:drive-the-account-help-menu-opens-the-searchable-help",
+      "state": "declared",
+      "statement": "The account help menu opens the searchable help center with eight project guides.",
+      "status": "proposed",
+      "subject": "drive-the-account-help-menu-opens-the-se",
+      "surface": {
+        "flow": "drive-the-account-help-menu-opens-the-searchable-help"
+      },
+      "updatedAt": 1793707761335
+    }
+  },
+  "subject": "drive-the-account-help-menu-opens-the-se",
+  "version": 1
+}

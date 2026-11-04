@@ -1,0 +1,18 @@
+{
+  "intents": {
+    "flow:drive-help-search-finds-guides-by-troubleshooting-deta": {
+      "declaredAt": 1793707688260,
+      "id": "flow:drive-help-search-finds-guides-by-troubleshooting-deta",
+      "state": "declared",
+      "statement": "Help search finds guides by troubleshooting details inside the article.",
+      "status": "proposed",
+      "subject": "drive-help-search-finds-guides-by-troubl",
+      "surface": {
+        "flow": "drive-help-search-finds-guides-by-troubleshooting-deta"
+      },
+      "updatedAt": 1793707688277
+    }
+  },
+  "subject": "drive-help-search-finds-guides-by-troubl",
+  "version": 1
+}

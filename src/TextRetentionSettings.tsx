@@ -1,3 +1,4 @@
+import {SettingsPolicy} from './SettingsLayout';
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useMemo,useState} from 'react';
 import {RefreshCw,Save} from 'lucide-react';
@@ -33,8 +34,8 @@ export function TextRetentionSettings({authority,category='response'}:{authority
     setConfirmed(false);await savePolicy(change);
   }
   const displayedConfirmation=isBriefing?'I understand that archived instruction source, prepared content and publication copies will be redacted from the current application view after the archive and related answers/case resolutions have aged past this policy. Pending checks and open cases prevent cleanup. Generated audio must finish its separate cleanup first. Version identities, audiences, outcomes and hashes remain; disabling cleanup cannot restore content.':confirmation;
-  return <section className="panel content-retention" aria-label={staffT.message(title)}>
-    <div className="people-panel-heading"><h2>{staffT.message(title)}</h2><button className="icon-button" title={staffT("Refresh {p0} retention",{p0:staffT(policyName)})} aria-label={staffT("Refresh {p0} retention",{p0:staffT(policyName)})} disabled={saving} onClick={refresh}><RefreshCw size={18}/></button></div>
+  return <SettingsPolicy title={staffT.message(title)} needsAttention={!!pending||!!error}><section className="panel content-retention" aria-label={staffT.message(title)}>
+    <div className="people-panel-heading"><span className="sr-only">{staffT.message(title)}</span><button className="icon-button" title={staffT("Refresh {p0} retention",{p0:staffT(policyName)})} aria-label={staffT("Refresh {p0} retention",{p0:staffT(policyName)})} disabled={saving} onClick={refresh}><RefreshCw size={18}/></button></div>
     {error&&<p role="alert" className="record-error">{staffT.error(error)}</p>}{saved&&<p role="status">{isBriefing?staffT("Instruction"):isActivity?staffT("Activity"):isGenerated?staffT("Generated audio"):isCase?staffT("Case"):staffT("Text")} {staffT("retention policy save confirmed.")}</p>}
     {data?<>
       <p className="muted">{staffT("Current policy:")} {data.days===null?staffT("Disabled"):staffT("{p0} days",{p0:data.days})}</p>
@@ -44,5 +45,5 @@ export function TextRetentionSettings({authority,category='response'}:{authority
       <dl className="retention-jobs">{isBriefing?<div><dt>{staffT("Instructions Redacted")}</dt><dd>{staffT.number(data.completed.briefing || 0)}</dd></div>:isActivity?<div><dt>{staffT("Activity Identities Cleared")}</dt><dd>{staffT.number(data.completed.activity || 0)}</dd></div>:isGenerated?<><div><dt>{staffT("Bundles Retired")}</dt><dd>{staffT.number(data.completed.retired || 0)}</dd></div><div><dt>{staffT("Bundles Removed")}</dt><dd>{staffT.number(data.completed.removed || 0)}</dd></div></>:isCase?<div><dt>{staffT("Cases Redacted")}</dt><dd>{staffT.number(data.completed.case || 0)}</dd></div>:<><div><dt>{staffT("Answers Redacted")}</dt><dd>{staffT.number(data.completed.attempt || 0)}</dd></div><div><dt>{staffT("Transcripts Cleared")}</dt><dd>{staffT.number(data.completed.recording || 0)}</dd></div></>}</dl>
       <p className="muted">{staffT(data.limitations)}</p>
     </>:<p role="status">{staffT("Loading")} {staffT.message(policyName)} {staffT("retention settings...")}</p>}
-  </section>;
+  </section></SettingsPolicy>;
 }

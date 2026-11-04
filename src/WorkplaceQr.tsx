@@ -1,3 +1,4 @@
+import {BrandLogo} from './BrandLogo';
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
@@ -44,7 +45,7 @@ export function WorkplaceQr({briefingId,title,organization,site,version,open,onC
       onClose={()=>{if(!kiosk)onClose();}}>
       {kiosk && <button type="button" className="button outline workplace-qr-exit" onClick={()=>setKiosk(false)}><X size={18}/>{staffT("Exit display")}</button>}
       <div className="workplace-qr-sheet" ref={sheet} dir="ltr" lang="en">
-        <header className="workplace-qr-brand"><span className="workplace-qr-wordmark">Understood</span><span>{site}</span></header>
+        <header className="workplace-qr-brand"><span className="workplace-qr-wordmark"><BrandLogo/></span><span>{site}</span></header>
         <p className="workplace-qr-kicker">{staffT("Workplace instruction access")}</p>
         <h1 id="workplace-qr-title">{showTitle?title:staffT("Open this work instruction")}</h1>
         {label.trim()?<p className="workplace-qr-location">{label.trim()}</p>:null}

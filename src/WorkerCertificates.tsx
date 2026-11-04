@@ -52,7 +52,7 @@ export function WorkerCertificates({session,language,refresh,current,onSessionLo
   const titleId='worker-certificates-title';
   return <section className="worker-certificates" aria-labelledby={titleId} dir={workerUiDirection(language)}>
     <div className="worker-notifications-head"><div><h1 id={titleId}>{text.title}</h1><p className="worker-subtitle">{text.subtitle}</p></div><button type="button" className="icon-button" aria-label={text.refresh} title={text.refresh} disabled={loading} onClick={()=>setTick(value=>value+1)}><RefreshCw size={20}/></button></div>
-    {loading ? <p role="status">{text.loading}</p> : failed ? <p className="notice notice-amber" role="alert">{text.loadFailed}</p> : items?.length ? <>
+    {loading ? <p data-page-loading role="status">{text.loading}</p> : failed ? <p className="notice notice-amber" role="alert">{text.loadFailed}</p> : items?.length ? <>
       {items.map(item=><article className="worker-card worker-certificate" key={item.id}>
         <div className="worker-certificate-head"><Award className="worker-certificate-icon" size={26} aria-hidden="true"/><div><h2>{item.title}</h2><p>{item.briefingTitle} · v{item.publicationVersion}</p></div><span className={`worker-certificate-status ${item.status}`}>{label(item.status)}</span></div>
         <dl><div><dt>{text.awarded}</dt><dd><time dateTime={item.awardedAt}>{date(item.awardedAt)}</time></dd></div><div><dt>{text.expires}</dt><dd><time dateTime={item.expiresAt}>{date(item.expiresAt)}</time></dd></div></dl>

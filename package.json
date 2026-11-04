@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "build:vercel": "node scripts/vercel-schema-check.mjs && npm run build",
     "start": "node scripts/postgres-hosted.mjs api",
     "hosted:check": "node scripts/postgres-hosted.mjs check",
     "hosted:check-worker": "node scripts/postgres-hosted.mjs check-worker",

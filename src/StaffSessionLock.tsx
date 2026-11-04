@@ -1,3 +1,4 @@
+import {BrandLogo} from './BrandLogo';
 import {useEffect,useRef,useState} from 'react';
 import {ArrowRight,LogIn,RefreshCw,ShieldAlert} from 'lucide-react';
 import {staffIdentityLabel,staffSessionText,type PageSession} from './session-state';
@@ -25,7 +26,7 @@ export function StaffSessionLock({session,onVerified,uiLanguage}:{session:PageSe
   }
   const label=(value:unknown,role=false)=>staffIdentityLabel(value,language,role);
   const active=observed && (observed.kind==='same' || observed.kind==='different')?observed.session:null;
-  return <main className="entry-page staff-session-lock" lang={language} dir={language==='en'?'ltr':'rtl'}><span className="brand">Understood</span><section className="staff-session-lock-content" role="alert"><ShieldAlert className="session-lock-icon" size={40}/><h1 ref={heading} tabIndex={-1}>{t.title}</h1><p>{t.body}</p><p className="muted">{t.next}</p>
+  return <main className="entry-page staff-session-lock" lang={language} dir={language==='en'?'ltr':'rtl'}><span className="brand"><BrandLogo/></span><section className="staff-session-lock-content" role="alert"><ShieldAlert className="session-lock-icon" size={40}/><h1 ref={heading} tabIndex={-1}>{t.title}</h1><p>{t.body}</p><p className="muted">{t.next}</p>
     <button className="button primary full" disabled={busy} onClick={()=>void check()}><RefreshCw size={18}/>{busy?t.checking:t.check}</button>
     {error && <p role="alert">{error}</p>}
     {observed && <div className="staff-session-observation"><p role="status">{t[observed.kind]}</p>{active && <dl><dt>{t.account}</dt><dd dir="auto">{label(active.name)}</dd><dt>{t.organization}</dt><dd dir="auto">{label(active.organization)}</dd><dt>{t.site}</dt><dd dir="auto">{label(active.site)}</dd><dt>{t.role}</dt><dd>{label(active.staffRole,true)}</dd></dl>}

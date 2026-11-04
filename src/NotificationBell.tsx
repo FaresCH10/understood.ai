@@ -1,13 +1,38 @@
 import {watchNeonNotifications} from './neon-notifications';
 import {useEffect,useRef,useState} from 'react';
 import {Bell} from 'lucide-react';
+import {gsap} from 'gsap';
+import {useGSAP} from '@gsap/react';
 import {validPageSession,type PageSession} from './session-state';
+
+gsap.registerPlugin(useGSAP);
 
 export const notificationChanged='understood:notifications-changed';
 
 export function NotificationBell({session,label,locale='en',disabled=false,onOpen,onSessionLost,showLabel=false}:{
   session:PageSession;label:string;locale?:string;disabled?:boolean;onOpen:()=>void;onSessionLost:()=>void;showLabel?:boolean;
 }) {
+  const buttonRef=useRef<HTMLButtonElement>(null);
+  useGSAP(()=>{
+    const button=buttonRef.current;
+    if(!button || disabled)return;
+    const media=gsap.matchMedia();
+    media.add('(prefers-reduced-motion: no-preference)',()=>{
+      const ring=gsap.timeline({paused:true,defaults:{ease:'sine.inOut'}})
+        .set('.notification-bell-icon',{transformOrigin:'50% 15%'})
+        .to('.notification-bell-icon',{rotation:16,duration:0.1})
+        .to('.notification-bell-icon',{rotation:-13,duration:0.14})
+        .to('.notification-bell-icon',{rotation:9,duration:0.13})
+        .to('.notification-bell-icon',{rotation:-5,duration:0.12})
+        .to('.notification-bell-icon',{rotation:0,duration:0.16});
+      const hover=(event:PointerEvent)=>{if(event.pointerType!=='touch')ring.restart();};
+      const focus=()=>{if(button.matches(':focus-visible'))ring.restart();};
+      button.addEventListener('pointerenter',hover);
+      button.addEventListener('focus',focus);
+      return()=>{button.removeEventListener('pointerenter',hover);button.removeEventListener('focus',focus);};
+    });
+    return()=>media.revert();
+  },{scope:buttonRef,dependencies:[disabled],revertOnUpdate:true});
   const binding=session.clientContext || '';
   const latest=useRef({session,onSessionLost});latest.current={session,onSessionLost};
   const [count,setCount]=useState<{binding:string;unread:number}|null>(null);
@@ -41,8 +66,8 @@ export function NotificationBell({session,label,locale='en',disabled=false,onOpe
   },[binding]);
   const unread=count?.binding===binding && validPageSession(session)?count.unread:0;
   const display=new Intl.NumberFormat(locale).format(Math.min(unread,99))+(unread>99?'+':'');
-  return <button type="button" className={`icon-button bell notification-bell${showLabel?' worker-header-action':''}`} aria-label={unread?`${label} (${new Intl.NumberFormat(locale).format(unread)})`:label}
-    title={label} disabled={disabled} onClick={onOpen}><Bell size={21} aria-hidden="true"/>
+  return <button ref={buttonRef} type="button" className={`icon-button bell notification-bell${showLabel?' worker-header-action':''}`} aria-label={unread?`${label} (${new Intl.NumberFormat(locale).format(unread)})`:label}
+    title={label} disabled={disabled} onClick={onOpen}><Bell className="notification-bell-icon" size={21} aria-hidden="true"/>
     {unread>0 && <span className={`notification-count${showLabel?' is-inline':''}`} aria-hidden="true">{display}</span>}
     {showLabel && <span className="worker-header-action-label" aria-hidden="true">{label}</span>}
   </button>;

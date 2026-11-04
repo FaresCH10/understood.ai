@@ -5,6 +5,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {provisionOperator,authenticateOperator,revokeOperator,operatorSession} from '../server/postgres/operators.mjs';
 import {issueWorkerGrant,redeemWorkerGrant} from '../server/postgres/auth.mjs';
+import {assignWorkerPassword,authenticateWorker} from '../server/postgres/worker-credentials.mjs';
 import {operationsTenantAccess,tenantAccessFilters} from '../server/postgres/operator-tenant-access.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {saveOperatorControl} from '../server/postgres/operations.mjs';
@@ -31,7 +32,7 @@ async function fixture(){
     UNION ALL SELECT 'worker_grants',to_jsonb(g) FROM worker_grants g UNION ALL SELECT 'audit',to_jsonb(a) FROM audit a
     UNION ALL SELECT 'operator_requests',to_jsonb(r) FROM operator_requests r UNION ALL SELECT 'operator_audit',to_jsonb(o) FROM operator_audit o
     ) evidence ORDER BY source,value::text`));
-  return {db,pool,options,identity:login.session,login,grant,worker,snapshot,setFailure:value=>{failed=value;},close:()=>db.close()};
+  return {db,pool,options,owner,identity:login.session,login,grant,worker,snapshot,setFailure:value=>{failed=value;},close:()=>db.close()};
 }
 
 test('operator tenant access filters require one explicit bounded tenant and allow only directory metadata filters',()=>{
@@ -89,6 +90,34 @@ test('access observations distinguish site/tenant restrictions and revoked, expi
     await saveOperatorControl(f.pool,f.identity,{requestId:randomUUID(),kind:'tenant',orgId:'qa',revision:0,state:'suspended',reason:'maintenance',confirmed:true},f.options);
     const r=await read('current');assert.equal(r.tenantState,'suspended');assert.ok(r.items[0].lastSignInAt);
     await revokeOperator(f.pool,f.identity,f.options);await assert.rejects(read('current'),/Operator sign in required/);
+  }finally{await f.close();}
+});
+
+test('password sessions report genuine sign-in times and require an active matching credential revision',async()=>{
+  const f=await fixture();try{
+    const read=async()=> (await operationsTenantAccess(f.pool,f.identity,{orgId:'qa',search:'Worker 001'},f.options)).items[0];
+    const input={company:'qa',workerId:'Worker 001',password:'Synthetic worker password only'};
+    assert.equal((await read()).lastSignInAt,null);
+    await assignWorkerPassword(f.pool,f.owner,'page-1',{expectedCode:'Worker 001',workerId:'Worker 001',password:input.password,confirmed:true},f.options);
+    assert.equal((await read()).credentialState,'no_current_access');assert.equal((await read()).lastSignInAt,null);
+    const signIn=()=>authenticateWorker(f.pool,input,'synthetic-worker',f.options);
+    await signIn();
+    const signedAt=(await f.db.query("SELECT created_at FROM sessions WHERE principal_id='page-1'")).rows[0].created_at.toISOString();
+    const before=await f.snapshot(),observed=await read();
+    assert.equal(observed.credentialState,'session_active');assert.equal(new Date(observed.lastSignInAt).toISOString(),signedAt);
+    assert.equal(await f.snapshot(),before);assert.doesNotMatch(JSON.stringify(observed),/token|hash|password|credential_revision/);
+    await f.db.query("UPDATE sessions SET revoked_at=clock_timestamp() WHERE principal_id='page-1'");
+    assert.equal((await read()).credentialState,'no_current_access');assert.equal(new Date((await read()).lastSignInAt).toISOString(),signedAt);
+    await signIn();await f.db.query("UPDATE sessions SET expires_at='1970-01-01' WHERE principal_id='page-1'");
+    assert.equal((await read()).credentialState,'no_current_access');
+    await signIn();await f.db.query("UPDATE worker_credentials SET credential_revision=credential_revision+1 WHERE worker_id='page-1'");
+    assert.equal((await read()).credentialState,'no_current_access');
+    await signIn();assert.equal((await read()).credentialState,'session_active');
+    await f.db.query("UPDATE worker_credentials SET state='setup',password_salt=NULL,password_hash=NULL,password_changed_at=NULL,credential_revision=credential_revision+1 WHERE worker_id='page-1'");
+    assert.equal((await read()).credentialState,'no_current_access');assert.ok((await read()).lastSignInAt);
+    await f.db.query("INSERT INTO sessions(token_hash,org_id,site_id,principal_type,principal_id,expires_at,access_mode) VALUES(repeat('d',64),'qa','main','worker','page-2',clock_timestamp()+interval '1 hour','demo')");
+    const demo=(await operationsTenantAccess(f.pool,f.identity,{orgId:'qa',search:'Worker 002'},f.options)).items[0];
+    assert.equal(demo.credentialState,'no_current_access');assert.equal(demo.lastSignInAt,null);
   }finally{await f.close();}
 });
 

@@ -1,3 +1,4 @@
+import {BrandLogo} from './BrandLogo';
 import {ArrowRight,AudioLines,Check,ChevronRight,Clock3,FileText,Globe2,MessageCircle,ShieldCheck,Users} from 'lucide-react';
 import {landingCopy,type LandingLocale} from './landing-content';
 
@@ -12,7 +13,7 @@ const sampleWorkers=[
 export function SupervisorPreview({locale}:{locale:LandingLocale}){
   const t=landingCopy[locale],answered=sampleWorkers.filter(row=>row.state!=='waiting').length,followUp=sampleWorkers.filter(row=>row.state==='clarification').length;
   return <figure className="landing-supervisor-preview" aria-label={t.supervisorTitle}>
-    <div className="landing-preview-top"><span><AudioLines size={20} aria-hidden="true"/>Understood</span><span>{t.supervisor}</span></div>
+    <div className="landing-preview-top"><span><BrandLogo/></span><span>{t.supervisor}</span></div>
     <div className="landing-preview-content"><div className="landing-preview-heading"><div><span className="landing-mini-label">{t.published} · v1</span><h3>{t.briefing}</h3></div><FileText size={20} aria-hidden="true"/></div>
       <dl className="landing-preview-metrics"><div><dt>{t.assigned}</dt><dd>{sampleWorkers.length}</dd></div><div><dt>{t.answered}</dt><dd>{answered}</dd></div><div><dt>{t.followUp}</dt><dd>{followUp}</dd></div></dl>
       <div className="landing-preview-attention"><MessageCircle size={18} aria-hidden="true"/><span>{t.workerLabel} 014 · {t.clarification}</span><ChevronRight size={16} className="landing-forward" aria-hidden="true"/></div>
@@ -23,7 +24,7 @@ export function SupervisorPreview({locale}:{locale:LandingLocale}){
 
 export function WorkerPreview({locale}:{locale:LandingLocale}){
   const t=landingCopy[locale];
-  return <figure className="landing-worker-preview"><div className="landing-phone"><div className="landing-phone-top"><span>Understood<AudioLines size={18} aria-hidden="true"/></span><Globe2 size={16} aria-hidden="true"/></div><div className="landing-phone-content"><span className="landing-mini-label">{t.myInstructions}</span><h3>{t.briefing}</h3><span className="landing-phone-version">v1 · {locale==='ar'?'AR':'EN'}</span><div className="landing-phone-paper"><strong>{t.readInstruction}</strong><p>{locale==='ar'?t.heroArabic:t.heroOriginal}</p><div className="landing-phone-wave" aria-hidden="true"><AudioLines size={21}/><span/><span/><span/><span/><span/><span/><span/><span/><span/><span/></div></div><p className="landing-phone-question">{t.phoneQuestion}</p><div className="landing-phone-answer"><Check size={16} aria-hidden="true"/>{t.phoneAnswer}</div><p className="landing-phone-help"><MessageCircle size={14} aria-hidden="true"/>{t.phoneHelp}</p></div></div><figcaption>{t.sample}</figcaption></figure>;
+  return <figure className="landing-worker-preview"><div className="landing-phone"><div className="landing-phone-top"><span><BrandLogo/></span><Globe2 size={16} aria-hidden="true"/></div><div className="landing-phone-content"><span className="landing-mini-label">{t.myInstructions}</span><h3>{t.briefing}</h3><span className="landing-phone-version">v1 · {locale==='ar'?'AR':'EN'}</span><div className="landing-phone-paper"><strong>{t.readInstruction}</strong><p>{locale==='ar'?t.heroArabic:t.heroOriginal}</p><div className="landing-phone-wave" aria-hidden="true"><AudioLines size={21}/><span/><span/><span/><span/><span/><span/><span/><span/><span/><span/></div></div><p className="landing-phone-question">{t.phoneQuestion}</p><div className="landing-phone-answer"><Check size={16} aria-hidden="true"/>{t.phoneAnswer}</div><p className="landing-phone-help"><MessageCircle size={14} aria-hidden="true"/>{t.phoneHelp}</p></div></div><figcaption>{t.sample}</figcaption></figure>;
 }
 
 export function CompanyPreview({locale}:{locale:LandingLocale}){

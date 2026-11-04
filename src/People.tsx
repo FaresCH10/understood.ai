@@ -139,7 +139,7 @@ function LanguageRequestsPanel({refresh,disabled,onChanged,authority}:{refresh:n
   },[refresh,page,peopleApi,current]);
   return <section className="panel people-language-requests" aria-label={t.languageRequests}>
     <h2><Languages size={19}/> {t.languageRequests}{data && data.total ? ` (${data.total})` : ''}</h2>
-    {loading ? <p role="status">{t.loadingLanguageRequests}</p> : error ? <p role="alert" className="record-error">{peopleErrorText(locale,new Error(error))}</p> : data?.items.length ? <ul className="language-request-list">{data.items.map((request)=><li key={request.id}>
+    {loading ? <p data-page-loading role="status">{t.loadingLanguageRequests}</p> : error ? <p role="alert" className="record-error">{peopleErrorText(locale,new Error(error))}</p> : data?.items.length ? <ul className="language-request-list">{data.items.map((request)=><li key={request.id}>
       <div className="language-request-head"><strong><bdi>{request.workerName || request.workerCode || request.workerId}</bdi></strong>{request.workerName && <small><bdi>{request.workerCode}</bdi></small>}{request.workerActive===false && <span className="status status-amber"><span className="status-dot"/>{t.disabled}</span>}</div>
       <p>{t.languageRequestFrom} <bdi>{languages[request.currentLanguage]}</bdi> {t.to} <bdi>{languages[request.requestedLanguage]}</bdi></p>
       <p className="muted">{t.languageRequestReason}: {request.reason ? <bdi>{request.reason}</bdi> : t.noReasonGiven}</p>
@@ -395,7 +395,7 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
     <div className={initialWorkerId?"worker-profile-layout":"worker-directory-layout"}>
       {!initialWorkerId && <section className="panel people-directory" aria-label={t.directory}>
         <h2>{t.workers} ({workers?.total ?? 0})</h2>
-        {loading && !workers ? <p role="status">{t.loadingWorkers}</p> : workers?.items.length ? <div className="table-wrap" role="region" aria-label={t.directory} tabIndex={0}><table className="people-table">
+        {loading && !workers ? <p data-page-loading role="status">{t.loadingWorkers}</p> : workers?.items.length ? <div className="table-wrap" role="region" aria-label={t.directory} tabIndex={0}><table className="people-table">
           <thead><tr><th>{t.workerId}</th><th>{t.language}</th><th>{t.accessStatus}</th><th>{t.crew}</th><th><span className="sr-only">{t.details}</span></th></tr></thead>
           <tbody>{workers.items.map((worker) => <tr key={worker.id} className="worker-profile-row" onClick={()=>navigate(`people/worker/${encodeURIComponent(worker.id)}`)}>
             <td><button className="people-row-button" onClick={event => {event.stopPropagation();navigate(`people/worker/${encodeURIComponent(worker.id)}`);}}><UserRound size={18} /> <span className="people-worker-identity"><strong><bdi>{worker.name || worker.code}</bdi></strong>{worker.name && <small><bdi>{worker.code}</bdi></small>}</span></button></td>
@@ -428,7 +428,7 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
           {!selected.active && (!canDelete || !deletionLocked) && <WorkerReenable authority={authority} key={selected.id} worker={selected} onChanged={(updated) => {if(!current())return;setSelected(updated);setStatus('all');setSearch(updated.code);setPage(1);setRevision((n) => n+1);setMessage(updated.active ? t.workerReenabled : t.reenableRecorded);workerSearchInput.current?.focus();}}/>}
         </section> : initialWorkerId && !loading ? <p role="status">Worker unavailable.</p> : null}
         {initialWorkerId && selected && !form && <div lang="en" dir="ltr"><WorkerAccess authority={authority} key={selected.id} workerId={selected.id} code={selected.code} active={selected.active} credentialAccess={credentialAccess} canManage={canManage}/></div>}
-        {initialWorkerId && selected && !form && canDelete && <div lang="en" dir="ltr"><Suspense fallback={<p role="status">{t.loadingData}</p>}><WorkerDeletion authority={authority} key={selected.id} workerId={selected.id} code={selected.code} onLocked={setDeletionLocked} onQueued={(status)=>{if(!current() || selectedRef.current?.id!==selected.id)return;setSelected({...selected,active:false});setStatus('all');setMessage(status==='complete'?t.cleanupComplete:t.cleanupQueued);}}/></Suspense></div>}
+        {initialWorkerId && selected && !form && canDelete && <div lang="en" dir="ltr"><Suspense fallback={<p data-page-loading role="status">{t.loadingData}</p>}><WorkerDeletion authority={authority} key={selected.id} workerId={selected.id} code={selected.code} onLocked={setDeletionLocked} onQueued={(status)=>{if(!current() || selectedRef.current?.id!==selected.id)return;setSelected({...selected,active:false});setStatus('all');setMessage(status==='complete'?t.cleanupComplete:t.cleanupQueued);}}/></Suspense></div>}
 
       </div>
     </div>
