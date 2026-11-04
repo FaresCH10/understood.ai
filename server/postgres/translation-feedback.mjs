@@ -23,17 +23,9 @@ const queueQuery=`SELECT f.*,b.title AS briefing_title,p.state AS publication_st
   LEFT JOIN staff reporter ON reporter.id=f.reported_by AND reporter.org_id=f.org_id AND reporter.site_id=f.site_id
   LEFT JOIN staff resolver ON resolver.id=f.resolved_by AND resolver.org_id=f.org_id AND resolver.site_id=f.site_id`;
 export async function listTranslationFeedback(pool,session,input={}, {schema='public'}={}) {
-  const {status,language,page,pageSize}=translationFeedbackFilters(input);
-  return domainTransaction(pool,schema,async client=>{
-    await requirePrincipal(client,session,'staff',['owner','supervisor','auditor']);
-    const where="f.org_id=$1 AND f.site_id=$2 AND ($3='all' OR f.status=$3) AND ($4='' OR f.language=$4)";
-    const args=[session.org_id,session.site_id,status,language];
-    const total=(await client.query(`SELECT COUNT(*)::int AS n FROM translation_feedback f WHERE ${where}`,args)).rows[0].n;
-    const items=(await client.query(`${queueQuery} WHERE ${where} ORDER BY f.reported_at DESC,f.id DESC LIMIT $5 OFFSET $6`,
-      [...args,pageSize,(page-1)*pageSize])).rows.map(feedbackRow);
-    return {items,total,page,pageSize};
-  });
+  throw new Error('Forbidden');
 }
+
 export async function reportTranslationFeedback(pool,session,input,{schema='public'}={}) {
   const value=translationFeedbackInput(input);
   return domainTransaction(pool,schema,async client=>{
@@ -60,21 +52,5 @@ export async function reportTranslationFeedback(pool,session,input,{schema='publ
   });
 }
 export async function decideTranslationFeedback(pool,session,id,input,{schema='public'}={}) {
-  if(typeof id!=='string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new Error('Invalid translation feedback');
-  const value=translationFeedbackDecisionInput(input);
-  return domainTransaction(pool,schema,async client=>{
-    await requirePrincipal(client,session,'staff');
-    const row=(await client.query('SELECT * FROM translation_feedback WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',[id,session.org_id,session.site_id])).rows[0];
-    if(!row) throw new Error('Translation feedback unavailable');
-    if(row.status!=='open') {
-      if(row.status===value.action && row.resolved_by===session.principal_id && (row.resolution_note ?? '')===value.note)
-        return {...feedbackRow((await client.query(`${queueQuery} WHERE f.id=$1`,[id])).rows[0]),duplicate:true};
-      throw new Error('Translation feedback already decided');
-    }
-    const changed=(await client.query("UPDATE translation_feedback SET status=$4,resolved_by=$5,resolved_at=clock_timestamp(),resolution_note=$6 WHERE id=$1 AND org_id=$2 AND site_id=$3 AND status='open' RETURNING id",
-      [id,session.org_id,session.site_id,value.action,session.principal_id,value.note || null])).rows[0];
-    if(!changed) throw new Error('Translation feedback already decided');
-    await domainAudit(client,session,`translation.feedback_${value.action}`,id);
-    return {...feedbackRow((await client.query(`${queueQuery} WHERE f.id=$1`,[id])).rows[0]),duplicate:false};
-  });
+  throw new Error('Forbidden');
 }

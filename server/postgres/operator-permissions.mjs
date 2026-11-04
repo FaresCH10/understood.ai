@@ -3,6 +3,7 @@ const updateGuardSha256='4eee91ca2a85465fe44d25c9a1877bbbb63493adcedf088cb0044af
 const guardTables=['organizations','sites','platform_operators','sessions','operator_sessions','briefings','jobs','assessment_jobs','report_exports'];
 const row=(select,insert='',update='',remove=false)=>Object.freeze({select:Object.freeze(fields(select)),insert:Object.freeze(fields(insert)),update:Object.freeze(fields(update)),remove});
 const policy=Object.freeze({
+  translation_feedback:row('id org_id site_id publication_id language field note status reported_at resolution_note resolved_at resolved_by_operator','','status resolved_by_operator resolved_at resolution_note'),
   schema_migrations:row('version checksum'),
   platform_operators:row('id email name active revision password_salt password_hash','','id'),
   operator_sessions:row('token_hash operator_id operator_revision expires_at revoked_at','token_hash operator_id operator_revision expires_at revoked_at','revoked_at',true),

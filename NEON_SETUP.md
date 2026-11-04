@@ -178,3 +178,17 @@ using a read-only transaction. A missing database configuration, pending migrati
 or checksum mismatch fails the build before the deployment can replace production.
 This check never applies migrations. Review and rehearse migrations, apply them
 as an explicit release step, then deploy. `npm run build` remains the local build.
+
+### Platform-only translation feedback (4 November 2026)
+
+Translation feedback review now lives in the platform console at
+`/operator.html`; customer staff may submit reports but cannot list or decide them.
+The operator queue exposes reported notes and publication references, without
+granting access to publication snapshots, source content, or worker responses.
+
+Before deploying this release, rehearse and apply
+`125_operator_translation_feedback.sql`, then refresh the existing operator role
+with `configureRuntimePermissions` using the updated `operator` column policy.
+The new column attributes platform decisions to `platform_operators` without
+impersonating company staff. Existing reports and historical staff decisions stay
+intact. Review decisions have exact retry receipts and an operator audit entry.

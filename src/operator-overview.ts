@@ -4,13 +4,14 @@ export type OperatorOverview={
   workerHealth:{status:string;items:{id:string;state:string;stage:string|null;seenAt:string;fresh:boolean;failureStages:string[]}[]};
   storageHealth:{status:string;privacy:string;observation:{adapter:string;state:string;result:string|null;completedAt:string|null}|null};limits:{reason:string};
 };
-export type OperatorDestination='overview'|'support'|'jobs'|'tenants'|'entitlements'|'providers'|'controls'|'audit'|'runbooks';
+export type OperatorDestination='overview'|'support'|'jobs'|'tenants'|'entitlements'|'providers'|'controls'|'audit'|'runbooks'|'translation-feedback';
 export const operatorSections:{id:OperatorDestination;label:string;description:string;group:string}[]=[
   {id:'overview',label:'Command center',description:'Platform health, dispatch and the next action.',group:'Monitor'},
   {id:'support',label:'Support desk',description:'Diagnose supervisor and worker access in a specific workspace.',group:'Monitor'},
   {id:'jobs',label:'Processing jobs',description:'Inspect processing failures and review eligible retries.',group:'Monitor'},
   {id:'tenants',label:'Workspaces',description:'Inspect sites, worker access and workspace admission.',group:'Manage'},
   {id:'entitlements',label:'Plans & activation',description:'Review activation requests, plan terms and worker limits.',group:'Manage'},
+  {id:'translation-feedback',label:'Translation feedback',description:'Review reported translation issues across companies.',group:'Manage'},
   {id:'providers',label:'AI & quotas',description:'Inspect provider readiness, usage and controlled synthetic checks.',group:'Manage'},
   {id:'controls',label:'Dispatch controls',description:'Pause or resume new operational and AI dispatch.',group:'Manage'},
   {id:'audit',label:'Audit trail',description:'Review the immutable history of operator actions.',group:'Investigate'},

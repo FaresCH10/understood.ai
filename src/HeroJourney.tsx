@@ -1,3 +1,4 @@
+import {JourneyOrnaments} from './JourneyOrnaments';
 import {useRef} from 'react';
 import {ArrowRight,Volume2} from 'lucide-react';
 import {gsap,useGSAP,ScrollTrigger} from './gsap-scroll';
@@ -40,6 +41,9 @@ export function HeroJourney({locale,motionPaused}:{locale:LandingLocale;motionPa
     const media=gsap.matchMedia();
     if(!motionPaused)media.add('(prefers-reduced-motion: no-preference)',()=>{
       gsap.fromTo(progress,{value:0},{value:1,ease:'none',onUpdate:draw,scrollTrigger:{id:'hero-journey-line',trigger:section,start:'top 70%',end:'bottom 70%',scrub:.65}});
+      gsap.utils.toArray<SVGSVGElement>('.journey-ornament',section).forEach((ornament,index)=>{
+        gsap.fromTo(ornament,{y:index%2?-18:18},{y:index%2?18:-18,ease:'none',scrollTrigger:{trigger:section,start:'top bottom',end:'bottom top',scrub:1}});
+      });
       gsap.from('.journey-introduction>*',{y:20,autoAlpha:0,stagger:.1,duration:.65,ease:'power2.out',scrollTrigger:{trigger:'.journey-introduction',start:'top 85%',once:true}});
       gsap.utils.toArray<HTMLElement>('.journey-scene',section).forEach((scene,index)=>{
         const select=gsap.utils.selector(scene),direction=index%2===0?-1:1;
@@ -60,6 +64,7 @@ export function HeroJourney({locale,motionPaused}:{locale:LandingLocale;motionPa
   },{scope:root,dependencies:[locale,motionPaused],revertOnUpdate:true});
 
   return <section ref={root} className={`hero-journey ${motionPaused?'is-static':''}`} aria-labelledby="journey-title" data-testid="hero-journey">
+    <JourneyOrnaments/>
     <svg ref={svg} className="journey-connection" aria-hidden="true" focusable="false" preserveAspectRatio="none"><path ref={track} className="journey-line-track"/><path ref={trace} className="journey-line-progress" pathLength="1"/><circle ref={signal} className="journey-signal" r="6"/></svg>
     <div className="landing-container journey-introduction"><h2 id="journey-title">{locale==='ar'?<>فرق مختلفة.<br/><span>وضوح مشترك.</span></>:<>Different teams.<br/><span>The same clarity.</span></>}</h2><p>{locale==='ar'?'من المستودع إلى الوردية التالية، تصل التعليمات باللغات التي يستخدمها فريقك.':'From the stockroom to the next shift, an instruction travels in the languages your team uses.'}</p></div>
     <ol className="journey-scenes landing-container">{scenes.map((scene,index)=>{const copy=scene[locale];return <li className={`journey-scene journey-scene--${scene.id}`} id={`journey-${scene.id}`} key={scene.id} data-side={index%2===0?'left':'right'}>

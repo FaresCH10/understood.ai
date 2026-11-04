@@ -1,3 +1,4 @@
+import {operationsTranslationFeedback,decideOperationsTranslationFeedback} from './operator-translation-feedback.mjs';
 import {send,readJson} from '../http.mjs';
 import {sessionCookie,clearSessionCookie} from '../auth.mjs';
 import {operatorHttpError} from '../operator-input.mjs';
@@ -53,6 +54,15 @@ export async function handleOperationsRoute(pool,req,res,url,{enabled=false,sche
       if(url.search)throw Error('Invalid operator command');
       const body=await readJson(req,4096),result=await revokeOperationsAccountSessions(pool,actor,body,options);
       send(res,200,{requestId:body.requestId,clientContext:operatorSession(actor).clientContext,...result});return true;
+    }
+    if(path==='/api/ops/translation-feedback' && req.method==='GET') {
+      if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid operator filters');
+      send(res,200,await operationsTranslationFeedback(pool,actor,Object.fromEntries(url.searchParams),options));return true;
+    }
+    const feedbackDecision=path.match(/^\/api\/ops\/translation-feedback\/([^/]+)\/decision$/);
+    if(feedbackDecision && req.method==='POST') {
+      if(url.search)throw Error('Invalid operator command');
+      send(res,200,await decideOperationsTranslationFeedback(pool,actor,feedbackDecision[1],await readJson(req,4096),options));return true;
     }
     if(path==='/api/ops/jobs' && req.method==='GET') {
       send(res,200,await operationsJobs(pool,actor,Object.fromEntries(url.searchParams),options));return true;

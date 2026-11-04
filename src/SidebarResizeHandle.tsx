@@ -4,7 +4,7 @@ import {DEFAULT_SIDEBAR_WIDTH,MIN_SIDEBAR_WIDTH,SIDEBAR_WIDTH_KEY,sidebarWidth,s
 
 export function SidebarResizeHandle({sidebar}:{sidebar:RefObject<HTMLElement|null>}){
  const tr=useStaffText();
- const [width,setWidth]=useState(()=>{let saved=DEFAULT_SIDEBAR_WIDTH;try{const raw=localStorage.getItem(SIDEBAR_WIDTH_KEY);if(raw!==null&&raw.trim()&&Number.isFinite(Number(raw)))saved=Number(raw);}catch{}return sidebarWidth(saved,window.innerWidth<=760?920:window.innerWidth);});
+ const [width,setWidth]=useState(()=>{let saved=DEFAULT_SIDEBAR_WIDTH;try{const raw=localStorage.getItem(SIDEBAR_WIDTH_KEY);if(raw!==null&&raw.trim()&&Number.isFinite(Number(raw)))saved=Number(raw);}catch{}return sidebarWidth(saved,window.innerWidth<=1024?1440:window.innerWidth);});
  const [maximum,setMaximum]=useState(()=>sidebarWidthLimit(window.innerWidth));
  const drag=useRef<{pointerId:number;startX:number;startWidth:number;lastWidth:number;rtl:boolean}|null>(null),frame=useRef<number|null>(null),widthRef=useRef(width);
  const shell=()=>sidebar.current?.closest<HTMLElement>('.staff-shell');
@@ -17,7 +17,7 @@ export function SidebarResizeHandle({sidebar}:{sidebar:RefObject<HTMLElement|nul
  }
  useEffect(()=>{
   const element=sidebar.current?.closest<HTMLElement>('.staff-shell');element?.style.setProperty('--sidebar-width',`${widthRef.current}px`);
-  const resize=()=>{setMaximum(sidebarWidthLimit(window.innerWidth));if(window.innerWidth>760)apply(sidebarWidth(widthRef.current,window.innerWidth));};
+  const resize=()=>{setMaximum(sidebarWidthLimit(window.innerWidth));if(window.innerWidth>1024)apply(sidebarWidth(widthRef.current,window.innerWidth));};
   window.addEventListener('resize',resize);
   return()=>{window.removeEventListener('resize',resize);if(frame.current!==null)cancelAnimationFrame(frame.current);element?.classList.remove('sidebar-resizing');};
  },[sidebar]);

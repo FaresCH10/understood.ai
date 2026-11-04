@@ -63,15 +63,9 @@ const queueQuery=`SELECT f.*,b.title AS briefing_title,p.state AS publication_st
   LEFT JOIN staff reporter ON reporter.id=f.reported_by AND reporter.org_id=f.org_id AND reporter.site_id=f.site_id
   LEFT JOIN staff resolver ON resolver.id=f.resolved_by AND resolver.org_id=f.org_id AND resolver.site_id=f.site_id`;
 export function listTranslationFeedback(db,session,input={}) {
-  const {status,language,page,pageSize}=translationFeedbackFilters(input);
-  return transaction(db,()=>{
-    authority(db,session);
-    const where="f.org_id=? AND f.site_id=? AND (?='all' OR f.status=?) AND (?='' OR f.language=?)",args=[session.org_id,session.site_id,status,status,language,language];
-    const total=db.prepare(`SELECT COUNT(*) AS n FROM translation_feedback f WHERE ${where}`).get(...args).n;
-    const items=db.prepare(`${queueQuery} WHERE ${where} ORDER BY f.reported_at DESC,f.id DESC LIMIT ? OFFSET ?`).all(...args,pageSize,(page-1)*pageSize).map(feedbackRow);
-    return {items,total,page,pageSize};
-  });
+  throw new Error('Forbidden');
 }
+
 export function reportTranslationFeedback(db,session,input) {
   const value=translationFeedbackInput(input);
   return transaction(db,()=>{
@@ -99,23 +93,5 @@ export function reportTranslationFeedback(db,session,input) {
   });
 }
 export function decideTranslationFeedback(db,session,id,input) {
-  if(!uuid(id)) throw new Error('Invalid translation feedback');
-  const value=translationFeedbackDecisionInput(input);
-  return transaction(db,()=>{
-    authority(db,session,true);
-    const row=db.prepare('SELECT * FROM translation_feedback WHERE id=? AND org_id=? AND site_id=?').get(id,session.org_id,session.site_id);
-    if(!row) throw new Error('Translation feedback unavailable');
-    if(row.status!=='open') {
-      if(row.status===value.action && row.resolved_by===session.principal_id && (row.resolution_note ?? '')===value.note)
-        return {...feedbackRow(db.prepare(`${queueQuery} WHERE f.id=?`).get(id)),duplicate:true};
-      throw new Error('Translation feedback already decided');
-    }
-    const now=NOW();
-    const changed=db.prepare("UPDATE translation_feedback SET status=?,resolved_by=?,resolved_at=?,resolution_note=? WHERE id=? AND org_id=? AND site_id=? AND status='open'")
-      .run(value.action,session.principal_id,now,value.note || null,id,session.org_id,session.site_id).changes;
-    if(changed!==1) throw new Error('Translation feedback already decided');
-    feedbackAudit(db,session,`translation.feedback_${value.action}`,id);
-    const updated=db.prepare(`${queueQuery} WHERE f.id=?`).get(id);
-    return {...feedbackRow(updated),duplicate:false};
-  });
+  throw new Error('Forbidden');
 }

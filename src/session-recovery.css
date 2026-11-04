@@ -1,0 +1,21 @@
+.session-recovery-page{min-height:100dvh;display:grid;place-items:center;background:#f3f6f3;padding:clamp(28px,6vh,64px) 20px;color:#21392e}
+.session-recovery-wrap{width:100%;max-width:480px;min-width:0}
+.session-recovery-brand{display:flex;justify-content:center;margin-bottom:30px}
+.session-recovery-brand .brand-logo{width:174px}
+.session-recovery-card{padding:36px;border:1px solid #dfe7e0;border-radius:18px;background:#fff;overflow-wrap:anywhere}
+.session-recovery-symbol{width:62px;height:62px;display:grid;place-items:center;background:#f2f5f1;border:1px solid #e3e9e2;border-radius:17px;color:#587566;margin-bottom:24px}
+.session-recovery-card--locked .session-recovery-symbol{background:#faf5e9;border-color:#eee4cd;color:#947128}
+.session-recovery-card h1{font-size:27px;line-height:1.3;font-weight:650;margin:0 0 14px;text-wrap:balance;color:#20362b}
+.session-recovery-content>p{font-size:14px;line-height:1.85;color:#627469;margin:0 0 24px;text-wrap:pretty}
+.session-recovery-content>p.muted{font-size:12px;border-inline-start:2px solid #dce6dd;padding-inline-start:12px;margin-top:-8px}
+.session-recovery-content>.button{display:flex;align-items:center;justify-content:center;width:100%;min-height:46px;border-radius:8px;font-size:14px;gap:9px;margin-top:12px;padding:12px 16px;white-space:normal}
+.session-recovery-card button:focus-visible{outline:2px solid #2b7959;outline-offset:3px}
+.session-recovery-card h1:focus{outline:none}
+.session-recovery-card .staff-session-observation{margin-top:22px;border-top:1px solid #e4eae4;padding-top:18px;font-size:13px;line-height:1.7}
+.session-recovery-card .staff-session-observation dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 16px;margin:16px 0 20px;padding:16px;background:#f4f7f3;border-radius:8px}
+.session-recovery-card .staff-session-observation dt{color:#65796c;font-size:12px}
+.session-recovery-card .staff-session-observation dd{margin:0;color:#20372c}
+.session-recovery-card .staff-session-observation .button{width:100%;justify-content:center;min-height:44px;white-space:normal}
+.session-recovery-card .billing-confirm{align-items:start;font-size:13px;line-height:1.65}
+.session-recovery-content>p[role=alert]{border:1px solid #e7d8c1;background:#faf6ed;padding:12px;border-radius:8px;color:#82612a;font-size:13px;margin-top:18px}
+@media(max-width:480px){.session-recovery-page{padding:28px 16px}.session-recovery-card{padding:26px 24px;border-radius:14px}.session-recovery-card h1{font-size:25px}.session-recovery-symbol{width:54px;height:54px;margin-bottom:20px}.session-recovery-brand{margin-bottom:24px}}

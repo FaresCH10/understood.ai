@@ -4,6 +4,7 @@ import {BootstrapSessionError,fetchBootstrapSession} from './worker-offline';
 
 const signal='understood:session-signal';
 export function useWorkerSessionGuard(session:PageSession|null,paused:boolean) {
+  const [retrying,setRetrying]=useState<string|null>(null);
   const [suspended,setSuspended]=useState<string|null>(null),retry=useRef<(()=>void)|null>(null);
   const [locked,setLocked]=useState<string|null>(null),[checking,setChecking]=useState<string|null>(null);
   const binding=session?.authenticated?JSON.stringify([session.clientContext,session.role,session.staffRole,session.staffScope,session.siteState,session.expiresAt]):null;
@@ -33,7 +34,7 @@ export function useWorkerSessionGuard(session:PageSession|null,paused:boolean) {
     const check=async(background=false)=>{
       if(!live || inFlight)return;
       if(!validPageSession(session)){lock(true);return;}
-      inFlight=true;
+      inFlight=true;setRetrying(binding);
       if(session.role==='staff' && !background){checkingRef.current=binding;setChecking(binding);}
       try {
         const value=await fetchBootstrapSession(fetch,controller.signal);
@@ -48,7 +49,7 @@ export function useWorkerSessionGuard(session:PageSession|null,paused:boolean) {
             clearTimeout(retryTimer);retryTimer=setTimeout(()=>void check(true),5000);
           }
         }
-      }finally {inFlight=false;if(live && active.current===binding && !unverified){checkingRef.current=null;setChecking(null);}}
+      }finally {inFlight=false;if(live && active.current===binding)setRetrying(null);if(live && active.current===binding && !unverified){checkingRef.current=null;setChecking(null);}}
 
     };
     retry.current=()=>{clearTimeout(retryTimer);void check(true);};
@@ -72,7 +73,7 @@ export function useWorkerSessionGuard(session:PageSession|null,paused:boolean) {
       window.removeEventListener('online',foreground);document.removeEventListener('visibilitychange',foreground);
     };
   },[binding,session?.language,session?.workerId,paused,locked]);
-  return {suspended:!!binding && suspended===binding,retry:()=>retry.current?.(),locked:!!binding && locked===binding,checking:!!binding && !paused && checking===binding,invalidate,resume,
+  return {retrying:!!binding&&retrying===binding,suspended:!!binding && suspended===binding,retry:()=>retry.current?.(),locked:!!binding && locked===binding,checking:!!binding && !paused && checking===binding,invalidate,resume,
     isInvalidated:()=>!!active.current && lockedRef.current===active.current,
     isLocked:()=>!!active.current && (lockedRef.current===active.current || checkingRef.current===active.current)};
 }

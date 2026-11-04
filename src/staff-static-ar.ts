@@ -1,4 +1,5 @@
 export const staffStaticArabic={
+  "Translation feedback is managed by the platform administrator.": "يتولى مسؤول المنصة مراجعة ملاحظات الترجمة.",
   "Updates from your team, all in one place.": "آخر مستجدات فريقك، في مكان واحد.",
   "{p0} unread": "{p0} غير مقروءة",
   "Mark all as read": "تحديد الكل كمقروء",

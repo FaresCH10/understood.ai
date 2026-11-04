@@ -1,0 +1,8 @@
+async page=>{
+ await page.getByRole('button',{name:'Recheck session',exact:true}).click();await page.getByRole('button',{name:'Go to sign in',exact:true}).waitFor();await page.getByRole('button',{name:'Go to sign in',exact:true}).click();await page.getByRole('heading',{name:'Welcome back',exact:true}).waitFor();
+ const session={authenticated:true,role:'staff',staffRole:'owner',staffScope:JSON.stringify(['preview-company','preview-site','preview-owner']),siteState:'active',mode:'synthetic-credential',clientContext:'c'.repeat(64),expiresAt:new Date(Date.now()+3600000).toISOString(),name:'Preview Owner',organization:'Cedar Works',site:'Beirut site',timezone:'UTC',firstRunRequired:false};let failing=false;
+ await page.route('**/api/session',route=>route.fulfill({status:failing?503:200,contentType:'application/json',body:JSON.stringify(failing?{error:'Unavailable'}:session)}));
+ await page.evaluate(()=>localStorage.setItem('understood:interface-language','ar'));await page.goto('http://127.0.0.1:3020/#translation-feedback');await page.reload();await page.locator('.staff-shell').waitFor();failing=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await page.locator('.session-recovery-page').waitFor();const dir=await page.locator('.session-recovery-page').getAttribute('dir');if(dir!=='rtl')throw Error('Arabic direction incorrect');if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Arabic overflow');await page.screenshot({path:'output/playwright/session-connection-arabic.png'});
+ await page.evaluate(()=>localStorage.removeItem('understood:interface-language'));return {signInRecoveryWorks:true,arabicDirection:dir,mobileOverflow:false};
+}

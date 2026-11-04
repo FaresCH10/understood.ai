@@ -1,9 +1,10 @@
-import {useEffect,useState} from 'react';
-import {CheckCircle2,ChevronLeft,ChevronRight,Clock3,FileText,Plus,RefreshCw,TriangleAlert,UserRound,Users} from 'lucide-react';
+import {useEffect,useId,useRef,useState} from 'react';
+import {CheckCircle2,ChevronLeft,ChevronRight,Clock3,FileText,Info,Plus,RefreshCw,TriangleAlert,UserRound,Users} from 'lucide-react';
 import {CrewActions} from './People';
+import {CrewWorkerPicker} from './CrewWorkerPicker';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {completeStaffRequest} from './staff-request';
-import {readCrewOverview,readCrewMembers,type CrewOverview,type CrewMembers} from './crew-overview';
+import {readCrewOverview,readCrewMembers,type CrewOverview,type CrewMembers,type CrewSummary} from './crew-overview';
 import {peopleText,peopleLanguageNames,peoplePageText,peopleMessageText,peopleErrorText,type PeopleLocale} from './people-locale';
 import {staffIdentityLabel} from './session-state';
 
@@ -15,7 +16,7 @@ const copy={
     selected:'Selected crew',choose:'Select a crew to see its current members.',manage:'Manage membership',loadingMembers:'Loading current members...',noMembers:'No active members in this crew.',openWorker:'Open worker',
     previousMembers:'Previous members',nextMembers:'Next members',activity:'Recent directory activity',allActivity:'View all activity',noActivity:'No directory activity recorded.',former:'Former site member',hidden:'Item unavailable',
     moved:'Worker membership changed',createdWorker:'Worker added',createdCrew:'Crew created',renamed:'Crew renamed',archived:'Crew archived',restored:'Crew restored',
-    warning:'Response status is not proof of safe work or internal understanding.',moveWarning:'Moving a worker does not change previous assignments or frozen crew reports.',
+    warning:'Response status is not proof of safe work or internal understanding.',responseInfo:'About response statuses',addToCrew:'Add worker to',restoreToAdd:'Restore this crew to add workers',workerAdded:'Worker added to',moveWarning:'Moving a worker does not change previous assignments or frozen crew reports.',
     morning:'Good morning',afternoon:'Good afternoon',evening:'Good evening'},
   ar:{title:'فرق الموقع',intro:'الفرق في',directory:'دليل العمال',create:'إنشاء فريق',refresh:'تحديث الفرق',loading:'جارٍ تحميل فرق الموقع...',retry:'إعادة المحاولة',
     publication:'أحدث تعليمات منشورة',noPublication:'لا توجد تعليمات منشورة متاحة.',frozen:'تستخدم أعداد إجابات الفرق العضوية المحفوظة عند النشر. تُعرض العضوية الحالية بشكل منفصل.',unavailable:'لقطة عضوية الفرق السابقة غير متاحة',
@@ -24,13 +25,16 @@ const copy={
     selected:'الفريق المحدد',choose:'اختر فريقاً لعرض أعضائه الحاليين.',manage:'إدارة العضوية',loadingMembers:'جارٍ تحميل الأعضاء الحاليين...',noMembers:'لا يوجد أعضاء نشطون في هذا الفريق.',openWorker:'فتح العامل',
     previousMembers:'الأعضاء السابقون',nextMembers:'الأعضاء التاليون',activity:'أحدث نشاط في الدليل',allActivity:'عرض كل النشاط',noActivity:'لا يوجد نشاط مسجل في الدليل.',former:'عضو سابق في الموقع',hidden:'العنصر غير متاح',
     moved:'تم تغيير عضوية عامل',createdWorker:'تمت إضافة عامل',createdCrew:'تم إنشاء فريق',renamed:'تم تغيير اسم فريق',archived:'تمت أرشفة فريق',restored:'تمت استعادة فريق',
-    warning:'حالة الإجابة ليست دليلاً على العمل الآمن أو الفهم الداخلي.',moveWarning:'لا يغيّر نقل العامل التكليفات السابقة أو تقارير الفرق المحفوظة عند النشر.',
+    warning:'حالة الإجابة ليست دليلاً على العمل الآمن أو الفهم الداخلي.',responseInfo:'حول حالات الإجابات',addToCrew:'إضافة عامل إلى',restoreToAdd:'استعد هذا الفريق لإضافة العمال',workerAdded:'تمت إضافة عامل إلى',moveWarning:'لا يغيّر نقل العامل التكليفات السابقة أو تقارير الفرق المحفوظة عند النشر.',
     morning:'صباح الخير',afternoon:'طاب نهارك',evening:'مساء الخير'},
 };
 export const siteCrewsText=copy;
 
 export default function SiteCrews({authority,refresh,locale,onLocaleChange,navigate,name,greeting,canManageContacts}:{authority:StaffRequestAuthority;refresh:number;locale:PeopleLocale;onLocaleChange:(locale:PeopleLocale)=>void;navigate:(route:string)=>void;name?:string;greeting:string;canManageContacts:boolean}) {
   const {request,current}=useStaffRequest(authority),t=copy[locale],p=peopleText[locale],languages=peopleLanguageNames(locale);
+  const responseInfoId=useId();
+  const [addingCrew,setAddingCrew]=useState<CrewSummary|null>(null),addWorkerTrigger=useRef<HTMLButtonElement|null>(null),heading=useRef<HTMLHeadingElement>(null);
+  function closeWorkerPicker(){setAddingCrew(null);requestAnimationFrame(()=>{if(addWorkerTrigger.current?.isConnected)addWorkerTrigger.current.focus();else heading.current?.focus();});}
   const [search,setSearch]=useState(''),[status,setStatus]=useState('all'),[page,setPage]=useState(1),[revision,setRevision]=useState(0);
   const [data,setData]=useState<CrewOverview|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState('');
   const [selectedId,setSelectedId]=useState(''),[memberPage,setMemberPage]=useState(1),[members,setMembers]=useState<CrewMembers|null>(null),[memberLoading,setMemberLoading]=useState(false),[memberError,setMemberError]=useState(''),[memberRevision,setMemberRevision]=useState(0);
@@ -61,8 +65,8 @@ export default function SiteCrews({authority,refresh,locale,onLocaleChange,navig
   const metricDefinitions=[['assigned',t.assigned,FileText],['responses',t.responses,Users],['matches',t.matches,CheckCircle2],['clarifications',t.clarifications,TriangleAlert],['pending',t.pending,Clock3]] as const;
   return <div className="site-crews people-localized" lang={locale} dir={locale==='ar'?'rtl':'ltr'}>
     <button className="back-link" onClick={()=>navigate('people')}><Users size={18}/>{t.directory}</button>
-    <div className="page-header"><div><h1>{t.crews}</h1><p>{t.intro} <bdi>{data?.site.name || authority.session.site}</bdi></p></div><div className="actions people-header-actions">
-      <button className="button primary" onClick={()=>navigate('people/new')}><Plus size={18}/>{p.addWorker}</button><button className="button outline" onClick={()=>navigate('people/new-crew')}><Users size={18}/>{t.create}</button>
+    <div className="page-header"><div><div className="site-crews-title"><h1 ref={heading} tabIndex={-1}>{t.crews}</h1><button type="button" className="icon-button crew-response-info" popoverTarget={responseInfoId} aria-label={t.responseInfo} title={t.responseInfo}><Info size={18} aria-hidden="true"/></button><p id={responseInfoId} popover="auto" className="crew-response-tip">{t.warning}</p></div><p>{t.intro} <bdi>{data?.site.name || authority.session.site}</bdi></p></div><div className="actions people-header-actions">
+      <button className="button primary" onClick={()=>navigate('people/new-crew')}><Plus size={18}/>{t.create}</button>
     </div></div>
     {error && <div className="notice" role="alert"><span>{peopleErrorText(locale,new Error(error))}</span><button className="button outline" onClick={()=>setRevision(n=>n+1)}><RefreshCw size={18}/>{t.retry}</button></div>}
     {message && <p role="status" className="notice notice-green">{peopleMessageText(locale,message)}</p>}
@@ -76,7 +80,7 @@ export default function SiteCrews({authority,refresh,locale,onLocaleChange,navig
       <section className="panel site-crew-list"><div className="people-panel-heading"><h2>{t.crews}{data?` (${data.total})`:''}</h2><button className="icon-button" aria-label={t.refresh} title={t.refresh} disabled={loading} onClick={()=>setRevision(n=>n+1)}><RefreshCw size={18}/></button></div>
         <div className="filters"><label className="field">{p.searchCrews}<input type="search" dir="auto" value={search} maxLength={80} onChange={event=>{setSearch(event.target.value);setPage(1);setMemberPage(1);}}/></label><label className="field">{p.crewStatus}<select value={status} onChange={event=>{setStatus(event.target.value);setPage(1);setMemberPage(1);}}><option value="all">{p.allCrews}</option><option value="active">{p.active}</option><option value="inactive">{p.archived}</option></select></label></div>
         {!loading && data && (data.items.length?<div className="table-wrap" role="region" tabIndex={0} aria-label={t.crews}><table className="site-crew-table"><thead><tr><th>{t.name}</th><th>{t.members}</th><th>{t.snapshotAssigned}</th><th>{t.matches}</th><th>{t.clarifications}</th><th>{t.pending}</th><th><span className="sr-only">{t.actions}</span></th></tr></thead><tbody>{data.items.map(crew=><tr key={crew.id} className={crew.id===selectedId?'people-selection':''}>
-          <td><button className="people-row-button" aria-label={`${t.open}: ${crew.name}`} aria-pressed={crew.id===selectedId} onClick={()=>{setSelectedId(crew.id);setMemberPage(1);}}><Users size={18}/><bdi>{crew.name}</bdi></button>{!crew.active && <small>{p.archived}</small>}</td><td data-label={t.members}>{crew.member_count}</td><td data-label={t.snapshotAssigned}>{crew.metrics?.assigned ?? '—'}</td><td data-label={t.matches}>{crew.metrics?.matches ?? '—'}</td><td data-label={t.clarifications}>{crew.metrics?.clarifications ?? '—'}</td><td data-label={t.pending}>{crew.metrics?.pending ?? '—'}</td><td><CrewActions authority={authority} locale={locale} crew={crew} disabled={loading} onChanged={(success)=>{if(!current())return;setMessage(success);setRevision(n=>n+1);}}/></td>
+          <td><button className="people-row-button" aria-label={`${t.open}: ${crew.name}`} aria-pressed={crew.id===selectedId} onClick={()=>{setSelectedId(crew.id);setMemberPage(1);}}><Users size={18}/><bdi>{crew.name}</bdi></button>{!crew.active && <small>{p.archived}</small>}</td><td data-label={t.members}>{crew.member_count}</td><td data-label={t.snapshotAssigned}>{crew.metrics?.assigned ?? '—'}</td><td data-label={t.matches}>{crew.metrics?.matches ?? '—'}</td><td data-label={t.clarifications}>{crew.metrics?.clarifications ?? '—'}</td><td data-label={t.pending}>{crew.metrics?.pending ?? '—'}</td><td><CrewActions leadingAction={<button type="button" className="icon-button crew-add-worker" disabled={!crew.active||loading} aria-label={`${t.addToCrew}: ${crew.name}`} title={crew.active?`${t.addToCrew}: ${crew.name}`:t.restoreToAdd} onClick={event=>{addWorkerTrigger.current=event.currentTarget;setSelectedId(crew.id);setMemberPage(1);setAddingCrew(crew);}}><Plus size={18}/></button>} authority={authority} locale={locale} crew={crew} disabled={loading} onChanged={(success)=>{if(!current())return;setMessage(success);setRevision(n=>n+1);}}/></td>
         </tr>)}</tbody></table></div>:<div className="empty-state"><p>{search.trim()||status!=='all'?t.empty:t.emptyAll}</p>{!search.trim()&&status==='all'&&<button className="button outline" onClick={()=>navigate('people/new-crew')}><Plus size={18}/>{t.create}</button>}</div>)}
         {!loading && !error && data && pages>1 && <div className="crew-pagination"><span>{peoplePageText(locale,page,pages)}</span><div className="actions"><button className="icon-button direction-arrow" aria-label={p.previousCrews} title={p.previousCrews} disabled={page<=1} onClick={()=>{setPage(n=>n-1);setMemberPage(1);}}><ChevronLeft size={18}/></button><button className="icon-button direction-arrow" aria-label={p.nextCrews} title={p.nextCrews} disabled={page>=pages} onClick={()=>{setPage(n=>n+1);setMemberPage(1);}}><ChevronRight size={18}/></button>{page>pages && <button className="button subtle" onClick={()=>setPage(1)}>{p.firstPage}</button>}</div></div>}
       </section>
@@ -87,6 +91,6 @@ export default function SiteCrews({authority,refresh,locale,onLocaleChange,navig
       </>}
       <p className="notice notice-blue">{t.moveWarning}</p>
     </aside></div>
-    <p className="notice"><TriangleAlert size={20}/>{t.warning}</p>
+    {addingCrew&&<CrewWorkerPicker crew={addingCrew} authority={authority} locale={locale} onClose={closeWorkerPicker} onAdded={()=>{if(!current())return;setMessage(`${t.workerAdded} ${addingCrew.name}.`);setRevision(value=>value+1);closeWorkerPicker();}}/>}
   </div>;
 }

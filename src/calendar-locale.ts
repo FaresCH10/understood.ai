@@ -91,8 +91,8 @@ export function calendarMonthTitle(month:string,language:CalendarLanguage) {
 }
 
 const weekAnchor=Date.UTC(2024,0,1,12); // Monday
-export function calendarWeekdays(language:CalendarLanguage) {
-  const format=new Intl.DateTimeFormat(calendarLocaleTag(language),{weekday:'short',timeZone:'UTC'});
+export function calendarWeekdays(language:CalendarLanguage,width:'short'|'narrow'='short') {
+  const format=new Intl.DateTimeFormat(calendarLocaleTag(language),{weekday:width,timeZone:'UTC'});
   return Array.from({length:7},(_,index)=>format.format(new Date(weekAnchor+index*86400000)));
 }
 

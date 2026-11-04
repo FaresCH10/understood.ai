@@ -1,6 +1,6 @@
 import {generateWorkerPassword} from './worker-password';
 import React, { createContext,lazy,Suspense,useContext,useEffect,useMemo, useRef, useState } from 'react';
-import { Archive,ArchiveRestore, Check, ChevronLeft, ChevronRight, Hash, Languages, Pencil, Plus, Search, Upload, UserRound,UserCheck, UserX, Users, X } from 'lucide-react';
+import { Archive,ArchiveRestore, Check, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Hash, Languages, Pencil, Plus, Search, Upload, UserRound,UserCheck, UserX, Users, X } from 'lucide-react';
 import {WorkerWorkHistory} from './WorkProgress';
 import { WorkerAccess } from './WorkerAccess';
 const WorkerDeletion=lazy(()=>import('./WorkerDeletion').then(module=>({default:module.WorkerDeletion})));
@@ -43,7 +43,7 @@ function usePeopleApi(authority:StaffRequestAuthority) {
   return {...scoped,peopleApi};
 }
 
-export function CrewActions({crew,disabled,onChanged,authority,locale:localeOverride}:{crew:Crew;disabled:boolean;onChanged:(message:string,updated:Crew)=>void;authority:StaffRequestAuthority;locale?:PeopleLocale}) {
+export function CrewActions({crew,disabled,onChanged,authority,locale:localeOverride,leadingAction}:{crew:Crew;disabled:boolean;onChanged:(message:string,updated:Crew)=>void;authority:StaffRequestAuthority;locale?:PeopleLocale;leadingAction?:React.ReactNode}) {
   const inheritedLocale=useContext(PeopleLocaleContext),locale=localeOverride || inheritedLocale,t=peopleText[locale];
   const {peopleApi,current}=usePeopleApi(authority);
   const dialog=useRef<HTMLDialogElement>(null),inFlight=useRef(false),requestId=useRef('');
@@ -64,6 +64,7 @@ export function CrewActions({crew,disabled,onChanged,authority,locale:localeOver
     } catch(reason) {if(current())setError((reason as Error).message);} finally {inFlight.current=false;if(current())setBusy(false);}
   }
   return <div className="crew-controls">
+    {leadingAction}
     {crew.active && <><button type="button" className="icon-button" disabled={disabled} title={`${t.rename} ${crew.name}`} aria-label={`${t.rename} ${crew.name}`} onClick={() => open('rename')}><Pencil size={18}/></button>
     <button type="button" className="icon-button" disabled={disabled} title={`${t.archive} ${crew.name}`} aria-label={`${t.archive} ${crew.name}`} onClick={() => open('archive')}><Archive size={18}/></button></>}
     {!crew.active && <button type="button" className="icon-button" disabled={disabled} title={`${t.restore} ${crew.name}`} aria-label={`${t.restore} ${crew.name}`} onClick={() => open('restore')}><ArchiveRestore size={18}/></button>}
@@ -219,6 +220,7 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [form, setForm] = useState<'add' | 'edit' | null>(initialAdd?'add':null);
+  const [filtersOpen,setFiltersOpen]=useState(false);
   const workerDialog=useRef<HTMLDialogElement>(null);
   useEffect(()=>{if(form && !workerDialog.current?.open){workerDialog.current?.showModal();workerDialog.current?.querySelector<HTMLInputElement>('input:not([readonly]):not([disabled])')?.focus();}else if(!form)workerDialog.current?.close();},[form]);
   const formRef=useRef(form);formRef.current=form;
@@ -385,9 +387,12 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
     <div className="filters people-filters">
       {(initialWorkerId || initialCrewId) && <button className="button outline" onClick={()=>navigate('people')}><X size={18}/>{t.clearFilter}</button>}
       <label className="search-box"><Search size={18} /><span className="sr-only">{t.searchWorkers}</span><input dir="auto" ref={workerSearchInput} value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={t.searchPlaceholder} /></label>
+      <button type="button" className="button outline people-filters-toggle" aria-expanded={filtersOpen} aria-controls="worker-directory-filters" onClick={()=>setFiltersOpen(value=>!value)}><SlidersHorizontal size={17}/>{locale==='ar'?'الفلاتر':'Filters'}{(language!=='all'||status!=='active'||workerCrew.id!=='all')&&<span> · {[language!=='all',status!=='active',workerCrew.id!=='all'].filter(Boolean).length}</span>}<ChevronDown size={15}/></button>
+      <div id="worker-directory-filters" className="people-filter-options" data-open={filtersOpen}>
       <label className="select-label">{t.language}<select value={language} onChange={(event) => { setLanguage(event.target.value); setPage(1); }}><option value="all">{t.allLanguages}</option><option value="unset">{t.notSelected}</option>{WORKER_LOCALES.map(item=><option key={item.code} value={item.code}>{languages[item.code]}</option>)}</select></label>
       <label className="select-label">{t.access}<select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}><option value="active">{t.active}</option><option value="inactive">{t.disabled}</option><option value="all">{t.allStatuses}</option></select></label>
       <label className="select-label">{t.membership}<select value={workerCrew.id} onChange={(event) => {const crew=crewChoices?.items.find(item=>item.id===event.target.value);setWorkerCrew({id:event.target.value,name:crew?.name || ''});setPage(1);}}><option value="all">{t.allCrews}</option><option value="none">{t.noCrew}</option>{crewChoices?.items.map(crew=><option key={crew.id} dir="auto" value={crew.id}>{crew.name}</option>)}{!['all','none'].includes(workerCrew.id) && !crewChoices?.items.some(crew=>crew.id===workerCrew.id) && <option dir="auto" value={workerCrew.id}>{workerCrew.name || t.selectedCrew}</option>}</select></label>
+      </div>
     </div>
     </>}
     {error && <p className="notice" role="alert">{peopleErrorText(locale,new Error(error))}</p>}
@@ -414,10 +419,10 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
           <form onSubmit={saveWorker}>{error&&<p role="alert" className="notice">{peopleErrorText(locale,new Error(error))}</p>}<label className="field">{t.workerId}<input autoFocus={form==='edit'} disabled={busy} readOnly={form==='add'} dir="ltr" value={code} onChange={(event) => setCode(event.target.value)} minLength={2} maxLength={80} required={form==='edit'} placeholder={form==='add'?workerIdSettings?.nextCode:undefined} /></label>
             {form==='add'&&<p className="field-hint">{peopleWorkerIdHint(locale,workerIdSettings?.nextCode)}</p>}
             {form==='add'&&<><label className="field">{locale==='ar'?'كلمة مرور العامل':'Worker password'}<input type={showNewPassword?'text':'password'} autoComplete="new-password" required minLength={8} maxLength={128} value={newPassword} disabled={busy} onChange={event=>setNewPassword(event.target.value)}/></label><div className="actions"><button type="button" className="button outline" disabled={busy} onClick={()=>{setNewPassword(generateWorkerPassword());setShowNewPassword(true);}}>{locale==='ar'?'إنشاء كلمة مرور':'Generate password'}</button><button type="button" className="button subtle" disabled={busy} onClick={()=>setShowNewPassword(value=>!value)}>{showNewPassword?(locale==='ar'?'إخفاء':'Hide'):(locale==='ar'?'إظهار':'Show')}</button></div><p className="muted">{locale==='ar'?'احفظ كلمة المرور وشاركها مع العامل بشكل خاص.':'Save this password and share it privately with the worker.'}</p></>}
-            <label className="field">{t.workerName}<input autoFocus={form==='add'} disabled={busy} dir="auto" value={workerName} onChange={(event) => setWorkerName(event.target.value)} required minLength={2} maxLength={80} placeholder={t.namePlaceholder} /></label>
+            <label className="field">{t.workerName}<input disabled={busy} dir="auto" value={workerName} onChange={(event) => setWorkerName(event.target.value)} required minLength={2} maxLength={80} placeholder={t.namePlaceholder} /></label>
             <label className="field">{t.preferred}<select disabled={busy} value={workerLanguage} onChange={(event) => setWorkerLanguage(event.target.value as '' | WorkerLanguage)}>{(form==='add' || selected?.language_selection_required) && <option value="">{t.chooseLater}</option>}{WORKER_LOCALES.map(item=><option key={item.code} value={item.code}>{languages[item.code]}</option>)}</select></label>
             <p className="muted">{t.workerLanguageHint}{form==='edit' && ` ${t.directCorrection}`}</p>
-            <button className="button primary full" type="submit" disabled={busy}><Check size={18} />{t.saveWorker}</button></form>
+            <div className="worker-form-footer"><button className="button primary full" type="submit" disabled={busy}><Check size={18} />{t.saveWorker}</button></div></form>
         </section></dialog>}
         {initialWorkerId && selected ? <section className="panel people-detail"><div className="people-panel-heading"><div className="people-detail-title"><span className="small-avatar"><UserRound size={23} /></span><div><h2><bdi>{selected.name || selected.code}</bdi></h2><p><bdi>{selected.code}</bdi> · {selected.active ? t.active : t.disabled} · {selected.language_selected ? languages[selected.language] : t.notSelected}</p></div></div><button className="icon-button" aria-label={t.closeDetails} onClick={() => navigate('people')}><X size={19} /></button></div>
           <dl className="people-facts"><dt>{t.workerName}</dt><dd><bdi>{selected.name || '—'}</bdi></dd><dt>{t.workerId}</dt><dd><bdi>{selected.code}</bdi></dd><dt>{t.preferred}</dt><dd>{selected.language_selected ? <>{languages[selected.language]}{selected.language_selected_by==='worker' ? <small className="language-source">{t.chosenByWorker}</small> : selected.language_selected_by==='staff' ? <small className="language-source">{t.setByStaff}</small> : null}</> : <>{t.firstUse}<small className="language-source">{t.noLanguage}</small></>}</dd><dt>{t.crew}</dt><dd><bdi>{selected.crew_name || t.noCrew}</bdi></dd><dt>{t.access}</dt><dd>{selected.active ? t.active : t.disabled}</dd></dl>

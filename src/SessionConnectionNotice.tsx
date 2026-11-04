@@ -1,6 +1,6 @@
+import {SessionRecoveryScreen} from './SessionRecoveryScreen';
 import {RefreshCw} from 'lucide-react';
 import type {WorkerUiLanguage} from './worker-ui-language';
-import {workerUiDirection} from './worker-ui-language';
 
 const copy:Record<WorkerUiLanguage,[string,string,string]>={
   en:['Checking your connection','Your unsent work is kept on this page. Server actions are paused until your session can be verified.','Check again'],
@@ -19,7 +19,7 @@ const copy:Record<WorkerUiLanguage,[string,string,string]>={
   'pa-Arab':['کنکشن دی جانچ','نہ بھیجیا کم ایس صفحے تے رہندا اے۔ سیشن دی تصدیق تک سرور دے کم رکے نیں۔','فیر جانچو'],
   id:['Memeriksa koneksi','Pekerjaan yang belum dikirim tetap ada di halaman ini. Tindakan server dijeda sampai sesi dapat diverifikasi.','Periksa lagi'],
 };
-export function SessionConnectionNotice({language,onRetry}:{language:WorkerUiLanguage;onRetry:()=>void}){
+export function SessionConnectionNotice({language,onRetry,busy=false}:{language:WorkerUiLanguage;onRetry:()=>void;busy?:boolean}){
   const [title,body,retry]=copy[language];
-  return <main className="entry-page" lang={language} dir={workerUiDirection(language)}><section role="alert"><h1>{title}</h1><p>{body}</p><button className="button primary" onClick={onRetry}><RefreshCw size={18}/>{retry}</button></section></main>;
+  return <SessionRecoveryScreen language={language} title={title}><p>{body}</p><button className="button primary" disabled={busy} aria-busy={busy} onClick={onRetry}><RefreshCw size={18} aria-hidden="true"/>{busy?title:retry}</button></SessionRecoveryScreen>;
 }

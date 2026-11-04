@@ -1,0 +1,8 @@
+.sign-out-confirmation{position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:28px;border:1px solid #dce5df;border-radius:16px;background:#fff;color:#1c3429;box-shadow:0 24px 80px #0b211a33}
+.sign-out-confirmation::backdrop{background:#10271f70}
+.sign-out-confirmation-symbol{color:#547467;margin-bottom:18px}
+.sign-out-confirmation h2{font-size:22px;line-height:1.35;letter-spacing:-.4px;margin:0 0 10px;font-weight:650}
+.sign-out-confirmation p{font-size:14px;line-height:1.75;color:#627169;margin:0 0 26px}
+.sign-out-confirmation-actions{display:flex;justify-content:flex-end;gap:10px}
+.sign-out-confirmation-actions .button{min-height:42px;padding:10px 18px;border-radius:8px;font-size:14px}
+.sign-out-confirmation button:focus-visible{outline:2px solid #287b60;outline-offset:3px}

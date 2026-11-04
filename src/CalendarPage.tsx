@@ -269,7 +269,7 @@ export function CalendarPage({authority,refresh,language,navigate}:CalendarPageP
   }
 
   const monthLabel=calendarMonthTitle(month,language);
-  const weekdays=calendarWeekdays(language);
+  const weekdays=calendarWeekdays(language),narrowWeekdays=calendarWeekdays(language,'narrow');
 
   return <div className="calendar-page" ref={root}>
     <div className="page-header calendar-intro">
@@ -294,7 +294,7 @@ export function CalendarPage({authority,refresh,language,navigate}:CalendarPageP
       </div>
     </div>
     <section className="calendar-month-panel" aria-label={`${t('Calendar month')} ${monthLabel}`}>
-      <div className="calendar-weekdays" aria-hidden="true">{weekdays.map(day=><span key={day}>{day}</span>)}</div>
+      <div className="calendar-weekdays" aria-hidden="true">{weekdays.map((day,index)=><span key={day} data-narrow={narrowWeekdays[index]}>{day}</span>)}</div>
       <div className="calendar-grid" ref={gridRef} role="group" aria-label={monthLabel}>
         {grid.map((date,index)=>{
           if(!date)return <span className="calendar-day is-blank" aria-hidden="true" key={`blank-${index}`}/>;
@@ -305,7 +305,7 @@ export function CalendarPage({authority,refresh,language,navigate}:CalendarPageP
             <span className="calendar-day-top">
               <span className="calendar-day-number">{calendarDayNumber(date)}</span>
               {isToday&&<span className="calendar-day-today-label" aria-hidden="true">{t('Today')}</span>}
-              {!!events.length&&<span className="calendar-day-count" aria-hidden="true">{events.length}</span>}
+              {!!events.length&&<span className="calendar-day-count" aria-hidden="true">{events.length>99?'99+':events.length}</span>}
             </span>
             <span className="calendar-day-items" aria-hidden="true">
               {instructions.slice(0,2).map(item=><span className={`calendar-day-instruction is-${item.kind}`} key={item.id}><i/>{item.title}</span>)}

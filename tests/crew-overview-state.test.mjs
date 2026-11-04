@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readCrewOverview,readCrewMembers,readCrewChange} from '../src/crew-overview.ts';
+import {readCrewOverview,readCrewMembers,readCrewCandidates,readCrewChange} from '../src/crew-overview.ts';
 import {crewOverviewResult,crewOverviewHttpError} from '../server/crew-overview.mjs';
 
 const at='2026-10-15T08:30:00.000Z',scope='["cedar","beirut","maya"]',expected={page:1,pageSize:5,scope};
@@ -9,6 +9,19 @@ const crew={id:'crew',name:'فريق QA',active:true,member_count:2,metrics};
 const overview={items:[crew],total:1,page:1,pageSize:5,site:{id:'beirut',name:'بيروت',timezone:'Asia/Beirut'},contacts:{primary:{name:'Maya',role:'owner'},deputy:null},
   publication:{id:'pub',briefingId:'brief',version:3,title:'Synthetic',publishedAt:at},metrics,metricScope:'latest_publication_frozen_crew_audience',crewSnapshotAvailable:true,
   activity:[{id:'event',action:'crew.created',actor:'Maya',item:'فريق QA',occurredAt:at}],asOf:at};
+
+test('crew worker picker accepts unassigned and assigned active workers only from the current site',()=>{
+  const worker={id:'worker',org_id:'cedar',site_id:'beirut',code:'Worker 001',name:'Rana',language:'ar',language_selection_required:false,language_selected:true,
+    language_selected_at:null,language_selected_by:null,active:true,crew_id:null,crew_name:null,pending_language_request:null};
+  const result={items:[worker],total:1,page:1,pageSize:5};
+  assert.deepEqual(readCrewCandidates(result,expected),result);
+  assert.doesNotThrow(()=>readCrewCandidates({...result,items:[{...worker,crew_id:'other',crew_name:'Other crew'}]},expected));
+  for(const change of [{site_id:'other'},{org_id:'other'},{active:false},{crew_id:'crew'},{crew_name:'Broken pair'},{password:'private'}])
+    assert.throws(()=>readCrewCandidates({...result,items:[{...worker,...change}]},expected),/cannot be verified/);
+  assert.throws(()=>readCrewCandidates({...result,items:[worker,worker],total:2},expected),/cannot be verified/);
+  assert.throws(()=>readCrewCandidates({...result,page:2},expected),/cannot be verified/);
+  assert.throws(()=>readCrewMembers(result,{...expected,crewId:undefined}),/cannot be verified/);
+});
 
 test('team view accepts actual bounded evidence and keeps missing legacy snapshot distinct from zero',()=>{
   assert.deepEqual(readCrewOverview(overview,expected),overview);

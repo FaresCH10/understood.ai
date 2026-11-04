@@ -13,6 +13,8 @@ export type CrewMember={id:string;org_id:string;site_id:string;code:string;name:
   language_selected_by:'worker'|'staff'|'migration'|null;active:boolean;crew_id:string;crew_name:string;
   pending_language_request:CrewMemberPendingLanguage|null};
 export type CrewMembers={items:CrewMember[];total:number;page:number;pageSize:number};
+export type CrewCandidate=Omit<CrewMember,'crew_id'|'crew_name'>&{crew_id:string|null;crew_name:string|null};
+export type CrewCandidates={items:CrewCandidate[];total:number;page:number;pageSize:number};
 const record=(value:unknown):value is Record<string,unknown>=>!!value && typeof value==='object' && !Array.isArray(value);
 const keys=(value:Record<string,unknown>,fields:string[])=>Object.keys(value).length===fields.length && fields.every(key=>Object.hasOwn(value,key));
 const text=(value:unknown,max=100):value is string=>typeof value==='string' && !!value.trim() && value.length<=max && !/[\u0000-\u001f\u007f]/.test(value);
@@ -58,7 +60,7 @@ export function readCrewOverview(value:unknown,expected:{page:number;pageSize:nu
     || new Set((data.activity as {id:string}[]).map(row=>row.id)).size!==(data.activity as unknown[]).length)fail();
   return data as unknown as CrewOverview;
 }
-export function readCrewMembers(value:unknown,expected:{page:number;pageSize:number;crewId:string;scope:string}):CrewMembers {
+function readCrewWorkers(value:unknown,expected:{page:number;pageSize:number;crewId?:string;scope:string}):CrewCandidates {
   if(!record(value) || !keys(value,['items','total','page','pageSize']))fail();
   const data=value as Record<string,unknown>;page(data,expected);const [orgId,siteId]=scope(expected.scope);
   const pending=(entry:unknown)=>entry===null || record(entry) && keys(entry,['id','currentLanguage','requestedLanguage','reason','requestedAt'])
@@ -66,13 +68,21 @@ export function readCrewMembers(value:unknown,expected:{page:number;pageSize:num
     && typeof entry.reason==='string' && entry.reason.length<=500 && !/[\u0000-\u001f\u007f]/.test(entry.reason) && date(entry.requestedAt);
   if(!(data.items as unknown[]).every(row=>record(row) && keys(row,['id','org_id','site_id','code','name','language','language_selection_required','language_selected','language_selected_at','language_selected_by','active','crew_id','crew_name','pending_language_request'])
     && id(row.id) && text(row.code,80) && (row.name===null || text(row.name,80)) && language(row.language)
-    && row.org_id===orgId && row.site_id===siteId && row.active===true && row.crew_id===expected.crewId && text(row.crew_name,80)
+    && row.org_id===orgId && row.site_id===siteId && row.active===true
+    && (expected.crewId===undefined ? row.crew_id===null && row.crew_name===null || id(row.crew_id) && text(row.crew_name,80) : row.crew_id===expected.crewId && text(row.crew_name,80))
     && typeof row.language_selection_required==='boolean' && row.language_selected===!row.language_selection_required
     && (row.language_selected_at===null || date(row.language_selected_at)) && !(row.language_selection_required && row.language_selected_at!==null)
     && (row.language_selected_by===null || ['worker','staff','migration'].includes(row.language_selected_by as string))
     && pending(row.pending_language_request))
     || new Set((data.items as CrewMember[]).map(row=>row.id)).size!==(data.items as CrewMember[]).length)fail();
-  return data as unknown as CrewMembers;
+  return data as unknown as CrewCandidates;
+}
+export function readCrewMembers(value:unknown,expected:{page:number;pageSize:number;crewId:string;scope:string}):CrewMembers {
+  if(!id(expected.crewId))fail();
+  return readCrewWorkers(value,expected) as CrewMembers;
+}
+export function readCrewCandidates(value:unknown,expected:{page:number;pageSize:number;scope:string}):CrewCandidates {
+  return readCrewWorkers(value,{page:expected.page,pageSize:expected.pageSize,scope:expected.scope});
 }
 export function readCrewChange(value:unknown,staffScope:string,expectedId?:string) {
   const fields=['id','org_id','site_id','name','active','member_count'],[orgId,siteId]=scope(staffScope);

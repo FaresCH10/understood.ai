@@ -75,10 +75,10 @@ export function operatorHttpError(error) {
   if(message==='Invalid credentials')return {status:401,error:message};
   if(message==='Operator context changed')return {status:409,error:message};
   if(['Operator request conflict','Operator revision changed','Job is not retryable','Workspace access paused','Provider verification configuration changed',
-    'Activation request revision changed','Activation request is closed','Account sessions changed'].includes(message))return {status:409,error:message};
-  if(['Invalid operator command','Invalid operator filters','Invalid operator login','Invalid entitlement expiry','Invalid JSON','Unsupported provider stage test'].includes(message))return {status:400,error:message};
+    'Activation request revision changed','Activation request is closed','Account sessions changed','Translation feedback already decided'].includes(message))return {status:409,error:message};
+  if(['Invalid operator command','Invalid operator filters','Invalid operator login','Invalid entitlement expiry','Invalid JSON','Unsupported provider stage test','Invalid translation feedback filter','Invalid translation feedback decision'].includes(message))return {status:400,error:message};
   if(message==='Request too large')return {status:413,error:message};
-  if(['Tenant unavailable','Activation request unavailable','Account unavailable'].includes(message))return {status:404,error:message};
+  if(['Tenant unavailable','Activation request unavailable','Account unavailable','Translation feedback unavailable'].includes(message))return {status:404,error:message};
   if(['Provider quota is closed','Provider request quota reached','Provider dispatch paused','Provider verification unavailable','Provider verification worker unavailable'].includes(message))return {status:409,error:message};
   return {status:503,error:'Operations are temporarily unavailable'};
 }
