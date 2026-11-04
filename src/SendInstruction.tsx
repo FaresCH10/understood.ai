@@ -72,7 +72,7 @@ function reasonText(reason:UndeliveredReason){
   return `${reason.reason.replaceAll('_',' ')}${language?` · ${language}`:''}`;
 }
 
-export default function SendInstruction({authority,scope,navigate,onSent,draftId,navigationGuard}:{draftId?:string;navigationGuard:RefObject<((next:string,resume?:()=>void)=>boolean)|null>;authority:StaffRequestAuthority;scope:string|null;navigate:(path:string)=>void;onSent:()=>void}){
+export default function SendInstruction({authority,scope,navigate,onSent,draftId,initialCrewId,navigationGuard}:{initialCrewId?:string;draftId?:string;navigationGuard:RefObject<((next:string,resume?:()=>void)=>boolean)|null>;authority:StaffRequestAuthority;scope:string|null;navigate:(path:string)=>void;onSent:()=>void}){
   const staffT=useStaffStaticText();
  const tr=useStaffText();
   const {request,current}=useStaffRequest(authority);
@@ -81,8 +81,8 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const [pending,setPending]=useState<PendingSend|null>(restoredPending);
   const [source,setSource]=useState(restoredPending?.source || '');
   const [title,setTitle]=useState(restoredPending?.title || '');
-  const [audienceType,setAudienceType]=useState<'all'|'crew'|'members'>(restoredPending?.audience.type || 'all');
-  const [crewId,setCrewId]=useState(restoredPending?.audience.type==='crew'?restoredPending.audience.crewId:'');
+  const [audienceType,setAudienceType]=useState<'all'|'crew'|'members'>(restoredPending?.audience.type || (initialCrewId?'crew':'all'));
+  const [crewId,setCrewId]=useState(restoredPending?.audience.type==='crew'?restoredPending.audience.crewId:(initialCrewId || ''));
   const [workerIds,setWorkerIds]=useState<string[]>(restoredPending?.audience.type==='members'?restoredPending.audience.workerIds:[]);
   const [responseMode,setResponseMode]=useState<Mode>(restoredPending?.responseMode || 'question');
   const [deliveryMode,setDeliveryMode]=useState<Delivery>(restoredPending?.deliveryMode || 'both');
@@ -282,7 +282,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
           <option value="all">{tr("All active workers")}</option><option value="crew">{tr("Crews")}</option><option value="members">{tr("Members")}</option>
         </select>
       </label>
-      {audienceType==='crew'&&<label className="field">{tr("Choose crew")}<select value={crewId} disabled={busy||!!pending} onChange={event=>setCrewId(event.target.value)}><option value="">{tr("Select crew")}</option>{audience?.crews.map(crew=><option key={crew.id} value={crew.id}>{crew.name} ({crew.members})</option>)}</select></label>}
+      {audienceType==='crew'&&<label className="field">{tr("Choose crew")}<select aria-label={tr("Choose crew")} value={crewId} disabled={busy||!!pending} onChange={event=>setCrewId(event.target.value)}><option value="">{tr("Select crew")}</option>{audience?.crews.map(crew=><option key={crew.id} value={crew.id}>{crew.name} ({crew.members})</option>)}</select></label>}
       {audienceType==='members'&&<RecipientMembers members={audience?.members||[]} selected={workerIds} onChange={setWorkerIds} disabled={busy||!!pending}/>}
 
       {selectedAudience && <div className="language-chips send-audience-languages" aria-label={staffT("Worker languages")}>{Object.entries(selectedAudience.byLanguage || {}).filter(([,count])=>count>0).map(([code,count])=><i key={code}>{code.toUpperCase()} {count}</i>)}</div>}

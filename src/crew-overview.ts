@@ -60,7 +60,7 @@ export function readCrewOverview(value:unknown,expected:{page:number;pageSize:nu
     || new Set((data.activity as {id:string}[]).map(row=>row.id)).size!==(data.activity as unknown[]).length)fail();
   return data as unknown as CrewOverview;
 }
-function readCrewWorkers(value:unknown,expected:{page:number;pageSize:number;crewId?:string;scope:string}):CrewCandidates {
+function readCrewWorkers(value:unknown,expected:{page:number;pageSize:number;crewId?:string;scope:string;status?:'active'|'inactive'|'all'}):CrewCandidates {
   if(!record(value) || !keys(value,['items','total','page','pageSize']))fail();
   const data=value as Record<string,unknown>;page(data,expected);const [orgId,siteId]=scope(expected.scope);
   const pending=(entry:unknown)=>entry===null || record(entry) && keys(entry,['id','currentLanguage','requestedLanguage','reason','requestedAt'])
@@ -68,7 +68,7 @@ function readCrewWorkers(value:unknown,expected:{page:number;pageSize:number;cre
     && typeof entry.reason==='string' && entry.reason.length<=500 && !/[\u0000-\u001f\u007f]/.test(entry.reason) && date(entry.requestedAt);
   if(!(data.items as unknown[]).every(row=>record(row) && keys(row,['id','org_id','site_id','code','name','language','language_selection_required','language_selected','language_selected_at','language_selected_by','active','crew_id','crew_name','pending_language_request'])
     && id(row.id) && text(row.code,80) && (row.name===null || text(row.name,80)) && language(row.language)
-    && row.org_id===orgId && row.site_id===siteId && row.active===true
+    && row.org_id===orgId && row.site_id===siteId && typeof row.active==='boolean' && (expected.status==='all' || row.active===(expected.status!=='inactive'))
     && (expected.crewId===undefined ? row.crew_id===null && row.crew_name===null || id(row.crew_id) && text(row.crew_name,80) : row.crew_id===expected.crewId && text(row.crew_name,80))
     && typeof row.language_selection_required==='boolean' && row.language_selected===!row.language_selection_required
     && (row.language_selected_at===null || date(row.language_selected_at)) && !(row.language_selection_required && row.language_selected_at!==null)
@@ -77,7 +77,7 @@ function readCrewWorkers(value:unknown,expected:{page:number;pageSize:number;cre
     || new Set((data.items as CrewMember[]).map(row=>row.id)).size!==(data.items as CrewMember[]).length)fail();
   return data as unknown as CrewCandidates;
 }
-export function readCrewMembers(value:unknown,expected:{page:number;pageSize:number;crewId:string;scope:string}):CrewMembers {
+export function readCrewMembers(value:unknown,expected:{page:number;pageSize:number;crewId:string;scope:string;status?:'active'|'inactive'|'all'}):CrewMembers {
   if(!id(expected.crewId))fail();
   return readCrewWorkers(value,expected) as CrewMembers;
 }

@@ -1,3 +1,4 @@
+import {keepDialogFocus} from './dialog-focus';
 import {useEffect,useRef,useState} from 'react';
 import {Check,ChevronLeft,ChevronRight,Search,UserRound,X} from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
@@ -38,7 +39,7 @@ export function CrewWorkerPicker({crew,authority,locale,onClose,onAdded}:{crew:C
   }catch(reason){if(current())setSaveError(peopleErrorText(locale,reason));}
   finally{inFlight.current=false;if(current())setBusy(false);}
  }
- return <dialog ref={dialog} className="crew-worker-dialog" aria-labelledby="crew-worker-title" lang={locale} dir={locale==='ar'?'rtl':'ltr'} onCancel={event=>{event.preventDefault();if(!inFlight.current)onClose();}}>
+ return <dialog ref={dialog} className="crew-worker-dialog" aria-labelledby="crew-worker-title" onKeyDown={keepDialogFocus} lang={locale} dir={locale==='ar'?'rtl':'ltr'} onCancel={event=>{event.preventDefault();if(!inFlight.current)onClose();}}>
   <form onSubmit={event=>void save(event)}>
    <div className="crew-worker-heading"><div><h2 id="crew-worker-title">{t.title}</h2><p><bdi>{crew.name}</bdi></p></div><button type="button" className="icon-button" aria-label={t.close} disabled={busy} onClick={onClose}><X size={20}/></button></div>
    <p className="muted">{t.intro}</p>

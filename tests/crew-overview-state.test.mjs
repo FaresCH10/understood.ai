@@ -10,6 +10,16 @@ const overview={items:[crew],total:1,page:1,pageSize:5,site:{id:'beirut',name:'�
   publication:{id:'pub',briefingId:'brief',version:3,title:'Synthetic',publishedAt:at},metrics,metricScope:'latest_publication_frozen_crew_audience',crewSnapshotAvailable:true,
   activity:[{id:'event',action:'crew.created',actor:'Maya',item:'فريق QA',occurredAt:at}],asOf:at};
 
+test('crew detail explicitly supports disabled members without admitting them to the add-worker picker',()=>{
+  const worker={id:'worker',org_id:'cedar',site_id:'beirut',code:'Worker 001',name:'Rana',language:'ar',language_selection_required:false,language_selected:true,language_selected_at:null,language_selected_by:null,active:false,crew_id:'crew',crew_name:'Crew',pending_language_request:null};
+  const result={items:[worker],total:1,page:1,pageSize:5};
+  assert.deepEqual(readCrewMembers(result,{...expected,crewId:'crew',status:'all'}),result);
+  assert.deepEqual(readCrewMembers(result,{...expected,crewId:'crew',status:'inactive'}),result);
+  assert.throws(()=>readCrewMembers(result,{...expected,crewId:'crew'}),/cannot be verified/);
+  assert.throws(()=>readCrewCandidates(result,expected),/cannot be verified/);
+  assert.throws(()=>readCrewMembers({...result,items:[{...worker,site_id:'elsewhere'}]},{...expected,crewId:'crew',status:'all'}),/cannot be verified/);
+});
+
 test('crew worker picker accepts unassigned and assigned active workers only from the current site',()=>{
   const worker={id:'worker',org_id:'cedar',site_id:'beirut',code:'Worker 001',name:'Rana',language:'ar',language_selection_required:false,language_selected:true,
     language_selected_at:null,language_selected_by:null,active:true,crew_id:null,crew_name:null,pending_language_request:null};

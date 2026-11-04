@@ -1,0 +1,16 @@
+.crew-detail { max-width: 1200px; margin-inline: auto; min-width: 0; }
+.crew-detail .crew-detail-links, .crew-detail .people-panel-heading, .crew-detail .people-panel-heading > .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.crew-detail .crew-detail-links { margin-block: 20px; }
+.crew-detail .button { white-space: normal; max-width: 100%; min-height: 44px; height: auto; }
+.crew-detail .button svg, .crew-detail .item-row > svg { flex-shrink: 0; }
+.crew-detail .filters { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr); gap: 16px; margin-block: 20px; }
+.crew-detail .filters .field, .crew-detail .filters input, .crew-detail .filters select { min-width: 0; width: 100%; box-sizing: border-box; }
+.crew-detail .item-main { min-width: 0; text-align: start; }
+.crew-detail .item-main strong, .crew-detail .item-main small { white-space: normal; overflow-wrap: anywhere; }
+.crew-detail .crew-pagination { flex-wrap: wrap; gap: 12px; }
+@media(max-width:600px) {
+ .crew-detail .filters { grid-template-columns: minmax(0,1fr); }
+ .crew-detail .crew-detail-links > .button { width: 100%; }
+ .crew-detail .people-panel-heading > .actions { width: 100%; }
+ .crew-detail .people-panel-heading > .actions > .button { flex: 1; }
+}

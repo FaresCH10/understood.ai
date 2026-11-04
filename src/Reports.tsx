@@ -63,15 +63,15 @@ function PublicationHistory({onSelect,disabled,authority,language}:{onSelect:(id
   </section>;
 }
 
-export function ReportsPage({refresh,authority,navigate,language='en',onLanguageChange}:{refresh:number;authority:StaffRequestAuthority;navigate:(path:string)=>void;language?:ReportLocale;onLanguageChange?:(language:ReportLocale)=>void}) {
+export function ReportsPage({refresh,authority,navigate,language='en',onLanguageChange,initialCrewId}:{initialCrewId?:string;refresh:number;authority:StaffRequestAuthority;navigate:(path:string)=>void;language?:ReportLocale;onLanguageChange?:(language:ReportLocale)=>void}) {
   const {request,current}=useStaffRequest(authority);
   const locale=reportLocale(language),t=(key:ReportTextKey)=>reportText(locale,key);
   const allowed=definition.roles!.includes(authority.session.staffRole || ''),scope=allowed?authority.session.staffScope:null;
   const canExport=allowed && authority.session.siteState!=='archived';
   const [recovery]=useState(()=>{try{return {pending:scope?readPendingExport(sessionStorage,checkedArtifactScope(scope,authority.session,definition.roles)):null,error:''};}catch(reason){return {pending:null,error:(reason as Error).message};}});
   const [publicationId, setPublicationId] = useState('');
-  const [filters,setFilters]=useState<ReportFilters>({crewId:'',responseFrom:'',responseThrough:''});
-  const [chosenFilters,setChosenFilters]=useState<ReportFilters>({crewId:'',responseFrom:'',responseThrough:''});
+  const [filters,setFilters]=useState<ReportFilters>({crewId:initialCrewId || '',responseFrom:'',responseThrough:''});
+  const [chosenFilters,setChosenFilters]=useState<ReportFilters>({crewId:initialCrewId || '',responseFrom:'',responseThrough:''});
   const [report, setReport] = useState<Report | null>(null);
   const [exports, setExports] = useState<Export[]>([]);
   const [error, setError] = useState('');
@@ -142,7 +142,7 @@ export function ReportsPage({refresh,authority,navigate,language='en',onLanguage
   const m = report?.metrics;
   const windowed=Boolean(filters.responseFrom || filters.responseThrough);
   const dirty=Object.keys(filters).some(key=>filters[key as keyof ReportFilters]!==chosenFilters[key as keyof ReportFilters]);
-  const crewLabel=filters.crewId==='@unassigned'?t('No crew'):report?.availableCrews?.find(crew=>crew.id===filters.crewId)?.name||t('All assigned workers');
+  const crewLabel=filters.crewId==='@unassigned'?t('No crew'):report?.availableCrews?.find(crew=>crew.id===filters.crewId)?.name||(filters.crewId?t('Crew'):t('All assigned workers'));
   return <div className={`reports-workspace ${filtersOpen?'reports-filters-open':''}`} ref={workspace} dir={locale==='en'?'ltr':'rtl'}>
     <div className="page-header report-header"><div><h1>{t('Reports')}</h1><p>{t('Review delivery, responses and follow-up for a published instruction.')}</p></div>
       <div className="actions">{onLanguageChange&&<CaseLocalePicker locale={locale} onChange={onLanguageChange}/>}<button className="button primary" onClick={() => void exportReport()} disabled={loading || busy || !m || !canExport || !!operation.pending.current || !!recovery.error}><Download size={17}/>{t(busy?'Working...':'Export CSV')}</button></div>
@@ -151,7 +151,7 @@ export function ReportsPage({refresh,authority,navigate,language='en',onLanguage
     {report?.publicationId && <p className="report-mode"><span><strong>{t('Response mode')}:</strong> {report.responseMode==='acknowledge'?t('Acknowledge only'):report.responseMode==='question'?t('Question'):t('Mode not recorded (legacy)')}</span><span><strong>{t('Delivery mode')}:</strong> {report.deliveryMode==='text'?t('Text'):report.deliveryMode==='voice'?t('Voice'):report.deliveryMode==='both'?t('Text and voice'):t('Mode not recorded (legacy)')}</span>{report.responseMode==='acknowledge'&&<span><strong>{t('Photo evidence')}:</strong> {report.evidenceMode==='photo'?t('Required'):t('Not requested')}</span>}</p>}
     {report?.evidenceMode==='photo'&&report.evidence&&<p className="report-date">{reportText(locale,'{received} of {required} photos received',{received:report.evidence.received,required:report.evidence.required})}</p>}
     {report?.asOf&&<div className="reports-observed">{date(report.asOf)}<span><bdi>{report.timezone}</bdi></span></div>}
-    {historyOpen && <div id="report-publication-history" className="reports-history-reveal"><PublicationHistory language={locale} authority={authority} disabled={busy} onSelect={id=>{if(!current())return;interacted.current=true;setPublicationId(id);setFilters(value=>({...value,crewId:''}));setChosenFilters(value=>({...value,crewId:''}));setHistoryOpen(false);historyTrigger.current?.focus();}}/></div>}
+    {historyOpen && <div id="report-publication-history" className="reports-history-reveal"><PublicationHistory language={locale} authority={authority} disabled={busy} onSelect={id=>{if(!current())return;interacted.current=true;setPublicationId(id);setFilters(value=>({...value,crewId:initialCrewId||''}));setChosenFilters(value=>({...value,crewId:initialCrewId||''}));setHistoryOpen(false);historyTrigger.current?.focus();}}/></div>}
     </section>
     <button ref={filterTrigger} className="reports-filter-toggle" aria-expanded={filtersOpen} aria-controls="reports-scope-filters" onClick={()=>setFiltersOpen(value=>!value)}><span><Search size={16}/>{t('Report scope')}</span><ChevronDown size={16}/></button>
     <form id="reports-scope-filters" className="filters report-scope-filters" onSubmit={event=>{event.preventDefault();if(!busy && !loading){interacted.current=true;setFilters({...chosenFilters});setFiltersOpen(false);if(window.matchMedia('(max-width: 600px)').matches)filterTrigger.current?.focus();}}}>
