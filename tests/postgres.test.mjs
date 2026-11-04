@@ -81,7 +81,7 @@ test('runtime schema verification is read-only and rejects missing, extra or cha
   await assert.rejects(verifyMigrations(pool),/not current/);
   await runMigrations(pool);
   pool.commands.length=0;
-  assert.deepEqual(await verifyMigrations(pool),{schema:'public',migrations:123});
+  assert.deepEqual(await verifyMigrations(pool),{schema:'public',migrations:124});
   assert.ok(pool.commands.some(({sql}) => sql==='SET TRANSACTION READ ONLY'));
   assert.ok(pool.commands.every(({sql}) => !/CREATE|ALTER|INSERT|UPDATE|DELETE/.test(sql)));
   pool.applied.set('999_future.sql','unexpected');
