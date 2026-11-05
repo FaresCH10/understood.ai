@@ -14,7 +14,7 @@ import {WorkerWorkProgress} from './WorkProgress';
 import {WorkerInbox} from './WorkerInbox';
 import './worker-journey.css';
 import {workerJourneyText} from './worker-journey-text';
-import type {WorkFilter} from './worker-journey';
+import {workListPath,type WorkFilter,type WorkerWorkPage} from './worker-journey';
 import {InstructionOverview} from './InstructionOverview';
 import {InstructionViewTabs} from './InstructionViewTabs';
 import {DashboardSidebar} from './DashboardSidebar';
@@ -44,7 +44,7 @@ import {readWorkerBriefingTarget,saveWorkerBriefingTarget,clearWorkerBriefingTar
 import {WorkerNotifications} from './WorkerNotifications';
 import {workerNotificationText} from './worker-notifications';
 import {WorkerAudioPlayer} from './WorkerAudioPlayer';
-import {workerInboxPath,workerNavigationText,type WorkerInboxTab} from './worker-navigation';
+import {workerNavigationText,type WorkerInboxTab} from './worker-navigation';
 import {readWorkerUiLanguage,readWorkerLockLanguage,saveWorkerUiLanguage,workerBrowserLanguage,workerUiDirection,workerUiFallbackLanguage,workerUiLanguageText,workerUiLanguages,workerUiNativeName,type WorkerUiLanguage} from './worker-ui-language';
 import {workerLeaveRequired,workerLeaveText,workerNavigationDecision,retainWorkerDetail,workerRefreshText,workerInputAvailability,type WorkerLeaveAction} from './worker-unsent';
 import {keepDialogFocus} from './dialog-focus';
@@ -1119,7 +1119,8 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
       .finally(()=>{briefingTargetRunning.current=false;});
     return()=>{current=false;};
   },[view,id,scanSignal,session.languageSelectionRequired,session.clientContext]);
-  const inbox=useApi<WorkerBriefingPage>(view==='help'?workerInboxPath(view,tab,page):null,refresh+audioRefresh,session.clientContext);
+  const inbox=useApi<WorkerWorkPage>(view==='help'?workListPath('active',page).slice(4):null,refresh+audioRefresh,session.clientContext);
+  useEffect(()=>{if(inbox.data&&page>Math.max(1,Math.ceil(inbox.data.total/inbox.data.pageSize)))setPage(Math.max(1,Math.ceil(inbox.data.total/inbox.data.pageSize)));},[inbox.data,page]);
   useEffect(() => {
     if(id || view==='device' || view==='notifications') return;
     const timer=window.setInterval(() => setAudioRefresh((value) => value+1),60000);
@@ -1132,7 +1133,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
     if(id!==pendingHelpAssignment.current){pendingHelpAssignment.current=null;return;}
     if(detail.loading || detail.error || detail.data?.id!==id)return;
     const section=document.getElementById('worker-help');
-    if(section){if(pendingHelpReason.current){setHelpText(pendingHelpReason.current);pendingHelpReason.current=null;}section.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});section.querySelector<HTMLElement>('textarea,h2')?.focus();}
+    if(section){if(section instanceof HTMLDetailsElement)section.open=true;if(pendingHelpReason.current){setHelpText(pendingHelpReason.current);pendingHelpReason.current=null;}section.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});section.querySelector<HTMLElement>('textarea,h2')?.focus();}
     pendingHelpAssignment.current=null;
   },[id,detail.loading,detail.error,detail.data,receipt]);
   const detailUnavailable=detail.loading || !!detail.error || detail.data?.contentExpired===true;
@@ -1297,7 +1298,13 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
     </div>;
   }
   const visible=inbox.data?.items || [];
-  const pages=Math.max(1,Math.ceil((inbox.data?.total || 0)/5));
+  const pages=Math.max(1,Math.ceil((inbox.data?.total || 0)/(inbox.data?.pageSize||10)));
+  function revealHelp(){
+    const section=document.getElementById('worker-help');
+    if(section instanceof HTMLDetailsElement)section.open=true;
+    section?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+    (section?.querySelector<HTMLElement>('textarea')||section?.querySelector<HTMLElement>('summary'))?.focus({preventScroll:true});
+  }
   // Do not unmount an unsent recording as the wall clock crosses a deadline. The server rechecks acceptance on upload.
   const responseState = useMemo(() => detail.data ? workerResponseState(detail.data) : null, [detail.data]);
   const responseMode=detail.data?.responseMode==='acknowledge'?'acknowledge':'question';
@@ -1343,7 +1350,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
             {detail.error && <p role="alert">{refreshText.failed}</p>}
             {receipt?.assignmentId!==id&&<><h1 lang={detail.data.language} dir={workerUiDirection(detail.data.language)}>{detail.data.contentExpired?detail.data.title:detail.data.content.title}</h1>
             <p className="worker-subtitle">{t.version} v{detail.data.version}</p></>}
-            {!detail.data.contentExpired&&<WorkerWorkProgress key={`work:${id}`} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} refresh={refresh+audioRefresh} language={language} timezone={session.timezone} onCompleted={()=>setAudioRefresh(value=>value+1)}/>}
+            {!detail.data.contentExpired&&<WorkerWorkProgress key={`work:${id}`} disabled={busy||detailUnavailable} confirmationLabel={responseMode==='acknowledge'?t.ackAction:undefined} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} refresh={refresh+audioRefresh} language={language} timezone={session.timezone} onCompleted={()=>setAudioRefresh(value=>value+1)}/>}
             {receipt?.assignmentId === id ? (
               <WorkerSubmissionReceipt choices={detail.data.content?.choices} key={receipt.requestId} session={session} selection={{assignmentId:id,version:receipt.publicationVersion,language:receipt.contentLanguage,requestId:receipt.requestId,kind:receipt.requestKind}} acknowledgedContext={receipt.clientContext} language={language} timezone={session.timezone} disabled={busy||detailUnavailable} canHelp={!!responseState?.canHelp} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost} onBack={goBack} onHelp={()=>{pendingHelpAssignment.current=id;setReceipt(null);}} onChecked={()=>{const requestId=receipt.requestId;if(!requestId||checkedReceipts.current.has(requestId))return;checkedReceipts.current.add(requestId);setAudioRefresh(value=>value+1);}}/>
             ) : detail.data.contentExpired ? (
@@ -1359,7 +1366,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                     <span className="play-round"><Volume2 size={25} /></span><span>{t.play}</span>
                     <span className="waveform" aria-hidden="true">▁▃▅▂▇▄▆▂▅▃▁</span>
                   </button>}
-                  <details className="worker-text-disclosure" key={`${id}:text:${detail.data.publicationId}:${detail.data.version}`}><summary><FileText size={18} aria-hidden="true"/> {t.text}<ChevronDown size={18} aria-hidden="true"/></summary>
+                  <details className="worker-text-disclosure" open={deliveryMode==='both'} key={`${id}:text:${detail.data.publicationId}:${detail.data.version}`}><summary><FileText size={18} aria-hidden="true"/> {t.text}<ChevronDown size={18} aria-hidden="true"/></summary>
                     <p className="briefing-text" lang={detail.data.language} dir={workerUiDirection(detail.data.language)}>{detail.data.content.text}</p>
                   </details>
                   </>}
@@ -1381,7 +1388,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                       </> : null}
                     </section>}
                     {detail.data.acknowledgedAt ? <><Status value={statusText.acknowledged}/><p className="muted"><time dateTime={detail.data.acknowledgedAt}>{new Date(detail.data.acknowledgedAt).toLocaleString(language,{timeZone:session.timezone,dateStyle:'medium',timeStyle:'short'})}</time></p></> : !responseState?.closed && responseState?.canRespond ? <button className="button primary full" disabled={busy || acknowledging || detailUnavailable || (evidenceMode==='photo' && !evidencePhoto)} onClick={()=>void acknowledge()}>{acknowledging?t.saving:<><CheckCircle2 size={20}/>{t.ackAction}</>}</button> : null}
-                    <button className="button outline full" onClick={() => document.getElementById('worker-help')?.scrollIntoView({ behavior: 'smooth' })}><MessageCircle size={20} /> {t.help}</button>
+                    <button className="button outline full" onClick={revealHelp}><MessageCircle size={20} /> {t.help}</button>
                   </> : <>
                   <div className="question-label"><HelpCircle size={24} />{t.question}</div>
                   <h2 lang={detail.data.language} dir={workerUiDirection(detail.data.language)}>{detail.data.content.question}</h2>
@@ -1427,15 +1434,15 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                     </>
                   )}
                   {responseState?.pending && <button className="icon-button" aria-label={statusText.check} title={statusText.check} disabled={busy} onClick={() => setAudioRefresh((value) => value + 1)}><RefreshCw size={20} /></button>}
-                  <button className="button outline full" onClick={() => document.getElementById('worker-help')?.scrollIntoView({ behavior: 'smooth' })}><MessageCircle size={20} /> {t.help}</button>
+                  <button className="button outline full" onClick={revealHelp}><MessageCircle size={20} /> {t.help}</button>
                   </>}
                 </section>
-                <section className="worker-card" id="worker-help">
-                  <h2 tabIndex={-1}>{t.helpTitle}</h2>
+                {responseState?.canHelp&&<details className="worker-card worker-help-disclosure" id="worker-help" open={!!helpText||helpVoiceUnsent}>
+                  <summary>{t.helpTitle}<ChevronDown size={18} aria-hidden="true"/></summary><div>
                   {responseState?.canHelp && <><label className="field">{t.helpPrompt}<textarea rows={3} value={helpText} disabled={busy || helpVoiceUnsent || inputAvailability.helpBlocked} onChange={(event) => setHelpText(event.target.value)} maxLength={500} /></label>
                   <button className="button outline full" disabled={helpText.trim().length < 3 || helpVoiceUnsent || inputAvailability.helpBlocked || busy || detailUnavailable} onClick={help}><MessageCircle size={18} />{t.help}</button>
                   {detail.data.canVoiceHelp && <CaseVoiceRecorder key={`help-voice:${id}`} scope={{kind:'help',id}} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} current={()=>!sessionInvalid()&&currentAssignment.current===id} language={language} noticeLanguage={contentLanguage} disabled={busy || detailUnavailable || inputAvailability.helpBlocked || !!helpText.trim()} onDirtyChange={setHelpVoiceUnsent} onSessionLost={onSessionLost} onReceived={()=>setAudioRefresh(value=>value+1)}/>}</>}
-                </section>
+                </div></details>}
               </>
             )}
 

@@ -5,10 +5,45 @@ import {openDatabase} from '../server/db.mjs';
 import {seed} from '../server/seed.mjs';
 import {sqliteWorkspace} from '../server/workspace-sqlite.mjs';
 import {attachmentDigest,attachmentPolicy,resolveAttachmentScanner,MAX_ATTACHMENT_BYTES,MAX_ATTACHMENT_JSON_BYTES} from '../server/attachment-policy.mjs';
+import {transaction} from '../server/db.mjs';
+import {openPrincipalSession} from './helpers/sqlite-app.mjs';
 
 const staff={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const content={title:'File check',source:'Please read the attached file.',audience:{type:'all'},responseMode:'question',deliveryMode:'text'};
 const file=()=>({id:randomUUID(),name:'Notes.txt',mime:'text/plain',data:Buffer.from('Check the shelf count.').toString('base64')});
+
+test('parallel SQLite workspace operations do not nest transactions',async()=>{
+ const db=openDatabase(':memory:');seed(db);
+ try{const ids=Array.from({length:5},()=>randomUUID());await Promise.all(ids.map(id=>sqliteWorkspace(db,staff,'composition',{id,content})));assert.equal(db.prepare('SELECT COUNT(*) AS n FROM instruction_compositions').get().n,5);}
+ finally{db.close();}
+});
+
+test('scanning releases SQLite locks and rechecks draft state before persistence',async()=>{
+ const db=openDatabase(':memory:');seed(db);let finishScan,started;
+ const scanning=new Promise(resolve=>{started=resolve;}),verdict=new Promise(resolve=>{finishScan=resolve;});
+ try{
+  const id=randomUUID(),original=file();await sqliteWorkspace(db,staff,'composition',{id,content});
+  const upload=sqliteWorkspace(db,staff,'attachments',{requestId:id,file:original},{integrationMode:'live',attachmentScanner:{async scan(){started();return verdict;}}});
+  await scanning;
+  transaction(db,()=>db.prepare("UPDATE staff SET active=0 WHERE id='maya'").run());
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM instruction_attachments').get().n,0);
+  finishScan('clean');await assert.rejects(upload,/Forbidden/);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM instruction_attachments').get().n,0);
+ }finally{finishScan?.('clean');db.close();}
+});
+
+test('a staff sign-out during scanning revokes the in-flight upload even when the account stays active',async()=>{
+ const db=openDatabase(':memory:');seed(db);
+ try{
+  openPrincipalSession(db,db.prepare("SELECT * FROM staff WHERE id='maya'").get());
+  const session={...staff,token_hash:db.prepare("SELECT token_hash FROM sessions WHERE principal_id='maya'").get().token_hash};
+  const id=randomUUID();await sqliteWorkspace(db,session,'composition',{id,content});
+  await assert.rejects(sqliteWorkspace(db,session,'attachments',{requestId:id,file:file()},{integrationMode:'live',attachmentScanner:{async scan(){
+   transaction(db,()=>db.prepare("UPDATE sessions SET revoked_at=? WHERE token_hash=?").run(new Date().toISOString(),session.token_hash));return 'clean';
+  }}}),/Sign in required/);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM instruction_attachments').get().n,0);
+ }finally{db.close();}
+});
 
 test('attachment gateway limit includes base64 overhead below Vercel transport cap',()=>{
  assert.equal(MAX_ATTACHMENT_BYTES,3*1024*1024);

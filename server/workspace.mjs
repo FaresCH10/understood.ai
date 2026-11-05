@@ -26,16 +26,22 @@ export function compositionInput(c){
  return {title:c.title,source:c.source,audience:a.type==='all'?{type:'all'}:a.type==='crew'?{type:'crew',crewId:a.crewId}:{type:'members',workerIds:[...a.workerIds].sort()},responseMode:c.responseMode,deliveryMode:c.deliveryMode,evidenceMode};
 }
 export function assignmentWorkStatus(row){
- if(row.open_case || row.outcome==='clarification' || row.outcome==='unassessable')return 'follow-up';
+ if(row.open_case)return 'follow-up';
  if(row.completed_at)return 'done';
- if(row.acknowledged_at || !isCurrentRecording(row)&&row.outcome==='matched')return 'in-progress';
+ if(row.acknowledged_at || !isCurrentRecording(row)&&(row.outcome==='matched'||row.resolved_outcome))return 'in-progress';
+ if(row.outcome==='clarification' || row.outcome==='unassessable')return 'follow-up';
  return 'sent';
 }
 const workColumns=`${responseColumns},ac.completed_at,
- EXISTS(SELECT 1 FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='open') AS open_case`;
-const workStatusSql=`CASE WHEN open_case OR outcome IN ('clarification','unassessable') THEN 'follow-up'
+ EXISTS(SELECT 1 FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='open') AS open_case,
+ EXISTS(SELECT 1 FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='resolved'
+  AND c.attempt_id=(SELECT t.id FROM attempts t JOIN submission_receipts sr ON sr.assignment_id=t.assignment_id AND sr.submission_id=t.submission_id
+   WHERE t.assignment_id=a.id ORDER BY sr.sequence DESC LIMIT 1)) AS resolved_outcome`;
+const currentRecordingSql=`audio_status IS NOT NULL AND (attempt_submission IS NULL OR audio_submission<>attempt_submission) AND (attempt_order IS NULL OR audio_order>attempt_order)`;
+const workStatusSql=`CASE WHEN open_case THEN 'follow-up'
  WHEN completed_at IS NOT NULL THEN 'done'
- WHEN acknowledged_at IS NOT NULL OR outcome='matched' AND NOT(audio_status IS NOT NULL AND (attempt_submission IS NULL OR audio_submission<>attempt_submission) AND (attempt_order IS NULL OR audio_order>attempt_order)) THEN 'in-progress' ELSE 'sent' END`;
+ WHEN acknowledged_at IS NOT NULL OR (outcome='matched' OR resolved_outcome) AND NOT(${currentRecordingSql}) THEN 'in-progress'
+ WHEN outcome IN ('clarification','unassessable') THEN 'follow-up' ELSE 'sent' END`;
 const workResponseSql=`CASE WHEN audio_status IS NOT NULL AND (attempt_submission IS NULL OR audio_submission<>attempt_submission) AND (attempt_order IS NULL OR audio_order>attempt_order)
  THEN CASE WHEN audio_status IN ('failed','blocked') THEN 'waiting' ELSE 'pending' END
  WHEN outcome IS NOT NULL OR acknowledged_at IS NOT NULL THEN 'received' WHEN attempt_at IS NOT NULL THEN 'pending' ELSE 'waiting' END`;
@@ -75,11 +81,7 @@ export async function workspaceOperation(q,session,operation,input={},options={}
    JOIN publication_report_audience pra ON pra.assignment_id=a.id AND pra.org_id=a.org_id AND pra.site_id=a.site_id AND pra.publication_id=a.publication_id
    LEFT JOIN assignment_completions ac ON ac.assignment_id=a.id AND ac.org_id=a.org_id AND ac.site_id=a.site_id
    WHERE a.org_id=? AND a.site_id=? AND pra.crew_id=?
-  ), work AS (SELECT publication_id,CASE
-   WHEN open_case OR outcome IN ('clarification','unassessable') THEN 'follow-up'
-   WHEN completed_at IS NOT NULL THEN 'done'
-   WHEN acknowledged_at IS NOT NULL OR outcome='matched' AND NOT(audio_status IS NOT NULL AND (attempt_submission IS NULL OR audio_submission<>attempt_submission) AND (attempt_order IS NULL OR audio_order>attempt_order)) THEN 'in-progress'
-   ELSE 'sent' END AS status FROM assessed
+  ), work AS (SELECT publication_id,${workStatusSql} AS status FROM assessed
   ), totals AS (SELECT publication_id,COUNT(*) AS assigned,
    SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) AS sent,
    SUM(CASE WHEN status='in-progress' THEN 1 ELSE 0 END) AS in_progress,
@@ -176,7 +178,7 @@ export async function workspaceOperation(q,session,operation,input={},options={}
    SUM(CASE WHEN state='published' AND status='in-progress' THEN 1 ELSE 0 END) AS in_progress,
    SUM(CASE WHEN state='published' AND status='follow-up' THEN 1 ELSE 0 END) AS follow_up,
    SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) AS done FROM work`,base))[0];
-  const pattern=`%${filter.search.replace(/[!%_]/g,'!$&')}%`,where=`WHERE (?='all' OR ?='active' AND state='published' AND status<>'done' OR status=?) AND LOWER(title) LIKE LOWER(?) ESCAPE '!'`,args=[...base,filter.status,filter.status,filter.status,pattern];
+  const pattern=`%${filter.search.replace(/[!%_]/g,'!$&')}%`,where=`WHERE (?='all' OR ?='active' AND state='published' AND status<>'done' OR status=? AND (?='done' OR state='published')) AND LOWER(title) LIKE LOWER(?) ESCAPE '!'`,args=[...base,filter.status,filter.status,filter.status,filter.status,pattern];
   const total=Number((await q(`${cte} SELECT COUNT(*) AS total FROM work ${where}`,args))[0].total);
   const rows=await q(`${cte} SELECT * FROM work ${where} ORDER BY CASE WHEN state='published' AND status='follow-up' AND supervisor_reply=1 THEN 0 WHEN state='published' AND status<>'done' AND due_at IS NOT NULL AND due_at<=? THEN 1 ELSE 2 END,
    CASE WHEN state='published' AND status<>'done' AND due_at IS NOT NULL THEN 0 ELSE 1 END,due_at ASC,published_at DESC,id DESC LIMIT ? OFFSET ?`,[...args,now,filter.pageSize,(filter.page-1)*filter.pageSize]);

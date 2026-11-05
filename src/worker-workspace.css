@@ -99,6 +99,10 @@
 }
 
 .worker-help-hub .worker-help-reasons { margin-block:28px; }
+.worker-help-hub .worker-page-heading h1 { min-width:0; flex:1; overflow-wrap:anywhere; }
+.worker-help-hub .worker-page-heading>.worker-heading-action { flex-shrink:0; }
+.worker-help-hub .worker-card .button>span,.worker-help-hub .worker-help-reason-grid button>span { min-width:0; overflow-wrap:anywhere; }
+.worker-help-hub .worker-card .button>svg { flex-shrink:0; }
 .worker-help-hub .worker-help-reasons h2 { margin:0 0 8px; font-size:20px; line-height:1.4; text-wrap:balance; }
 .worker-help-hub .worker-help-reasons>p { color:var(--worker-muted); font-size:14px; line-height:1.65; margin:0 0 18px; max-width:58ch; }
 .worker-help-hub .worker-help-reason-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }

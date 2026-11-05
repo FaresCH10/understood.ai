@@ -5,6 +5,8 @@ import {useEffect,useState,useRef} from 'react';
 import {Paperclip,Download,Expand,X,FileText} from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import './instruction-files.css';
+import {workerAttachmentText} from './worker-attachment-text';
+import {keepDialogFocus} from './dialog-focus';
 type FileRow={id:string;name:string;mime:string;bytes:number;captions?:Record<string,string>};
 type AttachmentPolicy={maxBytes:number;scanRequired:boolean;uploadAllowed:boolean};
 const photo=(mime:string)=>mime==='image/png'||mime==='image/jpeg';
@@ -15,24 +17,24 @@ const captionFor=(captions:Record<string,string>|undefined,language:string)=>{
 };
 function AttachmentPreview({requestId,file,clientContext,current,onSessionLost,alt,language='en'}:{requestId:string;file:FileRow;clientContext:string;current:()=>boolean;onSessionLost:()=>void;alt:string;language?:string}){
  const [url,setUrl]=useState(''),[opened,setOpened]=useState(false),[failed,setFailed]=useState(false),dialog=useRef<HTMLDialogElement>(null),trigger=useRef<HTMLButtonElement>(null);
- const ar=language==='ar',isPhoto=photo(file.mime);
+ const copy=workerAttachmentText(language),isPhoto=photo(file.mime),needsPreview=isPhoto||file.mime==='application/pdf'&&opened;
  useEffect(()=>{
-  if(!isPhoto&&!(file.mime==='application/pdf'&&opened))return;
+  if(!needsPreview)return;
   let objectUrl='';const controller=new AbortController();
   setUrl('');setFailed(false);
   fetch(`/api/workspace/attachments/${requestId}/${file.id}`,{credentials:'include',cache:'no-store',redirect:'error',signal:controller.signal,headers:{'x-client-session-context':clientContext}})
-   .then(async response=>{if(response.status===401||response.status===409)onSessionLost();if(!response.ok)throw Error();return response.blob();})
+   .then(async response=>{if(current()&&(response.status===401||response.status===409))onSessionLost();if(!response.ok)throw Error();return response.blob();})
    .then(blob=>{if(current()&&!controller.signal.aborted){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl);}})
    .catch(()=>{if(current()&&!controller.signal.aborted)setFailed(true);});
   return()=>{controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl);};
- },[requestId,file.id,file.mime,clientContext,opened]);
+ },[requestId,file.id,file.mime,clientContext,needsPreview]);
  useEffect(()=>{if(opened&&!dialog.current?.open)dialog.current?.showModal();},[opened]);
  if(!isPhoto&&file.mime!=='application/pdf')return null;
  return <>
-  {isPhoto&&url?<button type="button" ref={trigger} className="attachment-photo-button" onClick={()=>setOpened(true)} aria-label={ar?`تكبير ${file.name}`:`Enlarge ${file.name}`}><img className="attachment-preview" src={url} alt={alt} loading="lazy" width="640" height="360"/><Expand size={18} aria-hidden="true"/></button>:file.mime==='application/pdf'?<button type="button" ref={trigger} className="button outline" onClick={()=>setOpened(true)}><FileText size={18} aria-hidden="true"/>{ar?'معاينة PDF':'Preview PDF'}</button>:null}
-  <dialog ref={dialog} className="attachment-preview-dialog" aria-label={file.name} onClose={()=>{setOpened(false);trigger.current?.focus();}} onClick={event=>{if(event.target===event.currentTarget)dialog.current?.close();}}>
-   <div className="attachment-preview-toolbar"><strong dir="auto">{file.name}</strong><button type="button" className="icon-button" aria-label={ar?'إغلاق المعاينة':'Close preview'} onClick={()=>dialog.current?.close()}><X size={20} aria-hidden="true"/></button></div>
-   {failed?<p role="alert">{ar?'تعذرت المعاينة. حاول تنزيل الملف.':'Preview unavailable. Try downloading the file.'}</p>:!url?<p role="status">{ar?'جارٍ تحميل المعاينة…':'Loading preview…'}</p>:isPhoto?<img src={url} alt={alt} width="1200" height="900"/>:<><iframe src={url} sandbox="" title={file.name}/><p>{ar?'إذا لم تظهر المعاينة، أغلقها واستخدم زر التنزيل.':'If the preview is unavailable, close it and use the download button.'}</p></>}
+  {isPhoto&&url?<button type="button" ref={trigger} className="attachment-photo-button" onClick={()=>setOpened(true)} aria-label={`${copy.enlarge} ${file.name}`}><img className="attachment-preview" src={url} alt={alt} loading="lazy" width="640" height="360"/><Expand size={18} aria-hidden="true"/></button>:file.mime==='application/pdf'?<button type="button" ref={trigger} className="button outline" onClick={()=>setOpened(true)}><FileText size={18} aria-hidden="true"/>{copy.preview}</button>:isPhoto?<p role={failed?'alert':'status'}>{failed?copy.failed:copy.loading}</p>:null}
+  <dialog ref={dialog} className="attachment-preview-dialog" aria-label={file.name} onKeyDown={keepDialogFocus} onClose={()=>{setOpened(false);trigger.current?.focus();}} onClick={event=>{if(event.target===event.currentTarget)dialog.current?.close();}}>
+   <div className="attachment-preview-toolbar"><strong dir="auto">{file.name}</strong><button type="button" className="icon-button" aria-label={copy.close} onClick={()=>dialog.current?.close()}><X size={20} aria-hidden="true"/></button></div>
+   {failed?<p role="alert">{copy.failed}</p>:!url?<p role="status">{copy.loading}</p>:isPhoto?<img src={url} alt={alt} width="1200" height="900"/>:<><iframe src={url} sandbox="" title={file.name}/><p>{copy.fallback}</p></>}
   </dialog>
  </>;
 }
@@ -75,10 +77,10 @@ export function InstructionFiles({assignmentId,clientContext,current,onSessionLo
  const staffT=useStaffStaticText();
  const t=workerWorkText(language);
  const [data,setData]=useState<{items:FileRow[];requestId?:string}|null>(null),[error,setError]=useState('');
- useEffect(()=>{const controller=new AbortController();fetch(`/api/workspace/assignment-files/${encodeURIComponent(assignmentId)}`,{credentials:'include',cache:'no-store',signal:controller.signal,headers:{'x-client-session-context':clientContext}}).then(async response=>{if(response.status===401||response.status===409)onSessionLost();if(!response.ok)throw Error(t.fileUnavailable);return response.json();}).then(value=>{if(current()&&!controller.signal.aborted)setData(value);}).catch(reason=>{if(current()&&!controller.signal.aborted)setError(reason.message);});return()=>controller.abort();},[assignmentId,clientContext]);
+ useEffect(()=>{const controller=new AbortController();fetch(`/api/workspace/assignment-files/${encodeURIComponent(assignmentId)}`,{credentials:'include',cache:'no-store',redirect:'error',signal:controller.signal,headers:{'x-client-session-context':clientContext}}).then(async response=>{if(current()&&(response.status===401||response.status===409))onSessionLost();if(!response.ok)throw Error(t.fileUnavailable);return response.json();}).then(value=>{if(current()&&!controller.signal.aborted)setData(value);}).catch(reason=>{if(current()&&!controller.signal.aborted)setError(reason.message);});return()=>controller.abort();},[assignmentId,clientContext]);
  async function download(file:FileRow){
   if(!current())return;setError('');
-  try{const response=await fetch(`/api/workspace/attachments/${data?.requestId}/${file.id}`,{credentials:'include',cache:'no-store',headers:{'x-client-session-context':clientContext}});if(response.status===401||response.status===409)onSessionLost();if(!response.ok)throw Error(t.fileUnavailable);const blob=await response.blob();if(!current())return;const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(reason){if(current())setError((reason as Error).message);}
+  try{const response=await fetch(`/api/workspace/attachments/${data?.requestId}/${file.id}`,{credentials:'include',cache:'no-store',redirect:'error',headers:{'x-client-session-context':clientContext}});if(current()&&(response.status===401||response.status===409))onSessionLost();if(!response.ok)throw Error(t.fileUnavailable);const blob=await response.blob();if(!current())return;const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(reason){if(current())setError((reason as Error).message);}
  }
  if(!data?.items.length&&!error)return null;
  return <section className="worker-card"><h2><Paperclip size={19}/> {t.attachments}</h2>{error&&<p role="alert">{staffT.error(error)}</p>}{data?.items.map(file=>{const caption=photo(file.mime)?captionFor(file.captions,language):'';return <div className="worker-attachment" key={file.id}>{(photo(file.mime)||file.mime==='application/pdf')&&<AttachmentPreview requestId={data.requestId!} file={file} clientContext={clientContext} current={current} onSessionLost={onSessionLost} language={language} alt={caption||file.name}/>}{caption&&<p className="attachment-caption" lang={language} dir={direction(language)}>{caption}</p>}<button className="item-row" onClick={()=>void download(file)}><Download size={18}/><span>{file.name}<small> · {Math.ceil(file.bytes/1024)} KB</small></span></button></div>;})}</section>;

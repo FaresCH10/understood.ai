@@ -10,10 +10,38 @@ import {processOne} from '../server/worker.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {sqliteApp,openPrincipalSession,principalLoginBody} from './helpers/sqlite-app.mjs';
 import {listNotifications,readNotification,notificationReceipt} from '../server/notifications.mjs';
+import {resolveClarification,requestHelp} from '../server/clarifications.mjs';
 const staff={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const worker={principal_type:'worker',principal_id:'worker-1',org_id:'cedar',site_id:'beirut'};
 const content={title:'Delivery check',source:'Please check the delivery count.',audience:{type:'all'},responseMode:'question',deliveryMode:'text'};
 const fixture=()=>{const db=openDatabase(':memory:');seed(db);ensureInstructionSchema(db);return db;};
+test('resolved assessment follow-up releases work without rewriting its assessment, while fresh help still blocks completion',async()=>{
+ const db=fixture(),session={...worker,principal_id:'worker-14'},id='assignment-14';
+ try{
+  const read=async()=> (await sqliteWorkspace(db,session,'work',{assignmentId:id})).item;
+  assert.equal((await read()).status,'follow-up');
+  resolveClarification(db,staff,'clarification-14',{notes:'Explained the instruction and confirmed understanding in person.'});
+  assert.equal((await read()).status,'in-progress');assert.equal((await read()).canComplete,true);
+  assert.equal(db.prepare("SELECT outcome FROM attempts WHERE id='attempt-14'").get().outcome,'clarification');
+  const help=requestHelp(db,session,id,{requestId:randomUUID(),text:'The equipment is missing.'});
+  assert.equal((await read()).status,'follow-up');
+  await assert.rejects(sqliteWorkspace(db,session,'work',{complete:id}),/resolve follow-up/);
+  resolveClarification(db,staff,help.id,{notes:'Equipment supplied; worker can continue.'});
+  assert.equal((await sqliteWorkspace(db,session,'work',{complete:id})).status,'done');
+  assert.equal((await read()).status,'done');
+ }finally{db.close();}
+});
+
+test('an old resolved assessment cannot approve a newer failed answer',async()=>{
+ const db=fixture(),session={...worker,principal_id:'worker-14'},id='assignment-14';
+ try{
+  await sqliteWorkspace(db,session,'work',{});
+  resolveClarification(db,staff,'clarification-14',{notes:'First answer discussed in person.'});
+  db.prepare('INSERT INTO attempts(id,org_id,assignment_id,submission_id,answer_text,outcome,reasons_json,received_at) VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),'cedar',id,randomUUID(),'New answer','unassessable','[]',new Date().toISOString());
+  const row=(await sqliteWorkspace(db,session,'work',{assignmentId:id})).item;
+  assert.equal(row.status,'follow-up');assert.equal(row.canComplete,false);
+ }finally{db.close();}
+});
 test('compositions persist incomplete text, appear in drafts and stay private to their author',async()=>{
  const db=fixture();try{const id=randomUUID();await sqliteWorkspace(db,staff,'composition',{id,content:{...content,title:'',source:'unfinished'}});
  const read=await sqliteWorkspace(db,staff,'composition',{id});assert.equal(read.content.source,'unfinished');
@@ -64,6 +92,10 @@ test('work summaries paginate and filter on the server, preserve localized title
   await assert.rejects(sqliteWorkspace(db,worker,'work',{workerId:'worker-2'}),/Invalid work request/);
   for(const filter of [{pageSize:51},{page:0},{status:'invented'},{search:'x'.repeat(81)},{other:true}])await assert.rejects(sqliteWorkspace(db,worker,'work',filter),/Invalid work request/);
   assert.equal((await sqliteWorkspace(db,worker,'work',{search:'%'})).total,0);
+  db.prepare("UPDATE publications SET state='withdrawn' WHERE id=(SELECT publication_id FROM assignments WHERE id=?)").run(added[0]);
+  assert.equal((await sqliteWorkspace(db,worker,'work',{status:'sent',search:'Localized inventory'})).total,3);
+  assert.equal((await sqliteWorkspace(db,worker,'work',{status:'active',search:'Localized inventory'})).total,3);
+  assert.equal((await sqliteWorkspace(db,worker,'work',{status:'all',search:'Localized inventory'})).total,4);
  }finally{db.close();}
 });
 test('attachments validate bytes and become available only to the assigned worker after publication',async()=>{

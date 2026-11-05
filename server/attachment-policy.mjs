@@ -8,6 +8,26 @@ export const MAX_ATTACHMENT_JSON_BYTES=4*1024*1024+65536;
 export const MAX_ATTACHMENT_TOTAL_BYTES=10*1024*1024;
 export const attachmentDigest=bytes=>createHash('sha256').update(bytes).digest('hex');
 
+class ScanNeeded extends Error{
+  constructor(key,bytes,file){super('Scan required');this.key=key;this.bytes=Buffer.from(bytes);this.file={...file};}
+}
+// run must roll back on exceptions. Authorize and validate first, scan outside
+// the transaction, then repeat every authority/state check with a bound verdict.
+export async function withAttachmentScanOutsideTransaction(options,run){
+  const scanner=options.attachmentScanner;
+  if(options.integrationMode!=='live'||typeof scanner?.scan!=='function')return run(options);
+  const verdicts=new Map();
+  const checked={...options,attachmentScanner:{scan(bytes,file){
+    const key=JSON.stringify([attachmentDigest(bytes),file.mime,file.name]);
+    if(!verdicts.has(key))throw new ScanNeeded(key,bytes,file);
+    return verdicts.get(key);
+  }}};
+  for(;;){
+    try{return await run(checked);}
+    catch(error){if(!(error instanceof ScanNeeded))throw error;verdicts.set(error.key,await scanner.scan(error.bytes,error.file));}
+  }
+}
+
 export function attachmentPolicy({integrationMode='synthetic',attachmentScanner}={}) {
   const scanRequired=integrationMode==='live';
   return {maxBytes:MAX_ATTACHMENT_BYTES,maxFiles:5,totalBytes:MAX_ATTACHMENT_TOTAL_BYTES,

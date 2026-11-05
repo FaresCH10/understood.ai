@@ -4,6 +4,7 @@ import {workerJourneyText} from './worker-journey-text';
 import {workItemOverdue,workListPath,type WorkFilter,type WorkerWorkPage} from './worker-journey';
 import {workerUiDirection,type WorkerUiLanguage} from './worker-ui-language';
 import {languageDirection} from '../server/languages.mjs';
+import {workerWorkResponse,workPageWithinRange} from './worker-work-request';
 
 export function WorkerInbox({language,clientContext,refresh,filter,onFilter,onOpen,onHelp,onSessionLost,current,disabled,timezone,title,refreshLabel,previousLabel,nextLabel}:{language:WorkerUiLanguage;clientContext:string;refresh:number;filter:WorkFilter;onFilter:(value:WorkFilter)=>void;onOpen:(id:string)=>void;onHelp:()=>void;onSessionLost:()=>void;current:()=>boolean;disabled:boolean;timezone?:string;title:string;refreshLabel:string;previousLabel:string;nextLabel:string}){
  const t=workerJourneyText(language),rtl=workerUiDirection(language)==='rtl',Forward=rtl?ArrowLeft:ArrowRight;
@@ -12,8 +13,11 @@ export function WorkerInbox({language,clientContext,refresh,filter,onFilter,onOp
  const callbacks=useRef({current,onSessionLost});callbacks.current={current,onSessionLost};
  useEffect(()=>{const controller=new AbortController();setLoading(true);setFailed(false);
   fetch(workListPath(filter,page,search),{credentials:'include',cache:'no-store',redirect:'error',signal:controller.signal,headers:{'x-client-session-context':clientContext}})
-   .then(async response=>{if([401,403,409].includes(response.status)){callbacks.current.onSessionLost();throw Error();}if(!response.ok)throw Error();return response.json();})
-   .then(value=>{if(!controller.signal.aborted&&callbacks.current.current()){if(!Array.isArray(value.items)||!Number.isInteger(value.total)||!value.counts)throw Error();setData(value);}})
+   .then(response=>workerWorkResponse(response,()=>{if(!controller.signal.aborted&&callbacks.current.current())callbacks.current.onSessionLost();}))
+   .then(value=>{if(!controller.signal.aborted&&callbacks.current.current()){
+    if(!Array.isArray(value?.items)||!Number.isInteger(value.total)||value.total<0||value.pageSize!==10||!value.counts)throw Error();
+    const next=workPageWithinRange(page,value.total,value.pageSize);if(next!==page){setPage(next);return;}setData(value);
+   }})
    .catch(()=>{if(!controller.signal.aborted&&callbacks.current.current())setFailed(true);})
    .finally(()=>{if(!controller.signal.aborted&&callbacks.current.current())setLoading(false);});
   return()=>controller.abort();
@@ -24,8 +28,8 @@ export function WorkerInbox({language,clientContext,refresh,filter,onFilter,onOp
  return <section className="worker-task-inbox" aria-labelledby="worker-task-heading" aria-busy={loading}>
   <header className="worker-page-heading"><div><h1 id="worker-task-heading">{title}</h1><p>{done?t.done:t.active}{counts?` · ${new Intl.NumberFormat(language).format(done?counts.done:counts.active)}`:''}</p></div><button type="button" className="icon-button worker-heading-action" aria-label={refreshLabel} disabled={disabled||loading} onClick={()=>setTick(value=>value+1)}><RefreshCw size={20} aria-hidden="true"/></button></header>
   <div className="worker-inbox-main-tabs" role="group" aria-label={title}>
-   <button type="button" aria-pressed={!done} disabled={disabled} onClick={()=>choose('active')}>{t.active}{counts&&<span>{counts.active}</span>}</button>
-   <button type="button" aria-pressed={done} disabled={disabled} onClick={()=>choose('done')}><Check size={17} aria-hidden="true"/>{t.done}{counts&&<span>{counts.done}</span>}</button>
+   <button type="button" aria-pressed={!done} disabled={disabled} onClick={()=>choose('active')}><span className="worker-tab-title">{t.active}</span>{counts&&<span>{counts.active}</span>}</button>
+   <button type="button" aria-pressed={done} disabled={disabled} onClick={()=>choose('done')}><Check size={17} aria-hidden="true"/><span className="worker-tab-title">{t.done}</span>{counts&&<span>{counts.done}</span>}</button>
   </div>
   {!done&&<div className="worker-state-filters" role="group" aria-label={t.active}>{(['active','sent','in-progress','follow-up'] as WorkFilter[]).map(value=><button key={value} type="button" aria-pressed={filter===value} disabled={disabled} onClick={()=>choose(value)}>{value==='active'?t.all:value==='sent'?t.sent:value==='in-progress'?t.progress:t.follow}{value==='follow-up'&&!!counts?.followUp&&<span>{counts.followUp}</span>}</button>)}</div>}
   <form className="worker-inbox-search" role="search" onSubmit={event=>{event.preventDefault();setPage(1);setSearch(query.trim());}}><Search size={18} aria-hidden="true"/><input type="search" name="worker-instruction-search" aria-label={t.search} placeholder={t.search} maxLength={80} value={query} onChange={event=>{setQuery(event.target.value);if(!event.target.value){setSearch('');setPage(1);}}}/><button type="submit" className="icon-button" aria-label={t.search} disabled={disabled||loading}><Forward size={18} aria-hidden="true"/></button></form>

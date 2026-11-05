@@ -9,9 +9,13 @@ import {processOnePreparation} from '../server/postgres/preparation.mjs';
 import {acknowledgeAssignment} from '../server/postgres/acknowledgments.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {listNotifications,readNotification,notificationReceipt} from '../server/postgres/notifications.mjs';
+import {submitAnswer} from '../server/postgres/domain.mjs';
+import {processOneAssessment} from '../server/postgres/assessment-worker.mjs';
+import {resolveClarification,requestHelp} from '../server/postgres/clarifications.mjs';
 const scope={schema:'test_workspace',integrationMode:'synthetic'},staff={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'},worker={principal_type:'worker',principal_id:'w1',org_id:'a',site_id:'a'};
 test('PostgreSQL supports persisted drafts, selected members, attachments and explicit work completion',async()=>{
- const db=new PGlite(),client={async query(sql,values){return values?.length?db.query(sql,values):(await db.exec(sql)).at(-1)||{rows:[]};},release(){}},pool={async connect(){return client;}};
+ let inTransaction=false;
+ const db=new PGlite(),client={async query(sql,values){const result=values?.length?await db.query(sql,values):(await db.exec(sql)).at(-1)||{rows:[]};if(sql==='BEGIN')inTransaction=true;if(['COMMIT','ROLLBACK'].includes(sql))inTransaction=false;return result;},release(){}},pool={async connect(){return client;}};
  try{
   await db.exec('CREATE SCHEMA test_workspace');
   await runMigrations(pool,scope);
@@ -46,5 +50,28 @@ test('PostgreSQL supports persisted drafts, selected members, attachments and ex
   const files=await postgresWorkspace(pool,worker,'assignment-files',{id:assignment.id},scope);assert.equal(files.items.find(row=>row.id===file.id).name,file.name);assert.deepEqual(files.items.find(row=>row.id===photo.id).captions,{ur:'نیلی شیلف پر اشیاء'});
   await assert.rejects(postgresWorkspace(pool,{...worker,principal_id:'w2'},'attachments',{requestId:id},scope),/unavailable/);
   assert.equal((await postgresWorkspace(pool,staff,'work',{workerId:'w1'},scope)).items[0].status,'done');
+  const question=randomUUID();await startInstructionSend(pool,staff,{requestId:question,...content,responseMode:'question'},scope);await processOnePreparation(pool,scope);
+  const questionSent=await completeInstructionSend(pool,staff,question,scope),assignment2=(await db.query('SELECT id FROM assignments WHERE publication_id=$1',[questionSent.publicationId])).rows[0].id;
+  const snapshot=(await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[questionSent.publicationId])).rows[0].snapshot_json;
+  const wrongChoice=snapshot.languages.en.choices.find(choice=>choice.id!==snapshot.rubric.correctChoiceId).id;
+  const answer=await submitAnswer(pool,worker,assignment2,randomUUID(),wrongChoice,scope);
+  await processOneAssessment(pool,{async assess(){return {outcome:'clarification',reasons:['missing_asked_fact'],evidence:[]};}},scope);
+  const caseId=(await db.query('SELECT id FROM clarifications WHERE attempt_id=$1',[answer.id])).rows[0].id;
+  assert.equal((await postgresWorkspace(pool,worker,'work',{assignmentId:assignment2},scope)).item.status,'follow-up');
+  await resolveClarification(pool,staff,caseId,{notes:'Explained in person; understanding confirmed.'},scope);
+  assert.equal((await postgresWorkspace(pool,worker,'work',{assignmentId:assignment2},scope)).item.canComplete,true);
+  assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[answer.id])).rows[0].outcome,'clarification');
+  const help=await requestHelp(pool,worker,assignment2,{requestId:randomUUID(),text:'The equipment is missing.'},scope);
+  await assert.rejects(postgresWorkspace(pool,worker,'work',{complete:assignment2},scope),/resolve follow-up/);
+  await resolveClarification(pool,staff,help.id,{notes:'Equipment supplied.'},scope);
+  assert.equal((await postgresWorkspace(pool,worker,'work',{complete:assignment2},scope)).status,'done');
+
+  const draft=randomUUID();await postgresWorkspace(pool,staff,'composition',{id:draft,content},scope);
+  let scans=0;
+  await assert.rejects(postgresWorkspace(pool,staff,'attachments',{requestId:draft,file:{...file,id:randomUUID()}},{...scope,integrationMode:'live',attachmentScanner:{async scan(){
+   scans++;assert.equal(inTransaction,false,'malware scanner must not hold a database transaction');
+   await db.query("UPDATE staff SET active=false WHERE id='owner'");return 'clean';
+  }}}),/Forbidden/);
+  assert.equal(scans,1);assert.equal(Number((await db.query('SELECT COUNT(*) AS n FROM instruction_attachments WHERE request_id=$1',[draft])).rows[0].n),0);
  }finally{await db.close();}
 });
