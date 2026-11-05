@@ -8,6 +8,7 @@ import {startInstructionSend,completeInstructionSend} from '../server/postgres/i
 import {processOnePreparation} from '../server/postgres/preparation.mjs';
 import {acknowledgeAssignment} from '../server/postgres/acknowledgments.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
+import {listNotifications,readNotification,notificationReceipt} from '../server/postgres/notifications.mjs';
 const scope={schema:'test_workspace',integrationMode:'synthetic'},staff={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'},worker={principal_type:'worker',principal_id:'w1',org_id:'a',site_id:'a'};
 test('PostgreSQL supports persisted drafts, selected members, attachments and explicit work completion',async()=>{
  const db=new PGlite(),client={async query(sql,values){return values?.length?db.query(sql,values):(await db.exec(sql)).at(-1)||{rows:[]};},release(){}},pool={async connect(){return client;}};
@@ -32,6 +33,15 @@ test('PostgreSQL supports persisted drafts, selected members, attachments and ex
   await assert.rejects(postgresWorkspace(pool,worker,'work',{complete:assignment.id},scope),/Confirm understanding/);
   await acknowledgeAssignment(pool,worker,assignment.id,randomUUID(),scope);
   assert.equal((await postgresWorkspace(pool,worker,'work',{complete:assignment.id},scope)).status,'done');
+  const completedAgain=await postgresWorkspace(pool,worker,'work',{complete:assignment.id},scope);assert.equal(completedAgain.status,'done');
+  assert.equal(Number((await db.query("SELECT COUNT(*) AS n FROM audit WHERE action='instruction.completed'")).rows[0].n),1);
+  assert.equal(Number((await db.query("SELECT COUNT(*) AS n FROM notification_events WHERE kind='instruction.completed'")).rows[0].n),1);
+  const notice=(await listNotifications(pool,staff,{},scope)).items.find(item=>item.kind==='instruction.completed');assert.ok(notice);assert.equal(notice.target,`briefings/${sent.briefingId}`);
+  assert.equal((await readNotification(pool,staff,notice.id,scope)).target,notice.target);assert.equal((await notificationReceipt(pool,staff,notice.id,scope)).item.target,notice.target);
+  const exact=(await postgresWorkspace(pool,worker,'work',{assignmentId:assignment.id},scope)).item;assert.equal(exact.status,'done');assert.equal(exact.supervisorName,'Owner');assert.equal(exact.title,'Shelf handover');
+  const donePage=await postgresWorkspace(pool,worker,'work',{status:'done',pageSize:1,search:'Shelf'},scope);assert.equal(donePage.total,1);assert.equal(donePage.items.length,1);assert.equal(donePage.counts.done,1);
+  assert.equal((await postgresWorkspace(pool,worker,'work',{status:'active'},scope)).total,0);
+  await assert.rejects(postgresWorkspace(pool,{...worker,principal_id:'w2'},'work',{assignmentId:assignment.id},scope),/Assignment unavailable/);
   const doneLibrary=await postgresWorkspace(pool,staff,'library',{status:'done'},scope);assert.equal(doneLibrary.items[0].workCounts.done,1);
   const files=await postgresWorkspace(pool,worker,'assignment-files',{id:assignment.id},scope);assert.equal(files.items.find(row=>row.id===file.id).name,file.name);assert.deepEqual(files.items.find(row=>row.id===photo.id).captions,{ur:'نیلی شیلف پر اشیاء'});
   await assert.rejects(postgresWorkspace(pool,{...worker,principal_id:'w2'},'attachments',{requestId:id},scope),/unavailable/);

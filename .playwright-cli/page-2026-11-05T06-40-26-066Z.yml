@@ -1,0 +1,37 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e94]:
+    - link "Skip to main content" [ref=f1e95] [cursor=pointer]:
+      - /url: "#worker-main"
+    - banner [ref=f1e96]:
+      - generic [ref=f1e97]:
+        - img "Understood" [ref=f1e99]
+        - generic [ref=f1e101]: Cedar Works · Beirut site
+      - generic [ref=f1e102]:
+        - generic [ref=f1e104]:
+          - strong [ref=f1e105]: Rana Khoury
+          - generic [ref=f1e106]: EN
+        - button "Notifications (1)" [ref=f1e107] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e111]: "1"
+        - button "This device" [ref=f1e113] [cursor=pointer]
+        - button "Language settings" [ref=f1e117] [cursor=pointer]
+        - button "End session" [ref=f1e123] [cursor=pointer]
+    - main [ref=f1e128]:
+      - region [ref=f1e313]:
+        - generic [ref=f1e314]:
+          - heading "Ask your supervisor for help" [level=1] [ref=f1e317]
+          - button "Refresh instructions" [ref=f1e318] [cursor=pointer]
+        - paragraph [ref=f1e324]: For urgent help, speak to your supervisor in person.
+        - button "Follow-up conversations" [ref=f1e327] [cursor=pointer]
+        - heading "Current instructions" [level=2] [ref=f1e330]
+        - article [ref=f1e331]:
+          - heading "Naddif 2el Joura" [level=2] [ref=f1e332]
+          - paragraph [ref=f1e333]: Instruction v1 · EN
+          - button "Ask about this instruction" [ref=f1e334] [cursor=pointer]
+    - navigation "Worker navigation" [ref=f1e170]:
+      - generic [ref=f1e171]:
+        - button "Instructions" [ref=f1e172] [cursor=pointer]
+        - button "Help" [active] [ref=f1e177] [cursor=pointer]
+        - button "Device" [ref=f1e182] [cursor=pointer]
+  - generic:
+    - complementary "Reticle":
+      - button "Start Reticle" [ref=f1e311]

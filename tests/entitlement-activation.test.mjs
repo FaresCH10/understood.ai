@@ -134,13 +134,13 @@ test('PostgreSQL activation is operator-only, revision-bound, ledgered and auto-
     const third=input('Please activate after review.');await savePgActivationRequest(pool,pgOwner,third,options);
     const activeEnd=new Date(Date.now()+30*86400000).toISOString();
     const extended=await saveOperatorEntitlement(pool,identity,{requestId:randomUUID(),kind:'entitlement',orgId:'a',revision:1,
-      state:'active',endsAt:activeEnd,workerLimit:30,plan:'pilot',termsReference:'terms-v2',reason:'trial_extension',
+      state:'active',endsAt:activeEnd,workerLimit:30,plan:'business',termsReference:'terms-v2',reason:'trial_extension',
       activationRequestId:null,confirmed:true},options);
     assert.equal(extended.revision,2);assert.equal(extended.state,'active');assert.equal(extended.activationRequestId,third.requestId);
     assert.equal((await db.query('SELECT state FROM organization_activation_requests WHERE request_id=$1',[third.requestId])).rows[0].state,'accepted');
 
     const suspended=await saveOperatorEntitlement(pool,identity,{requestId:randomUUID(),kind:'entitlement',orgId:'a',revision:2,
-      state:'read_only',endsAt:null,workerLimit:30,plan:'pilot',termsReference:'terms-v2',reason:'security_review',
+      state:'read_only',endsAt:null,workerLimit:30,plan:'business',termsReference:'terms-v2',reason:'security_review',
       activationRequestId:null,confirmed:true},options);
     assert.equal(suspended.revision,3);assert.equal(suspended.state,'read_only');
     const readOnlyUsage=checkedUsageModel(await getUsage(pool,pgOwner,options),'synthetic-credential','owner');
@@ -148,7 +148,7 @@ test('PostgreSQL activation is operator-only, revision-bound, ledgered and auto-
     const fourth=input('Please reactivate this workspace.');const pendingFour=await savePgActivationRequest(pool,pgOwner,fourth,options);
     assert.equal(pendingFour.state,'pending');
     const reactivated=await saveOperatorEntitlement(pool,identity,{requestId:randomUUID(),kind:'entitlement',orgId:'a',revision:3,
-      state:'active',endsAt:null,workerLimit:30,plan:'pilot',termsReference:'terms-v2',reason:'manual_activation',
+      state:'active',endsAt:null,workerLimit:30,plan:'business',termsReference:'terms-v2',reason:'manual_activation',
       activationRequestId:fourth.requestId,confirmed:true},options);
     assert.equal(reactivated.revision,4);assert.equal(reactivated.state,'active');assert.equal(reactivated.activationRequestId,fourth.requestId);
     const listing=await operationsEntitlements(pool,identity,{search:'a',state:'active'},options);

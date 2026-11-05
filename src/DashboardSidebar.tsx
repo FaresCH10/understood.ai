@@ -14,7 +14,7 @@ type Item={key:string;label:string;icon:ComponentType<{size?:number}>;active:boo
 export function DashboardSidebar({brand,items,name,email,identity,settingsLabel,signOutLabel,closeLabel,accountLabel,onClose,navigate,logout,disabled,open=true}:{brand:ReactNode;items:Item[];name?:string;email?:string;identity:string;settingsLabel:string;signOutLabel:string;closeLabel:string;accountLabel:string;onClose:()=>void;navigate:(path:string)=>void;logout:()=>void;disabled:boolean;open?:boolean}){
   const root=useRef<HTMLElement>(null);
   const more=useRef<HTMLDetailsElement>(null),morePanel=useRef<HTMLDivElement>(null);
-  const moreKeys=new Set(['language-requests','competencies','reports']);
+  const moreKeys=new Set(['language-requests','reports']);
   const primaryItems=items.filter(item=>!moreKeys.has(item.key)),moreItems=items.filter(item=>moreKeys.has(item.key));
   const activeMoreKey=moreItems.find(item=>item.active)?.key;
   useEffect(()=>{if(activeMoreKey && more.current)more.current.open=true;},[activeMoreKey]);
@@ -96,12 +96,6 @@ export function DashboardSidebar({brand,items,name,email,identity,settingsLabel,
       gsap.fromTo(bars,{scaleY:.2},{scaleY:1,duration:.5,ease:'back.out(2.2)',stagger:.07,overwrite:true});
       return;
     }
-    if(key==='competencies'){
-      const parts=iconParts(icon);
-      gsap.set(parts,{svgOrigin:'12 12'});
-      gsap.fromTo(parts,{scale:.82},{scale:1,duration:.45,ease:'elastic.out(1,.5)',stagger:.03,overwrite:true});
-      return;
-    }
     if(key==='calendar'){
       const dots=[...icon.querySelectorAll<SVGPathElement>('path[d$="h.01"]')];
       gsap.fromTo(dots,{y:0},{y:-1.8,duration:.15,ease:'power2.out',stagger:.03,yoyo:true,repeat:1,overwrite:true});
@@ -116,9 +110,10 @@ export function DashboardSidebar({brand,items,name,email,identity,settingsLabel,
       if(head){
         const cx=Number(head.getAttribute('cx')),cy=Number(head.getAttribute('cy'));
         gsap.set(head,{svgOrigin:`${cx} ${cy}`});
-        gsap.fromTo(head,{scale:.72},{scale:1,duration:.45,ease:'elastic.out(1,.45)',overwrite:true});
+        gsap.fromTo(head,{scale:.86},{scale:1,duration:.3,ease:'back.out(1.5)',overwrite:true});
       }
-      gsap.fromTo(icon,{y:0},{y:-1.5,duration:.18,yoyo:true,repeat:1,ease:'power2.out',overwrite:true});
+      gsap.set(icon,{svgOrigin:'12 12'});
+      gsap.fromTo(icon,{rotate:0,y:0},{rotate:-6,y:-1,duration:.16,yoyo:true,repeat:1,ease:'power2.out',overwrite:true});
       return;
     }
     if(key==='people/crews'){

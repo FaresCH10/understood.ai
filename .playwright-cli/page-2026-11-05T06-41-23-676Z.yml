@@ -1,0 +1,94 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e94]:
+    - link "Skip to main content" [ref=f1e95] [cursor=pointer]:
+      - /url: "#worker-main"
+    - banner [ref=f1e96]:
+      - generic [ref=f1e97]:
+        - img "Understood" [ref=f1e99]
+        - generic [ref=f1e101]: Cedar Works · Beirut site
+      - generic [ref=f1e102]:
+        - generic [ref=f1e103]: W
+        - generic [ref=f1e104]:
+          - strong [ref=f1e105]: Rana Khoury
+          - generic [ref=f1e106]: EN
+        - button "Notifications (1)" [ref=f1e107] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e111]: "1"
+          - generic [aria-hidden] [ref=f1e112]: Notifications
+        - button "This device" [ref=f1e113] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e116]: This device
+        - button "Language settings" [ref=f1e117] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e122]: Language settings
+        - button "End session" [ref=f1e123] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e127]: End session
+    - main [ref=f1e128]:
+      - button "Back" [ref=f1e504] [cursor=pointer]
+      - button "Refresh instruction" [ref=f1e507] [cursor=pointer]
+      - heading "Naddif 2el Joura" [level=1] [ref=f1e513]
+      - paragraph [ref=f1e514]: Instruction v1
+      - generic [ref=f1e515]:
+        - heading "Listen and respond" [level=2] [ref=f1e516]
+        - button "Play instruction" [ref=f1e517] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e524]: ▁▃▅▂▇▄▆▂▅▃▁
+        - group [ref=f1e525]:
+          - generic "Read text" [ref=f1e526] [cursor=pointer]
+      - generic [ref=f1e532]:
+        - generic [ref=f1e533]: Your turn
+        - heading "What action does this instruction require?" [level=2] [ref=f1e537]
+        - button "Play question" [ref=f1e538] [cursor=pointer]
+        - group "Select one answer" [ref=f1e541]:
+          - generic [ref=f1e543] [cursor=pointer]:
+            - radio "Joura msatmi bada tendif" [ref=f1e544]
+            - generic [ref=f1e545]: Joura msatmi bada tendif
+          - generic [ref=f1e546] [cursor=pointer]:
+            - radio "Carry on with another task without following this instruction." [ref=f1e547]
+            - generic [ref=f1e548]: Carry on with another task without following this instruction.
+          - generic [ref=f1e549] [cursor=pointer]:
+            - radio "Do the opposite of this instruction." [ref=f1e550]
+            - generic [ref=f1e551]: Do the opposite of this instruction.
+          - generic [ref=f1e552] [cursor=pointer]:
+            - radio "Replace this instruction with your own steps." [ref=f1e553]
+            - generic [ref=f1e554]: Replace this instruction with your own steps.
+        - button "Send answer" [disabled] [ref=f1e555]
+        - button "I need help" [ref=f1e559] [cursor=pointer]
+      - generic [ref=f1e562]:
+        - heading "Ask your supervisor for help" [level=2] [ref=f1e563]
+        - generic [ref=f1e564]:
+          - text: What do you need help with?
+          - textbox "What do you need help with?" [ref=f1e565]
+        - button "I need help" [disabled] [ref=f1e566]
+      - generic [ref=f1e569]:
+        - heading "Work status" [level=2] [ref=f1e570]
+        - status [ref=f1e571]: Waiting for your response
+        - button "Go to the instruction" [ref=f1e573] [cursor=pointer]
+      - group [ref=f1e574]:
+        - generic "Save instruction for offline access" [ref=f1e575] [cursor=pointer]
+      - region "Text saved in this tab" [ref=f1e579]:
+        - heading "Text saved in this tab" [level=2] [ref=f1e580]
+        - paragraph [ref=f1e581]: This snapshot belongs to this tab and session. Browser restore may retain it after closing. Remove it before sharing the device. Browser storage is not a secure vault.
+        - paragraph [ref=f1e582]: Shared phone mode is on. Private saving is unavailable. Change the mode in This device only on a device you control.
+        - generic [ref=f1e583]:
+          - checkbox "This is a device I control" [disabled] [ref=f1e584]
+          - text: This is a device I control
+        - status [ref=f1e585]: No text snapshot saved.
+        - generic [ref=f1e586]:
+          - button "Save text in this tab" [disabled] [ref=f1e587]
+          - button "Restore saved text" [disabled] [ref=f1e592]
+          - button "Remove saved text" [ref=f1e596] [cursor=pointer]
+      - generic [ref=f1e600]:
+        - generic [ref=f1e601]:
+          - heading "My submitted answers" [level=2] [ref=f1e602]
+          - button "Refresh submitted answers" [ref=f1e603] [cursor=pointer]
+        - status [ref=f1e609]: No submitted answers yet.
+      - generic [ref=f1e610]:
+        - generic [ref=f1e611]:
+          - heading "Help requests and follow-up" [level=2] [ref=f1e612]
+          - button "Refresh requests" [ref=f1e613] [cursor=pointer]
+        - status [ref=f1e619]: No help requests or follow-up yet.
+    - navigation "Worker navigation" [ref=f1e170]:
+      - generic [ref=f1e171]:
+        - button "Instructions" [ref=f1e172] [cursor=pointer]
+        - button "Help" [ref=f1e177] [cursor=pointer]
+        - button "Device" [ref=f1e182] [cursor=pointer]
+  - generic:
+    - complementary "Reticle":
+      - button "Start Reticle" [ref=f1e311]

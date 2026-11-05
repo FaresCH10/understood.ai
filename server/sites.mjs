@@ -6,6 +6,7 @@ import {linkAccountMembership} from './accounts.mjs';
 import {siteLifecycleInput} from './site-lifecycle-input.mjs';
 import {requireSiteOperational,siteLifecycleState,siteArchiveDependencies} from './site-lifecycle.mjs';
 import {ensureSiteAdmissionGuards} from './site-schema.mjs';
+import {isPilotPlan} from './pilot-policy.mjs';
 
 function authority(db,session,credential=false) {
   if(session?.principal_type!=='staff' || session.role!=='owner' || !db.prepare("SELECT 1 FROM staff WHERE id=? AND org_id=? AND site_id=? AND role='owner' AND active=1").get(session.principal_id,session.org_id,session.site_id))throw Error('Forbidden');
@@ -22,12 +23,13 @@ export function listSites(db,session,input={}) {
         WHERE m.account_id=? AND s.org_id=? AND s.site_id=? AND s.active=1 AND s.role='owner'`).get(account.account_id,session.org_id,row.id);
       const lifecycle=siteLifecycleState(db,session.org_id,row.id);
       return {...row,current:row.id===session.site_id,lifecycleRevision:lifecycle.revision,lifecycle:lifecycle.state,canManageLifecycle:canManageAccess,
-        accessRevision:control?.revision ?? 0,workerAccess:control?.state ?? 'active',canManageAccess:canManageAccess && lifecycle.state==='active'};}),total,page:f.page,pageSize:f.pageSize,canCreate:!!account};});
+        accessRevision:control?.revision ?? 0,workerAccess:control?.state ?? 'active',canManageAccess:canManageAccess && lifecycle.state==='active'};}),total,page:f.page,pageSize:f.pageSize,canCreate:!!account&&!isPilotPlan(db.prepare('SELECT plan FROM organization_entitlements WHERE org_id=?').get(session.org_id)?.plan)};});
 }
 export function createSite(db,session,input) {
   const value=createSiteInput(input);return transaction(db,()=>{const account=authority(db,session,true);
     const old=db.prepare('SELECT * FROM site_creations WHERE org_id=? AND request_id=?').get(session.org_id,input.requestId);
     if(old){if(old.created_by!==session.principal_id || old.origin_site_id!==session.site_id || old.request_json!==JSON.stringify(value))throw Error('Site creation request conflict');return {id:old.site_id,ownerId:old.owner_id,duplicate:true};}
+    if(isPilotPlan(db.prepare('SELECT plan FROM organization_entitlements WHERE org_id=?').get(session.org_id)?.plan))throw Error('The pilot includes one site. Contact us to plan a multi-site rollout.');
     if(db.prepare('SELECT 1 FROM sites WHERE org_id=? AND lower(name)=lower(?)').get(session.org_id,value.name))throw Error('Site name already exists');
     const id=randomUUID(),ownerId=randomUUID(),name=db.prepare('SELECT name FROM staff WHERE id=?').get(session.principal_id).name;
     db.prepare('INSERT INTO sites VALUES(?,?,?,?)').run(id,session.org_id,value.name,value.timezone);

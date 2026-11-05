@@ -99,3 +99,6 @@
 .crew-worker-move-note{padding:12px;border-radius:8px;background:#f2f6f3;color:#526b5c;font-size:13px;line-height:1.6}
 @media(max-width:600px){.crew-worker-dialog{padding:20px}.crew-worker-dialog input{font-size:16px}.crew-worker-footer{bottom:-20px}.crew-worker-footer .button{flex:1;min-height:44px}.crew-worker-heading h2{font-size:18px}}
 @media(max-width:400px){.crew-worker-footer{flex-direction:column}.crew-worker-footer .button{width:100%;flex:auto}}
+.site-crews-directory{min-width:0;width:100%}
+.crew-directory-row{cursor:pointer}
+.crew-directory-row:hover{background:#f0f6f2}

@@ -5,9 +5,10 @@ import {gsap,ScrollTrigger} from './gsap-scroll';
 
 export function PageLoadingBoundary({children}:{children:ReactNode}){
   const content=useRef<HTMLDivElement>(null),[loading,setLoading]=useState(true);
+  const [loaderCycle,setLoaderCycle]=useState(0),cycleCounter=useRef(0),animationComplete=useRef<(cycle:number)=>void>(()=>{});
   useLayoutEffect(()=>{
     let route=loadingRoute(location.hash),generation=0,disposed=false,active=true,assets=0,timer:ReturnType<typeof setTimeout>|undefined,frame=0;
-    let fontsReady=false;
+    let fontsReady=false,animationReady=false;
     let landingVisited=false;
     const accountsVisited=new Set<string>();
     const seen=new Set<string>();
@@ -16,7 +17,7 @@ export function PageLoadingBoundary({children}:{children:ReactNode}){
     const resetTimer=()=>{clearTimeout(timer);};
     const check=()=>{
       resetTimer();
-      if(!active||disposed||!fontsReady||assets||pageLoads.size||content.current?.querySelector('[data-page-loading], .loading-page, .loading'))return;
+      if(!active||disposed||!animationReady||!fontsReady||assets||pageLoads.size||content.current?.querySelector('[data-page-loading], .loading-page, .loading'))return;
       if(document.fonts.status==='loading'){
         fontsReady=false;const cycle=generation;
         void document.fonts.ready.then(()=>{if(!disposed&&cycle===generation){fontsReady=true;scheduleScan();}});return;
@@ -24,7 +25,7 @@ export function PageLoadingBoundary({children}:{children:ReactNode}){
       // Let response parsing, React commits and lazy chunk fallbacks finish before revealing.
       const cycle=generation;
       timer=setTimeout(()=>{
-        if(disposed||cycle!==generation||assets||pageLoads.size||content.current?.querySelector('[data-page-loading], .loading-page, .loading'))return;
+        if(disposed||cycle!==generation||!animationReady||assets||pageLoads.size||content.current?.querySelector('[data-page-loading], .loading-page, .loading'))return;
         active=false;pageLoads.finish();setLoading(false);
         resume();requestAnimationFrame(()=>{if(!disposed)ScrollTrigger.refresh();});
         document.dispatchEvent(new Event('understood:page-ready'));
@@ -58,11 +59,12 @@ export function PageLoadingBoundary({children}:{children:ReactNode}){
     const scheduleScan=()=>{resetTimer();cancelAnimationFrame(frame);frame=requestAnimationFrame(scan);};
     const observer=new MutationObserver(scheduleScan);
     const start=()=>{
-      generation++;resume();active=true;assets=0;seen.clear();fontsReady=false;setLoading(true);pageLoads.start();resetTimer();
+      generation=++cycleCounter.current;resume();active=true;assets=0;seen.clear();fontsReady=false;animationReady=false;setLoaderCycle(generation);setLoading(true);pageLoads.start();resetTimer();
       const cycle=generation;
       void document.fonts.ready.then(()=>{if(!disposed&&cycle===generation){fontsReady=true;scheduleScan();}});
       scheduleScan();
     };
+    animationComplete.current=cycle=>{if(disposed||!active||cycle!==generation)return;animationReady=true;check();};
     const navigate=()=>{
       const next=loadingRoute(location.hash);if(next===route)return;route=next;
       if(next==='landing'&&!landingVisited){landingVisited=true;if(!active)start();}
@@ -76,7 +78,7 @@ export function PageLoadingBoundary({children}:{children:ReactNode}){
     if(content.current)observer.observe(content.current,{childList:true,subtree:true,attributes:true,attributeFilter:['src','srcset']});
     const unsubscribe=pageLoads.subscribe(scheduleScan);
     window.addEventListener('hashchange',navigate);document.addEventListener('understood:account-entry',enterAccount);start();
-    return()=>{disposed=true;generation++;resume();resetTimer();cancelAnimationFrame(frame);observer.disconnect();unsubscribe();window.removeEventListener('hashchange',navigate);document.removeEventListener('understood:account-entry',enterAccount);pageLoads.finish();};
+    return()=>{disposed=true;generation=++cycleCounter.current;animationComplete.current=()=>{};resume();resetTimer();cancelAnimationFrame(frame);observer.disconnect();unsubscribe();window.removeEventListener('hashchange',navigate);document.removeEventListener('understood:account-entry',enterAccount);pageLoads.finish();};
   },[]);
-  return <><div ref={content} className="page-loading-content" inert={loading} aria-hidden={loading||undefined} style={loading?{visibility:'hidden'}:undefined}>{children}</div>{loading&&<BrandLoader/>}</>;
+  return <><div ref={content} className="page-loading-content" inert={loading} aria-hidden={loading||undefined} style={loading?{visibility:'hidden'}:undefined}>{children}</div>{loading&&<BrandLoader key={loaderCycle} onComplete={()=>animationComplete.current(loaderCycle)}/>}</>;
 }

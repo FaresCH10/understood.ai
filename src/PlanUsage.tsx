@@ -10,11 +10,13 @@ import type {UsageModel} from '../server/usage.mjs';
 
 function entitlementLabel(entitlement:UsageEntitlement) {
   if(!entitlement.configured)return 'Legacy · unmanaged';
-  if(entitlement.effectiveState==='read_only')return entitlement.state==='trial'?'Trial ended · read-only':'Read-only';
-  if(entitlement.state==='trial')return `Trial · ${entitlement.daysRemaining ?? 0} ${entitlement.daysRemaining===1?'day':'days'} left`;
+  if(entitlement.plan==='pilot_pending')return 'Pilot awaiting approval';
+  if(entitlement.effectiveState==='read_only')return entitlement.state==='trial'?'Pilot ended · read-only':'Read-only';
+  if(entitlement.state==='trial')return `Pilot · ${entitlement.daysRemaining ?? 0} ${entitlement.daysRemaining===1?'day':'days'} left`;
   return 'Active';
 }
 function entitlementClass(entitlement:UsageEntitlement) {
+  if(entitlement.plan==='pilot_pending')return 'status-blue';
   if(!entitlement.configured)return 'status-blue';
   if(entitlement.effectiveState==='read_only')return 'status-red';
   return entitlement.state==='trial'?'status-blue':'status-green';
@@ -42,16 +44,16 @@ export function PlanUsage({refresh=0,authority}:{refresh?:number;authority:Staff
     {loading&&!data&&<p data-page-loading role="status">{staffT("Loading plan and usage...")}</p>}
     {(data&&<>
       <section className="panel entitlement-overview">
-        <div className="usage-plan"><Users size={24}/><div><h2>{staffT("Workspace plan")}</h2><strong className="usage-plan-name">{staffT(data.plan.name)}</strong><p>{data.plan.capabilities.map(value=>staffT(value)).join(' · ')}</p></div><span className={`status ${entitlementClass(data.entitlement)}`}><span className="status-dot"/>{(data.entitlement.state==='trial'&&data.entitlement.effectiveState!=='read_only'?staffT('Trial · {days} left',{days:staffT.days(data.entitlement.daysRemaining??0)}):staffT(entitlementLabel(data.entitlement)))}</span></div>
+        <div className="usage-plan"><Users size={24}/><div><h2>{staffT("Workspace plan")}</h2><strong className="usage-plan-name">{staffT(data.entitlement.plan==='pilot_pending'?'Pilot awaiting approval':data.entitlement.plan==='pilot'?'Company pilot':data.plan.name)}</strong><p>{data.plan.capabilities.map(value=>staffT(value)).join(' · ')}</p></div><span className={`status ${entitlementClass(data.entitlement)}`}><span className="status-dot"/>{(data.entitlement.state==='trial'&&data.entitlement.effectiveState!=='read_only'?staffT('Pilot · {days} left',{days:staffT.days(data.entitlement.daysRemaining??0)}):staffT(entitlementLabel(data.entitlement)))}</span></div>
         {data.entitlement.configured?<dl className="entitlement-facts">
-          <div><dt>{staffT("Plan")}</dt><dd>{data.entitlement.plan}</dd></div>
+          <div><dt>{staffT("Plan")}</dt><dd>{data.entitlement.plan==='pilot_pending'?staffT('Pilot awaiting approval'):data.entitlement.plan==='pilot'?staffT('Company pilot'):data.entitlement.plan}</dd></div>
           <div><dt>{staffT("Access state")}</dt><dd>{(data.entitlement.effectiveState==='read_only'?staffT("Read-only"):staffT.state(data.entitlement.effectiveState))}</dd></div>
-          <div><dt>{(data.entitlement.daysRemaining===null?staffT("End date"):staffT("Days remaining"))}</dt><dd>{(data.entitlement.daysRemaining===null?staffT("No end date"):staffT.days(data.entitlement.daysRemaining))}</dd></div>
-          <div><dt>{staffT("Ends")}</dt><dd>{(data.entitlement.endsAt?staffT.date(data.entitlement.endsAt):staffT("No end date"))}</dd></div>
+          <div><dt>{(data.entitlement.daysRemaining===null?staffT("End date"):staffT("Days remaining"))}</dt><dd>{(data.entitlement.plan==='pilot_pending'?staffT('Not started'):data.entitlement.daysRemaining===null?staffT("No end date"):staffT.days(data.entitlement.daysRemaining))}</dd></div>
+          <div><dt>{staffT("Ends")}</dt><dd>{(data.entitlement.plan==='pilot_pending'?staffT('Set at approval'):data.entitlement.endsAt?staffT.date(data.entitlement.endsAt):staffT("No end date"))}</dd></div>
           <div><dt>{staffT("Active workers")}</dt><dd>{staffT.number(data.entitlement.activeWorkers)} / {data.entitlement.workerLimit===null?staffT("Not recorded"):staffT.number(data.entitlement.workerLimit)} {staffT("limit")}</dd></div>
           <div><dt>{staffT("Terms reference")}</dt><dd>{(data.entitlement.termsReference??(staffT("Not recorded")))}</dd></div>
-        </dl>:<p className="muted">{staffT("No trial or subscription entitlement is recorded for this workspace. It remains writable under legacy handling until platform operations records plan terms.")}</p>}
-        {data.entitlement.state==='trial'&&data.entitlement.effectiveState==='read_only'&&<p className="record-error" role="status">{staffT("The trial ended on")} {(data.entitlement.endsAt?staffT.date(data.entitlement.endsAt):staffT("the recorded end date"))}{staffT(". New activity is blocked until activation.")}</p>}
+        </dl>:<p className="muted">{staffT("No pilot or subscription entitlement is recorded for this workspace. It remains writable under legacy handling until platform operations records plan terms.")}</p>}
+        {data.entitlement.state==='trial'&&data.entitlement.effectiveState==='read_only'&&<p className="record-error" role="status">{staffT("The pilot ended on")} {(data.entitlement.endsAt?staffT.date(data.entitlement.endsAt):staffT("the recorded end date"))}{staffT(". New activity is blocked until activation.")}</p>}
         {data.entitlement.effectiveState==='read_only'&&data.entitlement.state!=='trial'&&<p className="muted">{staffT("New sends, answers, imports and scheduled releases are blocked. Reads, sign-in, recovery, security, privacy and reconciliation remain available.")}</p>}
         {data.entitlement.request&&<p className="muted">{staffT("Activation request pending since")} {staffT.date(data.entitlement.request.requestedAt)}.</p>}
       </section>

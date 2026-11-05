@@ -5,6 +5,34 @@ export type CaseLocale='en'|'ar'|'ur';
 export const caseTranslations={
   'Interface language':['لغة الواجهة','انٹرفیس کی زبان'],
   'Clarifications':['التوضيحات','وضاحتیں'],
+  'A clear next step for every conversation.':['خطوة تالية واضحة لكل محادثة.','ہر گفتگو کے لیے اگلا قدم واضح۔'],
+  'Filters':['عوامل التصفية','فلٹرز'],
+  'Clear filters':['مسح عوامل التصفية','فلٹرز صاف کریں'],
+  'Clear search':['مسح البحث','تلاش صاف کریں'],
+  'Newest first':['الأحدث أولاً','سب سے نیا پہلے'],
+  'Instruction and reason':['التعليمات والسبب','ہدایت اور وجہ'],
+  'No deadline':['بلا موعد نهائي','کوئی آخری وقت نہیں'],
+  'How to follow up':['كيفية المتابعة','رابطہ کیسے کریں'],
+  'Assessment details':['تفاصيل التقييم','جانچ کی تفصیلات'],
+  'Additional follow-up':['خيارات متابعة إضافية','مزید رابطے کے اختیارات'],
+  'Give the worker another opportunity to respond.':['امنح العامل فرصة أخرى للإجابة.','کارکن کو جواب دینے کا ایک اور موقع دیں۔'],
+  'Manage the follow-up deadline or review the assessment.':['أدر موعد المتابعة أو راجع التقييم.','رابطے کی آخری تاریخ طے کریں یا جانچ کا جائزہ لیں۔'],
+  'Earlier answers and their original assessments.':['الإجابات السابقة وتقييماتها الأصلية.','پہلے کے جوابات اور ان کی اصل جانچ۔'],
+  'Unsaved changes':['تغييرات غير محفوظة','غیر محفوظ تبدیلیاں'],
+  'Needs attention':['يحتاج إلى متابعة','توجہ درکار ہے'],
+  'Case management':['إدارة الحالة','معاملے کا انتظام'],
+  'Instruction context':['سياق التعليمات','ہدایت کا سیاق'],
+  'Original instruction':['التعليمات الأصلية','اصل ہدایت'],
+  'Resolve case':['إغلاق الحالة بعد المتابعة','معاملہ حل کریں'],
+  'Recorded resolution':['المعالجة المسجّلة','درج کردہ حل'],
+  'Visible to authorized staff only.':['مرئية للموظفين المخوّلين فقط.','صرف مجاز عملے کو نظر آتا ہے۔'],
+  'Clarifications could not be loaded.':['تعذّر تحميل التوضيحات.','وضاحتیں لوڈ نہیں ہو سکیں۔'],
+  'Try again':['حاول مجدداً','دوبارہ کوشش کریں'],
+  'No resolved cases yet.':['لا توجد حالات محلولة بعد.','ابھی کوئی حل شدہ معاملہ نہیں۔'],
+  'No open conversations.':['لا توجد محادثات مفتوحة.','کوئی کھلی گفتگو نہیں۔'],
+  'No clarifications yet.':['لا توجد توضيحات بعد.','ابھی کوئی وضاحت نہیں۔'],
+  'Try another search or clear your filters.':['جرّب بحثاً آخر أو امسح عوامل التصفية.','دوبارہ تلاش کریں یا اپنے فلٹرز صاف کریں۔'],
+  'Worker questions and instruction follow-ups will appear here.':['ستظهر هنا أسئلة العمال ومتابعات التعليمات.','کارکنوں کے سوالات اور ہدایات کی پیروی یہاں نظر آئے گی۔'],
   'Clarification':['توضيح','وضاحت'],
   'New clarification':['توضيح جديد','نئی وضاحت'],
   'Staff follow-up':['متابعة من المشرف','عملے کی جانب سے رابطہ'],
@@ -307,7 +335,7 @@ export function caseState(locale:CaseLocale,value:string|null|undefined){
 }
 export function caseLanguage(locale:CaseLocale,value:WorkerLocaleCode){return ['en','ar','ur'].includes(value)?caseText(locale,({en:'English',ar:'Arabic',ur:'Urdu'} as Record<string,string>)[value] as CaseTextKey):workerLocale(value)?.name || value;}
 export function caseReason(locale:CaseLocale,value:string){
-  const codes:Record<string,CaseTextKey>={missing_asked_fact:'Missing fact',missing_fact:'Missing fact',incorrect_choice:'Incorrect choice',asked_facts_present:'Key facts were present',unclear_audio:'Unclear audio','Help requested':'Help requested','Voice help requested':'Help requested','[Deleted]':'Deleted','[Expired]':'Expired'};
+  const codes:Record<string,CaseTextKey>={missing_asked_fact:'Missing fact',missing_fact:'Missing fact','Missing fact':'Missing fact',incorrect_choice:'Incorrect choice','Incorrect choice':'Incorrect choice',asked_facts_present:'Key facts were present',unclear_audio:'Unclear audio','Unclear audio':'Unclear audio','Help requested':'Help requested','Voice help requested':'Help requested','[Deleted]':'Deleted','[Expired]':'Expired'};
   if(codes[value])return caseText(locale,codes[value]);
   return value.startsWith('Staff follow-up: ')?`${caseText(locale,'Staff follow-up')}: ${value.slice(17)}`:value;
 }

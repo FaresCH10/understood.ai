@@ -84,7 +84,6 @@ import {issueInvitation,changeInvitation,listInvitations,invitationReceipt,previ
 import {getDraftReview,saveDraftReview,draftReviewReceipt} from './draft-review.mjs';
 import {ensureTemplateSchema,listTemplates,getTemplate,setTemplateFavorite,changeTemplate,templateReceipt} from './templates.mjs';
 import {ensureTranslationFeedbackSchema,listTranslationFeedback,reportTranslationFeedback,decideTranslationFeedback} from './translation-feedback.mjs';
-import {saveCompetencySetting,listCompetencies,workerCompetencies} from './competencies.mjs';
 import {templateRecoveryScope} from './template-input.mjs';
 import {listGlossary,getGlossaryTerm,changeGlossary,glossaryReceipt} from './glossary.mjs';
 import { listPublicationResponses,getPublicationResponse,workerSubmissions,workerSubmission,staffWorkerAssignments,workerBriefings,workerRequestReceipt,publicationAssignmentEvidence,workerAssignmentEvidence } from './responses.mjs';
@@ -104,7 +103,7 @@ import {recordingNoticeLanguage} from './recording-notice-input.mjs';
 import { ensureWorkerImportSchema, readImportBytes, previewWorkerImport, getWorkerImport,
   confirmWorkerImport, workerImportErrorsCsv } from './worker-import.mjs';
 import { ensurePeopleSchema, listWorkers, createWorker, updateWorker, disableWorker,reenableWorker,
-  listCrews,getCrew,listCrewRecipients, createCrew, moveWorkerToCrew, renameCrew, archiveCrew,restoreCrew,
+  listCrews,getCrew,listCrewRecipients, createCrew, moveWorkerToCrew,moveWorkersToCrew,crewMembershipHttpError, renameCrew, archiveCrew,restoreCrew,
   workerLanguageState, workerLanguageHistory, selectWorkerLanguage, requestWorkerLanguage,
   staffWorkerLanguageHistory, listLanguageRequests, decideWorkerLanguageRequest,
   readWorkerIdSettings, updateWorkerIdPrefix } from './people.mjs';
@@ -711,6 +710,11 @@ export function createAppHandler(db, options = {}) {
         if (req.method === 'GET') return send(res, 200, listCrews(db, session,Object.fromEntries(url.searchParams)));
         if (req.method === 'POST') return send(res, 201, createCrew(db, session, await readJson(req)));
       }
+      const bulkCrewMembers=path.match(/^\/api\/people\/crews\/([^/]+)\/members$/);
+      if(bulkCrewMembers&&req.method==='POST'){
+        try{return send(res,200,moveWorkersToCrew(db,session,bulkCrewMembers[1],await readJson(req,32768)));}
+        catch(error){const result=crewMembershipHttpError(error);return send(res,result.status,{error:result.message});}
+      }
       const crewRecipients=path.match(/^\/api\/people\/crews\/([^/]+)\/recipients$/);
       if(crewRecipients && req.method==='GET') {
         try {return send(res,200,listCrewRecipients(db,session,crewRecipients[1],Object.fromEntries(url.searchParams)));}
@@ -827,11 +831,6 @@ export function createAppHandler(db, options = {}) {
         if(req.method==='GET')return send(res,200,requestId?getPreparationRequestReceipt(db,session,id,requestId):getPreparationRequestContext(db,session,id));
         if(req.method==='POST' && !requestId)return send(res,202,requestPreparation(db,session,id,await readJson(req)));
       }
-      const competencySettingMatch=path.match(/^\/api\/briefings\/([^/]+)\/competency$/);
-      if(competencySettingMatch && req.method==='POST') {
-        if(url.search)throw Error('Invalid competency setting');
-        return send(res,200,saveCompetencySetting(db,session,decodeURIComponent(competencySettingMatch[1]),await readJson(req,4096)));
-      }
       const briefingMatch = path.match(
         /^\/api\/briefings\/([^/]+)(?:\/(process|publish|withdraw|copy|archive|review))?$/,
       );
@@ -889,7 +888,6 @@ export function createAppHandler(db, options = {}) {
         }
         if (action === 'withdraw' && req.method === 'POST') return send(res,200,withdrawPublication(db,session,id,await readJson(req)));
       }
-      if(path==='/api/competencies' && req.method==='GET') return send(res,200,listCompetencies(db,session,Object.fromEntries(url.searchParams)));
       if(path==='/api/templates' && req.method==='GET') return send(res,200,listTemplates(db,session,Object.fromEntries(url.searchParams)));
       if(path==='/api/glossary' && req.method==='GET') return send(res,200,listGlossary(db,session,Object.fromEntries(url.searchParams)));
       if(path==='/api/glossary' && req.method==='POST') {if(url.search) throw new Error('Invalid glossary request');const result=changeGlossary(db,session,'create',null,await readJson(req));return send(res,result.duplicate ? 200 : 201,result);}
@@ -1162,11 +1160,6 @@ export function createAppHandler(db, options = {}) {
       if (path === "/api/worker/briefings" && req.method === "GET") {
         if (session.principal_type !== "worker") throw new Error("Forbidden");
         return send(res, 200, workerBriefings(db, session,Object.fromEntries(url.searchParams)));
-      }
-      if (path === "/api/worker/competencies" && req.method === "GET") {
-        if (session.principal_type !== "worker") throw new Error("Forbidden");
-        if(url.search)throw Error('Invalid competency filter');
-        return send(res, 200, workerCompetencies(db, session));
       }
       if (path === '/api/worker/history' && req.method === 'GET') {
         if (session.principal_type !== 'worker') throw new Error('Forbidden');

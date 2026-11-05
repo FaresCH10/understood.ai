@@ -134,8 +134,7 @@ export async function checkedPublication(client,session,briefing,request,{integr
     if(publicationModes.responseMode==='question'
       && (await client.query('SELECT 1 FROM instruction_sends WHERE briefing_id=$1 AND org_id=$2 AND site_id=$3',[briefingId,session.org_id,session.site_id])).rows.length
       && manifest.rubric.mode!=='multiple-choice')throw Error('Briefing is not technically ready');
-    snapshot={...briefing.prepared_json,...publicationModes,
-      ...(publicationModes.competency?{competency:{validityDays:publicationModes.competency.validityDays,title:briefing.prepared_json.title}}:{})};
+    snapshot={...briefing.prepared_json,...publicationModes};
   }else {
     snapshot=readySnapshot(briefing,workers,integrationMode,publicationModes);
     assertGlossaryCurrent(snapshot,glossary);

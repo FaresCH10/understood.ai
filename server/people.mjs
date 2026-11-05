@@ -821,6 +821,43 @@ export function moveWorkerToCrew(db, session, workerId, crewId) {
   });
 }
 
+export function bulkCrewMembershipInput(input){
+  inputKeys(input,['members','confirmedMoves']);
+  if(!Array.isArray(input.members)||!input.members.length||input.members.length>100||typeof input.confirmedMoves!=='boolean')throw Error('Invalid input');
+  const members=input.members.map(row=>{
+    inputKeys(row,['workerId','expectedCrewId']);
+    const valid=value=>typeof value==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(value);
+    if(!valid(row.workerId)||row.expectedCrewId!==null&&!valid(row.expectedCrewId))throw Error('Invalid input');
+    return {workerId:row.workerId,expectedCrewId:row.expectedCrewId};
+  });
+  if(new Set(members.map(row=>row.workerId)).size!==members.length)throw Error('Invalid input');
+  return {members:members.sort((a,b)=>a.workerId.localeCompare(b.workerId)),confirmedMoves:input.confirmedMoves};
+}
+export function crewMembershipHttpError(error){
+  const message=error instanceof Error?error.message:'';
+  const status=message==='Forbidden'?403:message==='Sign in required'?401:message==='Request too large'?413:['Invalid input','Invalid JSON','Invalid crew','Confirm worker moves'].includes(message)?400:['Worker membership changed','Crew unavailable','Worker unavailable'].includes(message)?409:503;
+  return {status,message:status===503?'Crew membership could not be updated':message};
+}
+export function moveWorkersToCrew(db,session,crewId,input){
+  requirePeopleStaff(db,session);crewRecipientId(crewId);
+  const value=bulkCrewMembershipInput(input);
+  return transaction(db,()=>{
+    const crew=crewRow(db,session,crewId);if(!crew.active)throw Error('Crew unavailable');
+    const items=[];
+    for(const member of value.members){
+      const worker=workerRow(db,session,member.workerId);if(!worker.active)throw Error('Worker unavailable');
+      if(worker.crew_id!==crewId){
+        if(worker.crew_id!==member.expectedCrewId)throw Error('Worker membership changed');
+        if(worker.crew_id&&!value.confirmedMoves)throw Error('Confirm worker moves');
+        db.prepare(`INSERT INTO crew_memberships(worker_id,org_id,site_id,crew_id,joined_at) VALUES(?,?,?,?,?) ON CONFLICT(worker_id) DO UPDATE SET crew_id=excluded.crew_id,joined_at=excluded.joined_at`).run(worker.id,session.org_id,session.site_id,crewId,NOW());
+        audit(db,session,'worker.crew_moved',worker.id);
+      }
+      items.push(workerRow(db,session,worker.id));
+    }
+    return {crewId,items};
+  });
+}
+
 export function requiredWorkerCreation(input){
   const value=createWorkerInput({...input,code:undefined});
   if(value.password===undefined)throw Error('Invalid password');

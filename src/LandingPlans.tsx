@@ -4,21 +4,21 @@ import {gsap,useGSAP,ScrollTrigger} from './gsap-scroll';
 import {landingCopy,type LandingLocale} from './landing-content';
 import './landing-plans.css';
 
-type PlanId='starter'|'pro'|'business'|'enterprise';
+type PlanId='pilot'|'pro'|'business'|'enterprise';
 type PlanSpec={id:PlanId;name:string;base:number;seat:number;min:number;featured?:boolean;from?:boolean;copy:Record<LandingLocale,{blurb:string;description:string;features:string[];cta:string;note:string}>};
 
 const formatNumber=(value:number)=>new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(value);
 
 const plans:PlanSpec[]=[
-  {id:'starter',name:'Starter',base:0,seat:2.9,min:25,copy:{
-    en:{blurb:'For your first crew',description:'Give one crew clear instructions in the languages they work in, and see who has responded.',features:['Start from 25 active workers','14-day trial with no card','Written, voice and choice checks','Responses, clarification and reports'],cta:'Start free trial',note:'A 14-day trial first, no card.'},
-    ar:{blurb:'لفريقك الأول',description:'امنح فريقاً واحداً تعليمات واضحة بلغات عمله، واطّلع على من استجاب.',features:['بدءاً من 25 عاملاً نشطاً','تجربة 14 يوماً دون بطاقة','فحوص مكتوبة وصوتية وخيارات متعددة','الردود وطلبات التوضيح والتقارير'],cta:'ابدأ تجربة مجانية',note:'تجربة 14 يوماً أولاً، دون بطاقة.'}}},
+  {id:'pilot',name:'Pilot',base:0,seat:0,min:25,copy:{
+    en:{blurb:'For your first crew',description:'Give one crew clear instructions in the languages they work in, and see who has responded.',features:['One site · up to 25 active workers','30 days from approved activation','Written, voice and choice checks','Responses, clarification and reports'],cta:'Request a pilot',note:'Approval required. Scope and start date agreed with you.'},
+    ar:{blurb:'لفريقك الأول',description:'امنح فريقاً واحداً تعليمات واضحة بلغات عمله، واطّلع على من استجاب.',features:['موقع واحد · حتى 25 عاملاً نشطاً','30 يوماً من التفعيل بعد الموافقة','فحوص مكتوبة وصوتية وخيارات متعددة','الردود وطلبات التوضيح والتقارير'],cta:'اطلب برنامجاً تجريبياً',note:'يتطلب الموافقة وتحديد النطاق وتاريخ البدء معك.'}}},
   {id:'pro',name:'Pro',base:149,seat:2.4,min:100,featured:true,copy:{
-    en:{blurb:'For growing teams',description:'Run everyday instructions across crews, with site workspaces and follow-up in one place.',features:['Everything in Starter','Crews and site-scoped workspaces','Supervisor roles and access controls','Publication history and report exports'],cta:'Discuss your team',note:'Pilot scope agreed with you.'},
-    ar:{blurb:'للفرق المتنامية',description:'شغّل التعليمات اليومية عبر الأطقم، مع مساحات عمل للمواقع والمتابعة في مكان واحد.',features:['كل ما في Starter','أطقم ومساحات عمل لكل موقع','أدوار المشرفين وصلاحيات الوصول','سجل النشر وتصدير التقارير'],cta:'ناقش احتياجات فريقك',note:'نحدد نطاق التجربة معك.'}}},
+    en:{blurb:'For growing teams',description:'Run everyday instructions across crews, with site workspaces and follow-up in one place.',features:['Core instruction and follow-up tools','Crews and site-scoped workspaces','Supervisor roles and access controls','Publication history and report exports'],cta:'Discuss your team',note:'Pilot scope agreed with you.'},
+    ar:{blurb:'للفرق المتنامية',description:'شغّل التعليمات اليومية عبر الأطقم، مع مساحات عمل للمواقع والمتابعة في مكان واحد.',features:['أدوات التعليمات والمتابعة الأساسية','أطقم ومساحات عمل لكل موقع','أدوار المشرفين وصلاحيات الوصول','سجل النشر وتصدير التقارير'],cta:'ناقش احتياجات فريقك',note:'نحدد نطاق التجربة معك.'}}},
   {id:'business',name:'Business',base:499,seat:1.85,min:300,copy:{
-    en:{blurb:'For multi-site operations',description:'Standardise instructions across sites, with every version and response kept accountable.',features:['Everything in Pro','Multiple sites and crews','Versioned publications and audit history','Onboarding for your first rollout'],cta:'Plan your rollout',note:'We map sites, languages and crews with you.'},
-    ar:{blurb:'للعمليات متعددة المواقع',description:'وحّد التعليمات بين المواقع، واحتفظ بكل نسخة ورد لمساءلة واضحة.',features:['كل ما في Pro','مواقع وأطقم متعددة','إصدارات موثقة وسجل تدقيق','تهيئة لأول عملية تعميم'],cta:'ناقش خطة التعميم',note:'نحدد المواقع واللغات والأطقم معك.'}}},
+    en:{blurb:'For multi-site operations',description:'Standardise instructions across sites, with every version and response kept accountable.',features:['Everything in Pro','Multiple sites and crews','Versioned instructions and response history','Onboarding for your first rollout'],cta:'Plan your rollout',note:'We map sites, languages and crews with you.'},
+    ar:{blurb:'للعمليات متعددة المواقع',description:'وحّد التعليمات بين المواقع، واحتفظ بكل نسخة ورد لمساءلة واضحة.',features:['كل ما في Pro','مواقع وأطقم متعددة','إصدارات التعليمات وسجل الردود','تهيئة لأول عملية تعميم'],cta:'ناقش خطة التعميم',note:'نحدد المواقع واللغات والأطقم معك.'}}},
   {id:'enterprise',name:'Enterprise',base:1250,seat:1.25,min:2000,from:true,copy:{
     en:{blurb:'For groups and franchises',description:'A shared standard across brands and sites, with procurement and security review support.',features:['Everything in Business','Flexible site and crew structure','Security review and procurement support','Dedicated onboarding and success'],cta:'Talk to us',note:'Annual agreement, invoiced.'},
     ar:{blurb:'للمجموعات والامتيازات',description:'معيار مشترك بين العلامات والمواقع، مع دعم الشراء ومراجعة الأمان.',features:['كل ما في Business','هيكل مرن للمواقع والأطقم','دعم مراجعة الأمان والمشتريات','تهيئة ونجاح مخصصان'],cta:'تواصل معنا',note:'اتفاق سنوي بفاتورة.'}}},
@@ -31,27 +31,27 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
   const totalStates=useRef<Record<string,{value:number}>>({});
   const labels=ar?{
     heading:'ابدأ بفريق واحد. وتوسّع إلى كل موقع.',
-    intro:'أربع خطط واضحة. فوترة سنوية بالدولار، وإضافة العمال النشطين مع نمو فرقك.',
-    billing:'دورة الفوترة',annual:'سنوي',annualHint:'وفّر 16.7%',monthly:'شهري',monthlyHint:'+20%',
+    intro:'ابدأ ببرنامج تجريبي موجّه. خطط التعميم المدفوعة معروضة بشكل منفصل بالدولار.',
+    billing:'فوترة الخطط المدفوعة',annual:'سنوي',annualHint:'وفّر 16.7%',monthly:'شهري',monthlyHint:'+20%',
     workers:'العمال النشطون',scaleMin:'25',scaleMax:'5,000',
     calcNote:'العامل النشط هو من تلقّى تعليماً واحداً على الأقل خلال الشهر.',
     popular:'الأكثر اختياراً',from:'ابتداءً من',perMonth:'/شهرياً',perWorkerMonth:'/للعامل النشط شهرياً',
     seat:'لكل عامل نشط شهرياً',minimum:(min:number)=>`${formatNumber(min)} عاملاً كحد أدنى`,
     example:'إجمالي تقديري',forWorkers:'لـ',workerNoun:'عاملاً نشطاً',minimumApplies:'يُطبَّق الحد الأدنى',
     billedAnnual:'فوترة سنوية',billedMonthly:'فوترة شهرية',
-    pricingNote:'الأسعار بالدولار الأمريكي شهرياً، قبل ضريبة القيمة المضافة. الفوترة الشهرية أعلى بنسبة 20% من السنوية. تُضاف الضرائب عند الدفع.',
+    pricingNote:'الأسعار بالدولار الأمريكي شهرياً، قبل ضريبة القيمة المضافة. الفوترة الشهرية أعلى بنسبة 20% من السنوية. تُحدَّد الضرائب المطبقة في الفاتورة.',
     faq:'قبل أن تبدأ',
   }:{
     heading:'Start with one crew. Grow to every site.',
-    intro:'Four clear plans. Annual billing in USD, adding active workers as your teams grow.',
-    billing:'Billing period',annual:'Annual',annualHint:'Save 16.7%',monthly:'Monthly',monthlyHint:'+20%',
+    intro:'Begin with a guided pilot. Paid rollout plans are shown separately in USD.',
+    billing:'Paid-plan billing',annual:'Annual',annualHint:'Save 16.7%',monthly:'Monthly',monthlyHint:'+20%',
     workers:'Active workers',scaleMin:'25',scaleMax:'5,000',
     calcNote:'An active worker received at least one instruction that month.',
     popular:'Most popular',from:'From',perMonth:'/mo',perWorkerMonth:'/active worker /mo',
     seat:'per active worker / month',minimum:(min:number)=>`${formatNumber(min)}-worker minimum`,
     example:'Example total',forWorkers:'for',workerNoun:'active workers',minimumApplies:'Minimum applies',
     billedAnnual:'billed annually',billedMonthly:'billed monthly',
-    pricingNote:'Prices are in USD per month, excluding VAT. Monthly billing is 20% above annual. Taxes are added at checkout.',
+    pricingNote:'Prices are in USD per month, excluding VAT. Monthly billing is 20% above annual. Applicable taxes are confirmed on the invoice.',
     faq:'Before you start',
   };
   const {contextSafe}=useGSAP({scope:root});
@@ -130,13 +130,13 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
         const copy=plan.copy[locale];
         const billable=Math.max(workers,plan.min);
         const total=Math.round((plan.base+plan.seat*billable)*(billing==='monthly'?1.2:1));
-        const href=plan.id==='starter'?(registrationAvailable?'#register':'#how-it-works'):'#pilot';
-        const cta=plan.id==='starter'?(registrationAvailable?t.trialCta:t.demoCta):copy.cta;
+        const href='#pilot';
+        const cta=copy.cta;
         return <div className="plans-card-wrap" key={plan.id}>
           <article {...interactions} className={`plans-card${plan.featured?' plans-card--featured':''}`} aria-labelledby={`plan-${plan.id}-title`}>
             {plan.featured&&<span className="plans-card-badge">{labels.popular}</span>}
             <div className="plans-card-heading"><h3 id={`plan-${plan.id}-title`}>{plan.name}</h3><span>{copy.blurb}</span></div>
-            <div className="plans-card-price">
+            {plan.id==='pilot'?<div className="plans-card-price"><p className="plans-price-main"><strong>{ar?'برنامج تجريبي موجّه':'Guided pilot'}</strong></p><p className="plans-price-min">{ar?'30 يوماً · موقع واحد · حتى 25 عاملاً':'30 days · one site · up to 25 workers'}</p></div>:<div className="plans-card-price">
               <p className="plans-price-main">
                 {plan.from&&<span className="plans-price-from">{labels.from}</span>}
                 <bdi dir="ltr"><strong>{plan.base?`$${formatNumber(plan.base)}`:`$${plan.seat.toFixed(2)}`}</strong></bdi>
@@ -144,16 +144,16 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
               </p>
               {plan.base>0&&<p className="plans-price-seat">+ <bdi dir="ltr">${plan.seat.toFixed(2)}</bdi> {labels.seat}</p>}
               <p className="plans-price-min">{labels.minimum(plan.min)}</p>
-            </div>
+            </div>}
             <p className="plans-card-description">{copy.description}</p>
             <span className="plans-card-rule" aria-hidden="true"/>
             <ul className="plans-card-features">{copy.features.map(point=><li key={point}><Check size={17} aria-hidden="true"/>{point}</li>)}</ul>
-            <div className="plans-card-example" data-plan-example={plan.id}>
+            {plan.id!=='pilot'&&<div className="plans-card-example" data-plan-example={plan.id}>
               <span>{labels.example}</span>
               <strong className="plans-example-total"><bdi dir="ltr">≈ $<span data-plan-total={plan.id} data-plan-amount={total}>{formatNumber(total)}</span></bdi><small>{labels.perMonth}</small></strong>
               <small>{labels.forWorkers} <bdi>{formatNumber(billable)}</bdi> {labels.workerNoun} · {billing==='annual'?labels.billedAnnual:labels.billedMonthly}</small>
               {billable!==workers&&<small className="plans-example-min">{labels.minimumApplies}</small>}
-            </div>
+            </div>}
             <div className="plans-card-action"><a className={`landing-button ${plan.featured?'landing-button--light':'landing-button--outline'}`} href={href}>{cta}<ArrowRight size={18} className="landing-forward" aria-hidden="true"/></a><p>{copy.note}</p></div>
           </article>
         </div>;

@@ -1,0 +1,45 @@
+- generic [active] [ref=f1e1]:
+  - status [ref=f1e4]: Loading Understood…
+  - generic:
+    - complementary "Reticle":
+      - region "Agent Log":
+        - generic:
+          - generic: Reticle
+          - 'button "Sign in through your browser. Also copies `reticle login`, for a terminal" [ref=f1e19] [cursor=pointer]': Sign in
+        - button "Minimise chat" [ref=f1e20] [cursor=pointer]
+        - generic:
+          - generic: Ready
+          - generic:
+            - button "Pause" [ref=f1e24] [cursor=pointer]
+            - button "End" [ref=f1e28] [cursor=pointer]
+        - region "Agent Log":
+          - generic:
+            - generic:
+              - generic:
+                - generic: 0s
+                - generic: "This app runs Reticle SDK 3.6.0, older than Reticle 3.9.0. Run `reticle update` in the app's folder, then restart its dev server."
+              - generic:
+                - generic: 0s
+                - generic: "This app runs Reticle SDK 3.6.0, older than Reticle 3.9.0. Run `reticle update` in the app's folder, then restart its dev server."
+          - generic [ref=f1e32]:
+            - generic [ref=f1e33]:
+              - generic [ref=f1e34]: Replay a flow
+              - button "See all →" [ref=f1e36] [cursor=pointer]
+            - button "▶ drive-signed-out-users-can-open-the-hosted-sign-in-pag" [ref=f1e38] [cursor=pointer]
+        - button "understood" [ref=f1e43] [cursor=pointer]
+      - complementary "Reticle" [ref=f1e53]:
+        - generic [ref=f1e54]:
+          - generic [ref=f1e55]:
+            - strong [ref=f1e56]: Sign in to try Reticle Harness
+            - generic [ref=f1e57]: Free credits every month for autonomous end-to-end checks
+          - button "Sign in" [ref=f1e58] [cursor=pointer]
+      - toolbar "Reticle controls" [ref=f1e60]:
+        - generic [ref=f1e61]:
+          - navigation "Reticle views" [ref=f1e62]:
+            - button "Agent log" [pressed] [ref=f1e63] [cursor=pointer]
+            - button "Saved flows" [ref=f1e67] [cursor=pointer]
+            - button "Notes" [ref=f1e71] [cursor=pointer]
+            - button "Open Impact" [ref=f1e75] [cursor=pointer]:
+              - generic [ref=f1e79]: · 71
+          - button "Settings" [ref=f1e81] [cursor=pointer]
+          - button "Exit" [ref=f1e88] [cursor=pointer]

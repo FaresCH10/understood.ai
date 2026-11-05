@@ -2,7 +2,7 @@ import {passwordRecord} from '../auth-crypto.mjs';
 import { randomUUID } from 'node:crypto';
 import { workerPassword,normalizeWorkerLogin } from '../worker-credentials-input.mjs';
 import {nextWorkerId,normalizeWorkerPrefix,suggestWorkerPrefix,workerIdFormat} from '../worker-ids.mjs';
-import { inputKeys,name,createWorkerInput,workerFilters,crewChangeInput,crewFilters,crewRecipientId,reactivationInput,reactivationReplay,
+import { inputKeys,name,createWorkerInput,workerFilters,crewChangeInput,crewFilters,crewRecipientId,reactivationInput,reactivationReplay,bulkCrewMembershipInput,
   selectWorkerLanguageInput,requestWorkerLanguageInput,languageRequestFilters,languageDecisionInput } from '../people.mjs';
 import { isWorkerLanguage } from '../languages.mjs';
 import { domainTransaction,domainAudit,requirePrincipal } from './domain.mjs';
@@ -509,5 +509,24 @@ export async function moveWorkerToCrew(pool,session,workerId,crewId,{schema='pub
       await domainAudit(client,session,'worker.crew_moved',workerId);
     }
     return workerRow(client,session,workerId);
+  });
+}
+export async function moveWorkersToCrew(pool,session,crewId,input,{schema='public'}={}){
+  crewRecipientId(crewId);const value=bulkCrewMembershipInput(input);
+  return domainTransaction(pool,schema,async client=>{
+    await requirePrincipal(client,session,'staff');
+    if(!(await client.query('SELECT id FROM crews WHERE id=$1 AND org_id=$2 AND site_id=$3 AND active=true FOR SHARE',[crewId,session.org_id,session.site_id])).rows.length)throw Error('Crew unavailable');
+    const items=[];
+    for(const member of value.members){
+      const worker=await workerRow(client,session,member.workerId,{lock:true});if(!worker.active)throw Error('Worker unavailable');
+      if(worker.crew_id!==crewId){
+        if(worker.crew_id!==member.expectedCrewId)throw Error('Worker membership changed');
+        if(worker.crew_id&&!value.confirmedMoves)throw Error('Confirm worker moves');
+        await client.query(`INSERT INTO crew_memberships(worker_id,org_id,site_id,crew_id) VALUES($1,$2,$3,$4) ON CONFLICT(worker_id) DO UPDATE SET crew_id=excluded.crew_id,joined_at=clock_timestamp()`,[worker.id,session.org_id,session.site_id,crewId]);
+        await domainAudit(client,session,'worker.crew_moved',worker.id);
+      }
+      items.push(await workerRow(client,session,worker.id));
+    }
+    return {crewId,items};
   });
 }

@@ -1,0 +1,63 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e111]:
+    - link "Skip to main content" [ref=f1e112] [cursor=pointer]:
+      - /url: "#worker-main"
+    - banner [ref=f1e113]:
+      - generic [ref=f1e114]:
+        - img "Understood" [ref=f1e116]
+        - generic [ref=f1e118]: Cedar Works · Beirut site
+      - generic [ref=f1e119]:
+        - generic [ref=f1e120]:
+          - strong [ref=f1e121]: Rana Khoury
+          - generic [ref=f1e122]: EN
+        - button "Notifications (1)" [ref=f1e123] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e127]: "1"
+        - button "This device" [ref=f1e128] [cursor=pointer]
+        - button "Language settings" [ref=f1e131] [cursor=pointer]
+        - button "End session" [ref=f1e136] [cursor=pointer]
+    - main [ref=f1e140]:
+      - button "Back to my instructions" [ref=f1e261] [cursor=pointer]
+      - generic [ref=f1e264]:
+        - heading "This device" [level=1] [ref=f1e265]
+        - paragraph [ref=f1e266]: Manage how Understood works on this device.
+      - region "This device" [ref=f1e267]:
+        - group "Who uses this device?" [ref=f1e268]:
+          - generic [ref=f1e270]:
+            - generic [ref=f1e271] [cursor=pointer]:
+              - radio "Shared device" [checked] [ref=f1e272]
+              - generic [ref=f1e278]: Shared device
+            - generic [ref=f1e281] [cursor=pointer]:
+              - radio "My device" [ref=f1e282]
+              - generic [ref=f1e285]: My device
+          - paragraph [ref=f1e286]: Private saving is blocked in shared mode. End your session before another person uses this device.
+        - generic [ref=f1e287] [cursor=pointer]:
+          - generic [ref=f1e292]:
+            - strong [ref=f1e293]: Change language
+            - generic [ref=f1e294]: English
+          - button "Language settings" [ref=f1e295]
+      - note [ref=f1e300]:
+        - generic [ref=f1e305]:
+          - strong [ref=f1e306]: Session expires
+          - paragraph [ref=f1e307]:
+            - time [ref=f1e308]: Nov 5, 2026, 4:57 PM
+      - generic [ref=f1e310]:
+        - term [ref=f1e311]: Connection
+        - definition [ref=f1e316]: Online
+      - group [ref=f1e317]:
+        - generic "Advanced settings Saved instructions, recordings, and browser storage." [ref=f1e318] [cursor=pointer]:
+          - generic [ref=f1e319]:
+            - strong [ref=f1e320]: Advanced settings
+            - generic [ref=f1e321]: Saved instructions, recordings, and browser storage.
+      - region "End this session" [ref=f1e324]:
+        - button "End this session Sign out and remove saved local copies from this device." [ref=f1e325] [cursor=pointer]:
+          - generic [ref=f1e330]:
+            - strong [ref=f1e331]: End this session
+            - generic [ref=f1e332]: Sign out and remove saved local copies from this device.
+    - navigation "Worker navigation" [ref=f1e187]:
+      - generic [ref=f1e188]:
+        - button "Instructions" [ref=f1e189] [cursor=pointer]
+        - button "Help" [ref=f1e194] [cursor=pointer]
+        - button "Device" [active] [ref=f1e199] [cursor=pointer]
+  - generic:
+    - complementary "Reticle":
+      - button "Start Reticle" [ref=f1e20]

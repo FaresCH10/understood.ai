@@ -1,11 +1,13 @@
 import {credentialInput,normalizeEmail} from './auth-crypto.mjs';
 import {isCountryCode} from './country-codes.mjs';
 import {inputKeys} from './people.mjs';
+import {PILOT_DAYS,PILOT_WORKER_LIMIT} from './pilot-policy.mjs';
 
 export const REGISTRATION_TERMS_VERSION='terms-v1';
 export const REGISTRATION_PRIVACY_VERSION='privacy-v1';
-export const REGISTRATION_TRIAL_HOURS=14*24;
-export const REGISTRATION_TRIAL_WORKER_LIMIT=25;
+// Kept as an internal compatibility export; verification no longer starts access.
+export const REGISTRATION_TRIAL_HOURS=PILOT_DAYS*24;
+export const REGISTRATION_TRIAL_WORKER_LIMIT=PILOT_WORKER_LIMIT;
 
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const invalid=()=>new Error('Invalid registration input');

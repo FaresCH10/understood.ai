@@ -132,7 +132,7 @@ test('invitation-like delivery failures retain the exact sealed link and only a 
   }finally {db.close();}
 });
 
-test('verified activation creates exactly one workspace, owner account, 14x24h trial and audit without a session',async()=>{
+test('verified activation creates exactly one workspace, owner account, pending pilot approval and audit without a session',async()=>{
   const db=dbFixture();try {
     const request=value();const delivery=await deliver(db,request.requestId,request);assert(delivery.token);
     const result=verifyRegistration(db,{token:delivery.token},'127.0.0.1',config);
@@ -146,9 +146,9 @@ test('verified activation creates exactly one workspace, owner account, 14x24h t
     assert.equal(organization.name,request.companyName);assert.equal(site.org_id,organization.id);assert.equal(site.name,request.companyName);
     assert.equal(site.timezone,'UTC');assert.equal(staff.name,request.ownerName);assert.equal(staff.role,'owner');assert.equal(staff.org_id,organization.id);
     assert.equal(credential.email,request.email);
-    assert.equal(entitlement.state,'trial');assert.equal(entitlement.plan,'trial');assert.equal(entitlement.worker_limit,REGISTRATION_TRIAL_WORKER_LIMIT);
+    assert.equal(entitlement.state,'read_only');assert.equal(entitlement.plan,'pilot_pending');assert.equal(entitlement.worker_limit,REGISTRATION_TRIAL_WORKER_LIMIT);
     assert.equal(entitlement.terms_reference,'terms-v1;privacy-v1');assert.equal(entitlement.revision,1);assert.equal(entitlement.updated_by,'registration');
-    assert.equal(Date.parse(entitlement.ends_at)-Date.parse(entitlement.started_at),REGISTRATION_TRIAL_HOURS*3600000);
+    assert.equal(entitlement.ends_at,null);assert.equal(count(db,'organization_activation_requests'),1);
     const registration=db.prepare('SELECT * FROM organization_registrations').get();
     const transition=db.prepare('SELECT * FROM organization_entitlement_transitions').get();
     assert.equal(transition.actor_type,'registration');assert.equal(transition.actor_id,registration.id);
@@ -158,7 +158,7 @@ test('verified activation creates exactly one workspace, owner account, 14x24h t
     assert.equal(registration.terms_version,'terms-v1');assert.equal(registration.privacy_version,'privacy-v1');assert(registration.acknowledged_at);
     const audit=db.prepare('SELECT * FROM audit').get();assert.equal(audit.action,'organization.registered');assert.equal(audit.org_id,organization.id);
     assert.equal(authenticateStaff(db,request.email,password,'127.0.0.1').role,'owner');
-    const exact=entitlementState(db,organization.id,{now:Date.parse(entitlement.ends_at)});
+    const exact=entitlementState(db,organization.id,{now:Date.now()+100*86400000});
     assert.equal(exact.effectiveState,'read_only');assert.equal(exact.writeAllowed,false);
     const before=db.prepare('SELECT started_at,ends_at FROM organization_entitlements').get();
     assert.deepEqual(await requestRegistration(db,value({email:request.email}),'127.0.0.1',config),{accepted:true,delivery:'queued'});
@@ -167,11 +167,12 @@ test('verified activation creates exactly one workspace, owner account, 14x24h t
   }finally {db.close();}
 });
 
-test('trial capacity is 25 active workers across the workspace, including setup-pending identities',async()=>{
+test('approved pilot capacity is 25 active workers across the workspace, including setup-pending identities',async()=>{
   const db=dbFixture();try {
     const delivery=await deliver(db,value().requestId);verifyRegistration(db,{token:delivery.token},'127.0.0.1',config);
     const orgId=db.prepare('SELECT org_id FROM organization_entitlements').get().org_id;
     const siteId=db.prepare('SELECT site_id FROM staff').get().site_id;
+    db.prepare("UPDATE organization_entitlements SET state='trial',plan='pilot',revision=revision+1,ends_at=? WHERE org_id=?").run(new Date(Date.now()+30*86400000).toISOString(),orgId);
     const insert=db.prepare("INSERT INTO workers(id,org_id,site_id,code,language,active) VALUES(?,?,?,?,'en',1)");
     for(let n=0;n<24;n++) insert.run(`worker-${n}`,orgId,siteId,`W${n}`);
     assert.doesNotThrow(()=>requireWorkerCapacity(db,orgId));

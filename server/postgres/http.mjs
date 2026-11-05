@@ -1,4 +1,5 @@
 import {requiredWorkerCreation} from '../people.mjs';
+import {crewMembershipHttpError} from '../people.mjs';
 import {notificationLiveQuery} from '../neon-realtime.mjs';
 import {registrationVerificationHttpError} from '../registration-verification.mjs';
 import {neonFunctionStatus} from '../neon-services.mjs';
@@ -62,7 +63,7 @@ import { listPublicationResponses,getPublicationResponse,workerSubmissions,worke
 import { receiveRecording,getRecording,getRecordingAudio } from './recordings.mjs';
 import { createPresentation,listPresentations } from './presentations.mjs';
 import { readPublicationReport,listReportPublications } from './reports.mjs';
-import { listWorkers,createWorker,updateWorker,disableWorker,reenableWorker,listCrews,getCrew,listCrewRecipients,createCrew,moveWorkerToCrew,renameCrew,archiveCrew,restoreCrew,
+import { listWorkers,createWorker,updateWorker,disableWorker,reenableWorker,listCrews,getCrew,listCrewRecipients,createCrew,moveWorkerToCrew,moveWorkersToCrew,renameCrew,archiveCrew,restoreCrew,
   workerLanguageState,workerLanguageHistory,selectWorkerLanguage,requestWorkerLanguage,staffWorkerLanguageHistory,listLanguageRequests,decideWorkerLanguageRequest,
   readWorkerIdSettings,updateWorkerIdPrefix } from './people.mjs';
 import {listNotifications,readNotification,notificationReceipt,readAllNotifications} from './notifications.mjs';
@@ -93,7 +94,6 @@ import {saveDraftReview,draftReviewReceipt,verifyDraftReviewReceipt} from './dra
 import {regenerateDraftTarget,regenerationReceipt} from './regeneration.mjs';
 import {listTemplates,getTemplate,setTemplateFavorite,changeTemplate,templateReceipt} from './templates.mjs';
 import {listTranslationFeedback,reportTranslationFeedback,decideTranslationFeedback} from './translation-feedback.mjs';
-import {saveCompetencySetting,listCompetencies,workerCompetencies} from './competencies.mjs';
 import {listGlossary,getGlossaryTerm,changeGlossary,glossaryReceipt} from './glossary.mjs';
 import {getAssignmentSpeech,getStaffArtifactSpeech} from './generated-audio.mjs';
 import {getLanguageReadiness,runLanguageReadiness} from './language-readiness.mjs';
@@ -208,7 +208,6 @@ badInput.add('Invalid activation request');
 badInput.add('Invalid voice request');
 for(const message of ['Invalid push request','Invalid push subscription','Push service unavailable'])badInput.add(message);
 for(const message of ['Invalid conversation request','Invalid conversation filter'])badInput.add(message);
-for(const message of ['Invalid competency setting','Invalid competency filter'])badInput.add(message);
 badInput.add('Invalid generation languages');
 badInput.add('Invalid presentation request');
 badInput.add('Invalid presentation content');
@@ -251,7 +250,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
   const pushAdapter=options.pushAdapter ?? resolvePushAdapter(options.pushEnv);
   const cookieOptions={name:cookieName,secure};
   const pipeline=pipelineStatus(options);
-  const repository={schema,integrationMode:config.integrationMode??'synthetic',cookieName,pipeline,providerVerification:options.providerVerification,storage};
+  const repository={schema,integrationMode:config.integrationMode??'synthetic',cookieName,pipeline,providerVerification:options.providerVerification,storage,attachmentScanner:options.attachmentScanner};
   const mail=options.mail ?? {available:false};
   const registrationVerification=options.registrationVerification ?? mail;
   const destination=pilotDestination(options.pilotDestination);
@@ -432,7 +431,6 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         }
         return send(res,result.state==='failed'?409:result.duplicate?200:201,result);
       }
-      if(path==='/api/competencies' && req.method==='GET') return send(res,200,await listCompetencies(pool,session,Object.fromEntries(url.searchParams),repository));
       if(path==='/api/templates' && req.method==='GET') return send(res,200,await listTemplates(pool,session,Object.fromEntries(url.searchParams),repository));
       if(path==='/api/glossary' && req.method==='GET') return send(res,200,await listGlossary(pool,session,Object.fromEntries(url.searchParams),repository));
       if(path==='/api/glossary' && req.method==='POST') {if(url.search) throw new Error('Invalid glossary request');const result=await changeGlossary(pool,session,'create',null,await readJson(req),repository);return send(res,result.duplicate ? 200 : 201,result);}
@@ -782,6 +780,11 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         if (req.method==='GET') return send(res,200,await listCrews(pool,session,Object.fromEntries(url.searchParams),repository));
         if (req.method==='POST') return send(res,201,await createCrew(pool,session,await readJson(req),repository));
       }
+      const bulkCrewMembers=path.match(/^\/api\/people\/crews\/([^/]+)\/members$/);
+      if(bulkCrewMembers&&req.method==='POST'){
+        try{return send(res,200,await moveWorkersToCrew(pool,session,bulkCrewMembers[1],await readJson(req,32768),repository));}
+        catch(error){const result=crewMembershipHttpError(error);return send(res,result.status,{error:result.message});}
+      }
       const crewRecipients=path.match(/^\/api\/people\/crews\/([^/]+)\/recipients$/);
       if(crewRecipients && req.method==='GET') {
         try {return send(res,200,await listCrewRecipients(pool,session,crewRecipients[1],Object.fromEntries(url.searchParams),repository));}
@@ -894,11 +897,6 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         const input=publicationHistoryQuery(url.searchParams,!!publicationId);
         return send(res,200,publicationId?await getPublicationHistoryDetail(pool,session,briefingId,publicationId,repository):await listPublicationHistory(pool,session,briefingId,input,repository));
       }
-      const competencySettingRoute=path.match(/^\/api\/briefings\/([^/]+)\/competency$/);
-      if(competencySettingRoute && req.method==='POST') {
-        if(url.search)throw Error('Invalid competency setting');
-        return send(res,200,await saveCompetencySetting(pool,session,decodeURIComponent(competencySettingRoute[1]),await readJson(req,4096),repository));
-      }
       const briefing=path.match(/^\/api\/briefings\/([^/]+)(?:\/(process|publish|withdraw|copy|archive|review|regenerate))?$/);
       if (briefing) {
         const [,id,action]=briefing;
@@ -960,10 +958,6 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         return send(res,200,await requestWorkerLanguage(pool,session,await readJson(req),repository));
       }
       if (path==='/api/worker/briefings' && req.method==='GET') return send(res,200,await workerBriefings(pool,session,repository,Object.fromEntries(url.searchParams)));
-      if (path==='/api/worker/competencies' && req.method==='GET') {
-        if(url.search)throw Error('Invalid competency filter');
-        return send(res,200,await workerCompetencies(pool,session,repository));
-      }
       if (path==='/api/worker/history' && req.method==='GET') return send(res,200,await workerBriefings(pool,session,{...repository,history:true},Object.fromEntries(url.searchParams)));
       const speech=path.match(/^\/api\/worker\/briefings\/([^/]+)\/speech\/(body|question)$/);
       if(speech && req.method==='GET') {

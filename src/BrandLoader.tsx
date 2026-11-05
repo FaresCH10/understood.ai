@@ -17,11 +17,13 @@ export type BrandLoaderProps={
   reducedMotion?:boolean;
   showMotionControl?:boolean;
   language?:string;
+  onComplete?:()=>void;
 };
 
-/** Decorative motion never gates a request, session, or application readiness. */
-export function BrandLoader({label='Loading Understood…',theme='light',compact=false,paused=false,progress=null,replay=0,reducedMotion=false,showMotionControl=false,language='en'}:BrandLoaderProps){
+/** With onComplete, play once and hold the finished logo while the page prepares. */
+export function BrandLoader({label='Loading Understood…',theme='light',compact=false,paused=false,progress=null,replay=0,reducedMotion=false,showMotionControl=false,language='en',onComplete}:BrandLoaderProps){
   const scope=useRef<HTMLDivElement>(null),timeline=useRef<gsap.core.Timeline|null>(null);
+  const completion=useRef(onComplete),completed=useRef(false);completion.current=onComplete;
   const [locallyPaused,setLocallyPaused]=useState(false);
   const motion=useRef({paused,locallyPaused,progress});motion.current={paused,locallyPaused,progress};
   const id=`brand-${useId().replace(/[^a-zA-Z0-9_-]/g,'')}`;
@@ -30,11 +32,13 @@ export function BrandLoader({label='Loading Understood…',theme='light',compact
 
   useGSAP(()=>{
     const root=scope.current;if(!root)return;
+    completed.current=false;
+    const notifyComplete=()=>{if(completed.current)return;completed.current=true;completion.current?.();};
     const media=gsap.matchMedia();
     media.add({motion:'(prefers-reduced-motion: no-preference)',reduce:'(prefers-reduced-motion: reduce)'},context=>{
       const select=gsap.utils.selector(root),ribbon=select('.brand-ribbon'),paths=select('.brand-silhouette'),folds=select('.brand-fold'),bars=select('.brand-bar');
       const thread=select('.brand-thread'),shine=select('.brand-shine'),aura=select('.brand-aura'),shadow=select('.brand-shadow');
-      if(context.conditions?.reduce||reducedMotion){
+      if(context.conditions?.reduce||reducedMotion||completed.current&&completion.current){
         // Explicitly restore every layer after a mid-cycle preference change.
         // Reverting a timeline's from/to tweens can otherwise leave its fold
         // layers at their hidden starting values.
@@ -44,6 +48,7 @@ export function BrandLoader({label='Loading Understood…',theme='light',compact
         bars.forEach((node,index)=>{const bar=brandMark.bars[index];for(const name of ['x','y','width','height','rx'] as const)node.setAttribute(name,String(bar[name]));});
         shine.forEach(node=>{node.setAttribute('opacity','0');node.setAttribute('transform','rotate(-26 183 117)');});
         thread.forEach(node=>node.setAttribute('opacity','0'));
+        notifyComplete();
         return;
       }
       const phase=motion.current;
@@ -83,10 +88,12 @@ export function BrandLoader({label='Loading Understood…',theme='light',compact
           .to(bars[index],{attr:{height:bar.height*1.07,y:bar.y-bar.height*.035},duration:.2,ease:'sine.out'},3.65+index*.055)
           .to(bars[index],{attr:{height:bar.height,y:bar.y},duration:.38,ease:'sine.inOut'},3.95+index*.055);
       });
+      // Four times the original pace. Stop on the complete mark before its fade-out.
+      sequence.timeScale(4).call(()=>{if(completion.current){sequence.pause();notifyComplete();}},[],5.15);
       if(phase.progress!==null)sequence.progress(Math.min(1,Math.max(0,phase.progress)),true).pause();
       const visibility=()=>{
         const value=motion.current;
-        if(document.hidden||value.paused||value.locallyPaused||value.progress!==null)sequence.pause();else sequence.resume();
+        if(document.hidden||value.paused||value.locallyPaused||value.progress!==null||completed.current&&completion.current)sequence.pause();else sequence.resume();
       };
       document.addEventListener('visibilitychange',visibility);
       return()=>{document.removeEventListener('visibilitychange',visibility);sequence.kill();timeline.current=null;};
@@ -97,7 +104,7 @@ export function BrandLoader({label='Loading Understood…',theme='light',compact
   useGSAP(()=>{
     const animation=timeline.current;if(!animation)return;
     if(progress!==null){animation.progress(Math.min(1,Math.max(0,progress)),true).pause();return;}
-    if(paused||locallyPaused||document.hidden)animation.pause();else animation.resume();
+    if(paused||locallyPaused||document.hidden||completed.current&&completion.current)animation.pause();else animation.resume();
   },{scope,dependencies:[paused,locallyPaused,progress]});
 
   const isPaused=paused||locallyPaused;

@@ -5,11 +5,16 @@ import {postgresHandler} from './postgres/http.mjs';
 import {processOneRegistration} from './postgres/registration.mjs';
 import {createPostgresPool} from './postgres/db.mjs';
 import {verifyMigrations,schemaName} from './postgres/migrate.mjs';
-import {neonAudioStore} from './private-storage.mjs';
+import {neonAudioStore,hostedPrivateAudioStore} from './private-storage.mjs';
+import {productionServiceConfig} from './postgres/production-admission.mjs';
+import {readProductionApproval} from './postgres/production-approval.mjs';
+import {verifyRuntimePermissions} from './postgres/runtime-permissions.mjs';
+import {readProductionReadiness} from './postgres/production-readiness.mjs';
+import {send as sendJson} from './http.mjs';
 
 // Preserve the existing synthetic application mode, but persist accounts and
 // sessions in Neon. Serverless registration cannot depend on a separate worker.
-export async function createVercelNeonHandler({env=process.env,pool,send,verify=verifyMigrations}={}) {
+export async function createVercelNeonHandler({env=process.env,pool,send,verify=verifyMigrations,verifyPermissions=verifyRuntimePermissions,approvalManifest}={}) {
   env=neonEnvironment(env);
   const hosts=new Set(['VERCEL_PROJECT_PRODUCTION_URL','VERCEL_URL','VERCEL_BRANCH_URL']
     .map(key=>env[key]).filter(Boolean));
@@ -20,29 +25,41 @@ export async function createVercelNeonHandler({env=process.env,pool,send,verify=
   const schema=schemaName(env.UNDERSTOOD_POSTGRES_SCHEMA || 'understood');
   const registrationVerification=resolveRegistrationVerification(env,{available:false},publicOrigin);
   if(registrationVerification.provider!=='neon' || !registrationVerification.available)throw Error('Neon verification configuration required');
+  const production=env.UNDERSTOOD_TIER==='production';
+  // A misspelled or partially live setting must never fall back to demo dispatch.
+  if(!production&&(env.UNDERSTOOD_AI_MODE==='live'||env.UNDERSTOOD_DATA_CLASS==='real'))throw Error('Select the approved production runtime');
+  const config=production?productionServiceConfig(env,{service:'api',transport:'vercel',approvalManifest:approvalManifest??readProductionApproval(env)}):
+    {tier:'local',aiMode:'synthetic',accessMode:'credential',integrationMode:'synthetic',dataClass:'synthetic',
+      publicOrigin,remoteDemo:true,localDemo:false,demoHosts:hosts};
   const ownsPool=!pool;
-  pool ??= await createPostgresPool({connectionString:env.DATABASE_URL,tls:true});
+  pool ??= await createPostgresPool({connectionString:production?env.UNDERSTOOD_POSTGRES_URL:env.DATABASE_URL,tls:true,caFile:production?env.UNDERSTOOD_POSTGRES_CA_FILE:undefined});
   try {
     await verify(pool,{schema});
-    const storage=env.UNDERSTOOD_NEON_STORAGE_ENDPOINT?neonAudioStore({
+    if(production)await verifyPermissions(pool,{schema,profile:'application'});
+    const storage=production?hostedPrivateAudioStore(config):env.UNDERSTOOD_NEON_STORAGE_ENDPOINT?neonAudioStore({
       endpoint:env.UNDERSTOOD_NEON_STORAGE_ENDPOINT,region:env.UNDERSTOOD_NEON_STORAGE_REGION,
       bucket:env.UNDERSTOOD_NEON_STORAGE_BUCKET,accessKeyId:env.UNDERSTOOD_NEON_STORAGE_ACCESS_KEY_ID,
       secretAccessKey:env.UNDERSTOOD_NEON_STORAGE_SECRET_ACCESS_KEY,
     }):undefined;
-    const config={tier:'local',aiMode:'synthetic',accessMode:'credential',integrationMode:'synthetic',dataClass:'synthetic',
-      publicOrigin,remoteDemo:true,localDemo:false,demoHosts:hosts};
-    const requestAddress=req=>{
+    const requestAddress=production?config.requestAddress:req=>{
       if(!hosts.has(req.headers.host) || req.headers['x-forwarded-proto']!=='https')throw Error('Forbidden transport');
       const address=req.headers['x-vercel-forwarded-for'] || req.headers['x-forwarded-for'];
       if(typeof address!=='string' || !isIP(address))throw Error('Forbidden transport');
       return address;
     };
-    const handler=postgresHandler(pool,{config,schema,storage,requestAddress,secure:true,
-      cookieName:'__Host-understood_session',backend:'postgres-vercel-synthetic',
-      mail:{available:false},registrationVerification,
+    const customerHandler=postgresHandler(pool,{...(production?config:{}),config,schema,storage,requestAddress,secure:true,
+      cookieName:'__Host-understood_session',backend:production?'postgres-vercel-live':'postgres-vercel-synthetic',
+      mail:production?config.mail:{available:false},registrationVerification,
       dispatchRegistration:registrationId=>processOneRegistration(pool,registrationVerification,
         {schema,registrationId,throwOnFailure:true,...(send?{send}:{})}),
     });
+    const handler=async(req,res)=>{
+      if(production&&req.method==='GET'&&req.url==='/api/health/readiness'){
+        requestAddress(req);const readiness=await readProductionReadiness(pool,config);
+        return sendJson(res,readiness.status==='ready'?200:503,readiness);
+      }
+      return customerHandler(req,res);
+    };
     return {handler,pool,config};
   }catch(error){if(ownsPool)await pool.end();throw error;}
 }

@@ -15,6 +15,9 @@ export type CrewMember={id:string;org_id:string;site_id:string;code:string;name:
 export type CrewMembers={items:CrewMember[];total:number;page:number;pageSize:number};
 export type CrewCandidate=Omit<CrewMember,'crew_id'|'crew_name'>&{crew_id:string|null;crew_name:string|null};
 export type CrewCandidates={items:CrewCandidate[];total:number;page:number;pageSize:number};
+export type CrewInstruction={id:string;briefingId:string;title:string;version:number;publicationState:string;sentAt:string;status:'sent'|'in-progress'|'follow-up'|'done';counts:{sent:number;inProgress:number;followUp:number;done:number;total:number};languages:WorkerLocaleCode[]};
+export type CrewInstructionSummary={ongoing:number;followUp:number;done:number};
+export type CrewInstructionsPage={crewId:string;items:CrewInstruction[];total:number;historyTotal:number;page:number;pageSize:number;summary:CrewInstructionSummary};
 const record=(value:unknown):value is Record<string,unknown>=>!!value && typeof value==='object' && !Array.isArray(value);
 const keys=(value:Record<string,unknown>,fields:string[])=>Object.keys(value).length===fields.length && fields.every(key=>Object.hasOwn(value,key));
 const text=(value:unknown,max=100):value is string=>typeof value==='string' && !!value.trim() && value.length<=max && !/[\u0000-\u001f\u007f]/.test(value);
@@ -22,7 +25,7 @@ const id=(value:unknown):value is string=>typeof value==='string' && /^[A-Za-z0-
 const count=(value:unknown):value is number=>Number.isSafeInteger(value) && (value as number)>=0;
 const date=(value:unknown):value is string=>typeof value==='string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString()===value;
 const language=(value:unknown):value is CrewMemberLanguage=>isWorkerLanguage(value);
-const fail=()=>{throw Error('Crew view cannot be verified');};
+function fail():never {throw Error('Crew view cannot be verified');}
 function scope(value:string) {let parsed;try{parsed=JSON.parse(value);}catch{fail();}if(!Array.isArray(parsed) || parsed.length!==3 || !parsed.every(item=>text(item)))fail();return parsed as string[];}
 function metrics(value:unknown):value is CrewMetrics {
   const base=['assigned','responses','matches','clarifications','unassessed','pending','completion'];
@@ -83,6 +86,27 @@ export function readCrewMembers(value:unknown,expected:{page:number;pageSize:num
 }
 export function readCrewCandidates(value:unknown,expected:{page:number;pageSize:number;scope:string}):CrewCandidates {
   return readCrewWorkers(value,{page:expected.page,pageSize:expected.pageSize,scope:expected.scope});
+}
+export function readCrewInstructions(value:unknown,expected:{crewId:string;page:number}):CrewInstructionsPage {
+  if(!record(value)||!keys(value,['crewId','items','total','historyTotal','page','pageSize','summary'])||value.crewId!==expected.crewId)fail();
+  page(value,{page:expected.page,pageSize:10});
+  const summary=value.summary;
+  if(!count(value.historyTotal)||(value.total as number)>value.historyTotal||!record(summary)||!keys(summary,['ongoing','followUp','done'])||!Object.values(summary).every(count)||(summary.ongoing as number)+(summary.followUp as number)+(summary.done as number)>value.historyTotal)fail();
+  for(const row of value.items as unknown[]){
+    if(!record(row)||!keys(row,['id','briefingId','title','version','publicationState','sentAt','status','counts','languages'])||!id(row.id)||!id(row.briefingId)||!text(row.title,500)||!count(row.version)||!row.version||!date(row.sentAt)||!['published','withdrawn','superseded','archived'].includes(row.publicationState as string))fail();
+    const c=row.counts;
+    if(!record(c)||!keys(c,['sent','inProgress','followUp','done','total'])||!Object.values(c).every(count)||c.total!==(c.sent as number)+(c.inProgress as number)+(c.followUp as number)+(c.done as number))fail();
+    const status=c.followUp?'follow-up':c.total&&c.done===c.total?'done':c.inProgress||c.done?'in-progress':'sent';
+    if(row.status!==status||!Array.isArray(row.languages)||!row.languages.every(language)||new Set(row.languages).size!==row.languages.length)fail();
+  }
+  if(new Set((value.items as CrewInstruction[]).map(row=>row.id)).size!==(value.items as unknown[]).length)fail();
+  return value as unknown as CrewInstructionsPage;
+}
+export function readCrewBulkChange(value:unknown,expected:{crewId:string;workerIds:string[];scope:string}):CrewCandidate[]{
+  if(!record(value)||!keys(value,['crewId','items'])||value.crewId!==expected.crewId||!expected.workerIds.length||expected.workerIds.length>100)fail();
+  const data=readCrewMembers({items:value.items,total:expected.workerIds.length,page:1,pageSize:expected.workerIds.length},{crewId:expected.crewId,scope:expected.scope,page:1,pageSize:expected.workerIds.length});
+  if(new Set(expected.workerIds).size!==data.items.length||data.items.some(row=>!expected.workerIds.includes(row.id)))fail();
+  return data.items;
 }
 export function readCrewChange(value:unknown,staffScope:string,expectedId?:string) {
   const fields=['id','org_id','site_id','name','active','member_count'],[orgId,siteId]=scope(staffScope);

@@ -11,10 +11,12 @@ import {caseText,caseMessage,type CaseLocale,type CaseTextKey} from './clarifica
 
 const empty:CaseDeadlineDraft={value:'',occurrence:''};
 const blockedCopy={read_only:'Your role cannot record a supervisor review.',workspace_archived:'This workspace is archived.',worker_unavailable:'Worker access is unavailable.',content_expired:'Private case content is no longer retained.'};
-export function CaseReviews({caseId,authority,available,canWrite,closed,timezone='UTC',onDirtyChange,onDeadlineChange,language:locale='en'}:{caseId:string;authority:StaffRequestAuthority;available:boolean;canWrite:boolean;closed:boolean;timezone?:string;onDirtyChange:(dirty:boolean)=>void;onDeadlineChange:(dueAt:string)=>void;language?:CaseLocale}){
+export function CaseReviews({caseId,authority,available,canWrite,closed,timezone='UTC',onDirtyChange,onDeadlineChange,onAttentionChange,language:locale='en'}:{caseId:string;authority:StaffRequestAuthority;available:boolean;canWrite:boolean;closed:boolean;timezone?:string;onDirtyChange:(dirty:boolean)=>void;onDeadlineChange:(dueAt:string)=>void;onAttentionChange?:(attention:boolean)=>void;language?:CaseLocale}){
   const t=(key:CaseTextKey)=>caseText(locale,key);
   const api=useStaffRequest(authority),[page,setPage]=useState(1),[tick,setTick]=useState(0),[draft,setDraft]=useState(empty),[expectedDueAt,setExpectedDueAt]=useState<string|null>(null),[reason,setReason]=useState(''),[pending,setPending]=useState<PendingReview|null>(null),[receipt,setReceipt]=useState<ReviewRow|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[recoveryFailed,setRecoveryFailed]=useState(false);
   const [read,setRead]=useState<{key:string;data:ReviewPage|null;loading:boolean;error:string}>({key:'',data:null,loading:true,error:''});
+  const needsAttention=!!pending||!!error||!!read.error||recoveryFailed;
+  useEffect(()=>{onAttentionChange?.(needsAttention);},[needsAttention,onAttentionChange]);
   const live=useRef(false),inFlight=useRef(false),command=useRef<AbortController|null>(null),refreshButton=useRef<HTMLButtonElement>(null),forms=useRef<HTMLDivElement>(null),latest=useRef({draft,expectedDueAt,reason,available,canWrite,authority,onDirtyChange,onDeadlineChange});latest.current={draft,expectedDueAt,reason,available,canWrite,authority,onDirtyChange,onDeadlineChange};
   const path=`/api/clarifications/${encodeURIComponent(caseId)}/reviews`,key=JSON.stringify([page,tick,available]);
   const data=read.key===key&&api.current()?read.data:null,loading=read.key!==key||read.loading,writeRole=['owner','supervisor'].includes(authority.session.staffRole||'');

@@ -1,5 +1,4 @@
 import {neonEnvironment} from '../server/neon-env.mjs';
-import {readFileSync,statSync} from 'node:fs';
 import {productionServiceConfig} from '../server/postgres/production-admission.mjs';
 import {hostedSyntheticConfig} from '../server/postgres/hosted-config.mjs';
 import {createPostgresPool} from '../server/postgres/db.mjs';
@@ -9,6 +8,7 @@ import {startHostedApi,startHostedOperator} from '../server/postgres/hosted-runt
 import {fileURLToPath} from 'node:url';
 import {runRehearsalWorker as runPostgresWorker} from '../server/postgres/runtime.mjs';
 import {hostedPrivateAudioStore} from '../server/private-storage.mjs';
+import {readProductionApproval} from '../server/postgres/production-approval.mjs';
 
 export function hostedServiceArguments(args) {
   const mode=args[0] ?? 'api';
@@ -19,7 +19,7 @@ async function main() {
   Object.assign(process.env,neonEnvironment(process.env));
   const {mode,service}=hostedServiceArguments(process.argv.slice(2));
   let approvalManifest;
-  if(process.env.UNDERSTOOD_TIER==='production'){const path=process.env.UNDERSTOOD_RELEASE_APPROVAL_FILE;if(!path||statSync(path).size>65536)throw Error('Production approval file required');approvalManifest=JSON.parse(readFileSync(path,'utf8'));}
+  if(process.env.UNDERSTOOD_TIER==='production')approvalManifest=readProductionApproval(process.env);
   const config=process.env.UNDERSTOOD_TIER==='production'?productionServiceConfig(process.env,{service,approvalManifest}):hostedSyntheticConfig(process.env,{service});
   const pool=await createPostgresPool(),storage=service==='operator'?null:hostedPrivateAudioStore(config),stop=new AbortController();let server;
   const shutdown=()=>stop.abort();process.once('SIGINT',shutdown);process.once('SIGTERM',shutdown);

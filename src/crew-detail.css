@@ -1,4 +1,5 @@
 .crew-detail { max-width: 1200px; margin-inline: auto; min-width: 0; }
+.crew-detail h1[tabindex="-1"]:focus{outline:none}
 .crew-detail .crew-detail-links, .crew-detail .people-panel-heading, .crew-detail .people-panel-heading > .actions { display: flex; flex-wrap: wrap; gap: 12px; }
 .crew-detail .crew-detail-links { margin-block: 20px; }
 .crew-detail .button { white-space: normal; max-width: 100%; min-height: 44px; height: auto; }
@@ -14,3 +15,52 @@
  .crew-detail .people-panel-heading > .actions { width: 100%; }
  .crew-detail .people-panel-heading > .actions > .button { flex: 1; }
 }
+.crew-detail-nav{display:flex;gap:24px;margin:26px 0 22px;border-bottom:1px solid #dfe7e1}
+.crew-detail-nav button{display:flex;align-items:center;gap:8px;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-1px;padding:12px 2px;color:#66786c;font:inherit;font-weight:500;cursor:pointer;min-height:46px}
+.crew-detail-nav button[aria-pressed=true]{color:#17533e;border-color:#23805e}
+.crew-detail-note{margin-top:20px;font-size:12px;line-height:1.7;color:#6b7b71}
+.crew-instructions .people-panel-heading{align-items:flex-start}
+.crew-instructions .people-panel-heading>div{min-width:0;flex:1}
+.crew-instructions .people-panel-heading p{font-size:13px;line-height:1.65;margin:8px 0 0}
+.crew-instruction-list{list-style:none;padding:0;margin:18px 0 0}
+.crew-instruction-list li+li{border-top:1px solid #e3eae5}
+.crew-instruction-row{display:flex;align-items:center;gap:16px;width:100%;padding:20px 0;border:0;background:none;color:inherit;text-align:start;cursor:pointer;font:inherit}
+.crew-instruction-row:hover .crew-instruction-main>strong{color:#167353}
+.crew-instruction-icon{width:42px;height:46px;border:1px solid #e0e9e3;border-radius:8px;background:#f6f9f7;display:flex;align-items:center;justify-content:center;flex:none;color:#557764}
+.crew-instruction-main{min-width:0;flex:1;display:grid;gap:7px;overflow-wrap:anywhere}
+.crew-instruction-main>strong{font-size:15px;font-weight:600}
+.crew-instruction-main>small{font-size:12px;color:#6a7b6f;line-height:1.5}
+.crew-instruction-counts{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:#4b6656}
+.crew-instruction-counts .crew-follow-up{color:#956222}
+.crew-instruction-row>.status{flex:none;font-size:12px}
+.crew-instruction-row>svg{flex:none;color:#85948b}
+.crew-member-directory-link{border-top:1px solid #e3eae5;padding-top:18px;margin-top:18px}
+@media(max-width:600px){.crew-detail-nav{gap:18px}.crew-detail-nav button{font-size:13px}.crew-instructions.panel{padding:18px}.crew-instruction-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}.crew-instruction-icon{display:none}.crew-instruction-main{grid-column:1/-1}.crew-instruction-row>.status{justify-self:start}.crew-instruction-row>svg{justify-self:end}.crew-detail .item-row{width:100%;text-align:start}}
+.crew-detail>.page-header{align-items:flex-start;flex-wrap:wrap;gap:20px}
+.crew-detail>.page-header>div:first-child{min-width:0;flex:1 1 240px}
+.crew-detail-title{display:flex;align-items:center;gap:8px}
+.crew-detail-title h1{margin:0;min-width:0;overflow-wrap:anywhere}
+.crew-detail .crew-detail-info{display:inline-flex;align-items:center;justify-content:center;width:36px;min-height:36px;flex:none;color:#728179;border-radius:50%;anchor-name:--crew-detail-info}
+.crew-detail .crew-detail-info:hover{color:#24553d;background:#eef4ef}
+.crew-detail-info-popup{position:fixed;inset:0;margin:auto;width:max-content;max-width:min(340px,calc(100vw - 32px));height:fit-content;padding:15px 18px;border:1px solid #dce5df;border-radius:10px;background:#fff;color:#52675c;font-size:13px;line-height:1.7;box-shadow:0 4px 12px #162d2014}
+.crew-detail-info-popup p{margin:0}.crew-detail-info-popup p+p{margin-top:12px;padding-top:12px;border-top:1px solid #e3eae5}
+@supports(position-anchor:--crew-detail-info){.crew-detail-info-popup{position:absolute;position-anchor:--crew-detail-info;inset:auto;top:anchor(bottom);left:anchor(left);margin:8px 0 0;position-try-fallbacks:flip-inline,flip-block,flip-inline flip-block}}
+.crew-detail-header-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px}
+.crew-detail-header-actions>.text-link{min-height:44px;font-size:13px}
+.crew-detail-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;margin:26px 0 0;padding:22px 0;border-block:1px solid #e0e8e2}
+.crew-detail-summary>div{min-width:0}
+.crew-detail-summary dt{font-size:12px;color:#6a7b6f;line-height:1.5}
+.crew-detail-summary dd{margin:8px 0 0;font-size:28px;line-height:1.1;font-weight:500;font-variant-numeric:tabular-nums;color:#234334}
+.crew-detail-summary .crew-summary-attention{color:#976328}
+.crew-history-filters{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,auto);align-items:center;gap:12px;margin:18px 0}
+.crew-history-filters .search-box,.crew-history-filters .select-label,.crew-history-filters input,.crew-history-filters select{width:100%;min-width:0}
+.crew-work-progress{display:block;height:4px;width:min(240px,100%);background:#e4ece7;border-radius:3px;overflow:hidden;margin-block:3px}
+.crew-work-progress>span{display:block;height:100%;background:#287b5a}
+.crew-worker-selection{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;margin-bottom:10px;color:#52705e}
+.crew-worker-selection .text-link{font-size:12px;min-height:36px}
+.crew-worker-move-note strong{font-size:13px}
+.crew-worker-move-note ul{max-height:100px;overflow:auto;padding-inline-start:18px;font-size:12px;line-height:1.7;margin:8px 0}
+.crew-worker-move-note label{display:flex;align-items:flex-start;gap:9px;margin-top:10px;cursor:pointer}
+.crew-worker-move-note label input{width:18px;height:18px;flex:none;margin-top:2px;accent-color:#215c45}
+@media(max-width:600px){.crew-detail-header-actions{width:100%}.crew-detail-header-actions>.primary{width:100%}.crew-detail-header-actions>.text-link{flex:1}.crew-detail-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 16px}.crew-history-filters{grid-template-columns:minmax(0,1fr)}.crew-detail .crew-detail-info{width:44px;min-height:44px}}
+@supports(position-anchor:--crew-detail-info){@media(max-width:600px){.crew-detail-info-popup{position:fixed;left:16px;right:16px;max-width:none;width:auto;position-try-fallbacks:flip-block}}}

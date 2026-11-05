@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readCrewOverview,readCrewMembers,readCrewCandidates,readCrewChange} from '../src/crew-overview.ts';
+import {readCrewOverview,readCrewMembers,readCrewCandidates,readCrewChange,readCrewInstructions,readCrewBulkChange} from '../src/crew-overview.ts';
 import {crewOverviewResult,crewOverviewHttpError} from '../server/crew-overview.mjs';
 
 const at='2026-10-15T08:30:00.000Z',scope='["cedar","beirut","maya"]',expected={page:1,pageSize:5,scope};
@@ -9,6 +9,13 @@ const crew={id:'crew',name:'فريق QA',active:true,member_count:2,metrics};
 const overview={items:[crew],total:1,page:1,pageSize:5,site:{id:'beirut',name:'بيروت',timezone:'Asia/Beirut'},contacts:{primary:{name:'Maya',role:'owner'},deputy:null},
   publication:{id:'pub',briefingId:'brief',version:3,title:'Synthetic',publishedAt:at},metrics,metricScope:'latest_publication_frozen_crew_audience',crewSnapshotAvailable:true,
   activity:[{id:'event',action:'crew.created',actor:'Maya',item:'فريق QA',occurredAt:at}],asOf:at};
+
+test('crew instruction history rejects another crew, forged progress, duplicate versions and private fields',()=>{
+  const item={id:'pub',briefingId:'shelf',title:'Shelf handover',version:3,publicationState:'published',sentAt:at,status:'in-progress',counts:{sent:1,inProgress:1,followUp:0,done:0,total:2},languages:['en','ar']};
+  const result={crewId:'crew',items:[item],total:1,historyTotal:1,page:1,pageSize:10,summary:{ongoing:1,followUp:0,done:0}},expected={crewId:'crew',page:1};
+  assert.deepEqual(readCrewInstructions(result,expected),result);
+  for(const value of [{...result,crewId:'other'},{...result,items:[{...item,status:'done'}]},{...result,items:[{...item,counts:{...item.counts,total:4}}]},{...result,items:[{...item,languages:['xx']}]},{...result,items:[{...item,answer:'private'}]},{...result,items:[item,item],total:2},{...result,page:2}])assert.throws(()=>readCrewInstructions(value,expected),/cannot be verified/);
+});
 
 test('crew detail explicitly supports disabled members without admitting them to the add-worker picker',()=>{
   const worker={id:'worker',org_id:'cedar',site_id:'beirut',code:'Worker 001',name:'Rana',language:'ar',language_selection_required:false,language_selected:true,language_selected_at:null,language_selected_by:null,active:false,crew_id:'crew',crew_name:'Crew',pending_language_request:null};
@@ -25,6 +32,11 @@ test('crew worker picker accepts unassigned and assigned active workers only fro
     language_selected_at:null,language_selected_by:null,active:true,crew_id:null,crew_name:null,pending_language_request:null};
   const result={items:[worker],total:1,page:1,pageSize:5};
   assert.deepEqual(readCrewCandidates(result,expected),result);
+  const admitted={crewId:'crew',items:[{...worker,crew_id:'crew',crew_name:'Crew'}]},selection={crewId:'crew',workerIds:['worker'],scope};
+  assert.equal(readCrewBulkChange(admitted,selection).length,1);
+  assert.throws(()=>readCrewBulkChange({...admitted,crewId:'other'},selection),/cannot be verified/);
+  assert.throws(()=>readCrewBulkChange(admitted,{...selection,workerIds:['foreign']}),/cannot be verified/);
+  assert.throws(()=>readCrewBulkChange({...admitted,items:[{...admitted.items[0],site_id:'other'}]},selection),/cannot be verified/);
   assert.doesNotThrow(()=>readCrewCandidates({...result,items:[{...worker,crew_id:'other',crew_name:'Other crew'}]},expected));
   for(const change of [{site_id:'other'},{org_id:'other'},{active:false},{crew_id:'crew'},{crew_name:'Broken pair'},{password:'private'}])
     assert.throws(()=>readCrewCandidates({...result,items:[{...worker,...change}]},expected),/cannot be verified/);

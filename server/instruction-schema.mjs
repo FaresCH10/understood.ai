@@ -5,8 +5,6 @@ export const INSTRUCTION_EVIDENCE_MODES=['none','photo'];
 const tableExists=(db,name)=>!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
 const instructionEvidenceColumn=(db)=>tableExists(db,'instruction_sends')
   && db.prepare('PRAGMA table_info(instruction_sends)').all().some((column)=>column.name==='evidence_mode');
-const competencyColumn=(db)=>tableExists(db,'briefings')
-  && db.prepare('PRAGMA table_info(briefings)').all().some((column)=>column.name==='competency_validity_days');
 
 export function instructionModes(db,briefingId,orgId,siteId) {
   const evidence=instructionEvidenceColumn(db);
@@ -17,10 +15,7 @@ export function instructionModes(db,briefingId,orgId,siteId) {
   const modes=row
     ? {responseMode:row.response_mode,deliveryMode:row.delivery_mode,evidenceMode:evidence?row.evidence_mode:'none'}
     : {responseMode:'question',deliveryMode:'both',evidenceMode:'none'};
-  if(!competencyColumn(db)) return modes;
-  const validityDays=db.prepare('SELECT competency_validity_days FROM briefings WHERE id=? AND org_id=? AND site_id=?')
-    .get(briefingId,orgId,siteId)?.competency_validity_days;
-  return Number.isSafeInteger(validityDays) ? {...modes,competency:{validityDays}} : modes;
+  return modes;
 }
 
 export function ensureInstructionSchema(db) {

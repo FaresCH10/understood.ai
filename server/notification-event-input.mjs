@@ -25,6 +25,7 @@ export const staffPushKinds = Object.freeze([
   'worker.language_requested',
   'answer.needs_attention',
   'instruction.send_incomplete',
+  'instruction.completed',
   'assignment.overdue',
 ]);
 export const pushEventKinds = Object.freeze([...Object.keys(workerEventKinds),...staffPushKinds]);

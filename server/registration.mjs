@@ -182,7 +182,7 @@ function registrationScope(registration,message) {
 }
 function verified(db,registration,now) {
   const id=randomUUID(),orgId=randomUUID(),siteId=randomUUID();
-  const endsAt=new Date(Date.parse(now)+REGISTRATION_TRIAL_HOURS*3600000).toISOString();
+  const endsAt=null; // Pilot access starts only after operator approval.
   db.prepare('INSERT INTO organizations(id,name) VALUES(?,?)').run(orgId,registration.companyName);
   db.prepare('INSERT INTO sites(id,org_id,name,timezone) VALUES(?,?,?,?)').run(siteId,orgId,registration.companyName,'UTC');
   db.prepare("INSERT INTO staff(id,org_id,site_id,name,role) VALUES(?,?,?,?,'owner')").run(id,orgId,siteId,registration.ownerName);
@@ -193,14 +193,16 @@ function verified(db,registration,now) {
     .run(id,registration.email,registration.passwordSalt,registration.passwordHash,now);
   const terms=`${registration.termsVersion ?? REGISTRATION_TERMS_VERSION};${registration.privacyVersion ?? REGISTRATION_PRIVACY_VERSION}`;
   db.prepare(`INSERT INTO organization_entitlements(org_id,state,started_at,ends_at,worker_limit,plan,terms_reference,
-    revision,updated_by,updated_at) VALUES(?,'trial',?,?,?,'trial',?,1,'registration',?)`)
+    revision,updated_by,updated_at) VALUES(?,'read_only',?,?,?,'pilot_pending',?,1,'registration',?)`)
     .run(orgId,now,endsAt,REGISTRATION_TRIAL_WORKER_LIMIT,terms,now);
   db.prepare(`INSERT INTO organization_entitlement_transitions(org_id,revision,state,started_at,ends_at,worker_limit,plan,
     terms_reference,reason,actor_type,actor_id,request_id,created_at)
-    VALUES(?,1,'trial',?,?,?,'trial',?,'Verified owner registration','registration',?,?,?)`)
+    VALUES(?,1,'read_only',?,?,?,'pilot_pending',?,'Verified owner registration; pilot approval pending','registration',?,?,?)`)
     .run(orgId,now,endsAt,REGISTRATION_TRIAL_WORKER_LIMIT,terms,registration.id,registration.id,now);
   db.prepare(`INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)`).run(randomUUID(),orgId,siteId,'system','registration',
     'organization.registered',registration.id,now);
+  db.prepare(`INSERT INTO organization_activation_requests VALUES(?,?,?,?,?,1,'pending',?,NULL,NULL,NULL)`)
+    .run(registration.id,orgId,siteId,id,'Pilot approval requested after email verification.',now);
   return {orgId,siteId,ownerId:id,endsAt};
 }
 export function verifyRegistration(db,input,remoteAddress,config) {
@@ -302,7 +304,7 @@ export async function processOneRegistration(db,config,{send=sendRegistrationVer
       token={token_hash:tokenHash(secret)};
       db.prepare('INSERT INTO registration_tokens(token_hash,registration_id,mail_id,expires_at) VALUES(?,?,?,?)')
         .run(token.token_hash,row.registration_id,row.id,row.expires_at);
-      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirming your email starts a 14-day trial for up to 25 workers. No card is required and nothing renews automatically. If you did not create this account, ignore this email.`;
+      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirm your email to prepare your pilot workspace. Access remains read-only until approval. The 30-day pilot covers one site and up to 25 workers; its clock starts when activated. No automatic charge. If you did not create this account, ignore this email.`;
       message={email:message.email,subject:'Verify your Understood account',text};
       db.prepare('UPDATE registration_mail SET payload=? WHERE id=?').run(sealMail(config,row.id,message),row.id);
     }

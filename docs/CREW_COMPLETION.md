@@ -7,7 +7,8 @@ The updated repository already implements scoped, persisted crew membership in S
 ## User journeys
 
 - Create a crew: the successful response is validated and opens the saved crew directly.
-- Open a crew from the crew list, site search, or a worker's current-crew field.
+- Open a crew by clicking its name or anywhere in its directory row, through site search, or through a worker's current-crew field. The directory uses the full content width and has no selected-crew side panel; plus, rename and archive controls remain grouped separately from row navigation.
+- The crew workspace opens on Instructions, with a separate Members view. Instruction history shows sent versions, dates, languages, assigned and completed counts, follow-up counts and progress status. Records use the frozen crew audience, so moving a worker does not change their historical crew assignments.
 - View named members and worker IDs, search, paginate, and filter active or disabled workers. The headline count explicitly means active workers; the member list can include disabled workers.
 - Add an existing active worker using the shared picker. Adding someone from another crew moves that membership using the existing API. Disabled workers cannot be admitted through the picker.
 - Open a member's full worker profile, change or remove membership there, and return through the current-crew link.
@@ -20,7 +21,7 @@ The updated repository already implements scoped, persisted crew membership in S
 
 | Route | Purpose |
 |---|---|
-| `#people/crews` | Search and select crews |
+| `#people/crews` | Browse crews and open their workspaces |
 | `#people/new-crew` | Create a persisted crew |
 | `#people/crew/:id` | Crew detail and connected actions |
 | `#people/crew/:id/workers` | Existing worker directory filtered to a crew |
@@ -35,6 +36,12 @@ Search destinations already use the crew detail route, so they now reach the sam
 The existing backend remains the authority. A worker has one current crew or no crew. Organization/site scope, staff authority, active destination status and mutation validation continue to be enforced by the existing services. This change does not expand role permissions or introduce migrations.
 
 Current membership and historical publication membership are different facts. Moving, unassigning, disabling or archiving does not rewrite accepted assignments, answers or the frozen crew audience used by reports. A report can therefore include a former member while the current member list excludes them. Reports without historical crew evidence retain their existing unavailable state; no synthetic totals are invented.
+
+`GET /api/workspace/crews/:id/instructions?page=1` returns ten sent versions per page, scoped to the current organization, site and crew. SQLite and PostgreSQL use the shared workspace query adapter and existing work-status rules. Current-session headers are required. Older sends without frozen crew records are omitted instead of being inferred from current membership. No new PostgreSQL migration or role grants are required.
+
+History supports title search and status filters. Its unfiltered summary counts currently published versions, so old superseded versions do not inflate ongoing or completed instruction totals. The summary stays stable across filters. Empty history has a send/add-workers action, while loading errors remain distinct from an empty result. Historical membership explanations live in the crew-heading info popover.
+
+The Members view supports selecting up to 100 existing workers across searches and pages. `POST /api/people/crews/:id/members` validates expected membership and explicit move confirmation, then updates the batch in one transaction. Failed validation rolls back every membership and audit change. Workers already in the target crew are accepted as idempotent retries. Both database implementations enforce active destinations, current-site staff authority and current-session headers.
 
 The member response validator now accepts inactive workers only when the detail page explicitly requests `inactive` or `all`. Existing crew overviews and admission pickers retain active-only validation. Picker focus is contained within its dialog, and Escape cancels safely.
 

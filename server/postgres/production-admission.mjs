@@ -6,6 +6,9 @@ import {resolveMailConfig} from '../auth-mail.mjs';
 import {validateNeonStorageConfig} from '../neon-storage-config.mjs';
 import {resolvePushAdapter} from '../push-adapter.mjs';
 import {WORKER_LANGUAGE_CODES} from '../languages.mjs';
+import {resolveAttachmentScanner} from '../attachment-policy.mjs';
+import {vercelTransport} from '../vercel-transport.mjs';
+import {resolveRegistrationVerification} from '../registration-verification.mjs';
 
 // Production adapters have a separate implementation. Runtime admission still requires the release and provider approvals.
 export const LIVE_PROVIDER_ADAPTERS=Object.freeze({
@@ -225,7 +228,7 @@ function reviewProviders(env,service,scope,blockers) {
 const admittedConfigs=new WeakSet();
 export function assertProductionAdmission(config){if(!admittedConfigs.has(config)||Date.parse(config.approvalValidUntil)<=Date.now())throw Error('Production release approval unavailable or expired');}
 
-function review(env,{service='api',approvalManifest=null}={}) {
+function review(env,{service='api',approvalManifest=null,transport='proxy'}={}) {
   if(!['api','worker','operator'].includes(service)) throw Error('Invalid production service');
   const blockers=[];
   if(env.UNDERSTOOD_TIER!=='production') blocker(blockers,'tier_not_production');
@@ -253,7 +256,10 @@ function review(env,{service='api',approvalManifest=null}={}) {
   }
   const port=Number(env.PORT ?? 10000);
   if(!Number.isInteger(port) || port<1024 || port>65535) blocker(blockers,'port_invalid');
-  const trusted=trustedProxyPolicy(env,blockers);
+  if(!['proxy','vercel'].includes(transport)||transport==='vercel'&&service!=='api')blocker(blockers,'invalid_production_transport');
+  let platformTransport=null;
+  if(transport==='vercel')try{platformTransport=vercelTransport(env,origin?.origin);}catch{blocker(blockers,'invalid_vercel_transport');}
+  const trusted=transport==='proxy'?trustedProxyPolicy(env,blockers):null;
   reviewDatabase(env,service,blockers);
   const storage=reviewStorage(env,service,blockers);
   const mail=reviewMail(env,origin?.origin,service,blockers);
@@ -262,6 +268,7 @@ function review(env,{service='api',approvalManifest=null}={}) {
   const providers=reviewProviders(env,service,scope,blockers);
   const requestAddress=req=>{
     assertProductionAdmission(config);
+    if(platformTransport)return platformTransport(req);
     let remote=req.socket.remoteAddress;
     if(remote?.startsWith('::ffff:')) remote=remote.slice(7);
     const version=isIP(remote ?? '');
@@ -307,5 +314,7 @@ export function productionServiceConfig(env=process.env,options={},providerOptio
     preparationAdapter:Object.freeze({provenance:Object.freeze({adapter:APPROVED_GEMINI_ADAPTER,dataClass:'real'}),capabilities:Object.freeze({textLanguages:config.geminiSettings.textLanguages,speechLanguages:config.geminiSettings.speechLanguages})}),
     caseFollowupAdapter:Object.freeze({provenance:Object.freeze({adapter:APPROVED_GEMINI_ADAPTER,dataClass:'real'}),capabilities:Object.freeze({speechLanguages:config.geminiSettings.speechLanguages})}),
   }:{};
-  const runtime=Object.freeze({...config,...handles});admittedConfigs.add(runtime);return runtime;
+  const attachmentScanner=config.service==='api'?resolveAttachmentScanner(env):undefined;
+  const registrationVerification=config.service==='operator'?undefined:resolveRegistrationVerification(env,config.mail,config.publicOrigin);
+  const runtime=Object.freeze({...config,...handles,...(config.service==='api'?{attachmentScanner}:{}),...(registrationVerification?{registrationVerification}:{})});admittedConfigs.add(runtime);return runtime;
 }

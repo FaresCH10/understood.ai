@@ -67,7 +67,7 @@ export function Notifications({refresh,navigate,timezone,authority}:{refresh:num
   const formatDate=(value:string,options:Intl.DateTimeFormatOptions)=>{try{return new Intl.DateTimeFormat(staffT.locale,{...options,timeZone:timezone || 'UTC'}).format(new Date(value));}catch{return new Intl.DateTimeFormat(staffT.locale,{...options,timeZone:'UTC'}).format(new Date(value));}};
   const groupDate=(value:string)=>formatDate(value,{year:'numeric',month:'long',day:'numeric'});
   for(const item of data?.items || []){const key=groupDate(item.occurredAt);groups.set(key,[...(groups.get(key) || []),item]);}
-  const openNotification=(item:NotificationItem)=>{if(current() && ['briefings','clarifications','reports','people'].includes(item.destination))navigate(item.destination);};
+  const openNotification=(item:NotificationItem)=>{if(current() && ['briefings','clarifications','reports','people'].includes(item.destination))navigate(item.target??item.destination);};
   const pages=Math.max(1,Math.ceil((data?.total || 0)/20));
   const date=staffT.date;
   return <div className="notifications-workspace" ref={root}>

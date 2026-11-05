@@ -1,0 +1,77 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - link:
+            - /url: "#worker-main"
+            - text: Skip to main content
+          - banner:
+            - generic: Cedar Works · Beirut site
+            - generic:
+              - generic:
+                - strong: Rana Khoury
+                - generic: EN
+              - button:
+                - generic [aria-hidden]: "1"
+              - button
+              - button
+              - button
+          - main:
+            - button: Back to my instructions
+            - generic:
+              - heading [level=1]: This device
+              - paragraph: Manage how Understood works on this device.
+            - region:
+              - group:
+                - generic: Who uses this device?
+                - generic:
+                  - generic:
+                    - radio [checked]
+                    - generic: Shared device
+                  - generic:
+                    - radio
+                    - generic: My device
+                - paragraph: Private saving is blocked in shared mode. End your session before another person uses this device.
+              - generic:
+                - generic:
+                  - strong: Change language
+                  - generic: English
+                - button
+            - dialog [ref=f1e335]:
+              - heading "Shared phone mode" [level=2] [ref=f1e336]
+              - paragraph [ref=f1e337]: Turn off shared phone mode for this session? Only continue on a device you control. Each private save still needs your explicit choice.
+              - generic [ref=f1e338]:
+                - button "Cancel" [active] [ref=f1e339] [cursor=pointer]
+                - button "Confirm" [ref=f1e340] [cursor=pointer]
+            - note:
+              - generic:
+                - strong: Session expires
+                - paragraph:
+                  - time: Nov 5, 2026, 4:57 PM
+            - generic:
+              - generic:
+                - term: Connection
+                - definition: Online
+            - group:
+              - generic:
+                - generic:
+                  - strong: Advanced settings
+                  - generic: Saved instructions, recordings, and browser storage.
+            - region:
+              - button:
+                - generic:
+                  - strong: End this session
+                  - generic: Sign out and remove saved local copies from this device.
+          - navigation:
+            - generic:
+              - button:
+                - generic: Instructions
+              - button:
+                - generic: Help
+              - button:
+                - generic: Device
+  - generic:
+    - complementary:
+      - generic:
+        - button

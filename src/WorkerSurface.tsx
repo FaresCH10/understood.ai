@@ -10,7 +10,7 @@ export function WorkerSurface({children,view}:{children:ReactNode;view:string}){
     const seen=new WeakSet<Element>();
     const reveal=contextSafe!(()=>{
       if(!root.current||!motion.matches)return;
-      const fresh=Array.from(root.current.querySelectorAll('.worker-page-heading,.device-heading,.worker-card,.worker-help-contact,.worker-inbox-help,.device-expiry,.device-danger-card,.empty-state')).filter(element=>!seen.has(element));
+      const fresh=Array.from(root.current.querySelectorAll('.worker-page-heading,.device-heading,.worker-card,.worker-task-card,.worker-journey,.worker-help-contact,.worker-inbox-help,.device-expiry,.device-danger-card,.empty-state')).filter(element=>!seen.has(element));
       fresh.forEach(element=>seen.add(element));
       if(fresh.length)gsap.from(fresh,{y:12,opacity:0,duration:.38,stagger:{each:.045,amount:.16},ease:'power2.out',clearProps:'transform,opacity'});
     });

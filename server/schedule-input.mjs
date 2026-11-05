@@ -10,6 +10,8 @@ export function scheduleCancel(input) {
 }
 export const scheduleHash=bundleHash;
 export function scheduledContentHash(value,modes={}) {
+  // Retain canonical hashing of historical scheduled payloads for receipt compatibility.
+  // Current instruction modes no longer produce the retired certificate configuration.
   const responseMode=modes?.responseMode ?? 'question',deliveryMode=modes?.deliveryMode ?? 'both',evidenceMode=modes?.evidenceMode ?? 'none';
   const validityDays=modes?.competency?.validityDays;
   return scheduleHash({...value,responseMode,deliveryMode,evidenceMode,...(Number.isSafeInteger(validityDays)?{competency:{validityDays,title:value?.title}}:{})});

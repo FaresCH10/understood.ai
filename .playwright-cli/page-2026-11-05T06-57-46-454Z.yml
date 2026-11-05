@@ -1,0 +1,5 @@
+- generic [active] [ref=f1e1]:
+  - status [ref=f1e4]: Loading Understood…
+  - generic:
+    - complementary "Reticle":
+      - button "Start Reticle" [ref=f1e20]

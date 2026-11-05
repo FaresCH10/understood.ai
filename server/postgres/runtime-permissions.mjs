@@ -47,8 +47,8 @@ const applicationHidden=new Set(['platform_operators','operator_sessions','opera
 const applicationReadOnly=new Set(['operator_requests','provider_verifications','tenant_controls','system_controls','provider_policies',
   'organization_entitlements','organization_entitlement_transitions','worker_competencies']);
 // Append-only evidence: both runtimes may create rows, but only schema triggers may reject or retain them.
-const applicationInsertOnly=new Set(['organization_entitlements','organization_entitlement_transitions','worker_competencies']);
-const workerInsertOnly=new Set(['instruction_improvements','assignment_completions','worker_competencies']);
+const applicationInsertOnly=new Set(['organization_entitlements','organization_entitlement_transitions']);
+const workerInsertOnly=new Set(['instruction_improvements','assignment_completions']);
 export function runtimeProfile(value='application'){
   if(!['application','worker','operator'].includes(value))throw Error('Invalid runtime permission profile');return value;
 }

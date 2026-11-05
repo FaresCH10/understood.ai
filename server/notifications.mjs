@@ -1,5 +1,5 @@
 import {transaction,NOW} from './db.mjs';
-import {notificationKinds,notificationRoles,notificationFilters,notificationId,notificationRow,notificationWindow,notificationReadBefore} from './notification-input.mjs';
+import {notificationKinds,notificationRoles,notificationFilters,notificationId,notificationRow,notificationWindow,notificationReadBefore,notificationSubjectColumns} from './notification-input.mjs';
 
 function authority(db,session) {
   if(session?.principal_type!=='staff' || !notificationRoles.includes(session.role))throw Error('Forbidden');
@@ -8,7 +8,7 @@ function authority(db,session) {
 }
 const kinds=Object.keys(notificationKinds),placeholders=kinds.map(()=>'?').join(',');
 const join=`FROM audit e LEFT JOIN notification_reads r ON r.event_id=e.id AND r.staff_id=? AND r.org_id=e.org_id AND r.site_id=e.site_id`;
-const title=`(SELECT b.title FROM briefings b WHERE b.id=e.object_id AND b.org_id=e.org_id AND b.site_id=e.site_id) AS title`;
+const title=notificationSubjectColumns();
 const where=`NOT (e.actor_type='staff' AND e.actor_id=?) AND e.org_id=? AND e.site_id=? AND e.occurred_at>=? AND e.occurred_at<=? AND e.action IN (${placeholders})`;
 export function listNotifications(db,session,filters={}) {
   return transaction(db,()=>{
@@ -25,7 +25,7 @@ export function readNotification(db,session,id) {
   return transaction(db,()=>{
     authority(db,session);
     const {asOf,since}=notificationWindow();
-    const event=db.prepare(`SELECT id,action,occurred_at,(SELECT b.title FROM briefings b WHERE b.id=audit.object_id AND b.org_id=audit.org_id AND b.site_id=audit.site_id) AS title FROM audit WHERE id=? AND org_id=? AND site_id=? AND occurred_at>=? AND occurred_at<=? AND action IN (${placeholders}) AND NOT (actor_type='staff' AND actor_id=?)`).get(id,session.org_id,session.site_id,since,asOf,...kinds,session.principal_id);
+    const event=db.prepare(`SELECT id,action,occurred_at,${notificationSubjectColumns('audit')} FROM audit WHERE id=? AND org_id=? AND site_id=? AND occurred_at>=? AND occurred_at<=? AND action IN (${placeholders}) AND NOT (actor_type='staff' AND actor_id=?)`).get(id,session.org_id,session.site_id,since,asOf,...kinds,session.principal_id);
     if(!event)throw Error('Notification unavailable');
     db.prepare(`INSERT INTO notification_reads(event_id,staff_id,org_id,site_id,read_at) VALUES(?,?,?,?,?) ON CONFLICT(event_id,staff_id) DO NOTHING`).run(id,session.principal_id,session.org_id,session.site_id,asOf);
     const receipt=db.prepare('SELECT read_at FROM notification_reads WHERE event_id=? AND staff_id=? AND org_id=? AND site_id=?').get(id,session.principal_id,session.org_id,session.site_id);

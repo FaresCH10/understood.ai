@@ -77,7 +77,7 @@ test('notification input rejects unknown scope, arbitrary IDs and unbounded pagi
   assert.deepEqual(Object.keys(notificationKinds).sort(),[
     'briefing.prepared','briefing.published','briefing.withdrawn','help.requested',
     'clarification.assigned','clarification.routed','clarification.escalated','clarification.resolved','clarification.message',
-    'worker.language_requested','answer.needs_attention','instruction.send_incomplete','assignment.overdue','export.ready','export.failed',
+    'worker.language_requested','answer.needs_attention','instruction.send_incomplete','instruction.completed','assignment.overdue','export.ready','export.failed',
   ].sort());
 });
 

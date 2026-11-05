@@ -8,7 +8,6 @@ import {currentAssessmentClaim,assessmentInput} from './assessment-claim.mjs';
 import {assessmentInputHash} from '../ai/assessment-config.mjs';
 import {reserveProviderOperation,providerRequestJournal} from './provider-budget.mjs';
 import {staffAuditOnce} from './notification-events.mjs';
-import {awardCompetency} from './competencies.mjs';
 
 export function validatedAssessment(value,answer,askedFacts) {
   if (!['matched','clarification','unassessable'].includes(value?.outcome) || !Array.isArray(value.reasons)
@@ -85,9 +84,6 @@ export async function processOneAssessment(pool,adapter,{schema='public'}={}) {
         WHERE id=$1 AND org_id=$5 AND site_id=$6 AND assignment_id=$7 AND assessment_status='pending' RETURNING id`,
       [job.attempt_id,result.outcome,JSON.stringify(result.reasons),JSON.stringify(result.evidence),job.org_id,job.site_id,job.assignment_id])).rows.length;
       if (changed) {
-        if (result.outcome==='matched')
-          await awardCompetency(client,{orgId:job.org_id,siteId:job.site_id,workerId:worker.worker_id,
-            assignmentId:job.assignment_id,attemptId:job.attempt_id,source:'typed'});
         const repeat=(await client.query(`SELECT cr.case_id FROM case_repeats cr JOIN attempts t ON t.assignment_id=cr.assignment_id AND t.submission_id=cr.submission_id
           AND t.org_id=cr.org_id AND t.site_id=cr.site_id WHERE t.id=$1 AND cr.status='submitted'`,[job.attempt_id])).rows[0];
         if (result.outcome!=='matched' && !repeat) {

@@ -11,7 +11,7 @@ import {caseText,caseMessage,caseState,type CaseLocale,type CaseTextKey} from '.
 
 const empty:CaseDeadlineDraft={value:'',occurrence:''};
 const blockedCopy={read_only:'Your role cannot request another answer.',workspace_archived:'This workspace is archived.',worker_unavailable:'Worker access is unavailable.',content_expired:'The instruction content is no longer available.',case_resolved:'This case is resolved.',publication_unavailable:'The publication is no longer available.',no_answer:'An earlier submitted answer is required before requesting a repeat.',active_repeat:'Another answer is already requested for this assignment.'};
-export function CaseRepeats({caseId,authority,available,canWrite,closed,timezone='UTC',onDirtyChange,language:locale='en'}:{caseId:string;authority:StaffRequestAuthority;available:boolean;canWrite:boolean;closed:boolean;timezone?:string;onDirtyChange:(dirty:boolean)=>void;language?:CaseLocale}){
+export function CaseRepeats({caseId,authority,available,canWrite,closed,timezone='UTC',onDirtyChange,onAttentionChange,language:locale='en'}:{caseId:string;authority:StaffRequestAuthority;available:boolean;canWrite:boolean;closed:boolean;timezone?:string;onDirtyChange:(dirty:boolean)=>void;onAttentionChange?:(attention:boolean)=>void;language?:CaseLocale}){
   const t=(key:CaseTextKey)=>caseText(locale,key);
   const api=useStaffRequest(authority),[page,setPage]=useState(1),[tick,setTick]=useState(0),[draft,setDraft]=useState(empty),[pending,setPending]=useState<PendingRepeat|null>(null),[receipt,setReceipt]=useState<RepeatRow|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[recoveryFailed,setRecoveryFailed]=useState(false);
   const [read,setRead]=useState<{key:string;data:RepeatPage|null;loading:boolean;error:string}>({key:'',data:null,loading:true,error:''});
@@ -20,6 +20,8 @@ export function CaseRepeats({caseId,authority,available,canWrite,closed,timezone
   const data=read.key===key&&api.current()?read.data:null,loading=read.key!==key||read.loading,writeRole=['owner','supervisor'].includes(authority.session.staffRole||'');
   const current=()=>live.current&&api.current(),writable=()=>current()&&latest.current.available&&latest.current.canWrite&&latest.current.authority.canMutate();
   const dirty=!!draft.value||busy;
+  const needsAttention=!!pending||!!error||!!read.error||recoveryFailed;
+  useEffect(()=>{onAttentionChange?.(needsAttention);},[needsAttention,onAttentionChange]);
   useEffect(()=>{live.current=true;try{setPending(readCaseRepeat(sessionStorage,authority.session,caseId));}catch{setRecoveryFailed(true);setError('Local repeat recovery could not be verified. No new request will be sent.');}return()=>{live.current=false;command.current?.abort();latest.current.onDirtyChange(false);};},[]);
   useEffect(()=>{latest.current.onDirtyChange(dirty);if(!dirty)return;const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty]);
   useEffect(()=>{

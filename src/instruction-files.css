@@ -1,0 +1,14 @@
+.attachment-photo-button { display:block; position:relative; border:0; padding:0; background:transparent; width:100%; cursor:zoom-in; border-radius:8px; overflow:hidden; text-align:start; }
+.attachment-photo-button .attachment-preview { display:block; width:100%; height:auto; max-height:300px; object-fit:contain; background:#f1f5f1; }
+.attachment-photo-button>svg { position:absolute; inset-inline-end:12px; bottom:12px; background:#fff; border:1px solid #d2ded6; width:34px; height:34px; padding:7px; border-radius:6px; color:#185440; }
+.attachment-photo-button:focus-visible { outline:2px solid #277c61; outline-offset:3px; }
+.attachment-preview-dialog { width:min(1000px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); padding:16px; border:1px solid #d2ded6; border-radius:12px; background:#fff; color:#163b30; overscroll-behavior:contain; }
+.attachment-preview-dialog::backdrop { background:rgb(13 31 24 / 65%); }
+.attachment-preview-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.attachment-preview-toolbar strong { flex:1; min-width:0; overflow-wrap:anywhere; }
+.attachment-preview-toolbar .icon-button { flex-shrink:0; width:44px; height:44px; }
+.attachment-preview-dialog>img { display:block; width:100%; height:auto; max-height:calc(100dvh - 150px); object-fit:contain; }
+.attachment-preview-dialog>iframe { display:block; width:100%; min-height:min(70dvh,700px); border:1px solid #d2ded6; border-radius:4px; }
+.attachment-preview-dialog>p { font-size:14px; line-height:1.6; margin-block:12px 0; }
+.worker-attachment>.button { margin-block:12px; }
+.worker-attachment .item-row span { overflow-wrap:anywhere; min-width:0; }

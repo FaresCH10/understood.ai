@@ -1,3 +1,5 @@
+// Retired feature: retained only to open/import historical databases without
+// rewriting immutable records. No application endpoint or award writer uses it.
 export function ensureCompetencySchema(db){
   if(!db.prepare('PRAGMA table_info(briefings)').all().some(column=>column.name==='competency_validity_days'))
     db.exec('ALTER TABLE briefings ADD COLUMN competency_validity_days INTEGER CHECK(competency_validity_days IS NULL OR competency_validity_days BETWEEN 1 AND 3650)');

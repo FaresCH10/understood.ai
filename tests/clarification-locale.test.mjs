@@ -44,6 +44,7 @@ test('locale formatting never translates or rewrites staff intent and leaves unk
     const rendered=caseReason(locale,'Staff follow-up: '+reason);assert.ok(rendered.endsWith(reason));
     assert.equal(caseReason(locale,'Unrecognized synthetic provider reason'),'Unrecognized synthetic provider reason');
     assert.equal(caseReason(locale,'missing_asked_fact'),caseText(locale,'Missing fact'));
+    for(const reason of ['Missing fact','Unclear audio','Incorrect choice'])assert.equal(caseReason(locale,reason),caseText(locale,reason));
     assert.equal(caseReason(locale,'[Deleted]'),caseText(locale,'Deleted'));
     assert.deepEqual(canonicalCreation(content),canonical);assert.equal(await creationHash(content),hash);
   }

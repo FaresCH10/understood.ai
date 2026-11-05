@@ -52,7 +52,9 @@ export function operatorEntitlementInput(input) {
       || !entitlementReasons.includes(input.reason) || !(input.activationRequestId===null || operatorUuid(input.activationRequestId))
       || input.state==='read_only' && input.activationRequestId!==null)
       throw Error('Invalid operator command');
-    return {kind:'entitlement',orgId:input.orgId,revision:input.revision,state:input.state,endsAt:input.endsAt,workerLimit:input.workerLimit,
+      if(input.plan==='pilot'&&input.state!=='read_only'&&(input.state!=='trial'||input.workerLimit>25))throw Error('Invalid operator command');
+      if(input.plan==='pilot_pending'&&input.state!=='read_only')throw Error('Invalid operator command');
+      return {kind:'entitlement',orgId:input.orgId,revision:input.revision,state:input.state,endsAt:input.endsAt,workerLimit:input.workerLimit,
       plan:input.plan,termsReference:input.termsReference,reason:input.reason,activationRequestId:input.activationRequestId,confirmed:true};
   }
   if(input.kind==='activation-decision') {
@@ -75,7 +77,7 @@ export function operatorHttpError(error) {
   if(message==='Invalid credentials')return {status:401,error:message};
   if(message==='Operator context changed')return {status:409,error:message};
   if(['Operator request conflict','Operator revision changed','Job is not retryable','Workspace access paused','Provider verification configuration changed',
-    'Activation request revision changed','Activation request is closed','Account sessions changed','Translation feedback already decided'].includes(message))return {status:409,error:message};
+    'Activation request revision changed','Activation request is closed','Account sessions changed','Translation feedback already decided','Pilot requires one site'].includes(message))return {status:409,error:message};
   if(['Invalid operator command','Invalid operator filters','Invalid operator login','Invalid entitlement expiry','Invalid JSON','Unsupported provider stage test','Invalid translation feedback filter','Invalid translation feedback decision'].includes(message))return {status:400,error:message};
   if(message==='Request too large')return {status:413,error:message};
   if(['Tenant unavailable','Activation request unavailable','Account unavailable','Translation feedback unavailable'].includes(message))return {status:404,error:message};

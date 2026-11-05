@@ -22,7 +22,7 @@ export function siteAccessInput(input) {
 export function siteHttpError(error) {
   const message=error?.message;
   if(['Sign in required','Forbidden','Forbidden origin','Workspace access paused','Worker access paused','Site archived'].includes(message))return {status:message==='Sign in required'?401:403,error:message};
-  if(['Session context changed','Site creation request conflict','Site access request conflict','Site access revision changed','Site access unchanged','Site lifecycle request conflict','Site lifecycle revision changed','Site lifecycle unchanged','Site has active dependencies','Site name already exists','Account membership unavailable'].includes(message))return {status:409,error:message};
+  if(['Session context changed','Site creation request conflict','Site access request conflict','Site access revision changed','Site access unchanged','Site lifecycle request conflict','Site lifecycle revision changed','Site lifecycle unchanged','Site has active dependencies','Site name already exists','The pilot includes one site. Contact us to plan a multi-site rollout.','Account membership unavailable'].includes(message))return {status:409,error:message};
   if(['Invalid site lifecycle request','Invalid site access request','Invalid site creation','Invalid site filter','Invalid settings request','Invalid site timezone','Invalid generation languages','Invalid search','Invalid page','Invalid staff filter','Invalid input','Invalid JSON'].includes(message))return {status:400,error:message};
   if(message==='Request too large')return {status:413,error:message};
   return {status:503,error:'Site operation unavailable. Check the receipt before retrying.'};

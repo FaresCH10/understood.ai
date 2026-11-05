@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
-import {ArrowLeft,Download,RefreshCw,Wifi,WifiOff,ShieldCheck,Clock3,Trash2,Globe,LogOut,TriangleAlert,ChevronRight} from 'lucide-react';
-import {workerUiLanguageText,workerUiLanguages,workerUiNativeName,type WorkerUiLanguage} from './worker-ui-language';
+import {ArrowLeft,ArrowRight,Download,RefreshCw,Wifi,WifiOff,ShieldCheck,Clock3,Trash2,Globe,LogOut,ChevronRight,ChevronLeft,ChevronDown,Smartphone,Users,Check} from 'lucide-react';
+import {workerUiDirection,workerUiNativeName,type WorkerUiLanguage} from './worker-ui-language';
 import {usePublicShell} from './pwa';
 import {removeTextDraft,textDraftCopy} from './worker-text-draft';
 import {WorkerAudioOutbox,type AudioOutboxProps} from './WorkerAudioOutbox';
@@ -8,6 +8,7 @@ import {WorkerOfflineCache} from './WorkerOffline';
 import {allowPrivateDevice,enableSharedDevice,sharedDeviceText} from './worker-device-policy';
 import {usePrivateDevice} from './usePrivateDevice';
 import {keepDialogFocus} from './dialog-focus';
+import {workerDeviceCopy} from './worker-help-device-copy';
 
 const labels={
   en:{title:'This device',subtitle:'Manage how Understood works on this device.',back:'Back to my instructions',connection:'Connection',online:'Online',offline:'Offline',shell:'App shell',ready:'Available on this device',loading:'Preparing...',failed:'Unavailable',unavailable:'Not available in this environment',recheck:'Retry app shell',privacy:'Private worker data',private:'Not cached on this device',limits:'Offline answers and recordings are not available yet.',expires:'Session expires',expiresToday:'Expires today {time}.',expiresNote:'Unsynced answers stay on this device until uploaded.',install:'Install Understood',installed:'Standalone app',noPrompt:'This browser is not offering installation.',installError:'Installation could not be started.',changeLanguage:'Change language',offlineAccess:'Offline access',offlineBody:'Only save instructions on a device you control.',on:'On',off:'Off',privateStatus:'Offline saving is available for this session. End your session before sharing this device.',clearAudio:'Clear saved audio',clearAudioBody:'Remove recordings saved on this device.',clearAudioWarning:'Remove all saved recordings on this device? Recordings that were not sent will be lost. This does not end your session.',clearAudioConfirm:'Clear saved audio',audioCleared:'Saved audio was removed from this device.',audioFailed:'Saved audio could not be removed. Try again before sharing this device.',endSession:'End this session',endSessionBody:'Sign out and remove saved local copies from this device.',endAndClear:'End session and clear local data',endAndClearBody:'Unsynced answers may be lost.',endAndClearWarning:'End this session and remove saved text, instructions and recordings from this device? Unsynced answers may be lost. This cannot be undone.',cancel:'Cancel'},
@@ -46,9 +47,10 @@ const deviceSectionText={
   id:{stored:'Tersimpan di perangkat ini',learnMore:'Pelajari lebih lanjut'},
 };
 export type WorkerDeviceProps=AudioOutboxProps & {onBack:()=>void;languageControl:React.ReactNode;languageError:string;onEndSession:()=>void;onEndSessionAndClear:()=>void};
-export function WorkerDevice({language,session,disabled,current,onOperation,onSessionLost,onBack,languageControl,languageError,onEndSession,onEndSessionAndClear}:WorkerDeviceProps) {
+export function WorkerDevice({language,session,disabled,current,onOperation,onSessionLost,onBack,languageControl,languageError,onEndSession}:WorkerDeviceProps) {
   const expiresAt=session.expiresAt!;
-  const t=labels[language],pwa=usePublicShell(),draftText=textDraftCopy[language],sectionText=deviceSectionText[language];
+  const t=labels[language],copy=workerDeviceCopy[language],pwa=usePublicShell(),draftText=textDraftCopy[language],sectionText=deviceSectionText[language];
+  const rtl=workerUiDirection(language)==='rtl',Back=rtl?ArrowRight:ArrowLeft,Forward=rtl?ChevronLeft:ChevronRight;
   const privateLabel={en:'Private instructions',ar:'التعليمات الخاصة',ur:'نجی ہدایات',hi:'निजी निर्देश',bn:'ব্যক্তিগত নির্দেশনা',ml:'സ്വകാര്യ നിർദ്ദേശങ്ങൾ',ta:'தனிப்பட்ட அறிவுறுத்தல்கள்',te:'వ్యక్తిగత సూచనలు',ne:'निजी निर्देशनहरू',fil:'Pribadong tagubilin',si:'පෞද්ගලික උපදෙස්',ru:'Личные инструктажи','pa-Guru':'ਨਿੱਜੀ ਹਦਾਇਤਾਂ','pa-Arab':'نجی ہدایتاں',id:'Instruksi privat'}[language];
   const languageName=workerUiNativeName(language),sharedLabel={en:'Shared mode · not saved privately',ar:'الوضع المشترك · لا يُحفظ بشكل خاص',ur:'مشترکہ موڈ · نجی طور پر محفوظ نہیں',hi:'साझा मोड · निजी रूप से सहेजा नहीं',bn:'শেয়ার্ড মোড · ব্যক্তিগতভাবে সংরক্ষিত নয়',ml:'പങ്കിട്ട മോഡ് · സ്വകാര്യമായി സംരക്ഷിച്ചിട്ടില്ല',ta:'பகிர்வு பயன்முறை · தனிப்பட்டதாகச் சேமிக்கப்படவில்லை',te:'భాగస్వామ్య మోడ్ · వ్యక్తిగతంగా సేవ్ చేయబడలేదు',ne:'साझा मोड · निजी रूपमा सुरक्षित छैन',fil:'Shared mode · hindi pribadong naka-save',si:'බෙදාගත් ආකාරය · පෞද්ගලිකව සුරැකී නැත',ru:'Общий режим · не сохраняется приватно','pa-Guru':'ਸਾਂਝਾ ਮੋਡ · ਨਿੱਜੀ ਤੌਰ ਤੇ ਸੰਭਾਲਿਆ ਨਹੀਂ','pa-Arab':'سانجھا موڈ · نجی طور تے محفوظ نہیں',id:'Mode berbagi · tidak disimpan secara privat'}[language];
   const [draftStatus,setDraftStatus]=useState('');
@@ -73,55 +75,58 @@ export function WorkerDevice({language,session,disabled,current,onOperation,onSe
   const [online,setOnline]=useState(navigator.onLine);
   useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
   const standalone=window.matchMedia('(display-mode: standalone)').matches;
-  const dangerDialog=useRef<HTMLDialogElement>(null),dangerTrigger=useRef<HTMLElement|null>(null);
-  const expiry=new Date(expiresAt),sameDay=expiry.toDateString()===new Date().toDateString();
-  const expiryHeadline=sameDay?t.expiresToday.replace('{time}',new Intl.DateTimeFormat(language,{timeStyle:'short'}).format(expiry)):`${t.expires}: ${new Intl.DateTimeFormat(language,{dateStyle:'medium',timeStyle:'short'}).format(expiry)}`;
-  return <><button className="back-link" disabled={disabled} onClick={onBack}><ArrowLeft size={19}/>{t.back}</button>
+  const expiry=new Date(expiresAt);
+  const expiryHeadline=new Intl.DateTimeFormat(language,{dateStyle:'medium',timeStyle:'short'}).format(expiry);
+  return <><button className="back-link" disabled={disabled} onClick={onBack}><Back size={19} aria-hidden="true"/>{t.back}</button>
     <header className="device-heading"><h1>{t.title}</h1><p>{t.subtitle}</p></header>
     <section className="device-actions worker-card" aria-label={t.title}>
+      <fieldset className="device-mode-choices" disabled={disabled||policyBusy}>
+        <legend>{copy.mode}</legend>
+        <div className="device-mode-grid">
+          <label className={!privateDevice?'selected':''}><input type="radio" name="worker-device-mode" checked={!privateDevice} onChange={()=>askPolicy(false)}/><Users size={23} aria-hidden="true"/><span>{copy.shared}</span>{!privateDevice&&<Check size={18} aria-hidden="true"/>}</label>
+          <label className={privateDevice?'selected':''}><input type="radio" name="worker-device-mode" checked={privateDevice} onChange={()=>askPolicy(true)}/><Smartphone size={23} aria-hidden="true"/><span>{copy.mine}</span>{privateDevice&&<Check size={18} aria-hidden="true"/>}</label>
+        </div>
+        <p>{privateDevice?t.offlineBody:policyText.body}</p>
+      </fieldset>
       <div className="device-action-row">
-        <span className="device-action-icon"><Globe size={22}/></span>
+        <span className="device-action-icon"><Globe size={22} aria-hidden="true"/></span>
         <span className="device-action-copy"><strong>{t.changeLanguage}</strong><small>{languageName}</small></span>
         {languageControl}
       </div>
       {languageError && <p role="alert">{languageError}</p>}
-      <div className="device-action-row">
-        <span className="device-action-icon"><ShieldCheck size={22}/></span>
-        <span className="device-action-copy"><strong>{policyText.title}</strong><small>{policyText.body}</small></span>
-        <span className="device-switch"><label className="checkbox-label"><input type="checkbox" role="switch" checked={!privateDevice} disabled={disabled || policyBusy} aria-label={policyText.title} onChange={event=>askPolicy(!event.target.checked)}/><span>{!privateDevice?policyText.on:policyText.off}</span></label></span>
-      </div>
     </section>
     <dialog ref={policyDialog} className="withdraw-dialog" aria-labelledby="worker-device-policy-title" aria-describedby="worker-device-policy-impact" onKeyDown={keepDialogFocus} onClose={()=>{if(policyTrigger.current?.isConnected)policyTrigger.current.focus();}}><h2 id="worker-device-policy-title">{policyText.title}</h2><p id="worker-device-policy-impact">{policyIntent.current===false?policyText.clearWarning:policyText.privateWarning}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>policyDialog.current?.close()}>{policyActions.cancel}</button><button className="button primary" onClick={()=>void changePolicy()}>{policyActions.confirm}</button></div></dialog>
     {policyStatus && <p role="status">{policyStatus}</p>}
-    <div className="device-expiry" role="note"><span className="device-expiry-icon"><Clock3 size={22}/></span><div><strong>{expiryHeadline}</strong><p>{t.expiresNote}</p></div></div>
-    <dl className="device-status worker-card"><div><dt>{online?<Wifi size={24}/>:<WifiOff size={24}/>}{t.connection}</dt><dd>{online?t.online:t.offline}</dd></div>
-      <div><dt><Download size={24}/>{t.shell}</dt><dd role="status">{pwa.status==='removed'?cacheText.removed:pwa.status==='waiting'?waitingText[language]:t[pwa.status]}{(pwa.status==='failed' || pwa.status==='waiting') && <button className="icon-button" onClick={()=>void pwa.recheck()} title={t.recheck} aria-label={t.recheck}><RefreshCw size={20}/></button>}</dd></div>
-      <div><dt><ShieldCheck size={24}/>{privateLabel}</dt><dd>{privateDevice?t.private:sharedLabel}</dd></div>
-    </dl><details className="device-disclosure"><summary>{sectionText.learnMore}</summary><p>{offlineLimits[language]}</p></details>
-    {standalone?<p role="status">{t.installed}</p>:<><button className="button primary full" disabled={!pwa.canInstall || pwa.installing} onClick={()=>void pwa.install()}><Download size={20}/>{t.install}</button>{!pwa.canInstall && <p className="muted">{t.noPrompt}</p>}</>}
+    <div className="device-expiry" role="note"><span className="device-expiry-icon"><Clock3 size={22} aria-hidden="true"/></span><div><strong>{t.expires}</strong><p><time dateTime={expiresAt}>{expiryHeadline}</time></p></div></div>
+    <dl className="device-status device-connection"><div><dt>{online?<Wifi size={20} aria-hidden="true"/>:<WifiOff size={20} aria-hidden="true"/>}{t.connection}</dt><dd>{online?t.online:t.offline}</dd></div></dl>
+    {standalone?<p role="status">{t.installed}</p>:pwa.canInstall?<button className="button outline full" disabled={pwa.installing} onClick={()=>void pwa.install()}><Download size={20} aria-hidden="true"/>{t.install}</button>:null}
     {pwa.installError && <p role="alert">{t.installError}</p>}
-    <section className="device-storage" aria-labelledby="worker-device-storage-title">
+    <details className="device-advanced">
+      <summary><span><strong>{copy.advanced}</strong><small>{copy.advancedBody}</small></span><ChevronDown size={20} aria-hidden="true"/></summary>
+      <div className="device-advanced-content">
+      <dl className="device-status"><div><dt><Download size={20} aria-hidden="true"/>{t.shell}</dt><dd role="status">{pwa.status==='removed'?cacheText.removed:pwa.status==='waiting'?waitingText[language]:t[pwa.status]}{(pwa.status==='failed' || pwa.status==='waiting') && <button className="icon-button" onClick={()=>void pwa.recheck()} title={t.recheck} aria-label={t.recheck}><RefreshCw size={20} aria-hidden="true"/></button>}</dd></div><div><dt><ShieldCheck size={20} aria-hidden="true"/>{privateLabel}</dt><dd>{privateDevice?t.private:sharedLabel}</dd></div></dl>
+      {!standalone&&!pwa.canInstall&&<p className="muted">{t.noPrompt}</p>}
+      <details className="device-disclosure"><summary>{sectionText.learnMore}</summary><p>{offlineLimits[language]}</p></details>
+      <section className="device-storage" aria-labelledby="worker-device-storage-title">
       <h2 id="worker-device-storage-title">{sectionText.stored}</h2>
       <section className="worker-text-draft worker-offline-controls">
         <h3>{draftText.title}</h3>
         <details className="device-disclosure"><summary>{sectionText.learnMore}</summary><p>{draftText.limits}</p></details>
-        <button className="button outline full" onClick={()=>{try {removeTextDraft(sessionStorage);setDraftStatus(draftText.removed);}catch {setDraftStatus(draftText.failed);}}}><Trash2 size={20}/>{draftText.remove}</button>
+        <button className="button outline full" disabled={disabled} onClick={()=>{if(!current())return;try {removeTextDraft(sessionStorage);setDraftStatus(draftText.removed);}catch {setDraftStatus(draftText.failed);}}}><Trash2 size={20} aria-hidden="true"/>{draftText.remove}</button>
         {draftStatus && <p role="status">{draftStatus}</p>}
       </section>
       <WorkerOfflineCache session={session} language={language} disabled={disabled} current={current} onOperation={onOperation} learnMore={sectionText.learnMore}/>
       <WorkerAudioOutbox session={session} language={language} disabled={disabled} current={current} onOperation={onOperation} onSessionLost={onSessionLost} learnMore={sectionText.learnMore}/>
-      {pwa.status==='ready' && <button className="button outline full" onClick={()=>void pwa.remove()}><Trash2 size={20}/>{cacheText.remove}</button>}
-    </section>
+      {pwa.status==='ready' && <button className="button outline full" disabled={disabled} onClick={()=>void pwa.remove()}><Trash2 size={20} aria-hidden="true"/>{cacheText.remove}</button>}
+      </section>
+      </div>
+    </details>
     <section className="device-actions worker-card" aria-label={t.endSession}>
       <button type="button" className="device-action-row" disabled={disabled} onClick={onEndSession}>
-        <span className="device-action-icon"><LogOut size={22}/></span>
+        <span className="device-action-icon"><LogOut size={22} aria-hidden="true"/></span>
         <span className="device-action-copy"><strong>{t.endSession}</strong><small>{t.endSessionBody}</small></span>
-        <ChevronRight size={20}/>
+        <Forward size={20} aria-hidden="true"/>
       </button>
     </section>
-    <button type="button" className="device-danger-card" disabled={disabled} onClick={()=>{dangerTrigger.current=document.activeElement as HTMLElement;dangerDialog.current?.showModal();}}>
-      <TriangleAlert size={26}/><span><strong>{t.endAndClear}</strong><small>{t.endAndClearBody}</small></span>
-    </button>
-    <dialog ref={dangerDialog} className="withdraw-dialog" aria-labelledby="worker-device-end-clear-title" aria-describedby="worker-device-end-clear-impact" onKeyDown={keepDialogFocus} onClose={()=>{if(dangerTrigger.current?.isConnected)dangerTrigger.current.focus();}}><h2 id="worker-device-end-clear-title">{t.endAndClear}</h2><p id="worker-device-end-clear-impact">{t.endAndClearWarning}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>dangerDialog.current?.close()}>{t.cancel}</button><button className="button danger" disabled={disabled} onClick={()=>{dangerDialog.current?.close();onEndSessionAndClear();}}>{t.endAndClear}</button></div></dialog>
   </>;
 }

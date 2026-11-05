@@ -1,0 +1,81 @@
+- generic [active] [ref=e1]:
+  - main [ref=e20]:
+    - link "Skip to sign in" [ref=e21] [cursor=pointer]:
+      - /url: "#auth-form"
+    - generic [ref=e22]:
+      - link "Understood home" [ref=e23] [cursor=pointer]:
+        - /url: "#home"
+        - img "Understood" [ref=e24]
+      - generic [ref=e26]:
+        - paragraph [ref=e27]: Built for the Arabian Gulf
+        - paragraph [ref=e28]:
+          - text: Frontline teamskeep things moving.
+          - generic [ref=e29]: Clear instructions.Stronger operations.
+        - paragraph [ref=e30]: Bring every person into the conversation. Share instructions, listen in your own language, and start the day on the same page.
+      - list "Made for your team":
+        - listitem:
+          - generic:
+            - generic:
+              - generic:
+                - strong: Works on shared devices
+                - generic: يعمل على الأجهزة المشتركة
+        - listitem:
+          - generic:
+            - generic:
+              - generic:
+                - strong: Arabic and English
+                - generic: بالعربية والإنجليزية
+        - listitem:
+          - generic:
+            - generic:
+              - generic:
+                - strong: Fast first-time setup
+                - generic: إعداد سريع للمرة الأولى
+      - generic [ref=e31]: One team. Every language.
+    - generic [ref=e33]:
+      - region "Worker sign in" [ref=e34]:
+        - region [ref=e36]:
+          - generic [ref=e37]:
+            - heading "Welcome to your instructions" [level=1] [ref=e38]
+            - paragraph [ref=e39]: Choose your language to continue.
+          - navigation "Sign in method" [ref=e40]:
+            - link "Supervisor" [ref=e41] [cursor=pointer]:
+              - /url: "#sign-in"
+            - link "Worker" [ref=e42] [cursor=pointer]:
+              - /url: "#worker-access"
+          - group [ref=e43]:
+            - generic [ref=e44] [cursor=pointer]:
+              - text: Interface language
+              - strong [ref=e48]: English
+              - text: +
+          - group "Sign in method" [ref=e49]:
+            - button "Worker ID and password" [pressed] [ref=e50] [cursor=pointer]
+            - button "Access link" [ref=e51] [cursor=pointer]
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - text: Company ID
+              - textbox "Company ID" [ref=e54]
+            - paragraph [ref=e55]: Use the company ID on your worker sign-in sheet. Ask your supervisor if you do not have it.
+            - generic [ref=e56]:
+              - generic [ref=e57] [cursor=pointer]:
+                - checkbox "Remember company ID on this device" [ref=e58]
+                - generic [ref=e59]: Remember company ID on this device
+              - paragraph [ref=e60]: Only on your own phone. Leave this off on a shared device.
+            - generic [ref=e61]:
+              - text: Worker ID
+              - textbox "Worker ID" [ref=e62]
+            - generic [ref=e63]:
+              - text: Password
+              - textbox "Password" [ref=e64]
+            - paragraph [ref=e65]: Use at least 8 characters.
+            - button "Sign in" [disabled] [ref=e66]
+          - generic [ref=e69]:
+            - button "Use another access link" [ref=e70] [cursor=pointer]
+            - button "Ask your supervisor for help" [ref=e77] [cursor=pointer]
+            - button "Back" [ref=e83] [cursor=pointer]
+      - paragraph [ref=e86]:
+        - text: Clear communication starts here.
+        - generic [ref=e87]: التواصل الواضح يبدأ هنا.
+  - generic:
+    - complementary "Reticle":
+      - button "Start Reticle" [ref=e178]

@@ -8,6 +8,12 @@ import {StaffRequestError,retainStaffRequest} from '../src/staff-request.ts';
 const item={id:'notice-original',kind:'briefing.prepared',...notificationKinds['briefing.prepared'],subject:null,occurredAt:'2026-10-14T00:00:00.000Z',readAt:null};
 const pending={requestId:item.id,body:{},item},accepted={...item,readAt:'2026-10-14T00:01:00.000Z'};
 const store=()=>{const rows=new Map();return {getItem:key=>rows.get(key)??null,setItem:(key,value)=>rows.set(key,value),removeItem:key=>rows.delete(key)};};
+test('completion notification targets only accept a scoped instruction route',()=>{
+ const completed={...item,kind:'instruction.completed',...notificationKinds['instruction.completed'],target:'briefings/instruction-1'};
+ assert.equal(checkedNotification(completed).target,completed.target);
+ for(const target of ['https://example.com','people/private','briefings/../admin','briefings/a?worker=foreign'])assert.throws(()=>checkedNotification({...completed,target}),/cannot be verified/);
+ assert.throws(()=>checkedNotification({...item,target:completed.target}),/cannot be verified/);
+});
 
 test('notification recovery retains only exact original event metadata in the original actor/site tab scope',()=>{
   const storage=store();savePendingNotification(storage,'original',pending);

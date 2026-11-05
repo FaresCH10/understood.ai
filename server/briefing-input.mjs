@@ -68,12 +68,9 @@ export function publicationReceiptReference(briefingId,kind,requestId) {
 export function readySnapshot(briefing,workers,integrationMode,modes={}) {
   const responseMode=modes?.responseMode ?? 'question',deliveryMode=modes?.deliveryMode ?? 'both';
   const evidenceMode=modes?.evidenceMode ?? 'none';
-  const validityDays=modes?.competency?.validityDays ?? null;
   if(!['question','acknowledge'].includes(responseMode) || !['text','voice','both'].includes(deliveryMode)
     || !['none','photo'].includes(evidenceMode) || (evidenceMode==='photo' && responseMode!=='acknowledge'))
     throw new Error('Briefing response mode is unavailable');
-  if(validityDays!==null && (!Number.isSafeInteger(validityDays) || validityDays<1 || validityDays>3650))
-    throw new Error('Invalid competency setting');
   const value=briefing.prepared_json;
   const questionMode=responseMode==='question';
   if (briefing.state!=='ready' || !value || value.source!==briefing.source || !nonempty(value.title,120)
@@ -99,7 +96,7 @@ export function readySnapshot(briefing,workers,integrationMode,modes={}) {
   if(missingLanguages.length) throw new Error(unavailableRecipientLanguage(missingLanguages));
   if (Buffer.byteLength(JSON.stringify(value))>100000) throw new Error('Prepared content exceeds limit');
   if(value.rubric?.mode==='multiple-choice' && !validateMultipleChoice({...value,languages:Object.fromEntries(workers.map(worker=>[worker.language,value.languages?.[worker.language]]))}))throw new Error('Briefing is not technically ready');
-  return {...value,responseMode,deliveryMode,evidenceMode,...(validityDays!==null?{competency:{validityDays,title:value.title}}:{})};
+  return {...value,responseMode,deliveryMode,evidenceMode};
 }
 
 export function expectedRevision(value) {

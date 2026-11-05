@@ -1,0 +1,153 @@
+- generic:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - link:
+            - /url: "#worker-main"
+            - text: Skip to main content
+          - banner:
+            - generic: Cedar Works · Beirut site
+            - generic:
+              - generic:
+                - strong: Rana Khoury
+                - generic: EN
+              - button:
+                - generic [aria-hidden]: "1"
+              - button
+              - button
+              - dialog [ref=f1e620]:
+                - generic [ref=f1e621]:
+                  - heading "Your language" [level=2] [ref=f1e622]
+                  - button "Close language settings" [active] [ref=f1e623] [cursor=pointer]
+                - paragraph [ref=f1e627]:
+                  - text: "Current language:"
+                  - strong [ref=f1e628]: English
+                - generic [ref=f1e629]:
+                  - group "Choose a new language" [ref=f1e630]:
+                    - generic [ref=f1e632] [cursor=pointer]:
+                      - radio "العربية" [checked] [ref=f1e633]
+                      - generic [ref=f1e634]: العربية
+                    - generic [ref=f1e635] [cursor=pointer]:
+                      - radio "हिन्दी" [ref=f1e636]
+                      - generic [ref=f1e637]: हिन्दी
+                    - generic [ref=f1e638] [cursor=pointer]:
+                      - radio "اردو" [ref=f1e639]
+                      - generic [ref=f1e640]: اردو
+                    - generic [ref=f1e641] [cursor=pointer]:
+                      - radio "বাংলা" [ref=f1e642]
+                      - generic [ref=f1e643]: বাংলা
+                    - generic [ref=f1e644] [cursor=pointer]:
+                      - radio "മലയാളം" [ref=f1e645]
+                      - generic [ref=f1e646]: മലയാളം
+                    - generic [ref=f1e647] [cursor=pointer]:
+                      - radio "தமிழ்" [ref=f1e648]
+                      - generic [ref=f1e649]: தமிழ்
+                    - generic [ref=f1e650] [cursor=pointer]:
+                      - radio "తెలుగు" [ref=f1e651]
+                      - generic [ref=f1e652]: తెలుగు
+                    - generic [ref=f1e653] [cursor=pointer]:
+                      - radio "नेपाली" [ref=f1e654]
+                      - generic [ref=f1e655]: नेपाली
+                    - generic [ref=f1e656] [cursor=pointer]:
+                      - radio "Filipino" [ref=f1e657]
+                      - generic [ref=f1e658]: Filipino
+                    - generic [ref=f1e659] [cursor=pointer]:
+                      - radio "සිංහල" [ref=f1e660]
+                      - generic [ref=f1e661]: සිංහල
+                    - generic [ref=f1e662] [cursor=pointer]:
+                      - radio "Русский" [ref=f1e663]
+                      - generic [ref=f1e664]: Русский
+                    - generic [ref=f1e665] [cursor=pointer]:
+                      - radio "ਪੰਜਾਬੀ" [ref=f1e666]
+                      - generic [ref=f1e667]: ਪੰਜਾਬੀ
+                    - generic [ref=f1e668] [cursor=pointer]:
+                      - radio "پنجابی" [ref=f1e669]
+                      - generic [ref=f1e670]: پنجابی
+                    - generic [ref=f1e671] [cursor=pointer]:
+                      - radio "Bahasa Indonesia" [ref=f1e672]
+                      - generic [ref=f1e673]: Bahasa Indonesia
+                  - generic [ref=f1e674]:
+                    - text: Reason (optional)
+                    - textbox "Reason (optional)" [ref=f1e675]
+                  - generic [ref=f1e676]:
+                    - button "Cancel" [ref=f1e677] [cursor=pointer]
+                    - button "Send change request" [ref=f1e678] [cursor=pointer]
+              - button
+          - main:
+            - button: Back
+            - button
+            - heading [level=1]: Naddif 2el Joura
+            - paragraph: Instruction v1
+            - generic:
+              - heading [level=2]: Listen and respond
+              - button:
+                - generic: Play instruction
+              - group:
+                - generic: Read text
+            - generic:
+              - generic: Your turn
+              - heading [level=2]: What action does this instruction require?
+              - button: Play question
+              - group:
+                - generic: Select one answer
+                - generic:
+                  - radio
+                  - generic: Joura msatmi bada tendif
+                - generic:
+                  - radio
+                  - generic: Carry on with another task without following this instruction.
+                - generic:
+                  - radio
+                  - generic: Do the opposite of this instruction.
+                - generic:
+                  - radio
+                  - generic: Replace this instruction with your own steps.
+              - button [disabled]: Send answer
+              - button: I need help
+            - generic:
+              - heading [level=2]: Ask your supervisor for help
+              - generic:
+                - text: What do you need help with?
+                - textbox
+              - button [disabled]: I need help
+            - generic:
+              - heading [level=2]: Work status
+              - status: Waiting for your response
+              - button: Go to the instruction
+            - group:
+              - generic: Save instruction for offline access
+            - region:
+              - heading [level=2]: Text saved in this tab
+              - paragraph: This snapshot belongs to this tab and session. Browser restore may retain it after closing. Remove it before sharing the device. Browser storage is not a secure vault.
+              - paragraph: Shared phone mode is on. Private saving is unavailable. Change the mode in This device only on a device you control.
+              - generic:
+                - checkbox [disabled]
+                - text: This is a device I control
+              - status: No text snapshot saved.
+              - generic:
+                - button [disabled]: Save text in this tab
+                - button [disabled]: Restore saved text
+                - button: Remove saved text
+            - generic:
+              - generic:
+                - heading [level=2]: My submitted answers
+                - button
+              - status: No submitted answers yet.
+            - generic:
+              - generic:
+                - heading [level=2]: Help requests and follow-up
+                - button
+              - status: No help requests or follow-up yet.
+          - navigation:
+            - generic:
+              - button:
+                - generic: Instructions
+              - button:
+                - generic: Help
+              - button:
+                - generic: Device
+  - generic:
+    - complementary:
+      - generic:
+        - button

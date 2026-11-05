@@ -1,0 +1,35 @@
+# Keep the queue worker running independently when Vercel hosts the frontend/API.
+# Fill the existing production environment files and reviewed runtime manifest.
+name: understood-vercel-worker
+services:
+  worker:
+    build: .
+    image: understood-worker:local
+    command: ["node", "scripts/postgres-hosted.mjs", "worker"]
+    restart: unless-stopped
+    env_file:
+      - ./.env.production
+      - ./.env.production.worker
+    environment:
+      UNDERSTOOD_ATTACHMENT_SCANNER_URL: ""
+      UNDERSTOOD_ATTACHMENT_SCANNER_KEY: ""
+    volumes:
+      - ./deploy/runtime:/run/understood:ro
+    healthcheck:
+      test: ["CMD", "node", "scripts/worker-readiness.mjs"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 90s
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

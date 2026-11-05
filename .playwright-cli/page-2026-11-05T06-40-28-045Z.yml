@@ -1,0 +1,91 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e94]:
+    - link "Skip to main content" [ref=f1e95] [cursor=pointer]:
+      - /url: "#worker-main"
+    - banner [ref=f1e96]:
+      - generic [ref=f1e97]:
+        - img "Understood" [ref=f1e99]
+        - generic [ref=f1e101]: Cedar Works · Beirut site
+      - generic [ref=f1e102]:
+        - generic [ref=f1e104]:
+          - strong [ref=f1e105]: Rana Khoury
+          - generic [ref=f1e106]: EN
+        - button "Notifications (1)" [ref=f1e107] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e111]: "1"
+        - button "This device" [ref=f1e113] [cursor=pointer]
+        - button "Language settings" [ref=f1e117] [cursor=pointer]
+        - button "End session" [ref=f1e123] [cursor=pointer]
+    - main [ref=f1e128]:
+      - button "Back to my instructions" [ref=f1e339] [cursor=pointer]
+      - generic [ref=f1e342]:
+        - heading "This device" [level=1] [ref=f1e343]
+        - paragraph [ref=f1e344]: Manage how Understood works on this device.
+      - region "This device" [ref=f1e345]:
+        - generic [ref=f1e346] [cursor=pointer]:
+          - generic [ref=f1e351]:
+            - strong [ref=f1e352]: Change language
+            - generic [ref=f1e353]: English
+          - button "Language settings" [ref=f1e354]
+        - generic [ref=f1e359] [cursor=pointer]:
+          - generic [ref=f1e364]:
+            - strong [ref=f1e365]: Shared phone mode
+            - generic [ref=f1e366]: Private saving is blocked in shared mode. End your session before another person uses this device.
+          - generic [ref=f1e368]:
+            - switch "Shared phone mode" [checked] [ref=f1e369]
+            - generic [ref=f1e370]: "On"
+      - note [ref=f1e371]:
+        - generic [ref=f1e376]:
+          - strong [ref=f1e377]: Expires today 4:38 PM.
+          - paragraph [ref=f1e378]: Unsynced answers stay on this device until uploaded.
+      - generic [ref=f1e379]:
+        - generic [ref=f1e380]:
+          - term [ref=f1e381]: Connection
+          - definition [ref=f1e386]: Online
+        - generic [ref=f1e387]:
+          - term [ref=f1e388]: App shell
+          - status [ref=f1e392]: Not available in this environment
+        - generic [ref=f1e393]:
+          - term [ref=f1e394]: Private instructions
+          - definition [ref=f1e398]: Shared mode · not saved privately
+      - group [ref=f1e399]:
+        - generic "Learn more" [ref=f1e400] [cursor=pointer]
+      - button "Install Understood" [disabled] [ref=f1e401]
+      - paragraph [ref=f1e405]: This browser is not offering installation.
+      - region [ref=f1e406]:
+        - heading "Stored on this device" [level=2] [ref=f1e407]
+        - generic [ref=f1e408]:
+          - heading "Text saved in this tab" [level=3] [ref=f1e409]
+          - group [ref=f1e410]:
+            - generic "Learn more" [ref=f1e411] [cursor=pointer]
+          - button "Remove saved text" [ref=f1e412] [cursor=pointer]
+        - generic [ref=f1e416]:
+          - heading "Saved instructions (0)" [level=2] [ref=f1e417]
+          - group [ref=f1e421]:
+            - generic "Learn more" [ref=f1e422] [cursor=pointer]
+          - paragraph [ref=f1e423]: No instructions saved in this tab for this session.
+          - button "Remove saved instructions" [ref=f1e424] [cursor=pointer]
+        - generic [ref=f1e428]:
+          - generic [ref=f1e429]:
+            - heading "Saved recordings" [level=2] [ref=f1e430]
+            - button "Recheck saved recording" [ref=f1e433] [cursor=pointer]
+          - group [ref=f1e439]:
+            - generic "Learn more" [ref=f1e440] [cursor=pointer]
+          - paragraph [ref=f1e441]: No recording saved here.
+          - button "Remove all saved recordings" [ref=f1e442] [cursor=pointer]
+      - region "End this session" [ref=f1e446]:
+        - button "End this session Sign out and remove saved local copies from this device." [ref=f1e447] [cursor=pointer]:
+          - generic [ref=f1e452]:
+            - strong [ref=f1e453]: End this session
+            - generic [ref=f1e454]: Sign out and remove saved local copies from this device.
+      - button "End session and clear local data Unsynced answers may be lost." [ref=f1e457] [cursor=pointer]:
+        - generic [ref=f1e460]:
+          - strong [ref=f1e461]: End session and clear local data
+          - generic [ref=f1e462]: Unsynced answers may be lost.
+    - navigation "Worker navigation" [ref=f1e170]:
+      - generic [ref=f1e171]:
+        - button "Instructions" [ref=f1e172] [cursor=pointer]
+        - button "Help" [ref=f1e177] [cursor=pointer]
+        - button "Device" [active] [ref=f1e182] [cursor=pointer]
+  - generic:
+    - complementary "Reticle":
+      - button "Start Reticle" [ref=f1e311]

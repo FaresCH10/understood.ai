@@ -1,0 +1,49 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e111]:
+    - link "Skip to main content" [ref=f1e112] [cursor=pointer]:
+      - /url: "#worker-main"
+    - banner [ref=f1e113]:
+      - generic [ref=f1e114]:
+        - img "Understood" [ref=f1e116]
+        - generic [ref=f1e118]: Cedar Works · Beirut site
+      - generic [ref=f1e119]:
+        - generic [ref=f1e120]:
+          - strong [ref=f1e121]: Rana Khoury
+          - generic [ref=f1e122]: EN
+        - button "Notifications (1)" [ref=f1e123] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e127]: "1"
+        - button "This device" [ref=f1e128] [cursor=pointer]
+        - button "Language settings" [ref=f1e131] [cursor=pointer]
+        - button "End session" [ref=f1e136] [cursor=pointer]
+    - main [ref=f1e140]:
+      - region [ref=f1e203]:
+        - generic [ref=f1e204]:
+          - heading "Ask your supervisor for help" [level=1] [ref=f1e207]
+          - button "Refresh instructions" [ref=f1e208] [cursor=pointer]
+        - paragraph [ref=f1e214]: For urgent help, speak to your supervisor in person.
+        - region [ref=f1e217]:
+          - heading "What do you need help with?" [level=2] [ref=f1e218]
+          - paragraph [ref=f1e219]: Choose a reason, then open the instruction below. You can add details before sending.
+          - generic [ref=f1e220]:
+            - button "I don’t understand" [ref=f1e221] [cursor=pointer]
+            - button "Missing equipment" [ref=f1e226] [cursor=pointer]
+            - button "Something is wrong" [ref=f1e230] [cursor=pointer]
+            - button "Something else" [ref=f1e234] [cursor=pointer]
+        - button "Follow-up conversations Read replies and continue a conversation." [ref=f1e240] [cursor=pointer]:
+          - generic [ref=f1e243]:
+            - strong [ref=f1e244]: Follow-up conversations
+            - generic [ref=f1e245]: Read replies and continue a conversation.
+        - heading "Current instructions" [level=2] [ref=f1e248]
+        - article [ref=f1e249]:
+          - heading "Naddif 2el Joura" [level=2] [ref=f1e250]
+          - paragraph [ref=f1e251]: Instruction v1 · EN
+          - button "Ask about this instruction" [ref=f1e252] [cursor=pointer]
+        - paragraph [ref=f1e257]: Type your message, or record it when voice help is available.
+    - navigation "Worker navigation" [ref=f1e187]:
+      - generic [ref=f1e188]:
+        - button "Instructions" [ref=f1e189] [cursor=pointer]
+        - button "Help" [active] [ref=f1e194] [cursor=pointer]
+        - button "Device" [ref=f1e199] [cursor=pointer]
+  - generic:
+    - complementary "Reticle":
+      - button "Start Reticle" [ref=f1e20]

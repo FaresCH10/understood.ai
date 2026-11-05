@@ -35,7 +35,7 @@ export default function ActivationRequestPanel({authority,entitlement,onChanged}
     const trimmed=note.trim();void mutation.write({...session,requestId:crypto.randomUUID(),body:{note:trimmed || null,confirmed:true}});}
   if(!roles.includes(authority.session.staffRole || ''))return null;
   const serverPending=entitlement.request;
-  const title=entitlement.effectiveState==='read_only'?'Request activation':entitlement.state==='active'?'Request plan change':'Request trial continuation';
+  const title=entitlement.plan==='pilot_pending'?'Request pilot approval':entitlement.effectiveState==='read_only'?'Discuss rollout or extension':entitlement.state==='active'?'Request plan change':'Request pilot extension';
   return <section className="panel activation-requests"><h2>{staffT("Activation & plan")}</h2>
     <p className="muted">{staffT("Requests are recorded for platform operations and reviewed by an authorized operator. They do not change access, purchase a plan or take payment by themselves.")}</p>
     {recovery.error?<p role="alert" className="record-error">{staffT.error(recovery.error)}</p>:null}

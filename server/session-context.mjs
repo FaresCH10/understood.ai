@@ -35,7 +35,7 @@ export function staffPeopleContextRequired(path,method) {
       || /^\/api\/people\/workers\/[^/]+\/(access|credentials|deletion|assignments|language-requests)$/.test(path) || path==='/api/privacy/workers')
     || method==='PATCH' && /^\/api\/people\/(workers|crews)\/[^/]+$/.test(path)
     || method==='POST' && (/^\/api\/people\/(workers|crews)$/.test(path)
-      || /^\/api\/people\/workers\/[^/]+\/(crew|disable|reenable|deletion|credentials\/setup)$/.test(path) || /^\/api\/people\/crews\/[^/]+\/(archive|restore)$/.test(path)
+      || /^\/api\/people\/workers\/[^/]+\/(crew|disable|reenable|deletion|credentials\/setup)$/.test(path) || /^\/api\/people\/crews\/[^/]+\/(archive|restore|members)$/.test(path)
       || path==='/api/people/imports/preview' || /^\/api\/people\/imports\/[^/]+\/confirm$/.test(path)
       || /^\/api\/people\/language-requests\/[^/]+\/decision$/.test(path)
       || path==='/api/worker-grants' || /^\/api\/worker-grants\/[^/]+\/revoke$/.test(path));

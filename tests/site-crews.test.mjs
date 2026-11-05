@@ -19,6 +19,9 @@ import {provisionStaffCredential} from '../server/auth.mjs';
 import {provisionStaffCredential as pgProvision} from '../server/postgres/auth.mjs';
 import {createSessionContextFetch} from './helpers/session-http.mjs';
 import {readCrewOverview,readCrewMembers,readCrewChange} from '../src/crew-overview.ts';
+import {readCrewInstructions} from '../src/crew-overview.ts';
+import {sqliteWorkspace} from '../server/workspace-sqlite.mjs';
+import {postgresWorkspace} from '../server/postgres/workspace.mjs';
 
 const config={tier:'local',aiMode:'synthetic',dataClass:'synthetic',accessMode:'credential',publicOrigin:'http://127.0.0.1:3020'};
 async function fixture(pg) {
@@ -51,6 +54,10 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} team overview kee
     if(!pg){assert.equal(legacy.metrics.assigned,30);assert.deepEqual(await f.query("SELECT name,sql FROM sqlite_master ORDER BY name"),beforeSchema);}
     const first=await f.invoke('createCrew',{name:'الفريق QA الأول'}),second=await f.invoke('createCrew',{name:'Second QA crew'});
     assert.equal(readCrewChange(first,scope).id,first.id);
+    await assert.rejects(async()=>f.invoke('moveWorkersToCrew',first.id,{members:[{workerId:'worker-1',expectedCrewId:null},{workerId:'zz-missing',expectedCrewId:null}],confirmedMoves:false}),/Worker unavailable/);
+    assert.equal((await f.invoke('listWorkers',{workerId:'worker-1'})).items[0].crew_id,null);
+    const added=await f.invoke('moveWorkersToCrew',first.id,{members:[{workerId:'worker-1',expectedCrewId:null},{workerId:'worker-2',expectedCrewId:null}],confirmedMoves:false});assert.equal(added.items.length,2);
+    const duplicate=await f.invoke('moveWorkersToCrew',first.id,{members:[{workerId:'worker-1',expectedCrewId:null},{workerId:'worker-2',expectedCrewId:null}],confirmedMoves:false});assert.equal(duplicate.items.length,2);
     await f.invoke('moveWorkerToCrew','worker-1',first.id);await f.invoke('moveWorkerToCrew','worker-2',first.id);await f.invoke('moveWorkerToCrew','worker-3',second.id);
     if(!pg)await f.query("UPDATE briefings SET state='ready',prepared_json=? WHERE id='shelf'",[JSON.stringify(syntheticPrepare(CANONICAL_SOURCE))]);
     const draft=(await f.query("SELECT revision,next_version FROM briefings WHERE id='shelf'"))[0],body={requestId:randomUUID(),revision:draft.revision,nextVersion:draft.next_version,workerIds:['worker-1','worker-2','worker-3']};
@@ -66,12 +73,33 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} team overview kee
     assert.equal(original.contacts.primary.role,'owner');assert.equal(original.contacts.deputy.role,'supervisor');
     const firstBefore=original.items.find(row=>row.id===first.id),secondBefore=original.items.find(row=>row.id===second.id);
     assert.equal(firstBefore.metrics.assigned,2);assert.equal(secondBefore.metrics.pending,1);
-    await f.invoke('moveWorkerToCrew','worker-1',second.id);
+    const history=(crewId,session=f.owner,page=1,filters={})=>pg?postgresWorkspace(f.pool,session,'crew-instructions',{crewId,page,...filters},f.options):sqliteWorkspace(f.db,session,'crew-instructions',{crewId,page,...filters});
+    const firstHistory=readCrewInstructions(await history(first.id),{crewId:first.id,page:1});
+    assert.equal(firstHistory.total,1);assert.deepEqual(firstHistory.summary,{ongoing:0,followUp:1,done:0});
+    assert.equal((await history(first.id,f.owner,1,{search:'SHELF',status:'follow-up'})).total,1);
+    assert.equal((await history(first.id,f.owner,1,{search:'%'})).total,0);
+    const filtered=await history(first.id,f.owner,1,{status:'done'});assert.equal(filtered.total,0);assert.deepEqual(filtered.summary,firstHistory.summary);
+    assert.equal((await history(first.id,f.owner,1,{status:'done'})).historyTotal,1);assert.equal(firstHistory.items[0].briefingId,'shelf');
+    assert.deepEqual(firstHistory.items[0].counts,{sent:0,inProgress:1,followUp:1,done:0,total:2});
+    assert.equal(firstHistory.items[0].status,'follow-up');assert.ok(!JSON.stringify(firstHistory).includes('PRIVATE ANSWER'));
+    assert.equal((await history(second.id)).items[0].counts.total,1);
+    assert.deepEqual((await history(first.id,f.owner,2)).items,[]);
+    for(const invalid of [0,5001,'bad'])await assert.rejects(history(first.id,f.owner,invalid),/Invalid/);
+    await assert.rejects(history(first.id,{principal_type:'staff',principal_id:'harbor-owner',org_id:'harbor',site_id:'harbor-yard',role:'owner'}),/unavailable/);
+    await assert.rejects(history(first.id,{principal_type:'worker',principal_id:'worker-1',org_id:'cedar',site_id:'beirut'}),/Forbidden/);
+    await assert.rejects(async()=>f.invoke('moveWorkersToCrew',second.id,{members:[{workerId:'worker-1',expectedCrewId:first.id}],confirmedMoves:false}),/Confirm worker moves/);
+    await assert.rejects(async()=>f.invoke('moveWorkersToCrew',second.id,{members:[{workerId:'worker-1',expectedCrewId:null}],confirmedMoves:true}),/Worker membership changed/);
+    const moved=await f.invoke('moveWorkersToCrew',second.id,{members:[{workerId:'worker-1',expectedCrewId:first.id}],confirmedMoves:true});assert.equal(moved.items[0].crew_id,second.id);
     await f.invoke('renameCrew',first.id,{expectedName:first.name,name:'الفريق QA الجديد'});
     await f.invoke('archiveCrew',first.id,{expectedName:'الفريق QA الجديد',confirmed:true});
+    await assert.rejects(async()=>f.invoke('moveWorkersToCrew',first.id,{members:[{workerId:'worker-3',expectedCrewId:second.id}],confirmedMoves:true}),/Crew unavailable/);
     const current=readCrewOverview(await f.read(),{page:1,pageSize:5,scope});
     assert.equal(current.items.find(row=>row.id===first.id).member_count,1);assert.equal(current.items.find(row=>row.id===second.id).member_count,2);
     assert.deepEqual(current.items.find(row=>row.id===first.id).metrics,firstBefore.metrics);assert.deepEqual(current.items.find(row=>row.id===second.id).metrics,secondBefore.metrics);
+    assert.deepEqual((await history(first.id)).items,firstHistory.items);
+    const completed=assignments.find(row=>row.worker_id==='worker-1').id;
+    await f.query('INSERT INTO assignment_completions(assignment_id,org_id,site_id,worker_id,completed_at) VALUES(?,?,?,?,?)',[completed,'cedar','beirut','worker-1',new Date().toISOString()]);
+    assert.equal((await history(first.id)).items[0].counts.done,1);
     assert.equal(current.activity.length,6);assert.ok(current.activity.some(row=>row.action==='crew.archived'));
     assert.ok(!JSON.stringify(current).includes('PRIVATE ANSWER'));assert.ok(!JSON.stringify(current).includes('rubric'));
     const workers=await f.invoke('listWorkers',{crewId:second.id,status:'active',page:1,pageSize:5});
@@ -101,7 +129,7 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} team overview HTT
       if(pg)await pgProvision(f.pool,{staffId:id,orgId,siteId,email:`${id}@example.test`,password},f.options);
       else provisionStaffCredential(f.db,id,`${id}@example.test`,password);
     }
-    await f.invoke('createCrew',{name:'HTTP scoped QA'});
+    const savedCrew=await f.invoke('createCrew',{name:'HTTP scoped QA'});
     await new Promise(resolve=>f.server.listen(0,'127.0.0.1',resolve));
     const base=`http://127.0.0.1:${f.server.address().port}/api`,call=(path,cookie,body)=>fetch(base+path,{method:body?'POST':'GET',headers:{origin:config.publicOrigin,'content-type':'application/json',...(cookie?{cookie}:{})},body:body?JSON.stringify(body):undefined});
     const login=async id=>(await call('/auth/staff/login',null,{email:`${id}@example.test`,password})).headers.get('set-cookie').split(';')[0];
@@ -113,5 +141,23 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} team overview HTT
     for(const query of ['page=1&page=2','site_id=harbor-yard','pageSize=101','status=other'])assert.equal((await call(path+'?'+query,owner)).status,400);
     assert.equal((await call(path,owner,{name:'Forbidden mutation'})).status,404);
     assert.equal((await f.read()).total,1);
+    const historyPath=`/workspace/crews/${savedCrew.id}/instructions`;
+    const contexts=new Map(await Promise.all([owner,viewer,foreign].map(async cookie=>[cookie,(await (await call('/session',cookie)).json()).clientContext])));
+    const historyCall=(query,cookie)=>fetch(base+historyPath+query,{headers:cookie?{cookie,'x-client-session-context':contexts.get(cookie)}:{}});
+    assert.equal((await call(historyPath,owner)).status,409);
+    assert.equal((await historyCall('',null)).status,401);
+    assert.equal((await historyCall('',viewer)).status,403);
+    const history=await historyCall('',owner);assert.equal(history.status,200,JSON.stringify(await history.clone().json()));
+    assert.deepEqual(readCrewInstructions(await history.json(),{crewId:savedCrew.id,page:1}).items,[]);
+    assert.notEqual((await historyCall('',foreign)).status,200);
+    for(const query of ['page=0','page=1&page=2','org_id=harbor'])assert.equal((await historyCall('?'+query,owner)).status,400);
+    for(const query of ['status=other','search='+('x'.repeat(81))])assert.equal((await historyCall('?'+query,owner)).status,400);
+    const memberPath=`/people/crews/${savedCrew.id}/members`,batch={members:[{workerId:'worker-1',expectedCrewId:null},{workerId:'worker-2',expectedCrewId:null}],confirmedMoves:false};
+    assert.equal((await call(memberPath,null,batch)).status,401);
+    assert.equal((await call(memberPath,viewer,batch)).status,403);
+    assert.equal((await call(memberPath,foreign,batch)).status,409);
+    const admitted=await call(memberPath,owner,batch);assert.equal(admitted.status,200);assert.equal((await admitted.json()).items.length,2);
+    assert.equal((await call(memberPath,owner,{...batch,members:[batch.members[0],batch.members[0]]})).status,400);
+    assert.equal((await globalThis.fetch(base+memberPath,{method:'POST',headers:{cookie:owner,origin:config.publicOrigin,'content-type':'application/json'},body:JSON.stringify(batch)})).status,409);
   }finally{if(f.server.listening)await new Promise(resolve=>f.server.close(resolve));await f.close();}
 });

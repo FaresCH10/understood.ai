@@ -5,6 +5,7 @@ import {linkAccountMembership} from './accounts.mjs';
 import {createSiteInput,siteFilters,siteRequestId,siteAccessInput} from '../site-input.mjs';
 import {siteLifecycleInput} from '../site-lifecycle-input.mjs';
 import {requireSiteOperational,siteLifecycleState,siteArchiveDependencies} from './site-lifecycle.mjs';
+import {isPilotPlan} from '../pilot-policy.mjs';
 async function authority(client,session,credential=false) {
   if(session?.principal_type!=='staff' || session.role!=='owner')throw Error('Forbidden');
   const account=await lockStaffAccount(client,session.principal_id);await requirePrincipal(client,session,'staff',['owner']);
@@ -20,13 +21,14 @@ export function listSites(pool,session,input={},{schema='public'}={}) {
         WHERE m.account_id=$1 AND s.org_id=$2 AND s.site_id=$3 AND s.active=true AND s.role='owner'`,[account.account_id,session.org_id,row.id])).rows.length;
       const lifecycle=await siteLifecycleState(client,session.org_id,row.id);row.lifecycle=lifecycle.state;row.lifecycleRevision=lifecycle.revision;
       row.canManageLifecycle=row.canManageAccess;row.canManageAccess=row.canManageAccess && lifecycle.state==='active';}
-    return {items:items.map(row=>({...row,current:row.id===session.site_id})),total,page:f.page,pageSize:f.pageSize,canCreate:!!account};});
+    return {items:items.map(row=>({...row,current:row.id===session.site_id})),total,page:f.page,pageSize:f.pageSize,canCreate:!!account&&!isPilotPlan((await client.query('SELECT plan FROM organization_entitlements WHERE org_id=$1',[session.org_id])).rows[0]?.plan)};});
 }
 export function createSite(pool,session,input,{schema='public'}={}) {
   const value=createSiteInput(input);return domainTransaction(pool,schema,async client=>{const account=await authority(client,session,true);
     await client.query('SELECT id FROM organizations WHERE id=$1 FOR UPDATE',[session.org_id]);
     const old=(await client.query('SELECT * FROM site_creations WHERE org_id=$1 AND request_id=$2',[session.org_id,input.requestId])).rows[0];
     if(old){if(old.created_by!==session.principal_id || old.origin_site_id!==session.site_id || JSON.stringify(createSiteInput({...old.request_json,requestId:input.requestId}))!==JSON.stringify(value))throw Error('Site creation request conflict');return {id:old.site_id,ownerId:old.owner_id,duplicate:true};}
+    if(isPilotPlan((await client.query('SELECT plan FROM organization_entitlements WHERE org_id=$1 FOR UPDATE',[session.org_id])).rows[0]?.plan))throw Error('The pilot includes one site. Contact us to plan a multi-site rollout.');
     if((await client.query('SELECT 1 FROM sites WHERE org_id=$1 AND lower(name)=lower($2)',[session.org_id,value.name])).rows.length)throw Error('Site name already exists');
     const id=randomUUID(),ownerId=randomUUID(),name=(await client.query('SELECT name FROM staff WHERE id=$1',[session.principal_id])).rows[0].name;
     await client.query('INSERT INTO sites VALUES($1,$2,$3,$4)',[id,session.org_id,value.name,value.timezone]);

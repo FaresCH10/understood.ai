@@ -132,6 +132,7 @@ const staffCopy = Object.freeze({
   'worker.language_requested':{en:['A language request needs review','Open Understood to review it.'],ar:['طلب تغيير لغة يحتاج إلى مراجعة','افتح Understood لمراجعته.']},
   'answer.needs_attention':{en:['An answer needs attention','Open Understood to review it.'],ar:['إجابة تحتاج إلى انتباه','افتح Understood لمراجعتها.']},
   'instruction.send_incomplete':{en:['An instruction delivery needs attention','Open Understood to review it.'],ar:['تسليم تعليمات يحتاج إلى انتباه','افتح Understood لمراجعته.']},
+  'instruction.completed':{en:['A worker finished an instruction','Open Understood to review the completed work.'],ar:['أكمل عامل تعليمات العمل','افتح Understood لمراجعة العمل المكتمل.']},
   'assignment.overdue':{en:['An assignment is overdue','Open Understood to review it.'],ar:['فات موعد مهمة','افتح Understood لمراجعتها.']},
 });
 

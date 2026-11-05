@@ -1,29 +1,40 @@
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {workerWorkText} from './worker-work-text';
 import {useStaffText} from './staff-language';
-import {useEffect,useState} from 'react';
-import {Paperclip,Download} from 'lucide-react';
+import {useEffect,useState,useRef} from 'react';
+import {Paperclip,Download,Expand,X,FileText} from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
+import './instruction-files.css';
 type FileRow={id:string;name:string;mime:string;bytes:number;captions?:Record<string,string>};
+type AttachmentPolicy={maxBytes:number;scanRequired:boolean;uploadAllowed:boolean};
 const photo=(mime:string)=>mime==='image/png'||mime==='image/jpeg';
 const direction=(code:string)=>['ar','ur','fa','he','pa-Arab'].includes(code)?'rtl':'ltr';
 const captionFor=(captions:Record<string,string>|undefined,language:string)=>{
  const values=captions||{};
  return values[language]||values.en||Object.values(values).find(value=>!!value)||'';
 };
-function AttachmentPreview({requestId,file,clientContext,current,onSessionLost,alt}:{requestId:string;file:FileRow;clientContext:string;current:()=>boolean;onSessionLost:()=>void;alt:string}){
- const [url,setUrl]=useState('');
+function AttachmentPreview({requestId,file,clientContext,current,onSessionLost,alt,language='en'}:{requestId:string;file:FileRow;clientContext:string;current:()=>boolean;onSessionLost:()=>void;alt:string;language?:string}){
+ const [url,setUrl]=useState(''),[opened,setOpened]=useState(false),[failed,setFailed]=useState(false),dialog=useRef<HTMLDialogElement>(null),trigger=useRef<HTMLButtonElement>(null);
+ const ar=language==='ar',isPhoto=photo(file.mime);
  useEffect(()=>{
-  if(!photo(file.mime))return;
+  if(!isPhoto&&!(file.mime==='application/pdf'&&opened))return;
   let objectUrl='';const controller=new AbortController();
-  setUrl('');
-  fetch(`/api/workspace/attachments/${requestId}/${file.id}`,{credentials:'include',cache:'no-store',signal:controller.signal,headers:{'x-client-session-context':clientContext}})
+  setUrl('');setFailed(false);
+  fetch(`/api/workspace/attachments/${requestId}/${file.id}`,{credentials:'include',cache:'no-store',redirect:'error',signal:controller.signal,headers:{'x-client-session-context':clientContext}})
    .then(async response=>{if(response.status===401||response.status===409)onSessionLost();if(!response.ok)throw Error();return response.blob();})
    .then(blob=>{if(current()&&!controller.signal.aborted){objectUrl=URL.createObjectURL(blob);setUrl(objectUrl);}})
-   .catch(()=>{});
+   .catch(()=>{if(current()&&!controller.signal.aborted)setFailed(true);});
   return()=>{controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl);};
- },[requestId,file.id,file.mime,clientContext]);
- return url?<img className="attachment-preview" src={url} alt={alt} loading="lazy"/>:null;
+ },[requestId,file.id,file.mime,clientContext,opened]);
+ useEffect(()=>{if(opened&&!dialog.current?.open)dialog.current?.showModal();},[opened]);
+ if(!isPhoto&&file.mime!=='application/pdf')return null;
+ return <>
+  {isPhoto&&url?<button type="button" ref={trigger} className="attachment-photo-button" onClick={()=>setOpened(true)} aria-label={ar?`تكبير ${file.name}`:`Enlarge ${file.name}`}><img className="attachment-preview" src={url} alt={alt} loading="lazy" width="640" height="360"/><Expand size={18} aria-hidden="true"/></button>:file.mime==='application/pdf'?<button type="button" ref={trigger} className="button outline" onClick={()=>setOpened(true)}><FileText size={18} aria-hidden="true"/>{ar?'معاينة PDF':'Preview PDF'}</button>:null}
+  <dialog ref={dialog} className="attachment-preview-dialog" aria-label={file.name} onClose={()=>{setOpened(false);trigger.current?.focus();}} onClick={event=>{if(event.target===event.currentTarget)dialog.current?.close();}}>
+   <div className="attachment-preview-toolbar"><strong dir="auto">{file.name}</strong><button type="button" className="icon-button" aria-label={ar?'إغلاق المعاينة':'Close preview'} onClick={()=>dialog.current?.close()}><X size={20} aria-hidden="true"/></button></div>
+   {failed?<p role="alert">{ar?'تعذرت المعاينة. حاول تنزيل الملف.':'Preview unavailable. Try downloading the file.'}</p>:!url?<p role="status">{ar?'جارٍ تحميل المعاينة…':'Loading preview…'}</p>:isPhoto?<img src={url} alt={alt} width="1200" height="900"/>:<><iframe src={url} sandbox="" title={file.name}/><p>{ar?'إذا لم تظهر المعاينة، أغلقها واستخدم زر التنزيل.':'If the preview is unavailable, close it and use the download button.'}</p></>}
+  </dialog>
+ </>;
 }
 function CaptionEditor({file,languages,disabled,busy,onSave}:{file:FileRow;languages:string[];disabled:boolean;busy:boolean;onSave:(id:string,captions:Record<string,string>)=>void}){
  const staffT=useStaffStaticText();
@@ -40,12 +51,14 @@ function CaptionEditor({file,languages,disabled,busy,onSave}:{file:FileRow;langu
 export function AttachmentComposer({authority,requestId,disabled,ready,saveDraft,onBusy,languages=[]}:{onBusy:(busy:boolean)=>void;authority:StaffRequestAuthority;requestId:string;disabled:boolean;ready:boolean;saveDraft:()=>Promise<void>;languages?:string[]}){
  const staffT=useStaffStaticText();
  const tr=useStaffText();
- const {request,current}=useStaffRequest(authority),[items,setItems]=useState<FileRow[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[captionDraft,setCaptionDraft]=useState<Record<string,string>>({});
+ const {request,current}=useStaffRequest(authority),[items,setItems]=useState<FileRow[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[captionDraft,setCaptionDraft]=useState<Record<string,string>>({}),[policy,setPolicy]=useState<AttachmentPolicy|null>(null);
+ useEffect(()=>{const controller=new AbortController();request<AttachmentPolicy>('/api/workspace/attachment-policy',undefined,controller.signal).then(value=>{if(current())setPolicy(value);}).catch(()=>{});return()=>controller.abort();},[request,current]);
  useEffect(()=>{if(!ready){setItems([]);return;}const controller=new AbortController();request<{items:FileRow[]}>(`/api/workspace/attachments/${requestId}`,undefined,controller.signal).then(value=>{if(current())setItems(value.items);}).catch(()=>{});return()=>controller.abort();},[requestId,request,current,ready]);
  async function upload(file:File){
   if(busy||disabled)return;setBusy(true);onBusy(true);setError('');
   try{
-   if(file.size>5*1024*1024)throw Error('Choose a file up to 5 MB.');
+   if(policy?.uploadAllowed===false)throw Error('Attachments are unavailable until file safety scanning is configured');
+   if(file.size>(policy?.maxBytes??3*1024*1024))throw Error('Choose a file up to 3 MB.');
    await saveDraft();
    const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('File could not be read'));reader.readAsDataURL(file);});
    const mime={'pdf':'application/pdf','png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','txt':'text/plain','csv':'text/csv','docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','pptx':'application/vnd.openxmlformats-officedocument.presentationml.presentation'}[file.name.split('.').pop()?.toLowerCase()||'']||file.type;
@@ -56,7 +69,7 @@ export function AttachmentComposer({authority,requestId,disabled,ready,saveDraft
  }
  async function remove(id:string){if(busy||disabled)return;setBusy(true);onBusy(true);setError('');try{const result=await request<{items:FileRow[]}>(`/api/workspace/attachments/${requestId}`,{remove:id});if(current())setItems(result.items);}catch(reason){if(current())setError((reason as Error).message);}finally{onBusy(false);if(current())setBusy(false);}}
  async function saveCaptions(id:string,captions:Record<string,string>){if(busy||disabled)return;setBusy(true);onBusy(true);setError('');try{const result=await request<{items:FileRow[]}>(`/api/workspace/attachments/${requestId}`,{id,captions});if(current())setItems(result.items);}catch(reason){if(current())setError((reason as Error).message);}finally{onBusy(false);if(current())setBusy(false);}}
- return <section className="instruction-attachments"><label className="field"><span><Paperclip size={17}/> {tr("Attachments")}</span><input type="file" accept=".jpg,.jpeg,.png,.pdf,.txt,.csv,.docx,.xlsx,.pptx" disabled={disabled||busy} onChange={event=>{const file=event.target.files?.[0];if(file)void upload(file);event.target.value='';}}/></label><p className="muted">{tr("Photos, PDFs, Office documents, CSV and text files. Up to 5 MB each; five files and 10 MB total. Workers receive these with the instruction.")}</p>{languages.length>0&&<details className="attachment-caption-editor attachment-caption-new" open={Object.keys(captionDraft).length>0}><summary>{staffT("Photo captions (optional)")}</summary><p className="muted">{staffT("Added to the next photo you attach. Captions appear in the worker's language, with English as the fallback.")}</p><div className="attachment-caption-fields">{languages.map(code=><label className="field" key={code}><span>{staffT.language(code)}</span><input maxLength={300} lang={code} dir={direction(code)} value={captionDraft[code]||''} disabled={disabled||busy} onChange={event=>setCaptionDraft(old=>({...old,[code]:event.target.value}))}/></label>)}</div></details>}{busy&&<p role="status">{tr("Saving attachment…")}</p>}{error&&<p role="alert">{staffT.error(error)}</p>}{items.length>0&&<ul className="attachment-list">{items.map(file=><li key={file.id}><div className="attachment-item-head"><span>{file.name} <small>({Math.ceil(file.bytes/1024)} {staffT("KB)")}</small></span> <button type="button" className="text-link" disabled={busy||disabled} onClick={()=>void remove(file.id)} aria-label={staffT("Remove {p0}",{p0:file.name})}>{tr("Remove")}</button></div>{photo(file.mime)&&<CaptionEditor file={file} languages={languages} disabled={disabled} busy={busy} onSave={(id,captions)=>void saveCaptions(id,captions)}/>}</li>)}</ul>}</section>;
+ return <section className="instruction-attachments"><label className="field"><span><Paperclip size={17}/> {tr("Attachments")}</span><input type="file" accept=".jpg,.jpeg,.png,.pdf,.txt,.csv,.docx,.xlsx,.pptx" disabled={disabled||busy||policy?.uploadAllowed===false} onChange={event=>{const file=event.target.files?.[0];if(file)void upload(file);event.target.value='';}}/></label><p className="muted">{tr("Photos, PDFs, Office documents, CSV and text files. Up to 3 MB each; five files and 10 MB total. Workers receive these with the instruction.")}</p>{languages.length>0&&<details className="attachment-caption-editor attachment-caption-new" open={Object.keys(captionDraft).length>0}><summary>{staffT("Photo captions (optional)")}</summary><p className="muted">{staffT("Added to the next photo you attach. Captions appear in the worker's language, with English as the fallback.")}</p><div className="attachment-caption-fields">{languages.map(code=><label className="field" key={code}><span>{staffT.language(code)}</span><input maxLength={300} lang={code} dir={direction(code)} value={captionDraft[code]||''} disabled={disabled||busy} onChange={event=>setCaptionDraft(old=>({...old,[code]:event.target.value}))}/></label>)}</div></details>}{policy?.uploadAllowed===false&&<p role="status">{tr("Attachments are unavailable until file safety scanning is configured")}</p>}{busy&&<p role="status">{tr("Checking and saving attachment…")}</p>}{error&&<p role="alert">{staffT.error(error)}</p>}{items.length>0&&<ul className="attachment-list">{items.map(file=><li key={file.id}><div className="attachment-item-head"><span>{file.name} <small>({Math.ceil(file.bytes/1024)} {staffT("KB)")}</small></span> <button type="button" className="text-link" disabled={busy||disabled} onClick={()=>void remove(file.id)} aria-label={staffT("Remove {p0}",{p0:file.name})}>{tr("Remove")}</button></div>{photo(file.mime)&&<CaptionEditor file={file} languages={languages} disabled={disabled} busy={busy} onSave={(id,captions)=>void saveCaptions(id,captions)}/>}</li>)}</ul>}</section>;
 }
 export function InstructionFiles({assignmentId,clientContext,current,onSessionLost,language='en'}:{language?:string;assignmentId:string;clientContext:string;current:()=>boolean;onSessionLost:()=>void}){
  const staffT=useStaffStaticText();
@@ -68,7 +81,7 @@ export function InstructionFiles({assignmentId,clientContext,current,onSessionLo
   try{const response=await fetch(`/api/workspace/attachments/${data?.requestId}/${file.id}`,{credentials:'include',cache:'no-store',headers:{'x-client-session-context':clientContext}});if(response.status===401||response.status===409)onSessionLost();if(!response.ok)throw Error(t.fileUnavailable);const blob=await response.blob();if(!current())return;const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(reason){if(current())setError((reason as Error).message);}
  }
  if(!data?.items.length&&!error)return null;
- return <section className="worker-card"><h2><Paperclip size={19}/> {t.attachments}</h2>{error&&<p role="alert">{staffT.error(error)}</p>}{data?.items.map(file=>{const caption=photo(file.mime)?captionFor(file.captions,language):'';return <div className="worker-attachment" key={file.id}>{photo(file.mime)&&<AttachmentPreview requestId={data.requestId!} file={file} clientContext={clientContext} current={current} onSessionLost={onSessionLost} alt={caption||file.name}/>}{caption&&<p className="attachment-caption" lang={language} dir={direction(language)}>{caption}</p>}<button className="item-row" onClick={()=>void download(file)}><Download size={18}/><span>{file.name}<small> · {Math.ceil(file.bytes/1024)} KB</small></span></button></div>;})}</section>;
+ return <section className="worker-card"><h2><Paperclip size={19}/> {t.attachments}</h2>{error&&<p role="alert">{staffT.error(error)}</p>}{data?.items.map(file=>{const caption=photo(file.mime)?captionFor(file.captions,language):'';return <div className="worker-attachment" key={file.id}>{(photo(file.mime)||file.mime==='application/pdf')&&<AttachmentPreview requestId={data.requestId!} file={file} clientContext={clientContext} current={current} onSessionLost={onSessionLost} language={language} alt={caption||file.name}/>}{caption&&<p className="attachment-caption" lang={language} dir={direction(language)}>{caption}</p>}<button className="item-row" onClick={()=>void download(file)}><Download size={18}/><span>{file.name}<small> · {Math.ceil(file.bytes/1024)} KB</small></span></button></div>;})}</section>;
 }
 export function StaffInstructionFiles({briefingId,authority,refresh}:{briefingId:string;authority:StaffRequestAuthority;refresh:number}){
  const staffT=useStaffStaticText();
@@ -76,5 +89,5 @@ export function StaffInstructionFiles({briefingId,authority,refresh}:{briefingId
  useEffect(()=>{const controller=new AbortController();request<{requestId?:string;items:FileRow[]}>(`/api/workspace/briefing-files/${encodeURIComponent(briefingId)}`,undefined,controller.signal).then(value=>{if(current())setData(value);}).catch(reason=>{if(current()&&!controller.signal.aborted)setError(reason.message);});return()=>controller.abort();},[briefingId,request,current,refresh]);
  async function download(file:FileRow){if(!current()||!data?.requestId)return;setError('');try{const response=await fetch(`/api/workspace/attachments/${data.requestId}/${file.id}`,{credentials:'include',cache:'no-store',redirect:'error',headers:{'x-client-session-context':authority.session.clientContext!}});if(response.status===401||response.status===409)authority.onSessionLost();if(!response.ok)throw Error('Attachment unavailable.');const bytes=await response.blob();if(!current())return;const url=URL.createObjectURL(bytes),link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(reason){if(current())setError((reason as Error).message);}}
  if(!data?.items.length&&!error)return null;
- return <section className="panel"><h2>{tr('Attachments')}</h2>{error&&<p role="alert">{staffT.error(error)}</p>}{data?.items.map(file=>{const captions=Object.entries(file.captions||{});return <div className="staff-attachment" key={file.id}>{photo(file.mime)&&data.requestId&&<AttachmentPreview requestId={data.requestId} file={file} clientContext={authority.session.clientContext!} current={current} onSessionLost={authority.onSessionLost} alt={captionFor(file.captions,'en')||file.name}/>}{captions.length>0&&<ul className="attachment-caption-list">{captions.map(([code,text])=><li key={code}><span>{staffT.language(code)}</span><p lang={code} dir={direction(code)}>{text}</p></li>)}</ul>}<button className="item-row" onClick={()=>void download(file)}><Download size={18}/><span>{file.name} · {Math.ceil(file.bytes/1024)} KB</span></button></div>;})}</section>;
+ return <section className="panel"><h2>{tr('Attachments')}</h2>{error&&<p role="alert">{staffT.error(error)}</p>}{data?.items.map(file=>{const captions=Object.entries(file.captions||{});return <div className="staff-attachment" key={file.id}>{(photo(file.mime)||file.mime==='application/pdf')&&data.requestId&&<AttachmentPreview requestId={data.requestId} file={file} clientContext={authority.session.clientContext!} current={current} onSessionLost={authority.onSessionLost} alt={captionFor(file.captions,'en')||file.name}/>}{captions.length>0&&<ul className="attachment-caption-list">{captions.map(([code,text])=><li key={code}><span>{staffT.language(code)}</span><p lang={code} dir={direction(code)}>{text}</p></li>)}</ul>}<button className="item-row" onClick={()=>void download(file)}><Download size={18}/><span>{file.name} · {Math.ceil(file.bytes/1024)} KB</span></button></div>;})}</section>;
 }

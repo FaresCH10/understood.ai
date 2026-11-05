@@ -9,6 +9,7 @@ import {instructionInput,startInstructionSend,completeInstructionSend} from '../
 import {processOne} from '../server/worker.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {sqliteApp,openPrincipalSession,principalLoginBody} from './helpers/sqlite-app.mjs';
+import {listNotifications,readNotification,notificationReceipt} from '../server/notifications.mjs';
 const staff={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const worker={principal_type:'worker',principal_id:'worker-1',org_id:'cedar',site_id:'beirut'};
 const content={title:'Delivery check',source:'Please check the delivery count.',audience:{type:'all'},responseMode:'question',deliveryMode:'text'};
@@ -36,9 +37,33 @@ test('work completion requires understanding, is idempotent, and appears in work
  await assert.rejects(sqliteWorkspace(db,{...worker,principal_id:'worker-30'},'work',{complete:sent.id}),/Confirm understanding/);
  const done=await sqliteWorkspace(db,worker,'work',{complete:inProgress.id});assert.equal(done.status,'done');
  assert.equal((await sqliteWorkspace(db,worker,'work',{complete:inProgress.id})).completedAt,done.completedAt);
+ const events=db.prepare("SELECT id FROM audit WHERE action='instruction.completed' AND object_id=?").all(inProgress.id);assert.equal(events.length,1);
+ assert.equal(db.prepare("SELECT COUNT(*) AS n FROM notification_events WHERE kind='instruction.completed'").get().n,1);
+ const notice=listNotifications(db,staff).items.find(item=>item.kind==='instruction.completed');assert.ok(notice);assert.equal(notice.target,`briefings/${inProgress.briefingId}`);
+ const read=readNotification(db,staff,notice.id);assert.equal(read.target,notice.target);assert.equal(notificationReceipt(db,staff,notice.id).item.target,notice.target);
  const history=(await sqliteWorkspace(db,staff,'work',{workerId:worker.principal_id})).items;assert.equal(history.find(row=>row.id===inProgress.id).status,'done');
  const library=await sqliteWorkspace(db,staff,'library',{});assert.ok(library.items.some(row=>row.workCounts.done===1));
  await assert.rejects(sqliteWorkspace(db,staff,'work',{workerId:worker.principal_id,complete:inProgress.id}),/Forbidden/);
+ }finally{db.close();}
+});
+test('work summaries paginate and filter on the server, preserve localized titles and exact worker scope',async()=>{
+ const db=fixture();try{
+  const original=db.prepare('SELECT p.* FROM publications p JOIN assignments a ON a.publication_id=p.id WHERE a.worker_id=? LIMIT 1').get(worker.principal_id);
+  const next=Number(db.prepare('SELECT MAX(version) AS n FROM publications WHERE briefing_id=?').get(original.briefing_id).n)+1;
+  const added=[];
+  for(let i=0;i<4;i++){
+   const pub=randomUUID(),id=randomUUID(),snapshot=JSON.parse(original.snapshot_json);snapshot.title=`Inventory ${i}`;snapshot.languages.en.title=`Localized inventory ${i}`;
+   db.prepare('INSERT INTO publications(id,org_id,site_id,briefing_id,version,snapshot_json,published_at,state) VALUES(?,?,?,?,?,?,?,?)').run(pub,'cedar','beirut',original.briefing_id,next+i,JSON.stringify(snapshot),new Date(Date.now()+i).toISOString(),'published');
+   db.prepare('INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,due_at,created_at,language) VALUES(?,?,?,?,?,?,?,?)').run(id,'cedar','beirut',pub,worker.principal_id,null,new Date().toISOString(),'en');added.push(id);
+  }
+  const first=await sqliteWorkspace(db,worker,'work',{pageSize:2,search:'Localized inventory',status:'active'}),second=await sqliteWorkspace(db,worker,'work',{pageSize:2,page:2,search:'Localized inventory',status:'active'});
+  assert.equal(first.total,4);assert.equal(first.items.length,2);assert.equal(second.items.length,2);assert.equal(new Set([...first.items,...second.items].map(item=>item.id)).size,4);
+  assert.ok(first.items.every(item=>item.title.startsWith('Localized inventory')&&!('snapshot_json'in item)));assert.equal(first.counts.active,5);
+  const exact=await sqliteWorkspace(db,worker,'work',{assignmentId:added[0]});assert.equal(exact.item.id,added[0]);assert.equal(exact.item.responseStatus,'waiting');assert.equal(exact.item.canComplete,false);
+  await assert.rejects(sqliteWorkspace(db,{...worker,principal_id:'worker-2'},'work',{assignmentId:added[0]}),/Assignment unavailable/);
+  await assert.rejects(sqliteWorkspace(db,worker,'work',{workerId:'worker-2'}),/Invalid work request/);
+  for(const filter of [{pageSize:51},{page:0},{status:'invented'},{search:'x'.repeat(81)},{other:true}])await assert.rejects(sqliteWorkspace(db,worker,'work',filter),/Invalid work request/);
+  assert.equal((await sqliteWorkspace(db,worker,'work',{search:'%'})).total,0);
  }finally{db.close();}
 });
 test('attachments validate bytes and become available only to the assigned worker after publication',async()=>{
@@ -69,5 +94,10 @@ test('workspace HTTP requires current session context for staff and workers',asy
  try{const base=`http://127.0.0.1:${server.address().port}/api`,response=await fetch(base+'/auth/staff/login',{method:'POST',headers:{origin:'http://127.0.0.1:3020','content-type':'application/json'},body:JSON.stringify(principalLoginBody('maya'))}),cookie=response.headers.get('set-cookie').split(';')[0];
  assert.equal((await fetch(base+'/workspace/instructions',{headers:{cookie}})).status,409);
  const session=await (await fetch(base+'/session',{headers:{cookie}})).json();const read=await fetch(base+'/workspace/instructions',{headers:{cookie,'x-client-session-context':session.clientContext}});assert.equal(read.status,200);assert.ok((await read.json()).items.length);
+ const headers={cookie,'x-client-session-context':session.clientContext};
+ const workPage=await fetch(base+'/workspace/work?workerId=worker-1&pageSize=1',{headers});assert.equal(workPage.status,200);const work=await workPage.json();assert.equal(work.items.length,1);assert.equal(work.pageSize,1);
+ const exact=await fetch(base+`/workspace/work/${work.items[0].id}?workerId=worker-1`,{headers});assert.equal(exact.status,200);assert.equal((await exact.json()).item.id,work.items[0].id);
+ for(const query of ['?workerId=worker-1&page=1&page=2','?workerId=worker-1&unknown=true','?workerId=worker-1&pageSize=1000'])assert.equal((await fetch(base+'/workspace/work'+query,{headers})).status,400);
+ assert.equal((await fetch(base+`/workspace/work/${work.items[0].id}?workerId=worker-2`,{headers})).status,404);
  }finally{await new Promise(resolve=>server.close(resolve));db.close();}
 });
