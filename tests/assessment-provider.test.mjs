@@ -160,7 +160,8 @@ test('malformed evidence and uncertain transport retry boundedly without fallbac
         for(let retry=0;retry<2;retry++){await f.db.exec("UPDATE assessment_jobs SET due_at=clock_timestamp()-interval '1 second'");await stage(f,adapter);}
         assert.equal(calls.length,3);assert.equal((await f.db.query('SELECT status FROM assessment_jobs')).rows[0].status,'failed');
         assert.equal((await f.db.query('SELECT outcome FROM attempts')).rows[0].outcome,null);
-        assert.equal((await counts(f)).checks,0);assert.equal((await counts(f)).cases,0);
+        assert.equal((await counts(f)).checks,0);assert.equal((await counts(f)).cases,1);
+        assert.equal((await f.db.query('SELECT reason FROM clarifications')).rows[0].reason,'Answer check failed');
         if(failure==='timeout')assert.equal((await f.db.query("SELECT count(*)::int n FROM provider_requests WHERE state='uncertain'")).rows[0].n,3);
       }
     }finally{await f.close();}

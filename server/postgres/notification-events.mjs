@@ -43,7 +43,14 @@ export function listWorkerNotifications(pool,session,filters={},{schema='public'
     const rows=(await client.query(`SELECT e.id,e.kind,e.object_type,e.object_id,e.created_at,r.read_at ${join} WHERE ${where}
       ${status==='unread'?'AND r.event_id IS NULL':''} ORDER BY e.created_at DESC,e.id DESC LIMIT $8 OFFSET $9`,
     [...args,pageSize,(page-1)*pageSize])).rows;
-    return {items:rows.map(row=>eventRow(row,row.kind)),total:status==='unread'?totals.unread:totals.total,unread:totals.unread,page,pageSize,asOf,since};
+    const items=[];
+    for(const row of rows){const subject=(await client.query(`SELECT a.id AS assignment_id,c.id AS case_id,p.snapshot_json->'languages'->a.language->>'title' AS instruction_title,s.name AS supervisor_name
+ FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
+ LEFT JOIN clarifications c ON c.assignment_id=a.id AND c.org_id=a.org_id
+ LEFT JOIN staff s ON s.id=c.owner_staff_id AND s.org_id=a.org_id AND s.site_id=a.site_id
+ WHERE a.org_id=$1 AND a.site_id=$2 AND a.worker_id=$3 AND
+ (($4='assignment' AND a.id=$5) OR ($6='case_message' AND EXISTS(SELECT 1 FROM case_messages m WHERE m.id=$7 AND m.case_id=c.id AND m.org_id=a.org_id AND m.site_id=a.site_id)) OR ($8='case_repeat' AND EXISTS(SELECT 1 FROM case_repeats cr WHERE cr.id=$9 AND cr.case_id=c.id AND cr.org_id=a.org_id AND cr.site_id=a.site_id))) LIMIT 1`,[session.org_id,session.site_id,session.principal_id,row.object_type,row.object_id,row.object_type,row.object_id,row.object_type,row.object_id])).rows[0];items.push({...eventRow(row,row.kind),...(subject?{assignmentId:subject.assignment_id,caseId:row.object_type==='assignment'?null:subject.case_id||null,title:subject.instruction_title||null,supervisorName:subject.supervisor_name||null}:{})});}
+    return {items,total:status==='unread'?totals.unread:totals.total,unread:totals.unread,page,pageSize,asOf,since};
   });
 }
 

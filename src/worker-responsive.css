@@ -1,0 +1,61 @@
+/* Last in the worker cascade: stable touch targets and layouts at small widths. */
+.worker-navigation-shell .worker-content .icon-button,
+.worker-navigation-shell .worker-language-dialog .icon-button { min-width:44px; min-height:44px; }
+.worker-navigation-shell .worker-content input:not([type=radio]):not([type=checkbox]),
+.worker-navigation-shell .worker-content textarea,
+.worker-navigation-shell .worker-language-dialog textarea { font-size:16px; }
+.worker-navigation-shell .worker-bottom-nav>div { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.worker-navigation-shell .worker-bottom-nav button span { overflow-wrap:anywhere; text-wrap:balance; line-height:1.3; max-width:100%; }
+.worker-account-menu { display:none; position:relative; flex-shrink:0; }
+.worker-account-menu>summary { display:grid; place-items:center; width:44px; height:44px; list-style:none; cursor:pointer; }
+.worker-account-menu>summary::-webkit-details-marker { display:none; }
+.worker-account-options { position:absolute; inset-inline-end:0; top:calc(100% + 7px); min-width:240px; max-width:calc(100vw - 32px); z-index:40; background:#fff; border:1px solid #cbdacf; border-radius:10px; padding:7px; box-shadow:0 8px 24px rgb(19 52 39 / 12%); }
+@media (max-width:700px) and (prefers-reduced-motion:no-preference) {
+ .worker-account-menu[open]>.worker-account-options { animation:worker-account-menu-enter 160ms ease-out; }
+}
+@keyframes worker-account-menu-enter {
+ from { opacity:0; transform:translateY(-5px); }
+}
+.worker-account-options>.icon-button { width:100%; min-height:48px; display:flex; align-items:center; justify-content:flex-start; gap:12px; padding:10px 12px; border-radius:6px; font-size:14px; text-align:start; }
+.worker-account-options .worker-header-action-label { display:inline; white-space:normal; }
+.worker-account-options>.icon-button:hover { background:#f0f4ef; }
+.worker-language-dialog[open]:has(.worker-language-form) { display:flex; flex-direction:column; height:min(720px,calc(100dvh - 24px)); max-height:calc(100dvh - 24px); overflow:hidden; }
+.worker-language-dialog>.withdraw-heading,.worker-language-dialog>p { flex-shrink:0; }
+.worker-language-dialog .worker-language-form { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
+.worker-language-fields { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; padding:0 5px 16px; scrollbar-gutter:stable; }
+.worker-language-dialog .worker-language-actions { flex-shrink:0; margin:0; padding:14px 0 0; border-top:1px solid #dbe5df; background:#fff; }
+.worker-language-actions .button { min-height:44px; white-space:normal; height:auto; }
+@media(max-width:700px) {
+ .worker-navigation-shell .worker-bottom-nav { padding:7px 8px calc(7px + env(safe-area-inset-bottom,0px)); }
+ .worker-navigation-shell .worker-bottom-nav>div { gap:4px; }
+ .worker-navigation-shell .worker-bottom-nav button { padding:7px 3px; font-size:12px; gap:5px; }
+ .worker-account-menu { display:block; }
+ .worker-navigation-shell .worker-content { padding-bottom:calc(96px + env(safe-area-inset-bottom,0px)); }
+ .worker-navigation-shell .worker-journey-trail li { font-size:13px; }
+ .worker-language-dialog .worker-language-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+ .worker-language-dialog .worker-language-actions .button { padding:10px; }
+}
+@media(max-width:380px) {
+ .worker-navigation-shell .worker-journey-trail { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 10px; }
+ .worker-navigation-shell .worker-journey-trail li { flex-direction:row; align-items:center; gap:8px; }
+ .worker-navigation-shell .worker-journey-trail li>span { flex-shrink:0; }
+ .worker-navigation-shell .worker-journey-trail li:after { display:none; }
+}
+@media(max-height:500px) and (orientation:landscape) {
+ .worker-navigation-shell .worker-bottom-nav { padding-block:3px calc(3px + env(safe-area-inset-bottom,0px)); }
+ .worker-navigation-shell .worker-bottom-nav button { flex-direction:row; min-height:44px; gap:6px; padding-block:5px; }
+ .worker-navigation-shell .worker-bottom-nav svg { width:19px; height:19px; flex-shrink:0; }
+ .worker-navigation-shell .worker-content { padding-top:20px; padding-bottom:70px; }
+ .worker-language-dialog[open]:has(.worker-language-form) { padding:12px 16px; }
+ .worker-language-dialog .withdraw-heading h2 { margin-block:0; font-size:20px; }
+ .worker-language-dialog>p { margin-block:6px; }
+ .worker-language-dialog .worker-language-actions { padding-top:8px; }
+}
+
+@media(min-width:701px) {
+ .worker-account-menu { display:block; }
+ .worker-account-menu>summary { display:none; }
+ .worker-account-options { display:flex; position:static; min-width:0; max-width:none; border:0; padding:0; box-shadow:none; background:transparent; gap:4px; }
+ .worker-account-options>.icon-button { width:auto; min-width:44px; min-height:44px; padding:9px; white-space:nowrap; font-size:13px; }
+}
+@media(min-width:701px) and (max-width:1000px) { .worker-account-options .worker-header-action-label { display:none; } }

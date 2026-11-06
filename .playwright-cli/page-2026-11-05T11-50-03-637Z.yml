@@ -1,0 +1,56 @@
+- generic [ref=e21]:
+  - link "Skip to main content" [ref=e22] [cursor=pointer]:
+    - /url: "#worker-main"
+  - banner [ref=e23]:
+    - generic [ref=e24]:
+      - img "Understood" [ref=e26]
+      - generic [ref=e28]: Cedar Works · Beirut site
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - strong [ref=e31]: Rana Khoury
+        - generic [ref=e32]: EN
+      - button "Notifications" [ref=e33] [cursor=pointer]
+      - group [ref=e37]:
+        - generic "More" [ref=e38] [cursor=pointer]
+  - main [ref=e43]:
+    - button "Back" [ref=e44] [cursor=pointer]
+    - button "Refresh instruction" [ref=e47] [cursor=pointer]
+    - heading "Delivery shelf check" [level=1] [ref=e149]
+    - paragraph [ref=e150]: Instruction v1
+    - region "Your progress" [ref=e53]:
+      - generic [ref=e54]:
+        - heading "Your progress" [level=2] [ref=e55]
+        - status [ref=e56]: Follow-up needed
+      - list [ref=e57]:
+        - listitem [ref=e58]:
+          - strong [ref=e62]: Assigned
+        - listitem [ref=e63]:
+          - generic [aria-hidden] [ref=e64]: "2"
+          - strong [ref=e65]: Answer check
+        - listitem [ref=e66]:
+          - generic [aria-hidden] [ref=e67]: "3"
+          - strong [ref=e68]: Working
+        - listitem [ref=e69]:
+          - generic [aria-hidden] [ref=e70]: "4"
+          - strong [ref=e71]: Done
+    - generic [ref=e151]:
+      - heading "Read the instruction" [level=2] [ref=e152]
+      - paragraph [ref=e153]: Put finished items on the blue shelf. Put unfinished items on the yellow shelf. Leave the walkway clear.
+    - generic [ref=e154]:
+      - generic [ref=e155]: Your turn
+      - heading "Where will you put finished and unfinished items?" [level=2] [ref=e159]
+      - generic [ref=e160]: Needs clarification
+      - button "I need help" [ref=e162] [cursor=pointer]
+    - group [ref=e165]:
+      - generic "Ask your supervisor for help" [ref=e166] [cursor=pointer]
+    - group [ref=e118]:
+      - generic "Saved work and offline access" [ref=e119] [cursor=pointer]
+    - group [ref=e122]:
+      - generic "Answers and conversations" [ref=e123] [cursor=pointer]
+    - status [ref=e175]: Saved.
+  - navigation "Worker navigation" [ref=e127]:
+    - generic [ref=e128]:
+      - button "Instructions" [ref=e129] [cursor=pointer]
+      - button "My crew" [ref=e134] [cursor=pointer]
+      - button "Help" [ref=e140] [cursor=pointer]
+      - button "Device" [ref=e145] [cursor=pointer]

@@ -1,6 +1,8 @@
-import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {ArrowLeft,ArrowRight,Check,CheckCircle2,Clock3,Globe2,KeyRound,LogIn,Mail,RefreshCw,ShieldCheck} from 'lucide-react';
+import {useEffect,useMemo,useRef,useState,type FormEvent} from 'react';
+import {ArrowLeft,ArrowRight,Check,CheckCircle2,Clock3,LogIn,Mail,RefreshCw,ShieldCheck} from 'lucide-react';
 import {countryOptions} from './country-options';
+import {AuthLanguagePicker} from './AuthLanguagePicker';
+import {staffSignInLanguages,staffSignInText} from './staff-signin-text';
 import {acceptedRegistrationReceipt,clearRegistrationReceipt,checkedVerification,readRegistrationReceipt,requestAccount,resendAccount,RegistrationError,saveRegistrationReceipt,verifyAccount,verifyAccountCode,normalizeVerificationCode,registrationOptions,type RegistrationReceipt} from './registration';
 
 export type RegistrationLanguage='en'|'ar';
@@ -10,14 +12,15 @@ const en={
   verifyEyebrow:'Email verification',verifyIntro:'Enter the six-digit code for',verifyHint:'Paste the code from your most recent email.',verifyTrialNote:'Your pilot starts after approval and activation.',verifyDifferent:'Use a different email',verifyMissing:'Didn’t receive an email?',verifyPrivacy:'Already registered? Sign in instead.',
   codeExpired:'This code has expired. Request a new code below.',codeLimited:'Too many attempts. Wait a few minutes before trying again.',codeService:'The verification service is temporarily unavailable. Please try again shortly.',
   codeLabel:'Verification code',codeHint:'Enter the six-digit code from your email. Codes expire; use the latest code or request another.',codeSent:'If this registration is eligible, a verification code has been requested for',codeResend:'Request another code',codeResent:'If this registration is still pending, a new code has been requested.',codeError:'The code could not be verified. Check the latest code and try again.',codeUnavailable:'Email verification is not configured or could not be checked. Please try again later.',codeNote:'Verify your email to prepare your pilot workspace.',checkingVerification:'Checking email verification…',retryVerification:'Check again',
-  kicker:'Company pilot',title:'Start using Understood',
-  lead:'Prepare your company workspace and verify your work email. Your guided pilot covers one site and up to 25 workers for 30 days after approval and activation.',
+  kicker:'Company pilot',title:'Set up your company workspace',
+  lead:'Enter your details and verify your work email to prepare for your pilot.',
   trial:['30 days from approved activation','Up to 25 active workers','One site · no automatic charge'],
+  accountDetails:'Your account',companyDetails:'Company details',
   ownerName:'Full name',email:'Work email',password:'Password',passwordHint:'Use 12 to 256 characters. You can reset it from the sign-in page.',
   confirmPassword:'Confirm password',company:'Company name',country:'Operating country',selectCountry:'Select a country',
   phone:'Business phone (optional)',phoneHint:'For account follow-up only. Adding it never sends a message.',
   terms:'I agree to the Terms of Service and acknowledge the Privacy Notice.',
-  submit:'Prepare pilot account',submitting:'Preparing account...',signIn:'Already have an account? Sign in',back:'Back to Understood',
+  submit:'Prepare pilot account',submitting:'Preparing account...',signIn:'Already have an account? Sign in',back:'Back to Understood',languageNote:'Choose the language for this signup screen.',
   deliveryNote:'Email verification prepares your account; pilot access requires approval.',
   signedInTitle:'You are already signed in',signedInBody:'Registration creates a separate workspace. Sign out first if you need another account.',continue:'Continue to my workspace',
   unavailableEnvironment:'Online account creation is unavailable',unavailableEnvironmentBody:'This environment does not accept online registrations. Use an existing account, or open the public site for a pilot inquiry.',
@@ -36,14 +39,15 @@ const ar={
   verifyEyebrow:'تأكيد البريد الإلكتروني',verifyIntro:'أدخل الرمز المكوّن من ستة أرقام للبريد',verifyHint:'الصق الرمز من أحدث رسالة وصلتك.',verifyTrialNote:'يبدأ البرنامج التجريبي بعد الموافقة والتفعيل.',verifyDifferent:'استخدام بريد مختلف',verifyMissing:'لم تصلك رسالة؟',verifyPrivacy:'لديك حساب؟ سجّل الدخول بدلاً من ذلك.',
   codeExpired:'انتهت صلاحية هذا الرمز. اطلب رمزاً جديداً أدناه.',codeLimited:'محاولات كثيرة. انتظر بضع دقائق قبل المحاولة مجدداً.',codeService:'خدمة التحقق غير متاحة مؤقتاً. حاول مجدداً بعد قليل.',
   codeLabel:'رمز التحقق',codeHint:'أدخل الرمز المكوّن من ستة أرقام من بريدك. تنتهي صلاحية الرموز؛ استخدم أحدث رمز أو اطلب رمزاً آخر.',codeSent:'إذا كان التسجيل مؤهلاً، فقد طُلب إرسال رمز تحقق إلى',codeResend:'طلب رمز آخر',codeResent:'إذا كان التسجيل ما زال معلقاً، فقد طُلب رمز جديد.',codeError:'تعذّر التحقق من الرمز. راجع أحدث رمز وحاول مجدداً.',codeUnavailable:'التحقق من البريد غير مضبوط أو تعذّر فحصه. حاول لاحقاً.',codeNote:'تحقق من البريد لتجهيز حساب البرنامج التجريبي.',checkingVerification:'جارٍ فحص التحقق من البريد…',retryVerification:'إعادة الفحص',
-  kicker:'برنامج تجريبي للشركة',title:'ابدأ استخدام Understood',
-  lead:'جهّز مساحة عمل شركتك وتحقق من بريد العمل. يشمل البرنامج التجريبي موقعاً واحداً وحتى 25 عاملاً لمدة 30 يوماً بعد الموافقة والتفعيل.',
+  kicker:'برنامج تجريبي للشركة',title:'جهّز مساحة عمل شركتك',
+  lead:'أدخل بياناتك وتحقق من بريد العمل للاستعداد للبرنامج التجريبي.',
   trial:['30 يوماً من التفعيل بعد الموافقة','حتى 25 عاملاً نشطاً','موقع واحد · دون خصم تلقائي'],
+  accountDetails:'حسابك',companyDetails:'بيانات الشركة',
   ownerName:'الاسم الكامل',email:'بريد العمل',password:'كلمة المرور',passwordHint:'استخدم من 12 إلى 256 حرفاً. يمكنك إعادة تعيينها من صفحة تسجيل الدخول.',
   confirmPassword:'تأكيد كلمة المرور',company:'اسم الشركة',country:'بلد التشغيل',selectCountry:'اختر بلداً',
   phone:'هاتف العمل (اختياري)',phoneHint:'للمتابعة المتعلقة بالحساب فقط. إضافته لا ترسل أي رسالة.',
   terms:'أوافق على شروط الخدمة وأقرّ بإشعار الخصوصية.',
-  submit:'تجهيز حساب البرنامج التجريبي',submitting:'جارٍ تجهيز الحساب...',signIn:'لديك حساب بالفعل؟ سجّل الدخول',back:'العودة إلى Understood',
+  submit:'تجهيز حساب البرنامج التجريبي',submitting:'جارٍ تجهيز الحساب...',signIn:'لديك حساب بالفعل؟ سجّل الدخول',back:'العودة إلى Understood',languageNote:'اختر لغة شاشة التسجيل.',
   deliveryNote:'التحقق من البريد يجهّز الحساب؛ الوصول للبرنامج التجريبي يتطلب الموافقة.',
   signedInTitle:'أنت مسجّل الدخول بالفعل',signedInBody:'ينشئ التسجيل مساحة عمل منفصلة. سجّل الخروج أولاً إذا كنت تحتاج إلى حساب آخر.',continue:'المتابعة إلى مساحة عملي',
   unavailableEnvironment:'التسجيل عبر الإنترنت غير متاح',unavailableEnvironmentBody:'لا تقبل هذه البيئة التسجيلات عبر الإنترنت. استخدم حساباً موجوداً، أو افتح الموقع العام لتقديم طلب تجريبي.',
@@ -59,19 +63,23 @@ const ar={
   uncertainTitle:'لم يتم تأكيد التحقق',uncertainBody:'تعذّر تأكيد النتيجة. أعد محاولة الرابط نفسه قبل تسجيل الدخول.',retryVerify:'إعادة محاولة التحقق',signInShort:'تسجيل الدخول',
 } satisfies {[K in keyof typeof en]:typeof en[K]};
 const copy:Record<RegistrationLanguage,typeof en>={en,ar};
+const registrationLanguages=staffSignInLanguages.filter(option=>option.code!=='ur');
 
-function countryLabel(code:string,fallback:string,language:RegistrationLanguage) {
-  try {return new Intl.DisplayNames([language],{type:'region'}).of(code) || fallback;} catch {return fallback;}
-}
 function LanguageSwitch({language,onLanguage,disabled}:{language:RegistrationLanguage;onLanguage:(value:RegistrationLanguage)=>void;disabled?:boolean}) {
   return <div className="segmented-control registration-languages" role="group" aria-label="Language"><button type="button" aria-pressed={language==='en'} disabled={disabled} onClick={()=>onLanguage('en')}>English</button><button type="button" aria-pressed={language==='ar'} disabled={disabled} onClick={()=>onLanguage('ar')}>العربية</button></div>;
 }
 function TrialPoints({text}:{text:readonly string[]}) {
-  return <ul className="registration-trial">{text.map(value=><li key={value}><Check size={17}/>{value}</li>)}</ul>;
+  return <ul className="registration-trial">{text.map(value=><li key={value}><Check size={17} aria-hidden="true"/>{value}</li>)}</ul>;
 }
 
 export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWorkspace,authenticated,available}:{language:RegistrationLanguage;onLanguage:(value:RegistrationLanguage)=>void;onBack:()=>void;onSignIn:()=>void;onOpenWorkspace:()=>void;authenticated:boolean;available:boolean}) {
   const t=copy[language],heading=useRef<HTMLHeadingElement>(null),sending=useRef(false);
+  const Back=language==='ar'?ArrowRight:ArrowLeft,Forward=language==='ar'?ArrowLeft:ArrowRight;
+  const countries=useMemo(()=>{
+    let names:Intl.DisplayNames|undefined;
+    try {names=new Intl.DisplayNames([language],{type:'region'});} catch {}
+    return countryOptions.map(([code,name])=>({code,label:names?.of(code)||name})).sort((a,b)=>a.label.localeCompare(b.label,language));
+  },[language]);
   const [receipt,setReceipt]=useState<RegistrationReceipt|null>(null),[pending,setPending]=useState<{receipt:RegistrationReceipt;body:AccountBody}|null>(null);
   const [ownerName,setOwnerName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');
   const [company,setCompany]=useState(''),[country,setCountry]=useState(''),[phone,setPhone]=useState(''),[terms,setTerms]=useState(false);
@@ -133,17 +141,23 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
     try {clearRegistrationReceipt(sessionStorage);} catch {setStorageError(true);}
     setReceipt(null);setPending(null);setCode('');setCodeComplete(false);setError('');setNotice('');setPassword('');setConfirmPassword('');setTerms(false);
   }
+  const header=<>
+    <div className="registration-top">
+      <button type="button" className="button subtle" onClick={onBack}><Back size={17} aria-hidden="true"/>{t.back}</button>
+    </div>
+    <AuthLanguagePicker label={staffSignInText[language].language} note={t.languageNote} name="registration-language" value={language} options={registrationLanguages} disabled={busy} onChange={onLanguage}/>
+  </>;
   if(authenticated) return <section className="registration-page" lang={language} dir={language==='ar'?'rtl':'ltr'}>
-    <div className="registration-top"><button type="button" className="button subtle" onClick={onBack}><ArrowLeft size={18}/>{t.back}</button><LanguageSwitch language={language} onLanguage={onLanguage}/></div>
+    {header}
     <div className="registration-intro"><span className="public-kicker">{t.kicker}</span><h1>{t.signedInTitle}</h1><p>{t.signedInBody}</p></div>
     <div className="actions"><button type="button" className="button primary" onClick={onOpenWorkspace}><ArrowRight size={18}/>{t.continue}</button></div>
   </section>;
   if(!available && !authenticated) return <section className="registration-page" lang={language} dir={language==='ar'?'rtl':'ltr'}>
-    <div className="registration-top"><button type="button" className="button subtle" onClick={onBack}><ArrowLeft size={18}/>{t.back}</button><LanguageSwitch language={language} onLanguage={onLanguage}/></div>
+    {header}
     <div className="registration-sent"><div className="registration-icon"><ShieldCheck size={30}/></div><h1>{t.unavailableEnvironment}</h1><p>{t.unavailableEnvironmentBody}</p><div className="actions"><button type="button" className="button outline" onClick={onSignIn}><LogIn size={18}/>{t.signInShort}</button><a className="button subtle" href="#pilot">{t.back}</a></div></div>
   </section>;
-  return <section className="registration-page" lang={language} dir={language==='ar'?'rtl':'ltr'}>
-    <div className="registration-top"><button type="button" className="button subtle" onClick={onBack}><ArrowLeft size={18}/>{t.back}</button><LanguageSwitch language={language} onLanguage={onLanguage} disabled={busy}/></div>
+  return <section className={`registration-page${!receipt&&!codeComplete?' registration-start':''}`} lang={language} dir={language==='ar'?'rtl':'ltr'}>
+    {header}
     {codeComplete?<div className="registration-sent"><div className="registration-icon"><CheckCircle2 size={30}/></div><h1 ref={heading} tabIndex={-1}>{t.verifiedTitle}</h1><p role="status">{t.verifiedLead}</p><p>{t.verifiedDuplicatePolicy}</p><button type="button" className="button primary" onClick={onSignIn}>{t.openSignIn}</button></div>:receipt?.state==='accepted'&&receipt.verification==='neon-code'?<div className="registration-sent registration-verification">
       <div className="verification-heading"><Mail size={22} aria-hidden="true"/><span>{t.verifyEyebrow}</span></div>
       <h1 ref={heading} tabIndex={-1}>{t.sentTitle}</h1>
@@ -178,24 +192,40 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
       </div>
       <button type="button" className="text-link" disabled={busy} onClick={onSignIn}>{t.signIn}<ArrowRight size={16}/></button>
     </div> : <div className="registration-layout">
-      <div className="registration-intro"><span className="public-kicker">{t.kicker}</span><h1>{t.title}</h1><p>{t.lead}</p><TrialPoints text={t.trial}/><div className="registration-assurance"><ShieldCheck size={22}/><span>{language==='ar'?'تحقق البريد يمنع إنشاء حسابات ببريد لا تملكه.':'Email verification prevents accounts being created for an address you do not control.'}</span></div></div>
+      <header className="registration-intro"><span className="public-kicker">{t.kicker}</span><h1>{t.title}</h1><p>{t.lead}</p><TrialPoints text={t.trial}/></header>
       <form className="registration-form" onSubmit={submit}>
-        <label className="field">{t.ownerName}<input required minLength={2} maxLength={100} autoComplete="name" value={ownerName} disabled={busy} onChange={event=>setOwnerName(event.target.value)}/></label>
-        <label className="field">{t.email}<input required type="email" maxLength={254} autoComplete="email" value={email} disabled={busy} onChange={event=>setEmail(event.target.value)}/></label>
-        <label className="field">{t.password}<input required type="password" minLength={12} maxLength={256} autoComplete="new-password" value={password} disabled={busy} onChange={event=>setPassword(event.target.value)}/></label>
-        <p className="field-hint">{t.passwordHint}</p>
-        <label className="field">{t.confirmPassword}<input required type="password" minLength={12} maxLength={256} autoComplete="new-password" value={confirmPassword} disabled={busy} onChange={event=>setConfirmPassword(event.target.value)}/></label>
-        <label className="field">{t.company}<input required minLength={2} maxLength={120} autoComplete="organization" value={company} disabled={busy} onChange={event=>setCompany(event.target.value)}/></label>
-        <label className="field">{t.country}<select required value={country} disabled={busy} onChange={event=>setCountry(event.target.value)}><option value="">{t.selectCountry}</option>{[...countryOptions].sort((a,b)=>countryLabel(a[0],a[1],language).localeCompare(countryLabel(b[0],b[1],language),language)).map(([code,name])=><option key={code} value={code}>{countryLabel(code,name,language)}</option>)}</select></label>
-        <label className="field">{t.phone}<input type="tel" maxLength={30} autoComplete="tel" value={phone} disabled={busy} onChange={event=>setPhone(event.target.value)}/></label>
-        <p className="field-hint">{t.phoneHint}</p>
-        <label className="billing-confirm registration-terms"><input type="checkbox" required checked={terms} disabled={busy} onChange={event=>setTerms(event.target.checked)}/><span>{t.terms}</span></label>
-        {error && <p role="alert" className="public-error">{error}</p>}
-        <button className="button primary full" type="submit" disabled={busy || !terms || verificationReady!==true}><KeyRound size={18}/>{busy?t.submitting:t.submit}</button>
-        <button type="button" className="text-link" disabled={busy} onClick={onSignIn}><LogIn size={16}/>{t.signIn}</button>
-        {verificationReady===true&&<p className="registration-environment"><Mail size={16}/>{method==='neon-code'?t.codeNote:t.deliveryNote}</p>}
-        {verificationReady===null&&<p role="status" className="registration-environment">{t.checkingVerification}</p>}
-        {verificationReady===false&&<div><p role="status" className="public-error">{t.codeUnavailable}</p><button type="button" className="text-link" onClick={()=>setVerificationCheck(value=>value+1)}><RefreshCw size={16}/>{t.retryVerification}</button></div>}
+        <fieldset className="registration-group">
+          <legend>{t.accountDetails}</legend>
+          <div className="registration-fields">
+            <label className="field">{t.ownerName}<input name="name" required minLength={2} maxLength={100} autoComplete="name" dir="auto" value={ownerName} disabled={busy} onChange={event=>setOwnerName(event.target.value)}/></label>
+            <label className="field">{t.email}<input name="email" required type="email" maxLength={254} autoComplete="email" dir="ltr" value={email} disabled={busy} onChange={event=>setEmail(event.target.value)}/></label>
+            <div className="registration-field-with-hint">
+              <label className="field">{t.password}<input name="password" required type="password" minLength={12} maxLength={256} autoComplete="new-password" aria-describedby="registration-password-hint" dir="ltr" value={password} disabled={busy} onChange={event=>setPassword(event.target.value)}/></label>
+              <p id="registration-password-hint" className="field-hint">{t.passwordHint}</p>
+            </div>
+            <label className="field">{t.confirmPassword}<input name="confirmPassword" required type="password" minLength={12} maxLength={256} autoComplete="new-password" dir="ltr" value={confirmPassword} disabled={busy} onChange={event=>setConfirmPassword(event.target.value)}/></label>
+          </div>
+        </fieldset>
+        <fieldset className="registration-group">
+          <legend>{t.companyDetails}</legend>
+          <div className="registration-fields">
+            <label className="field registration-field-wide">{t.company}<input name="organization" required minLength={2} maxLength={120} autoComplete="organization" dir="auto" value={company} disabled={busy} onChange={event=>setCompany(event.target.value)}/></label>
+            <label className="field">{t.country}<select name="country" autoComplete="country" required value={country} disabled={busy} onChange={event=>setCountry(event.target.value)}><option value="">{t.selectCountry}</option>{countries.map(({code,label})=><option key={code} value={code}>{label}</option>)}</select></label>
+            <div className="registration-field-with-hint">
+              <label className="field">{t.phone}<input name="phone" type="tel" maxLength={30} autoComplete="tel" aria-describedby="registration-phone-hint" dir="ltr" value={phone} disabled={busy} onChange={event=>setPhone(event.target.value)}/></label>
+              <p id="registration-phone-hint" className="field-hint">{t.phoneHint}</p>
+            </div>
+          </div>
+        </fieldset>
+        <div className="registration-submit">
+          <label className="billing-confirm registration-terms"><input type="checkbox" required checked={terms} disabled={busy} onChange={event=>setTerms(event.target.checked)}/><span>{t.terms}</span></label>
+          {error&&<p role="alert" className="public-error">{error}</p>}
+          {verificationReady===null&&<p role="status" className="registration-environment">{t.checkingVerification}</p>}
+          {verificationReady===false&&<div className="registration-unavailable"><p role="status" className="public-error">{t.codeUnavailable}</p><button type="button" className="text-link" onClick={()=>setVerificationCheck(value=>value+1)}><RefreshCw size={16} aria-hidden="true"/>{t.retryVerification}</button></div>}
+          <button className="button primary full" type="submit" disabled={busy || !terms || verificationReady!==true}>{busy?t.submitting:t.submit}<Forward size={18} aria-hidden="true"/></button>
+          {verificationReady===true&&<p className="registration-environment"><Mail size={16} aria-hidden="true"/>{method==='neon-code'?t.codeNote:t.deliveryNote}</p>}
+        </div>
+        <button type="button" className="text-link registration-signin" disabled={busy} onClick={onSignIn}>{t.signIn}</button>
       </form>
     </div>}
   </section>;

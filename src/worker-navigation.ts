@@ -17,7 +17,7 @@ export const workerNavigationText={
   id:{navigation:'Navigasi pekerja',briefings:'Instruksi',help:'Bantuan',device:'Perangkat',helpTitle:'Minta bantuan kepada pengawas Anda',currentBriefings:'Instruksi saat ini',ask:'Tanyakan tentang instruksi ini',followup:'Percakapan lanjutan',urgent:'Untuk bantuan mendesak, bicaralah langsung dengan pengawas Anda.',empty:'Tidak ada instruksi saat ini. Hubungi pengawas Anda secara langsung.',needHelp:'Butuh bantuan?',contact:'Hubungi pengawas Anda.',listFailed:'Instruksi Anda tidak dapat dimuat. Periksa koneksi dan coba muat ulang.',detailFailed:'Instruksi ini tidak dapat dimuat. Muat ulang atau hubungi pengawas Anda.',loading:'Memuat instruksi...',version:'Instruksi',openHelp:'Buka bantuan'},
 };
 export function workerInboxPath(view:string,tab:WorkerInboxTab,page:number){
-  if(view==='device' || view==='notifications' || view.startsWith('worker/'))return null;
+  if(view==='crew' || view==='device' || view==='notifications' || view.startsWith('worker/'))return null;
   if(!Number.isInteger(page) || page<1 || page>5000)throw Error('Invalid worker inbox page');
   const help=view==='help',history=!help && tab==='history';
   const filter=help || history?'all':tab==='todo'?'todo':tab==='completed'?'sent':'followup';

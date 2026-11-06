@@ -1,3 +1,4 @@
+import {EVIDENCE_MAX_JSON_BYTES} from '../evidence-policy.mjs';
 import {requiredWorkerCreation} from '../people.mjs';
 import {crewMembershipHttpError} from '../people.mjs';
 import {notificationLiveQuery} from '../neon-realtime.mjs';
@@ -135,7 +136,7 @@ unavailable.add('Company not found');
 const invoiceConflicts=['Invoice void request conflict','Invoice details changed','Invoice is voided','Only unpaid invoices can be voided'];
 const conflicts = new Set(['Invoice request conflict','Payment request conflict','Invoice number or request already exists','Payment exceeds outstanding balance','Briefing is archived','Briefing archive request conflict','Draft revision changed','Draft request conflict','Draft copy request conflict','Publication request conflict','Submission ID conflict',
   'Withdrawal request conflict','Publication is no longer current','Crew name changed','Crew is archived','Worker code changed','Worker ID already in use','Reactivation request conflict',
-  'Draft cannot be processed now','Recording storage still in progress','Recording unavailable; use a new recording','Assignment deadline passed','Directory entry already exists','Help request conflict','Resolution conflict',
+  'Draft cannot be processed now','Recording storage still in progress','Recording unavailable; use a new recording','Assignment deadline passed','Another answer requires an approved repeat','Directory entry already exists','Help request conflict','Resolution conflict',
   'Import request ID conflict','Import expired','Fix CSV errors before importing','Export request ID conflict','Export cannot be retried','Export expired','Export is not ready']);
 for(const message of invoiceConflicts) conflicts.add(message);
 conflicts.add('Session context changed');
@@ -987,7 +988,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if (assignment) {
         const [,id,action]=assignment;
         if(action==='acknowledge' && req.method==='POST') {
-          const body=await readJson(req,7*1024*1024),result=await acknowledgeAssignment(pool,session,id,body.requestId,{...repository,photo:body.photo});
+          const body=await readJson(req,EVIDENCE_MAX_JSON_BYTES),result=await acknowledgeAssignment(pool,session,id,body.requestId,{...repository,photo:body.photo});
           return send(res,result.duplicate?200:201,{...result,assignmentId:id,requestId:body.requestId,clientContext:clientSessionContext(session).clientContext});
         }
         if(action==='evidence' && req.method==='GET') {

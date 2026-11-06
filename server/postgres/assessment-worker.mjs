@@ -23,6 +23,18 @@ export function validatedAssessment(value,answer,askedFacts) {
   return {outcome:value.outcome,reasons:value.reasons,evidence:value.evidence.map(({factIndex,quote}) => ({factIndex,quote}))};
 }
 
+async function routeFailedAssessment(pool,job,schema){
+ await domainTransaction(pool,schema,async client=>{
+  await client.query('SELECT id FROM assignments WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',[job.assignment_id,job.org_id,job.site_id]);
+  const failed=(await client.query("SELECT 1 FROM assessment_jobs WHERE id=$1 AND status IN ('failed','blocked')",[job.id])).rows.length;
+  if(!failed)return;
+  const existing=(await client.query("SELECT id FROM clarifications WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 AND status='open' LIMIT 1",[job.assignment_id,job.org_id,job.site_id])).rows[0];
+  const caseId=existing?.id??randomUUID();
+  if(!existing){await client.query("INSERT INTO clarifications(id,org_id,site_id,assignment_id,attempt_id,reason,status) VALUES($1,$2,$3,$4,$5,'Answer check failed','open')",[caseId,job.org_id,job.site_id,job.assignment_id,job.attempt_id]);await routeNewCase(client,job.org_id,job.site_id,caseId);}
+  await staffAuditOnce(client,{orgId:job.org_id,siteId:job.site_id,action:'answer.needs_attention',objectId:caseId});
+ });
+}
+
 export async function processOneAssessment(pool,adapter,{schema='public'}={}) {
   if (typeof adapter?.assess!=='function') throw new Error('Assessment adapter unavailable');
   const job = await domainTransaction(pool,schema,async (client) => {
@@ -40,7 +52,7 @@ export async function processOneAssessment(pool,adapter,{schema='public'}={}) {
     return {...row,attempts:row.attempts+1,token};
   });
   if (!job) return false;
-  if (job.exhausted) return true;
+  if (job.exhausted){await routeFailedAssessment(pool,job,schema);return true;}
   try {
     const input = await domainTransaction(pool,schema,client=>currentAssessmentClaim(client,job));
     if (!input) {
@@ -101,5 +113,6 @@ export async function processOneAssessment(pool,adapter,{schema='public'}={}) {
       due_at=clock_timestamp()+$4*interval '15 seconds',error='Answer assessment failed'
       WHERE id=$1 AND status='processing' AND lease_token=$2 AND lease_until>clock_timestamp()`,[job.id,job.token,job.attempts>=3 ? 'failed' : 'queued',job.attempts]));
   }
+  if(job.attempts>=3)await routeFailedAssessment(pool,job,schema);
   return true;
 }

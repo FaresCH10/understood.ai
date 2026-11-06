@@ -1,3 +1,4 @@
+import {withdrawPublication} from '../server/domain.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -10,7 +11,7 @@ import {processOne} from '../server/worker.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {sqliteApp,openPrincipalSession,principalLoginBody} from './helpers/sqlite-app.mjs';
 import {listNotifications,readNotification,notificationReceipt} from '../server/notifications.mjs';
-import {resolveClarification,requestHelp} from '../server/clarifications.mjs';
+import {ensureClarificationSchema,resolveClarification,requestHelp} from '../server/clarifications.mjs';
 const staff={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const worker={principal_type:'worker',principal_id:'worker-1',org_id:'cedar',site_id:'beirut'};
 const content={title:'Delivery check',source:'Please check the delivery count.',audience:{type:'all'},responseMode:'question',deliveryMode:'text'};
@@ -20,7 +21,7 @@ test('resolved assessment follow-up releases work without rewriting its assessme
  try{
   const read=async()=> (await sqliteWorkspace(db,session,'work',{assignmentId:id})).item;
   assert.equal((await read()).status,'follow-up');
-  resolveClarification(db,staff,'clarification-14',{notes:'Explained the instruction and confirmed understanding in person.'});
+  resolveClarification(db,staff,'clarification-14',{notes:'[Understood:ready]\nExplained the instruction and confirmed understanding in person.'});
   assert.equal((await read()).status,'in-progress');assert.equal((await read()).canComplete,true);
   assert.equal(db.prepare("SELECT outcome FROM attempts WHERE id='attempt-14'").get().outcome,'clarification');
   const help=requestHelp(db,session,id,{requestId:randomUUID(),text:'The equipment is missing.'});
@@ -132,4 +133,24 @@ test('workspace HTTP requires current session context for staff and workers',asy
  for(const query of ['?workerId=worker-1&page=1&page=2','?workerId=worker-1&unknown=true','?workerId=worker-1&pageSize=1000'])assert.equal((await fetch(base+'/workspace/work'+query,{headers})).status,400);
  assert.equal((await fetch(base+`/workspace/work/${work.items[0].id}?workerId=worker-2`,{headers})).status,404);
  }finally{await new Promise(resolve=>server.close(resolve));db.close();}
+});
+
+
+test('closing follow-up without explicit readiness cannot release failed understanding',async()=>{
+ const db=fixture(),session={...worker,principal_id:'worker-14'};try{
+  ensureClarificationSchema(db);
+  const c=db.prepare("SELECT id FROM clarifications WHERE assignment_id='assignment-14' LIMIT 1").get();
+  resolveClarification(db,staff,c.id,{notes:'Conversation closed without a readiness decision.'});
+  assert.equal((await sqliteWorkspace(db,session,'work',{assignmentId:'assignment-14'})).item.canComplete,false);
+ }finally{db.close();}
+});
+
+test('withdrawal notifies assigned workers and remains available in instruction history',async()=>{
+ const db=fixture();try{
+  withdrawPublication(db,staff,'shelf',{requestId:randomUUID(),publicationId:'shelf-v3',version:3,reason:'Stop using this instruction.'});
+  assert.equal(db.prepare("SELECT count(*) n FROM notification_events WHERE kind='instruction.withdrawn'").get().n,30);
+  const history=await sqliteWorkspace(db,worker,'work',{status:'all'});
+  assert.ok(history.items.some(item=>item.publicationState==='withdrawn'));
+  assert.equal((await sqliteWorkspace(db,worker,'work',{status:'active'})).total,0);
+ }finally{db.close();}
 });

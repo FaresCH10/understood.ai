@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import { domainTransaction,requirePrincipal,domainAudit } from './domain.mjs';
 import { helpInput,clarificationFilters,resolutionInput,ownerInput,workerHelpHistoryInput } from '../clarification-input.mjs';
 import {responseRead} from './responses.mjs';
@@ -37,10 +38,19 @@ export async function requestHelp(pool,session,assignmentId,input,{schema='publi
       if (old.org_id!==session.org_id || old.site_id!==session.site_id || old.assignment_id!==assignmentId || old.text!==text) throw new Error('Help request conflict');
       return {id:input.requestId,status:old.status,duplicate:true};
     }
+    const priorMessage=(await client.query(`SELECT m.text,c.status FROM case_messages m JOIN clarifications c ON c.id=m.case_id AND c.org_id=m.org_id WHERE m.id=$1 AND m.org_id=$2 AND m.site_id=$3 AND m.assignment_id=$4 AND m.actor_type='worker' AND m.actor_id=$5`,[input.requestId,session.org_id,session.site_id,assignmentId,session.principal_id])).rows[0];
+    if(priorMessage){if(priorMessage.text!==text)throw Error('Help request conflict');return {id:input.requestId,status:priorMessage.status,duplicate:true};}
     await requireWritableEntitlement(client,session.org_id);
     // Help is independent of an answer and may be requested after a deadline, but not on withdrawn content.
     const publication=(await client.query('SELECT state,publication_content_available(id) AS content_available FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[assignment.publication_id,session.org_id,session.site_id])).rows[0];
     if (publication?.state!=='published' || !publication.content_available) throw new Error('Assignment unavailable');
+    const active=(await client.query("SELECT id FROM clarifications WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 AND status='open' ORDER BY created_at DESC,id DESC LIMIT 1 FOR UPDATE",[assignmentId,session.org_id,session.site_id])).rows[0];
+    if(active){
+      const a=(await client.query('SELECT language FROM assignments WHERE id=$1',[assignmentId])).rows[0];
+      await client.query(`INSERT INTO case_messages(id,org_id,site_id,case_id,assignment_id,actor_type,actor_id,language,text,request_hash,created_at) VALUES($1,$2,$3,$4,$5,'worker',$6,$7,$8,$9,clock_timestamp())`,[input.requestId,session.org_id,session.site_id,active.id,assignmentId,session.principal_id,a.language,text,createHash('sha256').update(text).digest('hex')]);
+      await domainAudit(client,session,'help.requested',active.id);
+      return {id:input.requestId,status:'open',duplicate:false};
+    }
     if ((await client.query('SELECT id FROM clarifications WHERE id=$1',[input.requestId])).rows.length) throw new Error('Help request conflict');
     await client.query(`INSERT INTO clarifications(id,org_id,site_id,assignment_id,reason,status)
       VALUES($1,$2,$3,$4,'Help requested','open')`,[input.requestId,session.org_id,session.site_id,assignmentId]);

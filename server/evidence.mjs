@@ -1,7 +1,8 @@
 import {createHash} from 'node:crypto';
 
 export const EVIDENCE_MODES=['none','photo'];
-export const EVIDENCE_MAX_BYTES=5*1024*1024;
+import {EVIDENCE_MAX_BYTES} from './evidence-policy.mjs';
+export {EVIDENCE_MAX_BYTES} from './evidence-policy.mjs';
 
 const EVIDENCE_MIME=[['image/jpeg',/^jpeg$/],['image/png',/^png$/],['image/webp',/^webp$/]];
 const tableExists=(db,name)=>!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);

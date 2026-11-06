@@ -1,3 +1,4 @@
+import {workerWorkflowCopy} from './worker-workflow-copy';
 import {useEffect,useRef,useState} from 'react';
 import {Bell,BellRing,Check,ChevronLeft,ChevronRight,RefreshCw,Trash2} from 'lucide-react';
 import {usePushNotifications} from './usePushNotifications';
@@ -50,7 +51,7 @@ export function WorkerNotifications({session,language,navigate,refresh,current,o
       setData(currentData=>{
         if(!currentData)return currentData;
         if(status==='unread')return {...currentData,items:currentData.items.filter(row=>row.id!==saved.id),total:Math.max(0,currentData.total-1),unread:Math.max(0,currentData.unread-1)};
-        return {...currentData,items:currentData.items.map(row=>row.id===saved.id?saved:row),unread:Math.max(0,currentData.unread-1)};
+        return {...currentData,items:currentData.items.map(row=>row.id===saved.id?{...row,...saved}:row),unread:Math.max(0,currentData.unread-1)};
       });
     } catch {if(latest.current.current())setActionFailed(true);}
     finally {setBusy(false);}
@@ -70,11 +71,11 @@ export function WorkerNotifications({session,language,navigate,refresh,current,o
     </div>
     {actionFailed && <p className="notice notice-amber" role="alert">{text.markFailed}</p>}
     <section className="notification-list" aria-label={text.title} aria-busy={loading}>
-      {loading ? <p data-page-loading role="status">{text.loading}</p> : failed ? <p className="notice notice-amber" role="alert">{text.loadFailed}</p> : data?.items.length ? data.items.map(item=>{
-        const label=text.kinds[item.kind] || text.kindOther,read=!!item.readAt;
+      {loading && !data ? <p data-page-loading role="status">{text.loading}</p> : failed ? <p className="notice notice-amber" role="alert">{text.loadFailed}</p> : data?.items.length ? data.items.map(item=>{
+        const label=item.kind==='instruction.withdrawn'?workerWorkflowCopy[language][0]:text.kinds[item.kind] || text.kindOther,read=!!item.readAt;
         return <article className="notification-row" key={item.id}>
           <Bell size={20} aria-hidden="true"/>
-          <div className="item-main"><strong>{label}</strong><small><time dateTime={item.occurredAt}>{date(item.occurredAt)}</time> · {read?text.read:text.unreadState}</small></div>
+          <div className="item-main"><strong>{label}</strong>{item.title&&<p dir="auto">{item.title}</p>}{item.supervisorName&&<small dir="auto">{item.supervisorName}</small>}<small><time dateTime={item.occurredAt}>{date(item.occurredAt)}</time> · {read?text.read:text.unreadState}</small></div>
           <div className="actions"><button type="button" className="icon-button" title={`${text.open}: ${label}`} aria-label={`${text.open}: ${label}`} disabled={busy} onClick={()=>open(item)}><Forward size={18}/></button>
             <button type="button" className="icon-button" title={`${text.markRead}: ${label}`} aria-label={`${text.markRead}: ${label}`} disabled={loading || busy || read} onClick={()=>void markRead(item)}><Check size={18}/></button></div>
         </article>;

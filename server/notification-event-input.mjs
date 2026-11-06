@@ -1,5 +1,6 @@
 export const workerEventKinds = Object.freeze({
   'instruction.available': {destination:'inbox'},
+  'instruction.withdrawn': {destination:'inbox'},
   'clarification.followup': {destination:'help'},
   'repeat.available': {destination:'inbox'},
   'language.decided': {destination:'inbox'},
@@ -9,6 +10,7 @@ export const workerEventKinds = Object.freeze({
 });
 export const workerEventLabels = Object.freeze({
   'instruction.available':'New instruction',
+  'instruction.withdrawn':'Instruction cancelled',
   'clarification.followup':'New follow-up',
   'repeat.available':'Repeat requested',
   'language.decided':'Language request updated',

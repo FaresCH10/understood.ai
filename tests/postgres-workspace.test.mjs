@@ -58,7 +58,7 @@ test('PostgreSQL supports persisted drafts, selected members, attachments and ex
   await processOneAssessment(pool,{async assess(){return {outcome:'clarification',reasons:['missing_asked_fact'],evidence:[]};}},scope);
   const caseId=(await db.query('SELECT id FROM clarifications WHERE attempt_id=$1',[answer.id])).rows[0].id;
   assert.equal((await postgresWorkspace(pool,worker,'work',{assignmentId:assignment2},scope)).item.status,'follow-up');
-  await resolveClarification(pool,staff,caseId,{notes:'Explained in person; understanding confirmed.'},scope);
+  await resolveClarification(pool,staff,caseId,{notes:'[Understood:ready]\nExplained in person; understanding confirmed.'},scope);
   assert.equal((await postgresWorkspace(pool,worker,'work',{assignmentId:assignment2},scope)).item.canComplete,true);
   assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[answer.id])).rows[0].outcome,'clarification');
   const help=await requestHelp(pool,worker,assignment2,{requestId:randomUUID(),text:'The equipment is missing.'},scope);

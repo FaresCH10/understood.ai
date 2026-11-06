@@ -194,6 +194,7 @@ export function withdrawPublication(db,session,briefingId,input) {
     db.prepare('INSERT INTO publication_withdrawals VALUES(?,?,?,?,?,?,?,?)')
       .run(input.requestId,session.org_id,session.site_id,publication.id,publication.version,request.reason,session.principal_id,now);
     briefingAudit(db,session,'briefing.withdrawn',publication.id);
+    for(const a of db.prepare('SELECT id,worker_id FROM assignments WHERE publication_id=? AND org_id=? AND site_id=?').all(publication.id,session.org_id,session.site_id))recordWorkerEvent(db,{orgId:session.org_id,siteId:session.site_id,workerId:a.worker_id,kind:'instruction.withdrawn',objectType:'assignment',objectId:a.id,dedupeKey:`withdrawn:${a.id}`,now});
     return {id:publication.id,version:publication.version,state:'withdrawn',duplicate:false};
   });
 }
@@ -231,6 +232,7 @@ export function submitAnswer(db, session, assignmentId, submissionId, answerText
     if (assignment.due_at && assignment.due_at<=NOW()) throw new Error('Assignment deadline passed');
     if (db.prepare('SELECT 1 FROM recordings WHERE assignment_id=? AND submission_id=?').get(assignmentId, submissionId))
       throw new Error('Submission ID conflict');
+    if(db.prepare(`SELECT sr.kind,r.status FROM submission_receipts sr LEFT JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.submission_id=sr.submission_id AND r.org_id=sr.org_id WHERE sr.assignment_id=? AND sr.org_id=? ORDER BY sr.sequence DESC LIMIT 1`).all(assignmentId,session.org_id).some(row=>row.kind!=='audio'||!['failed','blocked'].includes(row.status)))throw Error('Another answer requires an approved repeat');
     const snapshot = JSON.parse(assignment.snapshot_json);
     if(snapshot.responseMode==='acknowledge') throw new Error('This instruction only requires confirmation');
     const presentation=checkedPresentationBinding(db,session,assignmentId,presentationId);

@@ -1,3 +1,7 @@
+import {inspectWav} from '../server/audio.mjs';
+import {audioStore} from '../server/private-storage.mjs';
+import {requestHelp as requestPgHelp} from '../server/postgres/clarifications.mjs';
+import {requestCaseRepeat} from '../server/postgres/case-repeats.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -63,8 +67,14 @@ test('SQLite exact receipt stays original after later answer, returns server met
   try{
     const typedId=randomUUID(),laterId=randomUUID(),audioId=randomUUID();
     submitAnswer(db,principal,'assignment-30',typedId,'Finished blue; unfinished yellow.');
-    submitAnswer(db,principal,'assignment-30',laterId,'Finished yellow; unfinished blue.');
-    const audio=await receiveRecording(db,principal,'assignment-30',audioId,wav(),root);
+    // Historical receipts remain readable even though fresh unapproved repeats are now rejected.
+    const now=new Date().toISOString();
+    db.prepare('INSERT INTO attempts VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),'cedar','assignment-30',laterId,'Finished yellow; unfinished blue.','clarification','[]',now);
+    db.prepare('INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at) VALUES(?,?,?,?,?)').run('cedar','assignment-30',laterId,'typed',now);
+    const info=inspectWav(wav()),audio={id:randomUUID()};
+    await audioStore(root).save({id:audio.id,org_id:'cedar',site_id:'beirut',...info},wav());
+    db.prepare(`INSERT INTO recordings(id,org_id,site_id,assignment_id,submission_id,sha256,duration_seconds,bytes,status,created_at,received_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(audio.id,'cedar','beirut','assignment-30',audioId,info.sha256,info.durationSeconds,info.bytes,'received',now,now);
+    db.prepare('INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at) VALUES(?,?,?,?,?)').run('cedar','assignment-30',audioId,'audio',now);
     const login=async principal=>(await loginPrincipal(origin, principal)).headers.get('set-cookie').split(';')[0];
     const own=await login('worker-30'),other=await login('worker-14'),staff=await login('maya');
     const identity=await(await fetch(origin+'/api/session',{headers:{cookie:own}})).json();
@@ -104,6 +114,8 @@ test('embedded PostgreSQL exact receipt remains bound to its original request an
       await db.query("INSERT INTO attempts(id,org_id,site_id,assignment_id,submission_id,answer_text,outcome,reasons_json) VALUES($1,'qa','qa','assignment',$1,$2,$3,'[]')",[id,text,outcome]);
       await db.query("INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at) VALUES('qa','assignment',$1,'typed',clock_timestamp())",[id]);
     }
+    const help=await requestPgHelp(pool,worker,'assignment',{requestId:randomUUID(),text:'Please check another recording.'},options);
+    await requestCaseRepeat(pool,owner,help.id,{requestId:randomUUID(),dueAt:new Date(Date.now()+3600000).toISOString()},options);
     const audio=await receivePgRecording(pool,worker,'assignment',audioId,wav(),storage,options);
     const own=await redeemWorkerGrant(pool,(await issueWorkerGrant(pool,owner,'worker',30,options)).token,options),other=await redeemWorkerGrant(pool,(await issueWorkerGrant(pool,owner,'other',30,options)).token,options);
     server=createPostgresRehearsalServer(pool,{...options,storage,tier:'local',aiMode:'synthetic',accessMode:'credential',dataClass:'synthetic',publicOrigin:'http://127.0.0.1:3020'});

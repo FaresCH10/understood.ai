@@ -1,12 +1,12 @@
 import type {WorkerUiLanguage} from './worker-ui-language';
 
-export type WorkerNotificationKind='instruction.available'|'clarification.followup'|'repeat.available'|'language.decided'|'language.approved'|'language.rejected'|'deadline.reminder';
-export type WorkerNotificationItem={id:string;kind:WorkerNotificationKind;label:string;destination:'inbox'|'help';objectType:string;objectId:string;occurredAt:string;readAt:string|null};
+export type WorkerNotificationKind='instruction.withdrawn'|'instruction.available'|'clarification.followup'|'repeat.available'|'language.decided'|'language.approved'|'language.rejected'|'deadline.reminder';
+export type WorkerNotificationItem={assignmentId?:string;caseId?:string|null;title?:string|null;supervisorName?:string|null;id:string;kind:WorkerNotificationKind;label:string;destination:'inbox'|'help';objectType:string;objectId:string;occurredAt:string;readAt:string|null};
 export type WorkerNotificationPage={items:WorkerNotificationItem[];total:number;unread:number;page:number;pageSize:number;asOf:string;since:string};
-export type WorkerNotificationText={title:string;subtitle:string;loading:string;all:string;unread:string;markRead:string;read:string;unreadState:string;open:string;empty:string;emptyUnread:string;loadFailed:string;previous:string;next:string;page:string;refresh:string;kindOther:string;kinds:Record<WorkerNotificationKind,string>;pushTitle:string;pushBody:string;pushEnable:string;pushBusy:string;pushDenied:string;pushUnsupported:string;pushDisabled:string;pushSynthetic:string;pushRegistered:string;pushThisDevice:string;pushRemove:string;pushNoGuarantee:string;pushFailed:string;pushEnabled:string;pushRemoved:string;pushLoading:string;pushSaveFailed:string;markFailed:string};
+export type WorkerNotificationText={title:string;subtitle:string;loading:string;all:string;unread:string;markRead:string;read:string;unreadState:string;open:string;empty:string;emptyUnread:string;loadFailed:string;previous:string;next:string;page:string;refresh:string;kindOther:string;kinds:Partial<Record<WorkerNotificationKind,string>>;pushTitle:string;pushBody:string;pushEnable:string;pushBusy:string;pushDenied:string;pushUnsupported:string;pushDisabled:string;pushSynthetic:string;pushRegistered:string;pushThisDevice:string;pushRemove:string;pushNoGuarantee:string;pushFailed:string;pushEnabled:string;pushRemoved:string;pushLoading:string;pushSaveFailed:string;markFailed:string};
 
 const kinds=Object.keys({
-  'instruction.available':1,'clarification.followup':1,'repeat.available':1,'language.decided':1,'language.approved':1,'language.rejected':1,'deadline.reminder':1,
+  'instruction.withdrawn':1,'instruction.available':1,'clarification.followup':1,'repeat.available':1,'language.decided':1,'language.approved':1,'language.rejected':1,'deadline.reminder':1,
 }) as WorkerNotificationKind[];
 const timestamp=(value:unknown):value is string=>typeof value==='string' && value.length<=40 && Number.isFinite(Date.parse(value));
 function invalid():never{throw Error('Notifications could not be verified.');}
@@ -24,7 +24,8 @@ export function checkedWorkerNotificationPage(value:unknown):WorkerNotificationP
       || !['inbox','help'].includes(row.destination as string) || typeof row.objectType!=='string' || row.objectType.length>40
       || typeof row.objectId!=='string' || row.objectId.length<1 || row.objectId.length>120 || !timestamp(row.occurredAt)
       || !(row.readAt===null || timestamp(row.readAt)))invalid();
-    return {id:row.id,kind:row.kind as WorkerNotificationKind,label:row.label,destination:row.destination as 'inbox'|'help',
+    for(const key of ['assignmentId','caseId','title','supervisorName'])if(row[key]!==undefined&&row[key]!==null&&(typeof row[key]!=='string'||(row[key] as string).length>200))invalid();
+    return {...Object.fromEntries(['assignmentId','caseId','title','supervisorName'].filter(key=>row[key]!==undefined).map(key=>[key,row[key]])),id:row.id,kind:row.kind as WorkerNotificationKind,label:row.label,destination:row.destination as 'inbox'|'help',
       objectType:row.objectType,objectId:row.objectId,occurredAt:row.occurredAt,readAt:row.readAt as string|null};
   });
   return {items,total:page.total as number,unread:page.unread as number,page:page.page as number,pageSize:10,asOf:page.asOf,since:page.since};
@@ -33,7 +34,8 @@ export function checkedWorkerNotificationItem(value:unknown):WorkerNotificationI
   const page=checkedWorkerNotificationPage({items:[value],total:1,unread:1,page:1,pageSize:10,asOf:new Date().toISOString(),since:new Date().toISOString()});
   return page.items[0];
 }
-export function workerNotificationRoute(item:Pick<WorkerNotificationItem,'kind'|'destination'|'objectType'|'objectId'>):string {
+export function workerNotificationRoute(item:Pick<WorkerNotificationItem,'kind'|'destination'|'objectType'|'objectId'|'assignmentId'|'caseId'>):string {
+  if(item.assignmentId&&/^[A-Za-z0-9_-]{1,100}$/.test(item.assignmentId))return `worker/${item.assignmentId}${item.caseId&&/^[A-Za-z0-9_-]{1,100}$/.test(item.caseId)?'/'+item.caseId:''}`;
   if(item.kind!=='repeat.available' && item.objectType==='assignment' && /^[a-f0-9-]{36}$/.test(item.objectId))return `worker/${item.objectId}`;
   return item.destination==='help'?'help':'inbox';
 }

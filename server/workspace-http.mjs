@@ -4,6 +4,10 @@ export async function handleWorkspaceRoute(req,res,session,url,run){
  const path=url.pathname;
  if(!path.startsWith('/api/workspace/'))return false;
  let operation,input;
+ if(path==='/api/workspace/my-crew'&&req.method==='GET'){
+  const keys=[...url.searchParams.keys()];if(keys.some(key=>!['page','membersPage','status'].includes(key))||new Set(keys).size!==keys.length){send(res,400,{error:'Invalid crew request'});return true;}
+  operation='worker-crew';input=Object.fromEntries(url.searchParams);
+ }
  if(path==='/api/workspace/attachment-policy'&&req.method==='GET'){operation='attachment-policy';input={};}
  if(path==='/api/workspace/instructions'&&req.method==='GET'){operation='library';input=Object.fromEntries(url.searchParams);}
  const crewHistory=path.match(/^\/api\/workspace\/crews\/([a-zA-Z0-9_-]{1,100})\/instructions$/);
@@ -35,7 +39,7 @@ export async function handleWorkspaceRoute(req,res,session,url,run){
   if(['Attachments are unavailable until file safety scanning is configured','Attachment safety check unavailable','This file failed the safety check. Choose another file','This attachment exceeds the current download limit. Ask your supervisor to attach a smaller file'].includes(error.message)){
    send(res,error.message.startsWith('This file')?422:error.message.startsWith('This attachment')?413:503,{error:error.message});return true;
   }
-  const status=operation==='crew-instructions'?{'Forbidden':403,'Sign in required':401,'Crew unavailable':404,'Invalid crew history request':400}[error.message]:operation==='work'?{'Forbidden':403,'Sign in required':401,'Assignment unavailable':404,'Invalid work request':400,'Confirm understanding and resolve follow-up before finishing work':409}[error.message]:undefined;
+  const status=operation==='crew-instructions'?{'Forbidden':403,'Sign in required':401,'Crew unavailable':404,'Invalid crew history request':400}[error.message]:operation==='worker-crew'?{'Forbidden':403,'Invalid crew request':400}[error.message]:operation==='work'?{'Forbidden':403,'Sign in required':401,'Assignment unavailable':404,'Invalid work request':400,'Confirm understanding and resolve follow-up before finishing work':409}[error.message]:undefined;
   if(!status)throw error;send(res,status,{error:error.message});return true;
  }
  if(operation==='attachments'&&input.download){

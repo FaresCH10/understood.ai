@@ -398,13 +398,8 @@ ul{padding-inline-start:21px;line-height:1.7}
 .worker-inbox-help small{font-size:15px;font-weight:400;color:#657087;margin-top:5px;}
 .worker-inbox-help>svg{flex-shrink:0;}
 .worker-help-hub{min-width:0;}
-.worker-help-hub>h2{font-size:20px;margin-block:28px 16px;}
-.worker-help-hub .worker-card p{color:#657087;overflow-wrap:anywhere;}
-.worker-help-hub .worker-card h2{overflow-wrap:anywhere;}
 .worker-help-hub .button{max-width:100%;height:auto;min-height:52px;white-space:normal;gap:10px;}
 .worker-help-hub .button svg{flex-shrink:0;}
-.worker-help-contact{display:flex;align-items:flex-start;gap:12px;line-height:1.6;}
-.worker-help-contact svg{flex-shrink:0;margin-top:2px;}
 #worker-help{scroll-margin-top:24px;}
 #worker-help h2:focus{outline:3px solid #327abd;outline-offset:5px;}
 .worker-text-draft{padding-block:18px;margin-block:18px;border-block:1px solid #dce4e2;min-width:0}

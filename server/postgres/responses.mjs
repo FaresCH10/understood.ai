@@ -25,9 +25,11 @@ async function scopedPublication(client,session,id) {
 
 async function submissionHistory(client,session,assignmentId,page,pageSize,privateDetails,submissionId) {
   const receipt=(await client.query('SELECT COUNT(*)::int AS total,MAX(sequence) AS latest FROM submission_receipts WHERE assignment_id=$1 AND org_id=$2',[assignmentId,session.org_id])).rows[0];
-  const rows=(await client.query(`SELECT sr.sequence,sr.submission_id,sr.kind,sr.received_at,t.answer_text,t.outcome,${privateDetails ? 't.reasons_json,t.evidence_json,' : ''}
-    r.id AS recording_id,r.status AS audio_status,r.transcript,r.duration_seconds FROM submission_receipts sr
+  const rows=(await client.query(`SELECT sr.sequence,sr.submission_id,sr.kind,sr.received_at,t.answer_text,t.outcome,(SELECT j.status FROM assessment_jobs j WHERE j.attempt_id=t.id LIMIT 1) AS assessment_job_status,${privateDetails ? 't.reasons_json,t.evidence_json,' : ''}
+    r.id AS recording_id,r.status AS audio_status,r.transcript,r.duration_seconds,b.presentation_language,pa.choices_json AS presented_choices FROM submission_receipts sr
     LEFT JOIN attempts t ON t.assignment_id=sr.assignment_id AND t.submission_id=sr.submission_id AND t.org_id=sr.org_id AND t.site_id=$3
+    LEFT JOIN answer_presentation_bindings b ON b.attempt_id=t.id AND b.org_id=t.org_id
+    LEFT JOIN presentation_artifacts pa ON pa.id=b.presentation_id AND pa.org_id=b.org_id AND pa.site_id=b.site_id
     LEFT JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.submission_id=sr.submission_id AND r.org_id=sr.org_id AND r.site_id=$3 AND r.received_at IS NOT NULL
     WHERE sr.assignment_id=$1 AND sr.org_id=$2 ${submissionId===undefined?'':'AND sr.submission_id=$6'} ORDER BY sr.sequence DESC LIMIT $4 OFFSET $5`,[assignmentId,session.org_id,session.site_id,pageSize,(page-1)*pageSize,...(submissionId===undefined?[]:[submissionId])])).rows;
   return {receipts:rows.map((row) => submissionId===undefined?(privateDetails ? receiptRow : workerReceiptRow)(row,receipt.latest):{...workerReceiptRow(row,receipt.latest),durationSeconds:row.duration_seconds??null}),total:receipt.total,page,pageSize};
@@ -68,7 +70,7 @@ export async function workerRequestReceipt(pool,session,assignmentId,kind,reques
     const values=[assignmentId,session.org_id,session.site_id,requestId];
     let sql;
     if(kind==='help')sql=`SELECT c.id,c.status FROM help_requests h JOIN clarifications c ON c.id=h.case_id AND c.org_id=h.org_id AND c.site_id=h.site_id AND c.assignment_id=h.assignment_id
-      WHERE h.assignment_id=$1 AND h.org_id=$2 AND h.site_id=$3 AND h.case_id=$4`;
+      WHERE h.assignment_id=$1 AND h.org_id=$2 AND h.site_id=$3 AND h.case_id=$4 UNION ALL SELECT m.id,c.status FROM case_messages m JOIN clarifications c ON c.id=m.case_id AND c.org_id=m.org_id WHERE m.assignment_id=$1 AND m.org_id=$2 AND m.site_id=$3 AND m.id=$4 AND m.actor_type='worker'`;
     else if(kind==='acknowledge')sql=`SELECT request_id AS id,received_at FROM acknowledgments
       WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 AND request_id=$4`;
     else if(kind==='answer')sql=`SELECT t.id,t.outcome,t.assessment_status FROM submission_receipts sr JOIN attempts t ON t.assignment_id=sr.assignment_id AND t.org_id=sr.org_id AND t.submission_id=sr.submission_id

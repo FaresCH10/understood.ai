@@ -55,7 +55,7 @@ export function workerBriefingRow(row) {
     ...(expired?{contentExpired:true}:{}),
     ...(row.repeat_request?{repeatRequest:row.repeat_request}:{}),responseMode:row.response_mode||'question',deliveryMode:row.delivery_mode||'both',
     dueAt:row.due_at instanceof Date ? row.due_at.toISOString() : row.due_at || null,outcome:audio ? null : row.outcome || null,
-    assessmentStatus:audio || (row.attempt_at && !row.outcome) ? 'pending' : acknowledged || row.outcome ? 'complete' : null,audioStatus:audio ? row.audio_status : null,
+    assessmentStatus:!audio && !row.outcome && ['failed','blocked'].includes(row.assessment_job_status) ? 'failed' : audio || (row.attempt_at && !row.outcome) ? 'pending' : acknowledged || row.outcome ? 'complete' : null,audioStatus:audio ? row.audio_status : null,
     ...(acknowledged?{acknowledgedAt:row.acknowledged_at instanceof Date?row.acknowledged_at.toISOString():row.acknowledged_at}:{}),
     ...(row.reminder_at?{reminderAt:row.reminder_at instanceof Date?row.reminder_at.toISOString():row.reminder_at}:{})};
 }
@@ -98,7 +98,9 @@ export function receiptRow(row,latest) {
 }
 
 export function workerReceiptRow(row,latest) {
-  return {id:row.submission_id,kind:row.kind,receivedAt:row.received_at instanceof Date ? row.received_at.toISOString() : row.received_at,
+  const choices=typeof row.presented_choices==='string'?JSON.parse(row.presented_choices):row.presented_choices;
+  const presentedAnswer=Array.isArray(choices)?choices.find(choice=>choice.id===row.answer_text)?.text:null;
+  return {...(presentedAnswer?{presentedAnswer,presentedLanguage:row.presentation_language}:{}),...(['failed','blocked'].includes(row.assessment_job_status)&&!row.outcome?{assessmentFailed:true}:{}),id:row.submission_id,kind:row.kind,receivedAt:row.received_at instanceof Date ? row.received_at.toISOString() : row.received_at,
     isLatest:String(row.sequence)===String(latest),answerText:row.answer_text ?? row.transcript ?? null,
     outcome:row.outcome || null,recordingId:row.recording_id || null,audioStatus:row.audio_status || null};
 }
@@ -127,8 +129,10 @@ function authority(db,session,type='staff') {
 function submissionHistory(db,session,assignmentId,page,pageSize,privateDetails,submissionId) {
   const receipt=db.prepare('SELECT COUNT(*) AS total,MAX(sequence) AS latest FROM submission_receipts WHERE assignment_id=? AND org_id=?').get(assignmentId,session.org_id);
   const rows=db.prepare(`SELECT sr.sequence,sr.submission_id,sr.kind,sr.received_at,t.answer_text,t.outcome,${privateDetails ? 't.reasons_json,' : ''}
-    r.id AS recording_id,r.status AS audio_status,r.transcript,r.duration_seconds FROM submission_receipts sr
+    r.id AS recording_id,r.status AS audio_status,r.transcript,r.duration_seconds,b.presentation_language,pa.choices_json AS presented_choices FROM submission_receipts sr
     LEFT JOIN attempts t ON t.assignment_id=sr.assignment_id AND t.submission_id=sr.submission_id AND t.org_id=sr.org_id
+    LEFT JOIN answer_presentation_bindings b ON b.attempt_id=t.id AND b.org_id=t.org_id
+    LEFT JOIN presentation_artifacts pa ON pa.id=b.presentation_id AND pa.org_id=b.org_id AND pa.site_id=b.site_id
     LEFT JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.submission_id=sr.submission_id AND r.org_id=sr.org_id AND r.site_id=? AND r.received_at IS NOT NULL
     WHERE sr.assignment_id=? AND sr.org_id=? ${submissionId===undefined?'':'AND sr.submission_id=?'} ORDER BY sr.sequence DESC LIMIT ? OFFSET ?`)
     .all(session.site_id,assignmentId,session.org_id,...(submissionId===undefined?[]:[submissionId]),pageSize,(page-1)*pageSize);
@@ -172,7 +176,7 @@ export function workerRequestReceipt(db,session,assignmentId,kind,requestId) {
       WHERE a.id=? AND a.org_id=? AND a.site_id=? AND a.worker_id=?`).get(assignmentId,session.org_id,session.site_id,session.principal_id))throw Error('Response unavailable');
     let row;
     if(kind==='help')row=db.prepare(`SELECT c.id,c.status FROM help_requests h JOIN clarifications c ON c.id=h.case_id AND c.org_id=h.org_id AND c.assignment_id=h.assignment_id
-      WHERE h.assignment_id=? AND h.org_id=? AND h.site_id=? AND h.case_id=?`).get(assignmentId,session.org_id,session.site_id,requestId);
+      WHERE h.assignment_id=? AND h.org_id=? AND h.site_id=? AND h.case_id=? UNION ALL SELECT m.id,c.status FROM case_messages m JOIN clarifications c ON c.id=m.case_id AND c.org_id=m.org_id WHERE m.assignment_id=? AND m.org_id=? AND m.site_id=? AND m.id=? AND m.actor_type='worker'`).get(assignmentId,session.org_id,session.site_id,requestId,assignmentId,session.org_id,session.site_id,requestId);
     else if(kind==='acknowledge')row=db.prepare('SELECT request_id AS id,received_at FROM acknowledgments WHERE assignment_id=? AND org_id=? AND site_id=? AND request_id=?')
       .get(assignmentId,session.org_id,session.site_id,requestId);
     else if(kind==='answer')row=db.prepare(`SELECT t.id,t.outcome FROM submission_receipts sr JOIN attempts t ON t.assignment_id=sr.assignment_id AND t.org_id=sr.org_id AND t.submission_id=sr.submission_id

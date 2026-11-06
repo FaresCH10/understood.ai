@@ -2,6 +2,7 @@ import {workerEventKinds} from './notification-event-input.mjs';
 
 // Lock-screen copy stays deliberately generic: no names, titles, answer text, rubric or links.
 const workerCopy = Object.freeze({
+  'instruction.withdrawn':{en:['Instruction cancelled','Open Understood to review the update.'],ar:['أُلغيت التعليمات','افتح Understood لمراجعة التحديث.']},
   'instruction.available': {
     en:['New instruction','Open Understood to review it.'],
     ar:['تعليمات جديدة','افتح Understood لمراجعتها.'],

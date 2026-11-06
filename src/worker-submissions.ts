@@ -2,7 +2,7 @@ import {sameWorkerSession,validWorkerSession,type PageSession} from './session-s
 import {isWorkerLanguage,type WorkerLocaleCode} from '../server/languages.mjs';
 
 export type SubmissionScope={assignmentId:string;version:number;language:WorkerLocaleCode};
-export type WorkerSubmission={id:string;kind:'typed'|'audio';receivedAt:string;isLatest:boolean;answerText:string|null;outcome:'matched'|'clarification'|'unassessable'|null;recordingId:string|null;audioStatus:string|null};
+export type WorkerSubmission={assessmentFailed?:boolean;presentedAnswer?:string;presentedLanguage?:string;id:string;kind:'typed'|'audio';receivedAt:string;isLatest:boolean;answerText:string|null;outcome:'matched'|'clarification'|'unassessable'|null;recordingId:string|null;audioStatus:string|null};
 export type WorkerSubmissionPage={assignment:{id:string;language:string;version:number;state:string};receipts:WorkerSubmission[];total:number;page:number;pageSize:number;clientContext:string};
 export class WorkerSubmissionsError extends Error{
   readonly code:'session'|'unavailable'|'invalid';
@@ -14,7 +14,11 @@ const integer=(value:unknown,min:number,max:number)=>Number.isSafeInteger(value)
 const validRead=(scope:SubmissionScope,page:number,context:string)=>identifier(scope.assignmentId)&&integer(scope.version,1,Number.MAX_SAFE_INTEGER)&&isWorkerLanguage(scope.language)&&integer(page,1,5000)&&/^[a-f0-9]{64}$/.test(context);
 
 export function checkedWorkerSubmission(value:unknown):WorkerSubmission{
-  if(!exact(value,['id','kind','receivedAt','isLatest','answerText','outcome','recordingId','audioStatus'])||!identifier(value.id)||!['typed','audio'].includes(value.kind as string)
+  const optional=value&&typeof value==='object'?value as Record<string,unknown>:{};
+  if(!exact(value,['id','kind','receivedAt','isLatest','answerText','outcome','recordingId','audioStatus',...(Object.hasOwn(optional,'assessmentFailed')?['assessmentFailed']:[]),...(Object.hasOwn(optional,'presentedAnswer')?['presentedAnswer','presentedLanguage']:[])])
+    ||Object.hasOwn(optional,'assessmentFailed')&&optional.assessmentFailed!==true
+    ||Object.hasOwn(optional,'presentedAnswer')&&(typeof optional.presentedAnswer!=='string'||optional.presentedAnswer.length>1000||!isWorkerLanguage(optional.presentedLanguage))
+    ||!identifier(value.id)||!['typed','audio'].includes(value.kind as string)
     ||typeof value.receivedAt!=='string'||value.receivedAt.length>40||!/^\d{4}-\d{2}-\d{2}T.*Z$/.test(value.receivedAt)||!Number.isFinite(Date.parse(value.receivedAt))
     ||typeof value.isLatest!=='boolean'||value.answerText!==null&&(typeof value.answerText!=='string'||value.answerText.length>20000)
     ||value.outcome!==null&&!['matched','clarification','unassessable'].includes(value.outcome as string)
@@ -44,6 +48,7 @@ export function checkedWorkerSubmissions(value:unknown,scope:SubmissionScope,pag
 
 export function workerSubmissionState(row:WorkerSubmission){
   if(row.outcome)return row.outcome;
+  if(row.assessmentFailed)return 'paused';
   if(row.kind==='audio'){
     if(!row.recordingId)return 'unavailable';
     if(row.audioStatus==='failed')return 'audioFailed';

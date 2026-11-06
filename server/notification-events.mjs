@@ -6,6 +6,7 @@ import {
   workerEventKinds,workerEventLabels,staffPushKinds,notificationEventRef,pushSubscriptionInput,pushSubscriptionId,
   pushSubscriptionLimit,pushRetryLimit,retryAt,notificationEventKind,
 } from './notification-event-input.mjs';
+import {ensureCaseMessageSchema} from './case-messages.mjs';
 import {pushCopy} from './push-copy.mjs';
 
 const iso=value=>value instanceof Date?value.toISOString():value;
@@ -35,6 +36,7 @@ function eventRow(row,kind) {
 }
 
 export function listWorkerNotifications(db,session,filters={}) {
+  ensureCaseMessageSchema(db);
   const {status,page,pageSize}=notificationFilters(filters);
   return transaction(db,()=>{
     workerAuthority(db,session);
@@ -49,7 +51,13 @@ export function listWorkerNotifications(db,session,filters={}) {
     const rows=db.prepare(`SELECT e.id,e.kind,e.object_type,e.object_id,e.created_at,r.read_at ${join} WHERE ${where}
       ${status==='unread'?'AND r.event_id IS NULL':''} ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?`)
       .all(...args,pageSize,(page-1)*pageSize);
-    return {items:rows.map(row=>eventRow(row,row.kind)),total:status==='unread'?totals.unread:totals.total,unread:totals.unread,page,pageSize,asOf,since};
+    const items=rows.map(row=>{const subject=db.prepare(`SELECT a.id AS assignment_id,c.id AS case_id,json_extract(p.snapshot_json,'$.languages.'||a.language||'.title') AS instruction_title,s.name AS supervisor_name
+ FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
+ LEFT JOIN clarifications c ON c.assignment_id=a.id AND c.org_id=a.org_id
+ LEFT JOIN staff s ON s.id=c.owner_staff_id AND s.org_id=a.org_id AND s.site_id=a.site_id
+ WHERE a.org_id=? AND a.site_id=? AND a.worker_id=? AND
+ ((?='assignment' AND a.id=?) OR (?='case_message' AND EXISTS(SELECT 1 FROM case_messages m WHERE m.id=? AND m.case_id=c.id AND m.org_id=a.org_id AND m.site_id=a.site_id))) LIMIT 1`).get(session.org_id,session.site_id,session.principal_id,row.object_type,row.object_id,row.object_type,row.object_id);return {...eventRow(row,row.kind),...(subject?{assignmentId:subject.assignment_id,caseId:row.object_type==='assignment'?null:subject.case_id||null,title:subject.instruction_title||null,supervisorName:subject.supervisor_name||null}:{})};});
+    return {items,total:status==='unread'?totals.unread:totals.total,unread:totals.unread,page,pageSize,asOf,since};
   });
 }
 

@@ -11,6 +11,7 @@ import './team-workflow.css';
 import './worker-workspace.css';
 import './dashboard-header.css';
 import './supervisor-responsive.css';
+import './worker-responsive.css';
 
 installPageLoadTracking();
 createRoot(document.getElementById('root')!).render(<SignOutConfirmationProvider><PageLoadingBoundary><App/></PageLoadingBoundary></SignOutConfirmationProvider>);

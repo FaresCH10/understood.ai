@@ -57,3 +57,11 @@ test('unavailable recording processing permits a typed replacement while preserv
   const state=workerResponseState({state:'published',audioStatus:'blocked'});
   assert.equal(state.received,true);assert.equal(state.pending,false);assert.equal(state.canRespond,true);
 });
+
+
+test('failed typed checks preserve receipt state without waiting forever or allowing another unapproved response',()=>{
+ const state=workerResponseState({state:'published',assessmentStatus:'failed'});
+ assert.equal(state.received,true);assert.equal(state.pending,false);assert.equal(state.canRespond,false);assert.equal(state.canHelp,true);assert.equal(state.assessmentFailed,true);
+ const retry=workerResponseState({state:'published',assessmentStatus:'failed',repeatRequest:{id:'repeat',caseId:'case',dueAt:'2099-01-01T00:00:00.000Z'}});
+ assert.equal(retry.canRespond,true);assert.equal(retry.pending,false);
+});

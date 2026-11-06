@@ -1,3 +1,4 @@
+export const questionWithChoices=item=>[item.question,...(item.choices??[]).map((choice,index)=>`${index+1}. ${choice.text}`)].join('\n');
 import {providerDataClass} from './provider-policy.mjs';
 import {WORKER_LANGUAGE_CODES,isWorkerLanguage,languageTextMatches} from '../languages.mjs';
 import {createHash,randomUUID} from 'node:crypto';
@@ -187,7 +188,7 @@ export async function prepareLanguageBundle({source,title=null,revision,language
     }
     if(!checked) fail('question_alignment_failed');
     if(title!==null)content={...content,title:title.trim()};
-    const localized={en:{title:content.title,text:source,question:content.question,...(content.choices?{answerChoices:content.choices}:{})}},checks={preparation:'passed',translations:{},...(content.choices&&(!previous||previous.manifest.checks.choices==='passed')?{choices:'passed'}:{})};
+    let localized={en:{title:content.title,text:source,question:content.question,...(content.choices?{answerChoices:content.choices}:{})}},checks={preparation:'passed',translations:{},...(content.choices&&(!previous||previous.manifest.checks.choices==='passed')?{choices:'passed'}:{})};
     if(previous && previous.manifest.checks.translations.en==='passed'){
       const saved=previous.manifest.languages.en;
       localized.en={title:saved.title,text:saved.text,question:saved.question,...(content.choices?{answerChoices:content.choices}:{})};
@@ -243,12 +244,30 @@ export async function prepareLanguageBundle({source,title=null,revision,language
       }
       checks.translations[language]='passed';
     }
+    const rawLocalized=localized;
+    const choiceBundle=multipleChoice?withMultipleChoice({question:content.question,rubric:{askedFacts:content.askedFacts},languages:localized},{preserveQuestions:true,preserveAskedFacts:true}):null;
+    if(choiceBundle){
+      localized=choiceBundle.languages;
+      // Retain the frozen order when regenerating one language, so retained audio stays aligned.
+      if(previous?.manifest.rubric.mode==='multiple-choice'){
+        const old=previous.manifest;
+        for(const [code,item] of Object.entries(localized)){
+          const values=rawLocalized[code].answerChoices;
+          if(!values){item.choices=structuredClone(old.languages[code].choices);continue;}
+          const oldChoices=old.languages[code].choices;
+          const ids=[old.rubric.correctChoiceId,...oldChoices.filter(c=>c.id!==old.rubric.correctChoiceId).map(c=>c.id)];
+          item.choices=oldChoices.map(c=>({id:c.id,text:values[ids.indexOf(c.id)]}));
+        }
+        choiceBundle.rubric.correctChoiceId=old.rubric.correctChoiceId;
+      }
+    }
     const audio=[],cache=new Map();let totalBytes=0;
     for(language of targets) {
       const item=localized[language];item.speech={};
       for(const kind of ['body','question']) {
         stage='speech';track=kind;
-        const text=kind==='body' ? item.text : item.question,textHash=hash(text),key=`${language}:${textHash}`;
+        const includesChoices=kind==='question'&&!!item.choices&&(!previous||language===regeneration.language||previous.manifest.languages[language].speech.question.includesChoices===true);
+        const text=kind==='body'?item.text:includesChoices?questionWithChoices(item):item.question,textHash=hash(text),key=`${language}:${textHash}`;
         let artifact=cache.get(key);
         if(!artifact) {
           let bytes,info;
@@ -266,11 +285,11 @@ export async function prepareLanguageBundle({source,title=null,revision,language
           artifact={id:randomUUID(),language,textHash,bytes:Buffer.from(bytes),info};cache.set(key,artifact);audio.push(artifact);
         }else await reuse('cache');
         item.speech[kind]={id:artifact.id,textHash,sha256:artifact.info.sha256,bytes:artifact.info.bytes,durationSeconds:artifact.info.durationSeconds,
-          mimeType:'audio/wav',sampleRate:16000};
+          mimeType:'audio/wav',sampleRate:16000,...(includesChoices?{includesChoices:true}:{})};
       }
     }
     await current();
-    const manifest={title:content.title,source,question:content.question,facts:content.facts,rubric:{askedFacts:content.askedFacts},languages:localized,
+    const manifest={title:content.title,source,question:content.question,facts:content.facts,rubric:choiceBundle?.rubric??{askedFacts:content.askedFacts},languages:localized,
       dependencies,dependencyHash,checks,provenance:provider};
     if(Buffer.byteLength(JSON.stringify(manifest))>100000*Math.ceil(Object.keys(manifest.languages || {}).length/3)) fail('manifest_exceeds_limit');
     return {manifest:multipleChoice?withMultipleChoice(manifest,{preserveQuestions:true,preserveAskedFacts:true}):manifest,audio};
@@ -313,8 +332,8 @@ export function preparedAudioReferences(manifest) {
     if(language==='en' && manifest.checks.translations.en!=='passed' && (localized.title!==manifest.title || localized.text!==manifest.source || localized.question!==manifest.question)) fail('invalid_manifest');
     if(language!=='en' && manifest.checks.translations[language]!=='passed') fail('invalid_manifest');
     for(const kind of ['body','question']) {
-      const ref=localized.speech[kind],text=kind==='body' ? localized.text : localized.question;
-      if(!object(ref,['id','textHash','sha256','bytes','durationSeconds','mimeType','sampleRate'])
+      const ref=localized.speech[kind],text=kind==='body'?localized.text:ref?.includesChoices===true?questionWithChoices(localized):localized.question;
+      if(!object(ref,['id','textHash','sha256','bytes','durationSeconds','mimeType','sampleRate','includesChoices']) || ref.includesChoices!==undefined&&ref.includesChoices!==true
         || typeof ref.id!=='string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(ref.id)
         || ref.textHash!==hash(text) || !/^[a-f0-9]{64}$/.test(ref.sha256) || !Number.isInteger(ref.bytes)
         || ref.bytes<8044 || ref.bytes>2_880_044 || ref.bytes%2!==0 || ref.durationSeconds!==(ref.bytes-44)/32000

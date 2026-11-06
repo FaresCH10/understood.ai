@@ -15,7 +15,7 @@ export const staffSignInText:Record<CaseLocale,StaffSignInCopy>={
 };
 
 export const staffSignInLanguages=[
-  {code:'en' as CaseLocale,label:'English',dir:'ltr' as const},
-  {code:'ar' as CaseLocale,label:'العربية',dir:'rtl' as const},
-  {code:'ur' as CaseLocale,label:'اردو',dir:'rtl' as const},
-];
+  {code:'en',label:'English',dir:'ltr'},
+  {code:'ar',label:'العربية',dir:'rtl'},
+  {code:'ur',label:'اردو',dir:'rtl'},
+] as const;

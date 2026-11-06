@@ -74,6 +74,7 @@ export async function acceptingRepeat(client,session,assignment) {
       AND cr.due_at>clock_timestamp() AND c.status='open' FOR UPDATE OF cr FOR SHARE OF c`,[assignment.id,session.org_id,session.site_id,assignment.publication_id])).rows[0];
   if(row)return row.id;
   if(assignment.due_at && !(await client.query('SELECT $1::timestamptz>clock_timestamp() AS valid',[assignment.due_at])).rows[0].valid)throw Error('Assignment deadline passed');
+  if((await client.query(`SELECT sr.kind,r.status FROM submission_receipts sr LEFT JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.submission_id=sr.submission_id AND r.org_id=sr.org_id WHERE sr.assignment_id=$1 AND sr.org_id=$2 ORDER BY sr.sequence DESC LIMIT 1`,[assignment.id,session.org_id])).rows.some(row=>row.kind!=='audio'||!['failed','blocked'].includes(row.status)))throw Error('Another answer requires an approved repeat');
   return null;
 }
 export async function consumeRepeat(client,id,submissionId,receivedAt) {

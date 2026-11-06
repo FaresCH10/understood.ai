@@ -93,6 +93,7 @@ export const responseColumns = [...attemptAndAudioColumns,
   `(SELECT ak.received_at FROM acknowledgments ak WHERE ak.assignment_id=a.id AND ak.org_id=a.org_id) AS acknowledged_at`,
 ].join(',');
 export const postgresResponseColumns = [...attemptAndAudioColumns,
+  `(SELECT j.status FROM assessment_jobs j WHERE j.attempt_id=(${latestAttempt('t.id')}) ORDER BY j.id LIMIT 1) AS assessment_job_status`,
   `(SELECT ak.received_at FROM acknowledgments ak WHERE ak.assignment_id=a.id AND ak.org_id=a.org_id) AS acknowledged_at`,
 ].join(',');
 
@@ -124,6 +125,8 @@ export async function receiveRecording(db, session, assignmentId, submissionId, 
   if (JSON.parse(assignment.snapshot_json)?.responseMode==='acknowledge') throw new Error('This instruction only requires confirmation');
   if (db.prepare('SELECT 1 FROM attempts WHERE assignment_id=? AND submission_id=?').get(assignmentId, submissionId))
     throw new Error('Submission ID conflict');
+  const prior=db.prepare(`SELECT sr.kind,r.status FROM submission_receipts sr LEFT JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.submission_id=sr.submission_id AND r.org_id=sr.org_id WHERE sr.assignment_id=? AND sr.org_id=? ORDER BY sr.sequence DESC LIMIT 1`).get(assignmentId,session.org_id);
+  if(prior&&(prior.kind!=='audio'||!['failed','blocked'].includes(prior.status)))throw Error('Another answer requires an approved repeat');
   const presentation=checkedPresentationBinding(db,session,assignmentId,presentationId);
   const info = inspectWav(bytes);
   const id = randomUUID(), now = NOW();
@@ -145,6 +148,8 @@ export async function receiveRecording(db, session, assignmentId, submissionId, 
         WHERE a.id=? AND a.org_id=? AND a.site_id=? AND a.worker_id=?`).get(assignmentId,session.org_id,session.site_id,session.principal_id);
       if (!current || current.state!=='published' || (current.due_at && current.due_at<=NOW())) throw new Error('Assignment unavailable');
       if (session.access_mode==='credential' && !workerCredentialSessionValid(db, session)) throw new Error('Sign in required');
+      const latest=db.prepare(`SELECT sr.kind,r.status FROM submission_receipts sr LEFT JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.submission_id=sr.submission_id AND r.org_id=sr.org_id WHERE sr.assignment_id=? AND sr.org_id=? ORDER BY sr.sequence DESC LIMIT 1`).get(assignmentId,session.org_id);
+      if(latest&&(latest.kind!=='audio'||!['failed','blocked'].includes(latest.status)))throw Error('Another answer requires an approved repeat');
       const receivedAt = NOW();
       db.prepare('INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at) VALUES (?,?,?,?,?)')
         .run(session.org_id, assignmentId, submissionId, 'audio', receivedAt);

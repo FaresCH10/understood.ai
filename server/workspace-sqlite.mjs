@@ -29,7 +29,7 @@ async function workspaceTransaction(db,session,operation,input,options){
  if(!db.prepare(`SELECT 1 FROM ${staff?'staff':'workers'} WHERE id=? AND org_id=? AND site_id=? AND active=1 ${staff?'AND role=?':''}`).get(session.principal_id,session.org_id,session.site_id,...(staff?[session.role]:[])))throw Error('Forbidden');
  if(session.token_hash!==undefined&&!db.prepare(`SELECT 1 FROM sessions WHERE token_hash=? AND principal_type=? AND principal_id=? AND org_id=? AND site_id=? AND revoked_at IS NULL AND expires_at>?`).get(session.token_hash,session.principal_type,session.principal_id,session.org_id,session.site_id,new Date().toISOString()))throw Error('Sign in required');
  if(!staff){requireWorkerSiteAccess(db,session.org_id,session.site_id);if(session.access_mode==='credential'&&!workerCredentialSessionValid(db,session))throw Error('Sign in required');}
- if(operation==='crew-instructions'&&staff&&['owner','supervisor'].includes(session.role))ensureReportAudienceSchema(db);
+ if(operation==='worker-crew'||operation==='crew-instructions'&&staff&&['owner','supervisor'].includes(session.role))ensureReportAudienceSchema(db);
  if(input.content||input.file||input.complete)requireWritableEntitlement(db,session.org_id);
  // No external I/O is allowed here. Workspace calls on this connection are serialized.
  db.exec('BEGIN IMMEDIATE');

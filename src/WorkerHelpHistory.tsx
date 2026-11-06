@@ -24,7 +24,7 @@ export const workerStatusText = {
   id: { sent: 'Jawaban terkirim', emptySent: 'Belum ada jawaban terkirim.', check: 'Segarkan status jawaban', pending: 'Jawaban diterima. Pemeriksaan menunggu.', closed: 'Penugasan ini ditutup untuk jawaban baru dan permintaan bantuan.', history: 'Permintaan bantuan dan tindak lanjut', refresh: 'Segarkan permintaan', empty: 'Belum ada permintaan bantuan atau tindak lanjut.', open: 'Terbuka', resolved: 'Selesai', followup: 'Tindak lanjut jawaban', unassigned: 'Belum ada pengawas yang ditugaskan.', loading: 'Memuat permintaan...', failed: 'Permintaan tidak dapat dimuat.', acknowledged: 'Dikonfirmasi' },
 };
 
-export function WorkerHelpHistory({assignmentId,version,contentLanguage,language,refresh,session,current,onDirtyChange,onSessionLost,timezone,canWrite=true}:{assignmentId:string;version:number;contentLanguage:HelpHistoryScope['language'];language:WorkerUiLanguage;refresh:number;session:PageSession;current:()=>boolean;onDirtyChange:(value:boolean)=>void;onSessionLost:()=>void;timezone?:string;canWrite?:boolean}) {
+export function WorkerHelpHistory({requestedCaseId,assignmentId,version,contentLanguage,language,refresh,session,current,onDirtyChange,onSessionLost,timezone,canWrite=true}:{requestedCaseId?:string;assignmentId:string;version:number;contentLanguage:HelpHistoryScope['language'];language:WorkerUiLanguage;refresh:number;session:PageSession;current:()=>boolean;onDirtyChange:(value:boolean)=>void;onSessionLost:()=>void;timezone?:string;canWrite?:boolean}) {
   const copy = workerStatusText[language] || workerStatusText.en,direction=workerUiDirection(language);
   const [retry, setRetry] = useState(0);
   const scopeKey=JSON.stringify([session.clientContext,session.expiresAt,assignmentId,version,contentLanguage]);
@@ -38,12 +38,13 @@ export function WorkerHelpHistory({assignmentId,version,contentLanguage,language
   const conversationRef=useRef<HTMLDivElement>(null);
   const pagingCopy={en:{previous:'Newer help requests',next:'Older help requests',count:'requests'},ar:{previous:'طلبات المساعدة الأحدث',next:'طلبات المساعدة الأقدم',count:'طلبات'},ur:{previous:'مدد کی نئی درخواستیں',next:'مدد کی پرانی درخواستیں',count:'درخواستیں'},hi:{previous:'नए सहायता अनुरोध',next:'पुराने सहायता अनुरोध',count:'अनुरोध'},bn:{previous:'নতুন সাহায্য অনুরোধ',next:'পুরোনো সাহায্য অনুরোধ',count:'অনুরোধ'},ml:{previous:'പുതിയ സഹായ അഭ്യർത്ഥനകൾ',next:'പഴയ സഹായ അഭ്യർത്ഥനകൾ',count:'അഭ്യർത്ഥനകൾ'},ta:{previous:'புதிய உதவி கோரிக்கைகள்',next:'பழைய உதவி கோரிக்கைகள்',count:'கோரிக்கைகள்'},te:{previous:'కొత్త సహాయ అభ్యర్థనలు',next:'పాత సహాయ అభ్యర్థనలు',count:'అభ్యర్థనలు'},ne:{previous:'नयाँ सहयोग अनुरोध',next:'पुराना सहयोग अनुरोध',count:'अनुरोध'},fil:{previous:'Mas bagong help request',next:'Mas lumang help request',count:'request'},si:{previous:'නව උදව් ඉල්ලීම්',next:'පැරණි උදව් ඉල්ලීම්',count:'ඉල්ලීම්'},ru:{previous:'Более новые запросы помощи',next:'Более старые запросы помощи',count:'запросов'},'pa-Guru':{previous:'ਨਵੀਆਂ ਮਦਦ ਬੇਨਤੀਆਂ',next:'ਪੁਰਾਣੀਆਂ ਮਦਦ ਬੇਨਤੀਆਂ',count:'ਬੇਨਤੀਆਂ'},'pa-Arab':{previous:'نویں مدد درخواستاں',next:'پرانیاں مدد درخواستاں',count:'درخواستاں'},id:{previous:'Permintaan bantuan lebih baru',next:'Permintaan bantuan lebih lama',count:'permintaan'}}[language];
   const conversationLabel={en:'Open conversation',ar:'فتح المحادثة',ur:'گفتگو کھولیں',hi:'बातचीत खोलें',bn:'কথোপকথন খুলুন',ml:'സംഭാഷണം തുറക്കുക',ta:'உரையாடலைத் திற',te:'సంభాషణ తెరవండి',ne:'कुराकानी खोल्नुहोस्',fil:'Buksan ang usapan',si:'සංවාදය විවෘත කරන්න',ru:'Открыть переписку','pa-Guru':'ਗੱਲਬਾਤ ਖੋਲ੍ਹੋ','pa-Arab':'گفتگو کھولو',id:'Buka percakapan'}[language];
+  useEffect(()=>{if(requestedCaseId&&data?.cases.some(item=>item.id===requestedCaseId)&&!dirty)setConversation({scope:scopeKey,id:requestedCaseId});},[requestedCaseId,data,scopeKey,dirty]);
   function open(id:string){if(dirty||!callbacks.current.current()||!validWorkerSession(session))return;if(caseId===id)conversationRef.current?.focus();else setConversation({scope:scopeKey,id});}
   useEffect(()=>{if(caseId)conversationRef.current?.focus();},[caseId]);
   useEffect(() => {
     const controller=new AbortController();let alive=true,timedOut=false;
     const isCurrent=()=>alive&&selected.current===key&&callbacks.current.current()&&validWorkerSession(session);
-    setRead({key,data:null,failed:false});
+    setRead(old=>({key,data:old.key===key?old.data:null,failed:false}));
     const timeout=window.setTimeout(()=>{timedOut=true;controller.abort();},15000);
     readWorkerHelpHistory(fetch,session,{assignmentId,version,language:contentLanguage},page,controller.signal,isCurrent)
       .then(value=>{if(isCurrent())setRead({key,data:value,failed:false});}).catch(error=>{

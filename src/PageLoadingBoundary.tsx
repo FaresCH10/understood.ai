@@ -15,9 +15,10 @@ export function PageLoadingBoundary({children}:{children:ReactNode}){
     const paused=new Set<gsap.core.Animation>();
     const resume=()=>{for(const animation of paused)if(animation.parent)animation.resume();paused.clear();};
     const resetTimer=()=>{clearTimeout(timer);};
+    const hasVisibleLoading=()=>Array.from(content.current?.querySelectorAll('[data-page-loading], .loading-page, .loading')??[]).some(element=>!element.closest('[hidden]'));
     const check=()=>{
       resetTimer();
-      if(!active||disposed||!animationReady||!fontsReady||assets||pageLoads.size||content.current?.querySelector('[data-page-loading], .loading-page, .loading'))return;
+      if(!active||disposed||!animationReady||!fontsReady||assets||pageLoads.size||hasVisibleLoading())return;
       if(document.fonts.status==='loading'){
         fontsReady=false;const cycle=generation;
         void document.fonts.ready.then(()=>{if(!disposed&&cycle===generation){fontsReady=true;scheduleScan();}});return;
@@ -25,7 +26,7 @@ export function PageLoadingBoundary({children}:{children:ReactNode}){
       // Let response parsing, React commits and lazy chunk fallbacks finish before revealing.
       const cycle=generation;
       timer=setTimeout(()=>{
-        if(disposed||cycle!==generation||!animationReady||assets||pageLoads.size||content.current?.querySelector('[data-page-loading], .loading-page, .loading'))return;
+        if(disposed||cycle!==generation||!animationReady||assets||pageLoads.size||hasVisibleLoading())return;
         active=false;pageLoads.finish();setLoading(false);
         resume();requestAnimationFrame(()=>{if(!disposed)ScrollTrigger.refresh();});
         document.dispatchEvent(new Event('understood:page-ready'));
@@ -75,7 +76,7 @@ export function PageLoadingBoundary({children}:{children:ReactNode}){
       if(typeof key!=='string'||!key||accountsVisited.has(key))return;
       accountsVisited.add(key);if(!active)start();
     };
-    if(content.current)observer.observe(content.current,{childList:true,subtree:true,attributes:true,attributeFilter:['src','srcset']});
+    if(content.current)observer.observe(content.current,{childList:true,subtree:true,attributes:true,attributeFilter:['src','srcset','hidden']});
     const unsubscribe=pageLoads.subscribe(scheduleScan);
     window.addEventListener('hashchange',navigate);document.addEventListener('understood:account-entry',enterAccount);start();
     return()=>{disposed=true;generation=++cycleCounter.current;animationComplete.current=()=>{};resume();resetTimer();cancelAnimationFrame(frame);observer.disconnect();unsubscribe();window.removeEventListener('hashchange',navigate);document.removeEventListener('understood:account-entry',enterAccount);pageLoads.finish();};

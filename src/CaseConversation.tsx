@@ -89,10 +89,11 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
   const composerId=useId(),composerCountId=useId(),composerLimitId=useId();
   const [page,setPage]=useState(1),[tick,setTick]=useState(0),[text,setText]=useState(''),[failure,setFailure]=useState<ConversationFailure|null>(null),[notice,setNotice]=useState(false),[busy,setBusy]=useState(false),[pending,setPending]=useState<PendingMessage|null>(null),[recoveryFailed,setRecoveryFailed]=useState(false);
   const [voiceDirty,setVoiceDirty]=useState(false),[includeAudio,setIncludeAudio]=useState(true),[generationStatus,setGenerationStatus]=useState<ConversationReceipt['status']|null>(null);
-  const readKey=JSON.stringify([page,tick]);
+  const readKey=JSON.stringify([page]);
   const [read,setRead]=useState<{key:string;data:ConversationPage|null;loading:boolean;failure:ConversationFailure|null}>({key:'',data:null,loading:true,failure:null});
   const mounted=useRef(false),inFlight=useRef(false),command=useRef<AbortController|null>(null),callbacks=useRef({current,canWrite,canMutate,onDirtyChange,onSessionLost});callbacks.current={current,canWrite,canMutate,onDirtyChange,onSessionLost};
   const dialog=useRef<HTMLDialogElement>(null),clearTrigger=useRef<HTMLElement|null>(null),clearIntent=useRef<string|null>(null);
+  useEffect(()=>{const timer=window.setInterval(()=>{if(document.visibilityState==='visible'&&current())setTick(value=>value+1);},15000);return()=>window.clearInterval(timer);},[]);
   const composer=useRef<HTMLTextAreaElement>(null),refreshButton=useRef<HTMLButtonElement>(null);
   const draft=useRef(text);draft.current=text;
   const isCurrent=()=>mounted.current&&callbacks.current.current()&&validConversationSession(session);
@@ -113,7 +114,7 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
     return requestConversation(fetch,session,caseId,worker,operation,signal,isCurrent,canSend);
   }
   useEffect(()=>{
-    let alive=true;const controller=new AbortController();setRead({key:readKey,data:null,loading:true,failure:null});
+    let alive=true;const controller=new AbortController();setRead(old=>({key:readKey,data:old.key===readKey?old.data:null,loading:true,failure:null}));
     request({kind:'page',page},controller.signal).then(value=>{if(alive&&isCurrent())setRead({key:readKey,data:value as ConversationPage,loading:false,failure:null});}).catch(reason=>{
       if(!alive||!mounted.current||!callbacks.current.current())return;
       const code=reason instanceof ConversationRequestError?reason.code:'unavailable';setRead({key:readKey,data:null,loading:false,failure:code});if(code==='session')callbacks.current.onSessionLost?.();
@@ -156,7 +157,7 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
   return <section className={worker?'worker-card':'panel'} lang={locale} dir={rtl?'rtl':'ltr'}>
     <div className="worker-card-head"><h2>{t.title}</h2><button ref={refreshButton} className="icon-button" title={t.refresh} aria-label={t.refresh} disabled={busy||voiceDirty} onClick={()=>{setFailure(null);setTick(value=>value+1);}}><RefreshCw size={18}/></button></div>
     {error&&<p role="alert" className="record-error">{error}</p>}{notice&&<p role="status">{t.received}</p>}{generationStatus==='failed'&&<p role="alert" className="record-error">{g.failed}</p>}
-    {read.key===readKey&&read.failure?<p role="alert">{read.failure==='invalid'?s.invalid:t.failed}</p>:loading?<p data-page-loading role="status">{t.loading}</p>:!data?null:!data.items.length?<p>{t.empty}</p>:<div className="row-list">{data.items.map(item=><article className="worker-help-entry" key={item.id}><div className="worker-card-head"><strong><bdi>{item.author==='worker'?t.worker:item.authorName==='Supervisor'?t.supervisor:item.authorName}</bdi></strong><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString(locale,{timeZone:timezone})}</time></div><p lang={item.language} dir={workerUiDirection(item.language)}>{item.text}</p>{item.audioUrl&&<audio controls preload="none" src={item.audioUrl} aria-label={g.play}/>}</article>)}</div>}
+    {read.key===readKey&&read.failure?<p role="alert">{read.failure==='invalid'?s.invalid:t.failed}</p>:loading&&!data?<p data-page-loading role="status">{t.loading}</p>:!data?null:!data.items.length?<p>{t.empty}</p>:<div className="row-list">{data.items.map(item=><article className="worker-help-entry" key={item.id}><div className="worker-card-head"><strong><bdi>{item.author==='worker'?t.worker:item.authorName==='Supervisor'?t.supervisor:item.authorName}</bdi></strong><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString(locale,{timeZone:timezone})}</time></div><p lang={item.language} dir={workerUiDirection(item.language)}>{item.text}</p>{item.audioUrl&&<audio controls preload="none" src={item.audioUrl} aria-label={g.play}/>}</article>)}</div>}
     {data&&data.total>20&&<div className="actions"><button className="icon-button" title={t.previous} aria-label={t.previous} disabled={busy||voiceDirty||!!text||page<=1} onClick={()=>setPage(value=>value-1)}>{rtl?<ChevronRight size={18}/>:<ChevronLeft size={18}/>}</button><span>{page} / {Math.ceil(data.total/20)}</span><button className="icon-button" title={t.next} aria-label={t.next} disabled={busy||voiceDirty||!!text||page*20>=data.total||page>=5000} onClick={()=>setPage(value=>value+1)}>{rtl?<ChevronLeft size={18}/>:<ChevronRight size={18}/>}</button></div>}
     {pending&&<div className="notice notice-amber"><p role="status">{generationStatus==='queued'?g.queued:generationStatus==='processing'?g.processing:t.unknown}</p><button className="button outline" disabled={busy||recoveryFailed} onClick={()=>void check()}><RefreshCw size={18}/>{t.check}</button></div>}
     {data&&!data.canReply&&<p>{t.closed}</p>}{unavailable&&<p role="status">{t.translation}</p>}

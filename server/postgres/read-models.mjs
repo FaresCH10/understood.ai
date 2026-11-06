@@ -235,11 +235,11 @@ function workerContent(row,detail=false) {
     ...(detail && evidence ? {evidenceUrl:`/api/worker/briefings/${encodeURIComponent(row.id)}/evidence`} : {}),
     outcome:responseMode==='acknowledge' ? null : currentAudio ? null : row.outcome,
     assessmentStatus:responseMode==='acknowledge' ? acknowledgedAt ? 'complete' : null
-      : currentAudio || (row.attempt_at && !row.outcome) ? 'pending' : row.outcome ? 'complete' : null,
+      : !currentAudio && !row.outcome && ['failed','blocked'].includes(row.assessment_job_status) ? 'failed' : currentAudio || (row.attempt_at && !row.outcome) ? 'pending' : row.outcome ? 'complete' : null,
     ...(acknowledgedAt?{acknowledgedAt}:{}),
     audioStatus:currentAudio ? row.audio_status : null,...(detail ? {recordingId:currentAudio ? row.recording_id : null,
       content:expired?null:{title:lang.title,text:lang.text,...(responseMode==='question'?{question:lang.question,...(lang.questionType==='multiple-choice'?{questionType:lang.questionType,choices:lang.choices}:{})}:{}),speech:speechOffered ? lang.speech : null},
-      ...(!expired && row.speech_active===true && generatedSpeech && lang.speech?.body && lang.speech?.question ? {speechUrls:{body:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/body`,question:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/question`}} : {}),
+      ...(!expired && row.speech_active===true && generatedSpeech && lang.speech?.body && lang.speech?.question ? {speechUrls:{...(lang.speech.question.includesChoices===true?{includesChoices:true}:{}),body:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/body`,question:`/api/worker/briefings/${encodeURIComponent(row.id)}/speech/question`}} : {}),
       speechAvailable:speechOffered ? 'speechSynthesis' : null} : {})};
 }
 

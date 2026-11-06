@@ -1,3 +1,5 @@
+import {postgresWorkspace} from '../server/postgres/workspace.mjs';
+import {workerSubmission} from '../server/postgres/responses.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -139,4 +141,42 @@ test('repeat pages include every preserved request and prevent an inert request 
     await resolveClarification(f.pool,owner,f.caseId,{notes:'Synthetic closed repeat case'});assert.equal((await caseRepeatPage(f.pool,owner,f.caseId)).blockedReason,'case_resolved');
     await assert.rejects(caseRepeatPage(f.pool,worker,f.caseId),/Forbidden/);
   }finally{await f.close();}
+});
+
+
+test('approved repeat can finish after the original answer deadline and rejects unauthorized extra answers',async()=>{
+ const f=await fixture();try{
+  await f.request(command());
+  await submitAnswer(f.pool,worker,'assignment-14',randomUUID(),'Finished: blue. Unfinished: yellow.');
+  await processOneAssessment(f.pool,{assess:async()=>({outcome:'matched',reasons:['asked_facts_present'],evidence:[{factIndex:0,quote:'Finished: blue'},{factIndex:1,quote:'Unfinished: yellow'}]})});
+  await resolveClarification(f.pool,owner,f.caseId,{notes:'[Understood:ready]\nExplained; worker can continue.'});
+  const item=(await postgresWorkspace(f.pool,worker,'work',{assignmentId:'assignment-14'})).item;
+  assert.equal(item.canComplete,true);
+  assert.equal((await postgresWorkspace(f.pool,worker,'work',{complete:'assignment-14'})).status,'done');
+  await f.db.exec("UPDATE assignments SET due_at=clock_timestamp()+interval '1 hour'");
+  await assert.rejects(submitAnswer(f.pool,worker,'assignment-14',randomUUID(),'Another answer'),/approved repeat/);
+ }finally{await f.close();}
+});
+
+test('exhausted checks remain received, show failed instead of pending, and retain an open follow-up',async()=>{
+ const f=await fixture();try{
+  await f.request(command());const requestId=randomUUID();
+  await submitAnswer(f.pool,worker,'assignment-14',requestId,'Answer awaiting a provider check');
+  for(let n=0;n<3;n++){await f.db.exec("UPDATE assessment_jobs SET due_at=clock_timestamp()-interval '1 second' WHERE status='queued'");await processOneAssessment(f.pool,{assess:async()=>{throw Error('Synthetic unavailable provider');}});}
+  assert.equal((await workerBriefing(f.pool,worker,'assignment-14')).assessmentStatus,'failed');
+  assert.equal((await workerSubmission(f.pool,worker,'assignment-14',requestId)).receipt.assessmentFailed,true);
+  assert.equal((await f.db.query("SELECT count(*)::int n FROM clarifications WHERE status='open'")).rows[0].n,1);
+ }finally{await f.close();}
+});
+
+test('help after a wrong answer joins the active conversation and exact retries do not duplicate messages',async()=>{
+ const f=await fixture();try{
+  const input={requestId:randomUUID(),text:'Please explain the shelf colours.'};
+  const receipt=await requestHelp(f.pool,worker,'assignment-14',input);
+  assert.equal(receipt.id,input.requestId);assert.equal((await requestHelp(f.pool,worker,'assignment-14',input)).duplicate,true);
+  assert.equal((await f.db.query('SELECT count(*)::int n FROM clarifications')).rows[0].n,1);
+  const messages=(await f.db.query('SELECT case_id,text FROM case_messages')).rows;
+  assert.equal(messages.length,1);assert.equal(messages[0].case_id,f.caseId);assert.equal(messages[0].text,input.text);
+  await assert.rejects(requestHelp(f.pool,worker,'assignment-14',{...input,text:'Different text'}),/conflict/);
+ }finally{await f.close();}
 });

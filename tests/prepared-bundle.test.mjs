@@ -306,3 +306,26 @@ test('incompatible or corrupt regeneration baselines fail before any provider ca
   failed.input.revision=2;failed.input.regeneration={kind:'translation',language:'ar',bundle:previous,review:null};
   await rejectsCode(prepareLanguageBundle(failed.input),'translation_check_failed');assert.equal(failed.calls.some(call=>call[0]==='speech'),false);
 });
+
+
+test('multiple-choice question audio includes the frozen visible options in their displayed order',async()=>{
+ const f=fixture();const {manifest}=await prepareLanguageBundle({...f.input,multipleChoice:true});
+ preparedAudioReferences(manifest);
+ for(const [language,item] of Object.entries(manifest.languages)){
+  const text=[item.question,...item.choices.map((choice,index)=>`${index+1}. ${choice.text}`)].join('\n');
+  assert.equal(item.speech.question.includesChoices,true);
+  assert.equal(item.speech.question.textHash,hash(text));
+  assert.ok(f.calls.some(call=>call[0]==='speech'&&call[1]===text&&call[2]===language));
+ }
+});
+
+
+test('regenerating option speech preserves every frozen option ID and order in retained languages',async()=>{
+ const first=fixture(),previous=await prepareLanguageBundle({...first.input,multipleChoice:true});
+ const next=fixture(),result=await prepareLanguageBundle({...next.input,multipleChoice:true,revision:2,regeneration:{kind:'audio',language:'ar',bundle:previous,review:null}});
+ preparedAudioReferences(result.manifest);
+ for(const language of Object.keys(previous.manifest.languages)){
+  assert.deepEqual(result.manifest.languages[language].choices,previous.manifest.languages[language].choices);
+  assert.equal(result.manifest.languages[language].speech.question.textHash,previous.manifest.languages[language].speech.question.textHash);
+ }
+});

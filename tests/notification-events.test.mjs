@@ -92,7 +92,8 @@ for(const postgres of [false,true]) test(`${postgres?'PostgreSQL':'SQLite'} work
     const session=f.worker('worker-28');
     const page=await f.list(session,{pageSize:10});
     assert.equal(page.total,2);assert.equal(page.unread,2);assert.deepEqual(page.items.map(item=>item.kind),['deadline.reminder','instruction.available']);
-    assert.deepEqual(Object.keys(page.items[0]),['id','kind','label','destination','objectType','objectId','occurredAt','readAt']);
+    assert.ok(Object.keys(page.items[0]).every(key=>['id','kind','label','destination','objectType','objectId','occurredAt','readAt','assignmentId','caseId','title','supervisorName'].includes(key)));
+    if(page.items[0].assignmentId)assert.equal(page.items[0].assignmentId,'assignment-28');
     assert.doesNotMatch(JSON.stringify(page),/private-answer|rubric|answer_text|Worker|worker-28/);
     assert.equal((await f.list(f.worker('worker-29'),{pageSize:10})).total,0);
     const receipt=await f.read(session,page.items[0].id);assert.ok(receipt.readAt);assert.equal((await f.list(session)).unread,1);

@@ -33,8 +33,8 @@ export function assignmentWorkStatus(row){
  return 'sent';
 }
 const workColumns=`${responseColumns},ac.completed_at,
- EXISTS(SELECT 1 FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='open') AS open_case,
- EXISTS(SELECT 1 FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='resolved'
+ EXISTS(SELECT 1 FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND (c.status='open' OR (c.notes LIKE '[Understood:blocked]%' OR c.notes LIKE '[Understood:cancelled]%') AND c.id=(SELECT c2.id FROM clarifications c2 WHERE c2.assignment_id=a.id AND c2.org_id=a.org_id ORDER BY c2.created_at DESC,c2.id DESC LIMIT 1))) AS open_case,
+ EXISTS(SELECT 1 FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='resolved' AND c.notes LIKE '[Understood:ready]%'
   AND c.attempt_id=(SELECT t.id FROM attempts t JOIN submission_receipts sr ON sr.assignment_id=t.assignment_id AND sr.submission_id=t.submission_id
    WHERE t.assignment_id=a.id ORDER BY sr.sequence DESC LIMIT 1)) AS resolved_outcome`;
 const currentRecordingSql=`audio_status IS NOT NULL AND (attempt_submission IS NULL OR audio_submission<>attempt_submission) AND (attempt_order IS NULL OR audio_order>attempt_order)`;
@@ -139,6 +139,18 @@ export async function workspaceOperation(q,session,operation,input={},options={}
   const row=(await q('SELECT content_json FROM instruction_compositions WHERE id=? AND org_id=? AND site_id=? AND staff_id=?',values))[0];
   return {id:input.id,content:row?parse(row.content_json):null};
  }
+ if(operation==='worker-crew'){
+  if(staff)throw Error('Forbidden');
+  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(key=>!['page','membersPage','status'].includes(key)))throw Error('Invalid crew request');
+  const page=Number(input.page??1),membersPage=Number(input.membersPage??1),status=input.status??'active';
+  if(!Number.isSafeInteger(page)||page<1||page>5000||!Number.isSafeInteger(membersPage)||membersPage<1||membersPage>5000||!['active','done','all'].includes(status))throw Error('Invalid crew request');
+  const crew=(await q(`SELECT c.id,c.name,cm.joined_at FROM crew_memberships cm JOIN crews c ON c.id=cm.crew_id AND c.org_id=cm.org_id AND c.site_id=cm.site_id WHERE cm.worker_id=? AND cm.org_id=? AND cm.site_id=? AND c.active=TRUE`,[session.principal_id,...scope]))[0];
+  if(!crew)return {crew:null,members:{items:[],total:0,page:membersPage,pageSize:10},work:null};
+  const total=Number((await q(`SELECT COUNT(*) AS total FROM crew_memberships cm JOIN workers w ON w.id=cm.worker_id AND w.org_id=cm.org_id AND w.site_id=cm.site_id WHERE cm.crew_id=? AND cm.org_id=? AND cm.site_id=? AND w.active=TRUE`,[crew.id,...scope]))[0].total);
+  const members=await q(`SELECT w.name,w.language,CASE WHEN w.id=? THEN 1 ELSE 0 END AS is_you FROM crew_memberships cm JOIN workers w ON w.id=cm.worker_id AND w.org_id=cm.org_id AND w.site_id=cm.site_id WHERE cm.crew_id=? AND cm.org_id=? AND cm.site_id=? AND w.active=TRUE ORDER BY CASE WHEN w.id=? THEN 0 ELSE 1 END,LOWER(COALESCE(w.name,'')),w.id LIMIT 10 OFFSET ?`,[session.principal_id,crew.id,...scope,session.principal_id,(membersPage-1)*10]);
+  const work=await workspaceOperation(q,session,'work',{page,pageSize:10,status},{...options,workerCrewId:crew.id});
+  return {crew:{id:crew.id,name:crew.name,joinedAt:iso(crew.joined_at),activeMembers:total},members:{items:members.map(row=>({name:row.name||null,language:row.language,isYou:!!Number(row.is_you)})),total,page:membersPage,pageSize:10},work};
+ }
  if(operation==='work'){
   const filter=workInput(input,staff);
   const workerId=staff?input.workerId:session.principal_id;
@@ -152,15 +164,15 @@ export async function workspaceOperation(q,session,operation,input={},options={}
    CASE WHEN EXISTS(SELECT 1 FROM briefing_content_purges bp WHERE bp.briefing_id=p.briefing_id) THEN 1 ELSE 0 END AS content_expired,
    COALESCE((SELECT d.content_json->>'title' FROM instruction_deliveries d WHERE d.assignment_id=a.id AND d.org_id=a.org_id AND d.site_id=a.site_id),p.snapshot_json->'languages'->a.language->>'title',p.snapshot_json->>'title','Instruction') AS title,
    (SELECT st.name FROM instruction_sends s JOIN staff st ON st.id=s.requested_by AND st.org_id=s.org_id AND st.site_id=s.site_id WHERE s.publication_id=p.id AND s.org_id=a.org_id AND s.site_id=a.site_id) AS supervisor_name,
-   CASE WHEN EXISTS(SELECT 1 FROM clarifications c JOIN case_messages m ON m.case_id=c.id AND m.org_id=c.org_id AND m.site_id=a.site_id WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='open' AND m.actor_type='staff') THEN 1 ELSE 0 END AS supervisor_reply,
+   CASE WHEN EXISTS(SELECT 1 FROM clarifications c JOIN case_messages m ON m.case_id=c.id AND m.org_id=c.org_id AND m.site_id=a.site_id WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='open' AND m.actor_type='staff' AND NOT EXISTS(SELECT 1 FROM notification_events ne JOIN notification_event_reads nr ON nr.event_id=ne.id AND nr.org_id=ne.org_id AND nr.site_id=ne.site_id WHERE ne.org_id=a.org_id AND ne.site_id=a.site_id AND ne.recipient_id=a.worker_id AND ne.object_type='case_message' AND ne.object_id=m.id AND nr.principal_type='worker' AND nr.principal_id=a.worker_id)) THEN 1 ELSE 0 END AS supervisor_reply,
    ${workColumns} FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
    LEFT JOIN assignment_completions ac ON ac.assignment_id=a.id AND ac.org_id=a.org_id AND ac.site_id=a.site_id
-   WHERE a.org_id=? AND a.site_id=? AND a.worker_id=? ${filter.assignmentId?'AND a.id=?':''}),
+   WHERE a.org_id=? AND a.site_id=? AND a.worker_id=? ${filter.assignmentId?'AND a.id=?':''} ${options.workerCrewId?'AND EXISTS(SELECT 1 FROM publication_report_audience pra WHERE pra.assignment_id=a.id AND pra.publication_id=a.publication_id AND pra.org_id=a.org_id AND pra.site_id=a.site_id AND pra.crew_id=?)':''}),
    work AS (SELECT assessed.*,${workStatusSql} AS status,${workResponseSql} AS response_status FROM assessed)`;
-  const base=[...scope,workerId,...(filter.assignmentId?[filter.assignmentId]:[])],now=new Date().toISOString();
+  const base=[...scope,workerId,...(filter.assignmentId?[filter.assignmentId]:[]),...(options.workerCrewId?[options.workerCrewId]:[])],now=new Date().toISOString();
   const map=row=>({id:row.id,publicationId:row.publication_id,briefingId:row.briefing_id,title:Number(row.content_expired)?'Instruction unavailable':row.title,version:row.version,publicationState:row.state,
    status:row.status,language:row.language,dueAt:iso(row.due_at)||null,supervisorName:row.supervisor_name||null,hasSupervisorReply:!!Number(row.supervisor_reply),responseStatus:row.response_status,
-   contentExpired:!!Number(row.content_expired),canComplete:row.status==='in-progress'&&row.state==='published'&&!Number(row.content_expired)&&(!row.due_at||Date.parse(row.due_at)>Date.parse(now)),completedAt:iso(row.completed_at)||null,sentAt:iso(row.published_at)});
+   contentExpired:!!Number(row.content_expired),canComplete:row.status==='in-progress'&&row.state==='published'&&!Number(row.content_expired),completedAt:iso(row.completed_at)||null,sentAt:iso(row.published_at)});
   const exact=filter.assignmentId?(await q(`${cte} SELECT * FROM work`,base))[0]:null;
   if(filter.assignmentId&&!exact)throw Error('Assignment unavailable');
   if(input.complete){

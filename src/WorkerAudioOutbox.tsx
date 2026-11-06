@@ -5,6 +5,7 @@ import {sendWorkerRecording,WorkerAudioRetryError,workerAudioRetryText} from './
 import {readWorkerRequestReceipt,workerReceiptCheckText} from './worker-request';
 import type {PageSession} from './session-state';
 import type {WorkerUiLanguage} from './worker-ui-language';
+import {WorkerDeviceDisclosure} from './WorkerDeviceDisclosure';
 
 export type AudioOutboxProps={session:PageSession;language:WorkerUiLanguage;disabled:boolean;current:()=>boolean;onOperation:(work:()=>Promise<void>)=>Promise<void>;onSessionLost:()=>void;learnMore?:string};
 const copy={
@@ -69,10 +70,11 @@ export function WorkerAudioOutbox({session,language,disabled,current,onOperation
     finally {inFlight.current=false;if(live.current)setWorking(false);}
   }
   const locked=disabled || working;
-  return <section className="worker-audio-outbox"><div className="worker-card-head"><h2><HardDrive size={20}/> {t.title}</h2><button className="icon-button" title={a.reload} aria-label={a.reload} disabled={locked} onClick={()=>{setNotice('');setTick(value=>value+1);}}><RefreshCw size={20}/></button></div>
-    {learnMore?<details className="device-disclosure"><summary>{learnMore}</summary><p>{a.privacy}</p><p className="muted">{t.limits}</p></details>:<><p>{a.privacy}</p><p className="muted">{t.limits}</p></>}{notice && <p role="status">{notice}</p>}
+  const Heading=learnMore?'h3':'h2',ItemHeading=learnMore?'h4':'h3';
+  return <section className="worker-audio-outbox"><div className="worker-card-head"><Heading><HardDrive size={20} aria-hidden="true"/> <span>{t.title}</span></Heading><button className="icon-button" title={a.reload} aria-label={a.reload} disabled={locked} onClick={()=>{setNotice('');setTick(value=>value+1);}}><RefreshCw size={20} aria-hidden="true"/></button></div>
+    {learnMore?<WorkerDeviceDisclosure label={learnMore}><p>{a.privacy}</p><p>{t.limits}</p></WorkerDeviceDisclosure>:<><p>{a.privacy}</p><p className="muted">{t.limits}</p></>}{notice && <p role="status">{notice}</p>}
     {loading?<p data-page-loading role="status">{a.loading}</p>:!items.length?<p>{a.empty}</p>:items.map(item=><article className="worker-card" key={item.key}>
-      <h3>{t.scope} <bdi>{item.draft.scope.assignmentId}</bdi></h3><p>{t.version} {item.draft.scope.version} · {item.draft.scope.language.toUpperCase()}</p>
+      <ItemHeading>{t.scope} <bdi>{item.draft.scope.assignmentId}</bdi></ItemHeading><p>{t.version} {item.draft.scope.version} · {item.draft.scope.language.toUpperCase()}</p>
       <p><time dateTime={item.draft.capturedAt}>{new Date(item.draft.capturedAt).toLocaleString(language)}</time></p><p>{t.expires}: <time dateTime={item.draft.expiresAt}>{new Date(item.draft.expiresAt).toLocaleString(language)}</time></p>
       {!locked && <Preview item={item} label={a.title}/>}
       <p role="status">{statuses[item.draft.submissionId] || a.saved}</p><div className="actions"><button className="button primary" disabled={locked || [a.received,r.received].includes(statuses[item.draft.submissionId])} onClick={()=>void run('send',item)}><Send size={18}/>{a.send}</button><button className="button outline" disabled={locked} onClick={()=>void run('check',item)}><RefreshCw size={18}/>{a.check}</button><button className="button subtle" disabled={locked} onClick={()=>void run('remove',item)}><Trash2 size={18}/>{a.remove}</button></div>

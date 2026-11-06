@@ -9,6 +9,7 @@ import type {RecordingScope} from './worker-audio-retry';
 import {WorkerRecorderView} from './WorkerRecorderView';
 import {privateDeviceAllowed,sharedDeviceText,subscribeDevicePolicy} from './worker-device-policy';
 import {usePrivateDevice} from './usePrivateDevice';
+import {WorkerDeviceDisclosure} from './WorkerDeviceDisclosure';
 import {readWorkerLockLanguage,workerBrowserLanguage,workerUiDirection,workerUiNativeName,type WorkerUiLanguage} from './worker-ui-language';
 
 export const offlineCopy={
@@ -49,7 +50,8 @@ export function WorkerOfflineCache({session,language,disabled,current,onOperatio
   useEffect(()=>subscribeOfflineChanges(()=>setTick(value=>value+1)),[]);
   useEffect(()=>{let active=true;setCount(null);readOfflineBundle(undefined,()=>active && allowed.current()).then(value=>{if(active && allowed.current()){if(value && (!sameWorkerSession(session,value.session) || session.expiresAt!==value.session.expiresAt))throw Error();setCount(value?.briefings.length ?? 0);}}).catch(()=>{if(active)setStatus(t.failed);});return()=>{active=false;};},[session.clientContext,session.expiresAt,tick]);
   async function remove(){if(disabled || working || !allowed.current())return;setWorking(true);try{await onOperation(()=>clearOfflineBriefings(session.clientContext));if(allowed.current()){setStatus(t.removed);setTick(value=>value+1);}}catch{setStatus(t.failed);}finally{setWorking(false);}}
-  return <section className="worker-text-draft worker-offline-controls"><h2><FileText size={20}/> {t.title}{count!==null && ` (${count})`}</h2>{learnMore?<details className="device-disclosure"><summary>{learnMore}</summary><p>{t.privacy}</p></details>:<p>{t.privacy}</p>}{count===0 && <p>{t.empty}</p>}<button className="button outline full" disabled={disabled || working} onClick={()=>void remove()}><Trash2 size={20}/>{t.remove}</button>{status && <p role="status">{status}</p>}</section>;
+  const Heading=learnMore?'h3':'h2';
+  return <section className="worker-text-draft worker-offline-controls"><Heading><FileText size={20} aria-hidden="true"/> <span>{t.title}{count!==null && ` (${count})`}</span></Heading>{learnMore?<WorkerDeviceDisclosure label={learnMore}><p>{t.privacy}</p></WorkerDeviceDisclosure>:<p>{t.privacy}</p>}{count===0 && <p>{t.empty}</p>}<button className="button outline full" disabled={disabled || working} onClick={()=>void remove()}><Trash2 size={20} aria-hidden="true"/>{t.remove}</button>{status && <p role="status">{status}</p>}</section>;
 }
 function SavedAudio({value,label}:{value:string|null;label:string}){
   const [url,setUrl]=useState('');useEffect(()=>{if(!value){setUrl('');return;}const next=URL.createObjectURL(new Blob([offlineAudioBytes(value)],{type:'audio/wav'}));setUrl(next);return()=>URL.revokeObjectURL(next);},[value]);

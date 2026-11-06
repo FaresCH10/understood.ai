@@ -1,3 +1,5 @@
+import {ensureCaseMessageSchema} from './case-messages.mjs';
+import {createHash} from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import { NOW,transaction } from './db.mjs';
 import { helpInput,clarificationFilters,resolutionInput,ownerInput,workerHelpHistoryInput } from './clarification-input.mjs';
@@ -128,6 +130,7 @@ export function getClarification(db,session,id) {
 
 export function requestHelp(db,session,assignmentId,input) {
   const {requestId,text}=helpInput(assignmentId,input);
+  ensureCaseMessageSchema(db);
   return transaction(db,() => {
     authority(db,session,'worker');
     const assignment=db.prepare('SELECT id,publication_id FROM assignments WHERE id=? AND org_id=? AND site_id=? AND worker_id=?').get(assignmentId,session.org_id,session.site_id,session.principal_id);
@@ -137,8 +140,17 @@ export function requestHelp(db,session,assignmentId,input) {
       if (old.org_id!==session.org_id || old.site_id!==session.site_id || old.assignment_id!==assignmentId || old.text!==text) throw new Error('Help request conflict');
       return {id:requestId,status:old.status,duplicate:true};
     }
+    const priorMessage=db.prepare("SELECT m.text,c.status FROM case_messages m JOIN clarifications c ON c.id=m.case_id AND c.org_id=m.org_id WHERE m.id=? AND m.org_id=? AND m.site_id=? AND m.assignment_id=? AND m.actor_type='worker' AND m.actor_id=?").get(requestId,session.org_id,session.site_id,assignmentId,session.principal_id);
+    if(priorMessage){if(priorMessage.text!==text)throw Error('Help request conflict');return {id:requestId,status:priorMessage.status,duplicate:true};}
     requireWritableEntitlement(db,session.org_id);
     if (db.prepare('SELECT state FROM publications WHERE id=? AND org_id=? AND site_id=?').get(assignment.publication_id,session.org_id,session.site_id)?.state!=='published') throw new Error('Assignment unavailable');
+    const active=db.prepare("SELECT id FROM clarifications WHERE assignment_id=? AND org_id=? AND status='open' ORDER BY created_at DESC,id DESC LIMIT 1").get(assignmentId,session.org_id);
+    if(active){
+      const a=db.prepare('SELECT language FROM assignments WHERE id=?').get(assignmentId);
+      db.prepare('INSERT INTO case_messages VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(requestId,session.org_id,session.site_id,active.id,assignmentId,'worker',session.principal_id,a.language,text,createHash('sha256').update(text).digest('hex'),NOW());
+      audit(db,session,'help.requested',active.id);
+      return {id:requestId,status:'open',duplicate:false};
+    }
     if (db.prepare('SELECT 1 FROM clarifications WHERE id=?').get(requestId)) throw new Error('Help request conflict');
     const now=NOW();
     db.prepare('INSERT INTO clarifications VALUES(?,?,?,?,?,?,?,?,?)').run(requestId,session.org_id,assignmentId,null,'Help requested',null,'open','',now);

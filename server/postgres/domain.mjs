@@ -218,6 +218,8 @@ export async function withdrawPublication(pool,session,briefingId,input,{schema=
     await client.query(`INSERT INTO publication_withdrawals(request_id,org_id,site_id,publication_id,version,reason,withdrawn_by)
       VALUES($1,$2,$3,$4,$5,$6,$7)`,[input.requestId,session.org_id,session.site_id,publication.id,publication.version,request.reason,session.principal_id]);
     await domainAudit(client,session,'briefing.withdrawn',publication.id);
+    const affected=(await client.query('SELECT id,worker_id FROM assignments WHERE publication_id=$1 AND org_id=$2 AND site_id=$3',[publication.id,session.org_id,session.site_id])).rows;
+    for(const a of affected)await recordWorkerEvent(client,{orgId:session.org_id,siteId:session.site_id,workerId:a.worker_id,kind:'instruction.withdrawn',objectType:'assignment',objectId:a.id,dedupeKey:`withdrawn:${a.id}`});
     return {id:publication.id,version:publication.version,state:'withdrawn',duplicate:false};
   });
 }

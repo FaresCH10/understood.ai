@@ -10,25 +10,27 @@ import type {PageSession} from './session-state';
 type ViewState=({kind:'ready'|'pending'|'failed';artifact:WorkerPresentationArtifact}|{kind:'not_required'|'unavailable'|'deferred'|'conflict'});
 
 export function WorkerPresentationView({assignmentId,version,sourceKind,sourceId,originalLanguage,approvedLanguage,
-  uiLanguage,session,disabled=false,compact=false,hasAudio=false,current,onSessionLost,onActive,onChoices,requiresChoices=false}:{
+  uiLanguage,session,disabled=false,compact=false,hasAudio=false,current,onSessionLost,onActive,onChoices,onQuestion,onContent,requiresChoices=false}:{
   assignmentId:string;version:number;sourceKind:PresentationSourceKind;sourceId?:string;
   originalLanguage:string;approvedLanguage:string;uiLanguage:WorkerUiLanguage;session:PageSession;
-  disabled?:boolean;compact?:boolean;hasAudio?:boolean;current:()=>boolean;onSessionLost:()=>void;onActive?:(id:string|null)=>void;requiresChoices?:boolean;onChoices?:(choices:{id:string;text:string}[]|null)=>void;
+  disabled?:boolean;compact?:boolean;hasAudio?:boolean;current:()=>boolean;onSessionLost:()=>void;onActive?:(id:string|null)=>void;requiresChoices?:boolean;onContent?:(content:InstructionPresentationContent|null)=>void;onQuestion?:(question:string|null)=>void;onChoices?:(choices:{id:string;text:string}[]|null)=>void;
 }){
   const t=workerPresentationText[uiLanguage],panelId=useId();
   const [opened,setOpened]=useState(false),[busy,setBusy]=useState(false),[view,setView]=useState<ViewState|null>(null),[failure,setFailure]=useState('');
   const request=useRef<AbortController|null>(null);
   const notify=useRef(onActive);notify.current=onActive;
+  const notifyContent=useRef(onContent);notifyContent.current=onContent;
+  const notifyQuestion=useRef(onQuestion);notifyQuestion.current=onQuestion;
   const notifyChoices=useRef(onChoices);notifyChoices.current=onChoices;
   const enabled=isWorkerLanguage(originalLanguage)&&isWorkerLanguage(approvedLanguage)&&originalLanguage!==approvedLanguage
     &&(sourceKind==='instruction'||!!sourceId);
-  useEffect(()=>()=>{request.current?.abort();notify.current?.(null);notifyChoices.current?.(null);},[]);
+  useEffect(()=>()=>{request.current?.abort();notify.current?.(null);notifyChoices.current?.(null);notifyQuestion.current?.(null);notifyContent.current?.(null);},[]);
   useEffect(()=>{request.current?.abort();setOpened(false);setView(null);setFailure('');setBusy(false);},[assignmentId,version,sourceKind,sourceId,approvedLanguage]);
   const activeId=opened&&view?.kind==='ready'&&view.artifact.content
     &&(!requiresChoices||(view.artifact.content as InstructionPresentationContent).choices?.length===4)
     &&(view.artifact.sourceKind==='answer'||(view.artifact.content as {question?:string|null}).question)
     ?view.artifact.id:null;
-  useEffect(()=>{notify.current?.(activeId);notifyChoices.current?.(activeId&&view?.kind==='ready'?(view.artifact.content as InstructionPresentationContent).choices??null:null);},[activeId,view]);
+  useEffect(()=>{notifyContent.current?.(activeId&&view?.kind==='ready'?view.artifact.content as InstructionPresentationContent:null);notifyQuestion.current?.(activeId&&view?.kind==='ready'?(view.artifact.content as InstructionPresentationContent).question:null);notify.current?.(activeId);notifyChoices.current?.(activeId&&view?.kind==='ready'?(view.artifact.content as InstructionPresentationContent).choices??null:null);},[activeId,view]);
   if(!enabled)return null;
   const target=approvedLanguage as WorkerUiLanguage;
   const origin=((view&&'artifact' in view?view.artifact.originalLanguage:originalLanguage) as WorkerUiLanguage);
@@ -79,12 +81,12 @@ export function WorkerPresentationView({assignmentId,version,sourceKind,sourceId
       {failure?<><p className="notice notice-amber" role="alert">{failure}</p><button type="button" className="button outline" disabled={busy} onClick={()=>void load('check')}>{busy?t.loading:t.check}</button></>:
        view?.kind==='ready'&&requiresChoices&&!(view.artifact.content as InstructionPresentationContent)?.choices?<><p role="status">{t.pending}</p><button type="button" className="button outline" disabled={busy} onClick={()=>void load('check')}>{busy?t.loading:t.check}</button></>:
        view?.kind==='ready'?<>
-        {view.artifact.sourceKind==='instruction'&&view.artifact.content?<div lang={target} dir={direction}>
+        {!onContent&&view.artifact.sourceKind==='instruction'&&view.artifact.content?<div lang={target} dir={direction}>
           <h3>{(view.artifact.content as {title:string}).title}</h3>
           <p className="briefing-text" lang={target} dir={direction}>{(view.artifact.content as {text:string}).text}</p>
           {(view.artifact.content as {question:string|null}).question&&<><h4>{t.question}</h4><p className="question" lang={target} dir={direction}>{(view.artifact.content as {question:string}).question}</p></>}
           {(view.artifact.content as InstructionPresentationContent).choices&&<ul>{(view.artifact.content as InstructionPresentationContent).choices!.map(choice=><li key={choice.id}>{choice.text}</li>)}</ul>}
-        </div>:view.artifact.content?<div lang={target} dir={direction}>
+        </div>:!onContent&&view.artifact.content?<div lang={target} dir={direction}>
           <h3>{t.answer}</h3>
           <p className="briefing-text" lang={target} dir={direction}>{(view.artifact.content as {text:string}).text}</p>
         </div>:null}
