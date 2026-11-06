@@ -87,6 +87,14 @@
 .auth-error{padding:10px 12px;border:1px solid #eed0cb;border-radius:6px;background:#fff5f3;color:#8e3f32;font-size:12px;line-height:1.5;margin-top:16px}
 .auth-card .registration-page{max-width:none;padding:0;margin:0}
 .auth-card .registration-top{gap:8px;margin:0 0 10px}
+.registration-selected-plan{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:14px 16px;background:#f0f5f1;border:1px solid #d9e6de;border-radius:9px}
+.registration-selected-plan>div{display:grid;gap:4px}
+.registration-selected-plan small{color:#4a6558}
+.registration-access-options{display:grid;gap:10px;margin:16px 0}
+.registration-access-options .button{justify-content:space-between;gap:14px;min-height:44px;text-align:start;white-space:normal}
+.registration-access-options .button span{display:grid;gap:4px}
+.registration-access-options .button small{color:#4a6558}
+.registration-access-options svg{flex-shrink:0}
 .auth-card .registration-top>.button{padding:0;font-size:11px;min-height:30px}
 .auth-card .registration-layout{display:block}
 .auth-card .registration-intro h1{font-size:28px;margin:8px 0 10px;line-height:1.12;overflow-wrap:normal}

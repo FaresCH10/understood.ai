@@ -1,3 +1,4 @@
+import {assertPlanUpgrade} from './pilot-policy.mjs';
 import {randomUUID} from 'node:crypto';
 import {transaction,NOW} from './db.mjs';
 import {reviewRequestId} from './briefing-input.mjs';
@@ -40,7 +41,9 @@ export function saveActivationRequest(db,session,input) {
     }
     if(db.prepare("SELECT 1 FROM organization_activation_requests WHERE org_id=? AND state='pending'").get(session.org_id))
       throw Error('Activation request already pending');
-    const createdAt=NOW(), entitlementRevision=readEntitlement(db,session.org_id)?.revision ?? 0;
+    const entitlement=readEntitlement(db,session.org_id);
+    assertPlanUpgrade(value.note,session.role,entitlement?.plan);
+    const createdAt=NOW(), entitlementRevision=entitlement?.revision ?? 0;
     try {
       db.prepare(`INSERT INTO organization_activation_requests
         VALUES(?,?,?,?,?,?,'pending',?,NULL,NULL,NULL)`)

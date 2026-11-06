@@ -14,6 +14,9 @@ import {createServer,request as httpRequest} from 'node:http';
 import {createVercelNeonHandler} from '../server/vercel-neon.mjs';
 import {verifyRegistrationCode} from '../server/postgres/registration.mjs';
 import {validStaffSession} from '../src/session-state.ts';
+import {provisionOperator,authenticateOperator} from '../server/postgres/operators.mjs';
+import {saveOperatorEntitlement} from '../server/postgres/entitlement-operations.mjs';
+import {tokenHash} from '../server/auth-crypto.mjs';
 
 const schema='understood_test_registration';
 const options={schema};
@@ -75,7 +78,7 @@ test('Vercel Neon registration dispatches before responding and survives handler
     assert.deepEqual(await (await request('auth/registrations/options')).json(),{available:true,verification:'neon-code'});
     const old=value();await requestRegistration(f.pool,old,'192.0.2.10',config,options);
     await f.q("UPDATE organization_registrations SET state='expired',payload=NULL WHERE id=$1",[old.requestId]);
-    const input=value();
+    const input=value({plan:'business'});
     fail=true;
     const failed=await request('auth/registrations',input);
     assert.equal(failed.status,503);assert.equal(dispatches,1);
@@ -100,9 +103,34 @@ test('Vercel Neon registration dispatches before responding and survives handler
     const login=await request('auth/staff/login',{email,password});
     assert.equal(login.status,200);
     assert.match(login.headers.get('set-cookie'),/__Host-understood_session=.*Secure/);
-    const session=await request('session',null,{cookie:login.headers.get('set-cookie').split(';')[0]});
+    const cookie=login.headers.get('set-cookie').split(';')[0];
+    const session=await request('session',null,{cookie});
     assert.equal(session.status,200);
-    assert.equal(validStaffSession(await session.json()),true,'signed-in session must satisfy the browser contract');
+    const signedIn=await session.json();
+    assert.equal(validStaffSession(signedIn),true,'signed-in session must satisfy the browser contract');
+    assert.equal(signedIn.workspacePlan,'business_pending');
+    const workspaceHeaders={cookie,'x-client-session-context':signedIn.clientContext};
+    const blocked=await request('overview',null,workspaceHeaders);
+    assert.equal(blocked.status,403);
+    assert.equal((await blocked.json()).error,'Workspace access is pending');
+
+    const operator={id:randomUUID(),email:'ops@example.test',name:'Operator',password};
+    await provisionOperator(f.pool,operator,options);
+    const operatorSession=await authenticateOperator(f.pool,{email:operator.email,password},'192.0.2.11',options);
+    const identity={token_hash:tokenHash(operatorSession.token)};
+    const {org_id:orgId}=(await f.q('SELECT org_id FROM organization_registrations WHERE id=$1',[receipt.requestId]))[0];
+    const command={requestId:randomUUID(),kind:'entitlement',orgId,revision:1,state:'active',endsAt:null,workerLimit:30,
+      plan:'business',termsReference:'manual-activation-test',reason:'manual_activation',activationRequestId:receipt.requestId,confirmed:true};
+    await assert.rejects(saveOperatorEntitlement(f.pool,identity,{...command,plan:'pro'},options),/Invalid operator command/);
+    await saveOperatorEntitlement(f.pool,identity,command,options);
+    assert.equal((await (await request('session',null,{cookie})).json()).workspacePlan,'business');
+    assert.equal((await request('overview',null,workspaceHeaders)).status,200);
+    const upgrade=plan=>request('entitlement/requests',{requestId:randomUUID(),confirmed:true,note:`Plan upgrade: ${plan}`},workspaceHeaders);
+    assert.equal((await upgrade('pro')).status,400);
+    const upgraded=await upgrade('enterprise');
+    assert.equal(upgraded.status,201);
+    assert.equal((await upgraded.json()).changesApplied,false);
+    assert.equal((await (await request('session',null,{cookie})).json()).workspacePlan,'business');
   }finally{if(server?.listening)await new Promise(resolve=>server.close(resolve));await f.db.close();}
 });
 

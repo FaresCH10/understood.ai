@@ -51,6 +51,7 @@
 .account-address .account-menu-name strong{font-size:13px;line-height:1.4;color:#203a2c}
 .account-role{padding:2px 5px;background:#f0f4f1;border-radius:4px;color:#52665a;font-size:11px;line-height:1.4;font-weight:500}
 .account-address .account-menu-identity small{margin-top:6px;font-size:12px;line-height:1.5;color:#5a6a60;overflow-wrap:anywhere}
+.account-menu-identity .account-plan{display:table;padding:2px 8px;border-radius:5px;background:#e5f0e9;color:#21513d;font-weight:650}
 .account-actions{padding:6px}
 .account-options .account-action{gap:10px;min-height:42px;border-radius:6px;padding:10px;font-size:13px;line-height:1.4}
 .account-action>svg{stroke-width:1.6;flex:none;color:#526f5e}

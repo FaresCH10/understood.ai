@@ -1,3 +1,4 @@
+import {registrationEntitlement} from './pilot-policy.mjs';
 import {registrationAcceptance,sendRegistrationVerification,checkRegistrationCode} from './registration-verification.mjs';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {NOW,transaction} from './db.mjs';
@@ -8,7 +9,7 @@ import {authMailCapacity} from './auth-mail-budget.mjs';
 import {ensureSettingsSchema} from './settings.mjs';
 import {ensureEntitlementSchema} from './entitlement-schema.mjs';
 import {registrationRequestInput,registrationResendInput,registrationVerifyInput,registrationCodeInput,registrationEmailHash,
-  REGISTRATION_TERMS_VERSION,REGISTRATION_PRIVACY_VERSION,REGISTRATION_TRIAL_HOURS,REGISTRATION_TRIAL_WORKER_LIMIT} from './registration-input.mjs';
+  REGISTRATION_TERMS_VERSION,REGISTRATION_PRIVACY_VERSION} from './registration-input.mjs';
 
 
 const unavailable=()=>new Error('Registration verification unavailable');
@@ -131,7 +132,7 @@ export async function requestRegistration(db,input,remoteAddress,config) {
     if(!existing && db.prepare('SELECT 1 FROM organization_registrations WHERE id=?').get(value.requestId)) return generic;
     const id=existing?.id ?? value.requestId,expiresAt=date(registrationLifetime);
     const envelope=sealMail(config,id,{email:value.email,ownerName:value.ownerName,companyName:value.companyName,country:value.country,
-      phone:value.phone,passwordSalt:record.salt,passwordHash:record.derived,termsVersion:REGISTRATION_TERMS_VERSION,
+      phone:value.phone,plan:value.plan,passwordSalt:record.salt,passwordHash:record.derived,termsVersion:REGISTRATION_TERMS_VERSION,
       privacyVersion:REGISTRATION_PRIVACY_VERSION,acknowledgedAt:now});
     if(existing) {
       db.prepare(`UPDATE organization_registrations SET state='pending',payload=?,created_at=?,expires_at=?,verified_at=NULL,
@@ -182,7 +183,8 @@ function registrationScope(registration,message) {
 }
 function verified(db,registration,now) {
   const id=randomUUID(),orgId=randomUUID(),siteId=randomUUID();
-  const endsAt=null; // Pilot access starts only after operator approval.
+  const endsAt=null;
+  const {plan,limit,note}=registrationEntitlement(registration.plan);
   db.prepare('INSERT INTO organizations(id,name) VALUES(?,?)').run(orgId,registration.companyName);
   db.prepare('INSERT INTO sites(id,org_id,name,timezone) VALUES(?,?,?,?)').run(siteId,orgId,registration.companyName,'UTC');
   db.prepare("INSERT INTO staff(id,org_id,site_id,name,role) VALUES(?,?,?,?,'owner')").run(id,orgId,siteId,registration.ownerName);
@@ -193,16 +195,16 @@ function verified(db,registration,now) {
     .run(id,registration.email,registration.passwordSalt,registration.passwordHash,now);
   const terms=`${registration.termsVersion ?? REGISTRATION_TERMS_VERSION};${registration.privacyVersion ?? REGISTRATION_PRIVACY_VERSION}`;
   db.prepare(`INSERT INTO organization_entitlements(org_id,state,started_at,ends_at,worker_limit,plan,terms_reference,
-    revision,updated_by,updated_at) VALUES(?,'read_only',?,?,?,'pilot_pending',?,1,'registration',?)`)
-    .run(orgId,now,endsAt,REGISTRATION_TRIAL_WORKER_LIMIT,terms,now);
+    revision,updated_by,updated_at) VALUES(?,'read_only',?,?,?,?,?,1,'registration',?)`)
+    .run(orgId,now,endsAt,limit,plan,terms,now);
   db.prepare(`INSERT INTO organization_entitlement_transitions(org_id,revision,state,started_at,ends_at,worker_limit,plan,
     terms_reference,reason,actor_type,actor_id,request_id,created_at)
-    VALUES(?,1,'read_only',?,?,?,'pilot_pending',?,'Verified owner registration; pilot approval pending','registration',?,?,?)`)
-    .run(orgId,now,endsAt,REGISTRATION_TRIAL_WORKER_LIMIT,terms,registration.id,registration.id,now);
+    VALUES(?,1,'read_only',?,?,?,?,?,?,'registration',?,?,?)`)
+    .run(orgId,now,endsAt,limit,plan,terms,note,registration.id,registration.id,now);
   db.prepare(`INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)`).run(randomUUID(),orgId,siteId,'system','registration',
     'organization.registered',registration.id,now);
   db.prepare(`INSERT INTO organization_activation_requests VALUES(?,?,?,?,?,1,'pending',?,NULL,NULL,NULL)`)
-    .run(registration.id,orgId,siteId,id,'Pilot approval requested after email verification.',now);
+    .run(registration.id,orgId,siteId,id,note,now);
   return {orgId,siteId,ownerId:id,endsAt};
 }
 export function verifyRegistration(db,input,remoteAddress,config) {
@@ -304,7 +306,7 @@ export async function processOneRegistration(db,config,{send=sendRegistrationVer
       token={token_hash:tokenHash(secret)};
       db.prepare('INSERT INTO registration_tokens(token_hash,registration_id,mail_id,expires_at) VALUES(?,?,?,?)')
         .run(token.token_hash,row.registration_id,row.id,row.expires_at);
-      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirm your email to prepare your pilot workspace. Access remains read-only until approval. The 30-day pilot covers one site and up to 25 workers; its clock starts when activated. No automatic charge. If you did not create this account, ignore this email.`;
+      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirm your email to finish creating your Understood account. Workspace access starts after your pilot is approved or your plan is activated. If you did not create this account, ignore this email.`;
       message={email:message.email,subject:'Verify your Understood account',text};
       db.prepare('UPDATE registration_mail SET payload=? WHERE id=?').run(sealMail(config,row.id,message),row.id);
     }

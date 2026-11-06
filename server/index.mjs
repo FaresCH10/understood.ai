@@ -1,3 +1,4 @@
+import {isPendingWorkspacePlan} from './pilot-policy.mjs';
 import {EVIDENCE_MAX_JSON_BYTES} from './evidence-policy.mjs';
 import {requiredWorkerCreation} from './people.mjs';
 import {neonFunctionStatus} from './neon-services.mjs';
@@ -368,7 +369,7 @@ export function createAppHandler(db, options = {}) {
       if (req.method !== "GET") verifyMutationOrigin(req, config);
       if(path.startsWith('/api/ops/'))return send(res,path==='/api/ops/session' && req.method==='GET'?200:404,
         path==='/api/ops/session' && req.method==='GET'?{available:false,authenticated:false}:{error:'Not found'});
-      if(await handlePilotRoute(req,res,url,{save:(input,address)=>savePilot(db,input,address,{mail:pilotMail,destination}),read:(id,secret)=>readPilot(db,id,secret)}))return;
+      if(await handlePilotRoute(req,res,url,{save:(input)=>savePilot(db,input,req.socket.remoteAddress,{mail:pilotMail,destination}),read:(id,secret)=>readPilot(db,id,secret)}))return;
       if(path==='/api/auth/recovery' && req.method==='POST') {
         if(config.accessMode!=='credential') return send(res,404,{error:'Not found'});
         if(url.search) throw new Error('Invalid recovery input');
@@ -446,6 +447,7 @@ export function createAppHandler(db, options = {}) {
             siteState:siteLifecycleState(db,session.org_id,session.site_id).state,
             timezone:site?.timezone,
             staffInterfaceLanguage: session.principal_type==='staff' ? siteSettings?.staff_interface_language ?? 'en' : null,
+            ...(session.principal_type==='staff'?{workspacePlan:entitlementState(db,session.org_id).plan}:{}),
             firstRunRequired: session.principal_type==='staff' && session.role==='owner' && !!siteSettings && siteSettings.first_run_completed_at===null,
             language: session.language || "en",
             languageSelectionRequired: session.principal_type === "worker" ? !!session.language_selection_required : false,
@@ -517,6 +519,8 @@ export function createAppHandler(db, options = {}) {
         if(error.message==='Session context changed')return send(res,409,{error:error.message});
         throw error;
       }
+      if(session.principal_type==='staff' && path!=='/api/logout' && isPendingWorkspacePlan(entitlementState(db,session.org_id).plan))
+        return send(res,403,{error:'Workspace access is pending'});
       if(path==='/api/search' && req.method==='GET')return send(res,200,searchSite(db,session,searchQuery(url.searchParams)));
       if(path==='/api/auth/worker/redemption' && req.method==='GET')return send(res,200,readWorkerRedemption(db,session,redemptionHttpInput(req,url)));
       if(await handleSourceAudioRoute(req,res,session,url,{

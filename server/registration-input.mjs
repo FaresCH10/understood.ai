@@ -1,7 +1,7 @@
 import {credentialInput,normalizeEmail} from './auth-crypto.mjs';
 import {isCountryCode} from './country-codes.mjs';
 import {inputKeys} from './people.mjs';
-import {PILOT_DAYS,PILOT_WORKER_LIMIT} from './pilot-policy.mjs';
+import {PILOT_DAYS,PILOT_WORKER_LIMIT,isPaidPlan} from './pilot-policy.mjs';
 
 export const REGISTRATION_TERMS_VERSION='terms-v1';
 export const REGISTRATION_PRIVACY_VERSION='privacy-v1';
@@ -22,7 +22,7 @@ function address(value) {
   return value;
 }
 export function registrationRequestInput(input,remoteAddress) {
-  keys(input,['requestId','ownerName','email','password','companyName','country','phone','acceptTerms','acceptPrivacy']);
+  keys(input,['requestId','ownerName','email','password','companyName','country','phone','acceptTerms','acceptPrivacy','plan']);
   if(typeof input.requestId!=='string' || !uuid.test(input.requestId)) throw invalid();
   address(remoteAddress);
   const ownerName=text(input.ownerName,2,100),companyName=text(input.companyName,2,120);
@@ -36,7 +36,9 @@ export function registrationRequestInput(input,remoteAddress) {
   }
   if(input.acceptTerms!==true || input.acceptPrivacy!==true) throw invalid();
   let email;try {email=credentialInput(input.email,input.password);}catch {throw invalid();}
-  return {requestId:input.requestId,ownerName,companyName,country,phone,email,password:input.password};
+  const plan=input.plan===undefined?'pilot':input.plan;
+  if(plan!=='pilot'&&!isPaidPlan(plan))throw invalid();
+  return {requestId:input.requestId,ownerName,companyName,country,phone,email,password:input.password,plan};
 }
 export function registrationResendInput(input,remoteAddress) {
   keys(input,['requestId','email']);

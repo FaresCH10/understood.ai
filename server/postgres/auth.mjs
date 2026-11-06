@@ -115,8 +115,9 @@ export async function requireSession(pool, req, { schema='public',cookieName='un
   if (!validToken(token)) throw new Error('Sign in required');
   return inSchema(pool,schema,async (client) => {
     const row = (await client.query(`SELECT se.token_hash,se.org_id,se.site_id,se.principal_type,se.principal_id,se.expires_at,se.grant_id,se.access_mode,se.credential_revision,
-      COALESCE(s.name,w.name,w.code) AS name,s.role,w.language,w.language_selection_required,w.language_selected_at,w.language_selected_by,a.id AS account_id,cred.email
+      COALESCE(s.name,w.name,w.code) AS name,s.role,w.language,w.language_selection_required,w.language_selected_at,w.language_selected_by,a.id AS account_id,cred.email,e.plan AS workspace_plan
       FROM sessions se
+      LEFT JOIN organization_entitlements e ON se.principal_type='staff' AND e.org_id=se.org_id
       LEFT JOIN staff s ON se.principal_type='staff' AND s.id=se.principal_id AND s.org_id=se.org_id AND s.site_id=se.site_id
       LEFT JOIN workers w ON se.principal_type='worker' AND w.id=se.principal_id AND w.org_id=se.org_id AND w.site_id=se.site_id
       LEFT JOIN staff_account_memberships m ON m.staff_id=s.id LEFT JOIN staff_accounts a ON a.id=m.account_id

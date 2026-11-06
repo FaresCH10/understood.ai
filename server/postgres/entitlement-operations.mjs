@@ -1,3 +1,4 @@
+import {PILOT_DAYS,isPendingWorkspacePlan,pendingPaidPlan,requestedUpgradePlan} from '../pilot-policy.mjs';
 import {domainTransaction} from './domain.mjs';
 import {requireOperatorInTransaction,operatorAudit} from './operators.mjs';
 import {operatorEntitlementInput} from '../operator-input.mjs';
@@ -83,10 +84,14 @@ export function saveOperatorEntitlement(pool,identity,input,{schema='public'}={}
         ORDER BY created_at DESC,request_id DESC LIMIT 1 FOR UPDATE`,[value.orgId])).rows[0] ?? null;
     }
     if(value.plan==='pilot'&&value.state!=='read_only'){
-      if(value.state!=='trial'||value.workerLimit>25||value.endsAt===null||Date.parse(value.endsAt)>Date.now()+30*86400000)throw Error('Invalid operator command');
+      if(value.state!=='trial'||value.workerLimit>25||value.endsAt===null||Date.parse(value.endsAt)>Date.now()+PILOT_DAYS*86400000)throw Error('Invalid operator command');
       if(Number((await client.query('SELECT COUNT(*) AS n FROM sites WHERE org_id=$1',[value.orgId])).rows[0].n)>1)throw Error('Pilot requires one site');
     }
-    const revision=value.revision+1,startedAt=current?.plan==='pilot_pending'&&value.state==='trial'?new Date():current?.started_at ?? new Date();
+    const requestedPlan=pendingPaidPlan(current?.plan)??requestedUpgradePlan(activation?.note);
+    if(requestedPlan && value.state!=='read_only' && (value.state!=='active'||value.plan!==requestedPlan))throw Error('Invalid operator command');
+    if(isPendingWorkspacePlan(current?.plan) && value.state==='read_only' && value.plan!==current.plan)throw Error('Invalid operator command');
+    const activating=isPendingWorkspacePlan(current?.plan) && value.state!=='read_only';
+    const revision=value.revision+1,startedAt=activating?new Date():current?.started_at ?? new Date();
     if(current) {
       await client.query(`UPDATE organization_entitlements SET state=$2,started_at=$3,ends_at=$4,worker_limit=$5,plan=$6,
         terms_reference=$7,revision=$8,updated_by=$9,updated_at=clock_timestamp() WHERE org_id=$1`,

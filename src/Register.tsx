@@ -1,64 +1,64 @@
 import {useEffect,useMemo,useRef,useState,type FormEvent} from 'react';
 import {ArrowLeft,ArrowRight,Check,CheckCircle2,Clock3,LogIn,Mail,RefreshCw,ShieldCheck} from 'lucide-react';
+import {isPaidPlan,PAID_PLANS,PLAN_NAMES,PILOT_DAYS} from '../server/pilot-policy.mjs';
 import {countryOptions} from './country-options';
 import {AuthLanguagePicker} from './AuthLanguagePicker';
 import {staffSignInLanguages,staffSignInText} from './staff-signin-text';
 import {acceptedRegistrationReceipt,clearRegistrationReceipt,checkedVerification,readRegistrationReceipt,requestAccount,resendAccount,RegistrationError,saveRegistrationReceipt,verifyAccount,verifyAccountCode,normalizeVerificationCode,registrationOptions,type RegistrationReceipt} from './registration';
 
 export type RegistrationLanguage='en'|'ar';
-type AccountBody={requestId:string;ownerName:string;email:string;password:string;companyName:string;country:string;phone?:string;acceptTerms:boolean;acceptPrivacy:boolean};
+type AccountBody=Parameters<typeof requestAccount>[0];
+type RegistrationPlan=keyof typeof PLAN_NAMES;
 
 const en={
-  verifyEyebrow:'Email verification',verifyIntro:'Enter the six-digit code for',verifyHint:'Paste the code from your most recent email.',verifyTrialNote:'Your pilot starts after approval and activation.',verifyDifferent:'Use a different email',verifyMissing:'Didn’t receive an email?',verifyPrivacy:'Already registered? Sign in instead.',
+  verifyEyebrow:'Email verification',verifyIntro:'Enter the six-digit code for',verifyHint:'Paste the code from your most recent email.',verifyTrialNote:'Sign in after verification to check your workspace access.',verifyDifferent:'Use a different email',verifyMissing:'Didn’t receive an email?',verifyPrivacy:'Already registered? Sign in instead.',
   codeExpired:'This code has expired. Request a new code below.',codeLimited:'Too many attempts. Wait a few minutes before trying again.',codeService:'The verification service is temporarily unavailable. Please try again shortly.',
-  codeLabel:'Verification code',codeHint:'Enter the six-digit code from your email. Codes expire; use the latest code or request another.',codeSent:'If this registration is eligible, a verification code has been requested for',codeResend:'Request another code',codeResent:'If this registration is still pending, a new code has been requested.',codeError:'The code could not be verified. Check the latest code and try again.',codeUnavailable:'Email verification is not configured or could not be checked. Please try again later.',codeNote:'Verify your email to prepare your pilot workspace.',checkingVerification:'Checking email verification…',retryVerification:'Check again',
-  kicker:'Company pilot',title:'Set up your company workspace',
-  lead:'Enter your details and verify your work email to prepare for your pilot.',
-  trial:['30 days from approved activation','Up to 25 active workers','One site · no automatic charge'],
+  codeLabel:'Verification code',codeHint:'Enter the six-digit code from your email. Codes expire; use the latest code or request another.',codeSent:'If this registration is eligible, a verification code has been requested for',codeResend:'Request another code',codeResent:'If this registration is still pending, a new code has been requested.',codeError:'The code could not be verified. Check the latest code and try again.',codeUnavailable:'Email verification is not configured or could not be checked. Please try again later.',codeNote:'Verify your email to finish setting up your account.',checkingVerification:'Checking email verification…',retryVerification:'Check again',
+  kicker:'Company account',title:'Set up your company workspace',
+  lead:'Enter your company details and verify your work email.',
   accountDetails:'Your account',companyDetails:'Company details',
   ownerName:'Full name',email:'Work email',password:'Password',passwordHint:'Use 12 to 256 characters. You can reset it from the sign-in page.',
   confirmPassword:'Confirm password',company:'Company name',country:'Operating country',selectCountry:'Select a country',
   phone:'Business phone (optional)',phoneHint:'For account follow-up only. Adding it never sends a message.',
   terms:'I agree to the Terms of Service and acknowledge the Privacy Notice.',
-  submit:'Prepare pilot account',submitting:'Preparing account...',signIn:'Already have an account? Sign in',back:'Back to Understood',languageNote:'Choose the language for this signup screen.',
-  deliveryNote:'Email verification prepares your account; pilot access requires approval.',
+  submit:'Create company account',submitting:'Preparing account...',signIn:'Already have an account? Sign in',back:'Back to Understood',languageNote:'Choose the language for this signup screen.',
+  deliveryNote:'We’ll send a verification email to finish setting up your account.',
   signedInTitle:'You are already signed in',signedInBody:'Registration creates a separate workspace. Sign out first if you need another account.',continue:'Continue to my workspace',
   unavailableEnvironment:'Online account creation is unavailable',unavailableEnvironmentBody:'This environment does not accept online registrations. Use an existing account, or open the public site for a pilot inquiry.',
   sentTitle:'Check your email',sentBody:'If these details can start a new workspace, we sent a verification link to',sentPrivacy:'For privacy, we show this message whether or not an account already exists.',
-  sentNote:'The link expires in 24 hours. Pilot access starts only after approval and activation.',resend:'Resend verification email',resending:'Sending...',
+  sentNote:'The verification link expires in 24 hours.',resend:'Resend verification email',resending:'Sending...',
   resent:'If this registration is still waiting for verification, a new link has been sent. Earlier links may stop working.',
   unconfirmed:'The result could not be confirmed. Retry the same registration before starting over.',retry:'Retry the same registration',
   startOver:'Start a different registration',dismiss:'Dismiss',passwordMismatch:'The passwords do not match.',storage:'This browser could not keep a registration receipt. Keep this tab open until the result is confirmed.',
   verifyTitle:'Verify your work email',verifyLead:'Confirm your email to prepare your workspace. Pilot access remains read-only until approval.',verify:'Verify work email',verifying:'Verifying...',
-  verifiedDuplicatePolicy:'Sign in to check your current access. Existing workspace terms remain unchanged.',verifiedTitle:'Email verified',verifiedLead:'Your account is ready. Sign in to review your workspace while pilot approval is pending.',verifiedDuplicate:'This link was already used. Sign in to open your workspace.',
-  verifiedTrial:'Your pilot is awaiting approval. Its 30-day access period has not started. One site and up to 25 active workers are included after activation.',openSignIn:'Sign in to continue',
+  verifiedDuplicatePolicy:'Sign in to check your current access. Existing workspace terms remain unchanged.',verifiedTitle:'Email verified',verifiedLead:'Your email is verified. Sign in to check your workspace access.',verifiedDuplicate:'This link was already used. Sign in to open your workspace.',
+  verifiedTrial:'Workspace access opens once your pilot is approved or your paid plan is activated.',openSignIn:'Sign in to continue',
   unavailableTitle:'This link is unavailable',unavailableBody:'It may have expired, been replaced, or already been used. Sign in if your account is active, or request a new link from the registration page.',newLink:'Request a new link',
   uncertainTitle:'Verification not confirmed',uncertainBody:'The result could not be confirmed. Retry this same link before signing in.',retryVerify:'Retry verification',signInShort:'Sign in',
 };
 const ar={
-  verifyEyebrow:'تأكيد البريد الإلكتروني',verifyIntro:'أدخل الرمز المكوّن من ستة أرقام للبريد',verifyHint:'الصق الرمز من أحدث رسالة وصلتك.',verifyTrialNote:'يبدأ البرنامج التجريبي بعد الموافقة والتفعيل.',verifyDifferent:'استخدام بريد مختلف',verifyMissing:'لم تصلك رسالة؟',verifyPrivacy:'لديك حساب؟ سجّل الدخول بدلاً من ذلك.',
+  verifyEyebrow:'تأكيد البريد الإلكتروني',verifyIntro:'أدخل الرمز المكوّن من ستة أرقام للبريد',verifyHint:'الصق الرمز من أحدث رسالة وصلتك.',verifyTrialNote:'سجّل الدخول بعد التحقق لمراجعة الوصول إلى مساحة العمل.',verifyDifferent:'استخدام بريد مختلف',verifyMissing:'لم تصلك رسالة؟',verifyPrivacy:'لديك حساب؟ سجّل الدخول بدلاً من ذلك.',
   codeExpired:'انتهت صلاحية هذا الرمز. اطلب رمزاً جديداً أدناه.',codeLimited:'محاولات كثيرة. انتظر بضع دقائق قبل المحاولة مجدداً.',codeService:'خدمة التحقق غير متاحة مؤقتاً. حاول مجدداً بعد قليل.',
-  codeLabel:'رمز التحقق',codeHint:'أدخل الرمز المكوّن من ستة أرقام من بريدك. تنتهي صلاحية الرموز؛ استخدم أحدث رمز أو اطلب رمزاً آخر.',codeSent:'إذا كان التسجيل مؤهلاً، فقد طُلب إرسال رمز تحقق إلى',codeResend:'طلب رمز آخر',codeResent:'إذا كان التسجيل ما زال معلقاً، فقد طُلب رمز جديد.',codeError:'تعذّر التحقق من الرمز. راجع أحدث رمز وحاول مجدداً.',codeUnavailable:'التحقق من البريد غير مضبوط أو تعذّر فحصه. حاول لاحقاً.',codeNote:'تحقق من البريد لتجهيز حساب البرنامج التجريبي.',checkingVerification:'جارٍ فحص التحقق من البريد…',retryVerification:'إعادة الفحص',
-  kicker:'برنامج تجريبي للشركة',title:'جهّز مساحة عمل شركتك',
-  lead:'أدخل بياناتك وتحقق من بريد العمل للاستعداد للبرنامج التجريبي.',
-  trial:['30 يوماً من التفعيل بعد الموافقة','حتى 25 عاملاً نشطاً','موقع واحد · دون خصم تلقائي'],
+  codeLabel:'رمز التحقق',codeHint:'أدخل الرمز المكوّن من ستة أرقام من بريدك. تنتهي صلاحية الرموز؛ استخدم أحدث رمز أو اطلب رمزاً آخر.',codeSent:'إذا كان التسجيل مؤهلاً، فقد طُلب إرسال رمز تحقق إلى',codeResend:'طلب رمز آخر',codeResent:'إذا كان التسجيل ما زال معلقاً، فقد طُلب رمز جديد.',codeError:'تعذّر التحقق من الرمز. راجع أحدث رمز وحاول مجدداً.',codeUnavailable:'التحقق من البريد غير مضبوط أو تعذّر فحصه. حاول لاحقاً.',codeNote:'تحقق من بريدك لإكمال إعداد حسابك.',checkingVerification:'جارٍ فحص التحقق من البريد…',retryVerification:'إعادة الفحص',
+  kicker:'حساب الشركة',title:'جهّز مساحة عمل شركتك',
+  lead:'أدخل بيانات شركتك وتحقق من بريد العمل.',
   accountDetails:'حسابك',companyDetails:'بيانات الشركة',
   ownerName:'الاسم الكامل',email:'بريد العمل',password:'كلمة المرور',passwordHint:'استخدم من 12 إلى 256 حرفاً. يمكنك إعادة تعيينها من صفحة تسجيل الدخول.',
   confirmPassword:'تأكيد كلمة المرور',company:'اسم الشركة',country:'بلد التشغيل',selectCountry:'اختر بلداً',
   phone:'هاتف العمل (اختياري)',phoneHint:'للمتابعة المتعلقة بالحساب فقط. إضافته لا ترسل أي رسالة.',
   terms:'أوافق على شروط الخدمة وأقرّ بإشعار الخصوصية.',
-  submit:'تجهيز حساب البرنامج التجريبي',submitting:'جارٍ تجهيز الحساب...',signIn:'لديك حساب بالفعل؟ سجّل الدخول',back:'العودة إلى Understood',languageNote:'اختر لغة شاشة التسجيل.',
-  deliveryNote:'التحقق من البريد يجهّز الحساب؛ الوصول للبرنامج التجريبي يتطلب الموافقة.',
+  submit:'إنشاء حساب الشركة',submitting:'جارٍ تجهيز الحساب...',signIn:'لديك حساب بالفعل؟ سجّل الدخول',back:'العودة إلى Understood',languageNote:'اختر لغة شاشة التسجيل.',
+  deliveryNote:'سنرسل رسالة تحقق لإكمال إعداد حسابك.',
   signedInTitle:'أنت مسجّل الدخول بالفعل',signedInBody:'ينشئ التسجيل مساحة عمل منفصلة. سجّل الخروج أولاً إذا كنت تحتاج إلى حساب آخر.',continue:'المتابعة إلى مساحة عملي',
   unavailableEnvironment:'التسجيل عبر الإنترنت غير متاح',unavailableEnvironmentBody:'لا تقبل هذه البيئة التسجيلات عبر الإنترنت. استخدم حساباً موجوداً، أو افتح الموقع العام لتقديم طلب تجريبي.',
   sentTitle:'تحقق من بريدك',sentBody:'إذا كانت هذه البيانات صالحة لبدء مساحة عمل جديدة، فقد أرسلنا رابط تحقق إلى',sentPrivacy:'حفاظاً على الخصوصية، تظهر هذه الرسالة سواء كان الحساب موجوداً أم لا.',
-  sentNote:'ينتهي الرابط خلال 24 ساعة. يبدأ الوصول بعد الموافقة والتفعيل فقط.',resend:'إعادة إرسال رسالة التحقق',resending:'جارٍ الإرسال...',
+  sentNote:'تنتهي صلاحية رابط التحقق خلال 24 ساعة.',resend:'إعادة إرسال رسالة التحقق',resending:'جارٍ الإرسال...',
   resent:'إذا كان هذا التسجيل ما زال بانتظار التحقق، فقد أُرسل رابط جديد. قد تتوقف الروابط السابقة عن العمل.',
   unconfirmed:'تعذّر تأكيد النتيجة. أعد محاولة التسجيل نفسه قبل البدء من جديد.',retry:'إعادة محاولة التسجيل نفسه',
   startOver:'بدء تسجيل مختلف',dismiss:'إغلاق',passwordMismatch:'كلمتا المرور غير متطابقتين.',storage:'تعذّر على هذا المتصفح حفظ إيصال التسجيل. أبقِ هذه النافذة مفتوحة حتى تأكيد النتيجة.',
   verifyTitle:'تحقق من بريد العمل',verifyLead:'تحقق من البريد لتجهيز مساحة العمل. تبقى صلاحيات البرنامج للقراءة فقط حتى الموافقة.',verify:'تحقق من بريد العمل',verifying:'جارٍ التحقق...',
-  verifiedDuplicatePolicy:'سجّل الدخول للاطلاع على صلاحياتك الحالية. تبقى شروط مساحة العمل القائمة دون تغيير.',verifiedTitle:'تم التحقق من البريد',verifiedLead:'مساحة عملك جاهزة. سجّل الدخول ببريد العمل وكلمة المرور.',verifiedDuplicate:'استُخدم هذا الرابط سابقاً. سجّل الدخول لفتح مساحة عملك.',
-  verifiedTrial:'البرنامج التجريبي بانتظار الموافقة. لم تبدأ مدة الوصول البالغة 30 يوماً بعد. يشمل موقعاً واحداً وحتى 25 عاملاً بعد التفعيل.',openSignIn:'سجّل الدخول للمتابعة',
+  verifiedDuplicatePolicy:'سجّل الدخول للاطلاع على صلاحياتك الحالية. تبقى شروط مساحة العمل القائمة دون تغيير.',verifiedTitle:'تم التحقق من البريد',verifiedLead:'تم التحقق من بريدك. سجّل الدخول لمراجعة الوصول إلى مساحة العمل.',verifiedDuplicate:'استُخدم هذا الرابط سابقاً. سجّل الدخول لفتح مساحة عملك.',
+  verifiedTrial:'يتاح الوصول عند الموافقة على البرنامج التجريبي أو تفعيل خطتك المدفوعة.',openSignIn:'سجّل الدخول للمتابعة',
   unavailableTitle:'هذا الرابط غير متاح',unavailableBody:'قد يكون منتهي الصلاحية أو مستبدلاً أو مستخدماً سابقاً. سجّل الدخول إذا كان حسابك نشطاً، أو اطلب رابطاً جديداً من صفحة التسجيل.',newLink:'طلب رابط جديد',
   uncertainTitle:'لم يتم تأكيد التحقق',uncertainBody:'تعذّر تأكيد النتيجة. أعد محاولة الرابط نفسه قبل تسجيل الدخول.',retryVerify:'إعادة محاولة التحقق',signInShort:'تسجيل الدخول',
 } satisfies {[K in keyof typeof en]:typeof en[K]};
@@ -68,11 +68,23 @@ const registrationLanguages=staffSignInLanguages.filter(option=>option.code!=='u
 function LanguageSwitch({language,onLanguage,disabled}:{language:RegistrationLanguage;onLanguage:(value:RegistrationLanguage)=>void;disabled?:boolean}) {
   return <div className="segmented-control registration-languages" role="group" aria-label="Language"><button type="button" aria-pressed={language==='en'} disabled={disabled} onClick={()=>onLanguage('en')}>English</button><button type="button" aria-pressed={language==='ar'} disabled={disabled} onClick={()=>onLanguage('ar')}>العربية</button></div>;
 }
-function TrialPoints({text}:{text:readonly string[]}) {
-  return <ul className="registration-trial">{text.map(value=><li key={value}><Check size={17} aria-hidden="true"/>{value}</li>)}</ul>;
+function AccessChoice({language,onChoose,onClose}:{language:RegistrationLanguage;onChoose:(plan:RegistrationPlan)=>void;onClose:()=>void}) {
+  const dialog=useRef<HTMLDialogElement>(null),[paid,setPaid]=useState(false);
+  const t=(en:string,ar:string)=>language==='ar'?ar:en;
+  useEffect(()=>{const element=dialog.current;element?.showModal();return()=>element?.close();},[]);
+  return <dialog ref={dialog} className="sign-out-confirmation registration-access-choice" aria-labelledby="registration-access-title" onCancel={event=>{event.preventDefault();onClose();}}>
+    <h2 id="registration-access-title">{t('How would you like to get started?','كيف ترغب في البدء؟')}</h2>
+    {paid?<><p>{t('Choose a plan. We’ll arrange billing and activate it with you.','اختر خطة وسنتواصل معك لترتيب الفوترة وتفعيلها.')}</p>
+      <div className="registration-access-options">{PAID_PLANS.map(plan=><button className="button outline" type="button" key={plan} onClick={()=>onChoose(plan)}>{PLAN_NAMES[plan]}<ArrowRight size={16}/></button>)}</div>
+      <button className="button subtle" type="button" onClick={()=>setPaid(false)}>{t('Back','رجوع')}</button>
+    </>:<><div className="registration-access-options">
+      <button type="button" className="button outline" onClick={()=>onChoose('pilot')}><span><strong>{t(`Request a ${PILOT_DAYS}-day pilot`,`اطلب تجربة لمدة ${PILOT_DAYS} يوماً`)}</strong><small>{t('Try Understood with one site and up to 25 workers.','جرّب Understood في موقع واحد مع ما يصل إلى 25 عاملاً.')}</small></span><ArrowRight size={16}/></button>
+      <button type="button" className="button outline" onClick={()=>setPaid(true)}><span><strong>{t('Choose a paid plan','اختر خطة مدفوعة')}</strong><small>{t('Go straight to Pro, Business or Enterprise.','ابدأ مباشرة مع Pro أو Business أو Enterprise.')}</small></span><ArrowRight size={16}/></button>
+    </div><button className="button subtle" type="button" onClick={onClose}>{t('Close','إغلاق')}</button></>}
+  </dialog>;
 }
 
-export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWorkspace,authenticated,available}:{language:RegistrationLanguage;onLanguage:(value:RegistrationLanguage)=>void;onBack:()=>void;onSignIn:()=>void;onOpenWorkspace:()=>void;authenticated:boolean;available:boolean}) {
+export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWorkspace,authenticated,available,initialPlan}:{initialPlan?:string;language:RegistrationLanguage;onLanguage:(value:RegistrationLanguage)=>void;onBack:()=>void;onSignIn:()=>void;onOpenWorkspace:()=>void;authenticated:boolean;available:boolean}) {
   const t=copy[language],heading=useRef<HTMLHeadingElement>(null),sending=useRef(false);
   const Back=language==='ar'?ArrowRight:ArrowLeft,Forward=language==='ar'?ArrowLeft:ArrowRight;
   const countries=useMemo(()=>{
@@ -80,6 +92,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
     try {names=new Intl.DisplayNames([language],{type:'region'});} catch {}
     return countryOptions.map(([code,name])=>({code,label:names?.of(code)||name})).sort((a,b)=>a.label.localeCompare(b.label,language));
   },[language]);
+  const [plan,setPlan]=useState<RegistrationPlan|null>(isPaidPlan(initialPlan)?initialPlan:null),[choosingPlan,setChoosingPlan]=useState(false);
   const [receipt,setReceipt]=useState<RegistrationReceipt|null>(null),[pending,setPending]=useState<{receipt:RegistrationReceipt;body:AccountBody}|null>(null);
   const [ownerName,setOwnerName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');
   const [company,setCompany]=useState(''),[country,setCountry]=useState(''),[phone,setPhone]=useState(''),[terms,setTerms]=useState(false);
@@ -87,7 +100,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   const [verificationCheck,setVerificationCheck]=useState(0);
   const [method,setMethod]=useState<'link'|'neon-code'>('link'),[verificationReady,setVerificationReady]=useState<boolean|null>(null),[code,setCode]=useState(''),[codeComplete,setCodeComplete]=useState(false);
   useEffect(()=>{setVerificationReady(null);const controller=new AbortController();void registrationOptions(controller.signal).then(value=>{setMethod(value.verification);setVerificationReady(value.available);}).catch(()=>{if(!controller.signal.aborted)setVerificationReady(false);});return()=>controller.abort();},[verificationCheck]);
-  useEffect(()=>{try{const saved=readRegistrationReceipt(sessionStorage);if(saved)setReceipt(saved);}catch{setStorageError(true);}},[]);
+  useEffect(()=>{try{const saved=readRegistrationReceipt(sessionStorage);if(saved)setReceipt(saved);else if(!isPaidPlan(initialPlan))setChoosingPlan(true);}catch{setStorageError(true);}},[initialPlan]);
   useEffect(()=>{if(receipt||codeComplete)heading.current?.focus();},[receipt,codeComplete]);
   async function send(body:AccountBody,value:RegistrationReceipt) {
     sending.current=true;setBusy(true);setError('');setNotice('');
@@ -114,10 +127,11 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   function submit(event:FormEvent) {
     event.preventDefault();
     if(sending.current || busy) return;
+    if(!plan){setChoosingPlan(true);return;}
     if(password!==confirmPassword) {setError(t.passwordMismatch);return;}
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {setError(language==='ar'?'أدخل بريد عمل صالحاً.':'Enter a valid work email.');return;}
     const requestId=crypto.randomUUID(),normalized=email.trim().toLowerCase();
-    const body:AccountBody={requestId,ownerName:ownerName.trim(),email:normalized,password,companyName:company.trim(),country,
+    const body:AccountBody={requestId,ownerName:ownerName.trim(),email:normalized,password,companyName:company.trim(),country,plan,
       ...(phone.trim()?{phone:phone.trim()}:{}),acceptTerms:true,acceptPrivacy:true};
     const value:RegistrationReceipt={requestId,email:normalized,createdAt:new Date().toISOString(),state:'pending'};
     setReceipt(value);setPending({receipt:value,body});
@@ -181,7 +195,6 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
         <><p>{receipt.verification==='neon-code'?t.codeSent:t.sentBody} <bdi dir="ltr">{receipt.email}</bdi>.</p><p className="muted">{t.sentPrivacy}</p><p className="registration-note"><Clock3 size={18}/>{receipt.verification==='neon-code'?t.codeHint:t.sentNote}</p></>:
         <><p>{pending?t.unconfirmed:language==='ar'?'تعذّر تأكيد نتيجة التسجيل. إذا لم تصلك رسالة، ابدأ تسجيلاً جديداً بالبيانات نفسها.':'The registration result could not be confirmed. If no email arrives, start a new registration with the same details.'}</p></>}
       {receipt.state==='accepted'&&receipt.verification==='neon-code'&&<form className="registration-code-form" onSubmit={verifyCode}><label className="field">{t.codeLabel}<input required inputMode="numeric" autoComplete="one-time-code" dir="ltr" minLength={6} maxLength={6} pattern="[0-9]{6}" value={code} disabled={busy} onChange={event=>setCode(normalizeVerificationCode(event.target.value))}/></label><button type="submit" className="button primary full" disabled={busy||code.length!==6}>{busy?t.verifying:t.verify}</button></form>}
-      <TrialPoints text={t.trial}/>
       {notice && <p role="status" className="registration-notice">{notice}</p>}
       {error && <p role="alert" className="public-error">{error}</p>}
       {storageError && <p className="muted">{t.storage}</p>}
@@ -192,8 +205,10 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
       </div>
       <button type="button" className="text-link" disabled={busy} onClick={onSignIn}>{t.signIn}<ArrowRight size={16}/></button>
     </div> : <div className="registration-layout">
-      <header className="registration-intro"><span className="public-kicker">{t.kicker}</span><h1>{t.title}</h1><p>{t.lead}</p><TrialPoints text={t.trial}/></header>
+      <header className="registration-intro"><span className="public-kicker">{t.kicker}</span><h1>{t.title}</h1><p>{t.lead}</p></header>
+      {choosingPlan&&<AccessChoice language={language} onClose={()=>setChoosingPlan(false)} onChoose={choice=>{setPlan(choice);setChoosingPlan(false);}}/>}
       <form className="registration-form" onSubmit={submit}>
+        <div className="registration-selected-plan"><div><small>{language==='ar'?'الوصول إلى مساحة العمل':'Workspace access'}</small><strong>{plan==='pilot'?(language==='ar'?'برنامج تجريبي لمدة 14 يوماً':'14-day pilot'):plan?PLAN_NAMES[plan]:(language==='ar'?'اختر خياراً':'Choose how to start')}</strong></div><button type="button" className="button outline" disabled={busy} onClick={()=>setChoosingPlan(true)}>{plan?(language==='ar'?'تغيير':'Change'):(language==='ar'?'اختيار':'Choose')}</button></div>
         <fieldset className="registration-group">
           <legend>{t.accountDetails}</legend>
           <div className="registration-fields">

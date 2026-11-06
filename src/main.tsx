@@ -152,6 +152,8 @@ import {invitationLinkToken} from './invitation-link';
 import {RegistrationPage,VerifyRegistration,type RegistrationLanguage} from './Register';
 import {verificationToken} from './registration';
 import {PilotOnboarding} from './PilotOnboarding';
+import {WorkspaceAccess} from './WorkspaceAccess';
+import {isPendingWorkspacePlan,PLAN_NAMES} from '../server/pilot-policy.mjs';
 import type {FirstRunLanguage} from './first-run';
 const StaffInvitations=lazy(()=>import('./StaffInvitations').then(module=>({default:module.StaffInvitations})));
 const AcceptInvitation=lazy(()=>import('./AcceptInvitation').then(module=>({default:module.AcceptInvitation})));
@@ -163,7 +165,7 @@ class InvitationView extends React.Component<{children:React.ReactNode},{failed:
   render() {const t=createStaffText(this.context);return this.state.failed ? <section role="alert"><h1>{t("Invitation view unavailable")}</h1><p>{t("Reload this page to try again. For acceptance, reopen the original email link.")}</p><button className="button outline" onClick={()=>location.reload()}><RefreshCw size={18}/>{t("Reload")}</button></section> : <Suspense fallback={<p data-page-loading role="status">{t("Loading invitation...")}</p>}>{this.props.children}</Suspense>;}
 }
 
-type Session = PageSession & { authenticated: boolean; mode: string; role?: 'staff' | 'worker'; staffRole?: 'owner' | 'administrator' | 'supervisor' | 'auditor' | null; name?: string; organization?: string; site?: string;siteState?:'active'|'archived';timezone?:string; language?: string;languageSelectionRequired?:boolean;staffScope?:string|null;billingRecoveryScope?:string|null;templateRecoveryScope?:string|null;staffRecoveryScope?:string|null;staffInterfaceLanguage?:'en'|'ar'|null;firstRunRequired?:boolean };
+type Session = PageSession & { authenticated: boolean; mode: string; role?: 'staff' | 'worker'; staffRole?: 'owner' | 'administrator' | 'supervisor' | 'auditor' | null; name?: string; organization?: string; site?: string;siteState?:'active'|'archived';timezone?:string; language?: string;languageSelectionRequired?:boolean;staffScope?:string|null;billingRecoveryScope?:string|null;templateRecoveryScope?:string|null;staffRecoveryScope?:string|null;staffInterfaceLanguage?:'en'|'ar'|null;firstRunRequired?:boolean;workspacePlan?:string|null };
 type Counts = { assigned: number; responses: number; matches: number; clarifications: number; unassessed: number; pending: number; completion: number; acknowledged?: number };
 type Case = { id: string; worker: string; language: string; title: string; reason: string; status: string; created_at: string };
 type WaitingReply = { assignmentId: string; worker: string; language: string; title: string; briefingId: string; version: number; dueAt: string | null; createdAt: string };
@@ -381,19 +383,22 @@ export default function App() {
     return()=>controller.abort();
   },[sessionRetry]);
   const navigate = (next: string) => {if(navigationGuard.current && !navigationGuard.current(next))return;location.hash = next; setView(next); window.scrollTo(0, 0); };
+  const pendingWorkspace=session?.authenticated&&session.role==='staff'&&isPendingWorkspacePlan(session.workspacePlan);
+  const registerView=view==='register'||/^register\/(pro|business|enterprise)$/.test(view);
   const signInDestination=authBusy||workerEntryRecovery.pending||workerEntryRecovery.error||sessionGuard.isLocked()?null:signedInDestination(session,view);
   useEffect(()=>{
-    if(!validPageSession(session)||isPublicLandingView(view)||['walkthrough','pilot','contact','register','verify-registration','account-recovery','reset-password','accept-invitation','worker-access'].includes(view))return;
+    if(pendingWorkspace||registerView||!validPageSession(session)||isPublicLandingView(view)||['walkthrough','pilot','contact','register','verify-registration','account-recovery','reset-password','accept-invitation','worker-access'].includes(view))return;
     document.dispatchEvent(new CustomEvent('understood:account-entry',{detail:session!.clientContext}));
-  },[session?.clientContext,view]);
+  },[session?.clientContext,view,pendingWorkspace,registerView]);
   useEffect(()=>{
     if(!signInDestination)return;
     history.replaceState(null,'',`${location.pathname}${location.search}#${signInDestination}`);
     setView(signInDestination);window.scrollTo(0,0);
   },[signInDestination]);
+  useEffect(()=>{if(view==='workspace-access'&&session?.authenticated&&session.role==='staff'&&!pendingWorkspace)navigate(session.firstRunRequired?'onboarding/first-run':'overview');},[view,session?.authenticated,session?.role,session?.firstRunRequired,pendingWorkspace]);
   useEffect(()=>{if(session?.authenticated&&session.role==='staff'&&view.startsWith('templates'))navigate('briefings');},[session?.authenticated,session?.role,view]);
-  useEffect(()=>{if(session?.authenticated && session.staffRole==='administrator' && !view.startsWith('settings') && !isPublicLandingView(view) && !['operations','home','walkthrough','pilot','sign-in','account-recovery','reset-password','accept-invitation','register','verify-registration'].includes(view)) navigate('settings/staff');},[session?.authenticated,session?.staffRole,view]);
-  useEffect(()=>{if(session?.authenticated && session.role==='staff' && session.firstRunRequired && view!=='onboarding/first-run' && !isPublicLandingView(view) && !['operations','home','walkthrough','pilot','sign-in','account-recovery','reset-password','accept-invitation','register','verify-registration','worker-access'].includes(view)) navigate('onboarding/first-run');},[session?.authenticated,session?.role,session?.firstRunRequired,view]);
+  useEffect(()=>{if(!pendingWorkspace && !registerView && session?.authenticated && session.staffRole==='administrator' && !view.startsWith('settings') && !isPublicLandingView(view) && !['operations','home','walkthrough','pilot','sign-in','account-recovery','reset-password','accept-invitation','register','verify-registration'].includes(view)) navigate('settings/staff');},[session?.authenticated,session?.staffRole,view,pendingWorkspace,registerView]);
+  useEffect(()=>{if(!pendingWorkspace && !registerView && session?.authenticated && session.role==='staff' && session.firstRunRequired && view!=='onboarding/first-run' && !isPublicLandingView(view) && !['operations','home','walkthrough','pilot','sign-in','account-recovery','reset-password','accept-invitation','register','verify-registration','worker-access'].includes(view)) navigate('onboarding/first-run');},[session?.authenticated,session?.role,session?.firstRunRequired,view,pendingWorkspace,registerView]);
   useEffect(()=>{
     const value=session?.role==='staff'?session.staffInterfaceLanguage:null;
     if(value!=='en' && value!=='ar') return;
@@ -476,7 +481,7 @@ export default function App() {
       try {if(rememberDevice && email.trim())localStorage.setItem('understood:sign-in-email',email.trim());else localStorage.removeItem('understood:sign-in-email');}catch {}
       setSession(signedIn);
       setPassword(''); setWorkerToken('');
-      navigate(signedIn.role === 'worker' ? 'inbox' : 'overview');
+      navigate(signedIn.role==='worker'?'inbox':isPendingWorkspacePlan(signedIn.workspacePlan)?'workspace-access':'overview');
     } catch (error) {
       if(kind==='worker' && entry && [400,401,403,404].includes(Number((error as {status?:number}).status))){
         try{clearPendingWorkerEntry(sessionStorage,entry);setWorkerEntryRecovery({pending:null,error:''});}catch{/* Keep a receipt if local cleanup cannot be verified. */}
@@ -541,7 +546,7 @@ export default function App() {
   if(signInDestination)return <div className="loading-page" role="status">{signInCopy.signingIn}</div>;
   if(workerEntryRecovery.pending || workerEntryRecovery.error)return <main className="entry-page"><Brand/><WorkerEntryRecovery pending={workerEntryRecovery.pending} storageError={workerEntryRecovery.error} paused={authBusy} request={api} onResolved={signedIn=>finishWorkerEntry(signedIn,workerEntryRecovery.pending!)} onAnother={anotherWorkerLink}/></main>;
   if(view==='operations')return <BriefingView label="Platform operations"><Operations/></BriefingView>;
-  if(view==='register')return <AuthLayout variant="register"><RegistrationPage language={registrationLanguage} onLanguage={setRegistrationLanguage} authenticated={!!session?.authenticated} available={isCredentialMode(session?.mode)} onBack={()=>navigate('home')} onSignIn={()=>navigate('sign-in')} onOpenWorkspace={()=>navigate('overview')}/></AuthLayout>;
+  if(registerView)return <AuthLayout variant="register"><RegistrationPage key={view} initialPlan={view.split('/')[1]} language={registrationLanguage} onLanguage={setRegistrationLanguage} authenticated={!!session?.authenticated} available={isCredentialMode(session?.mode)} onBack={()=>navigate('home')} onSignIn={()=>navigate('sign-in')} onOpenWorkspace={()=>navigate('overview')}/></AuthLayout>;
   if(view==='verify-registration')return <main className="entry-page"><Brand/><VerifyRegistration key={registrationToken} token={registrationToken} language={registrationLanguage} onLanguage={setRegistrationLanguage} onRegister={()=>navigate('register')} onSignIn={()=>navigate('sign-in')}/></main>;
   if(isPublicLandingView(view) || ['walkthrough','pilot'].includes(view) || (session?.authenticated===false && view==='overview'))return <BriefingView label="public site"><PublicProduct view={view} registrationAvailable={isCredentialMode(session?.mode)}/></BriefingView>;
   if (!session) {
@@ -600,6 +605,8 @@ export default function App() {
   );
 
   if (session.role === 'worker') return <>{sessionGuard.suspended&&<SessionConnectionNotice language={workerUiFallbackLanguage(session)} onRetry={sessionGuard.retry} busy={sessionGuard.retrying}/>}<div hidden={sessionGuard.suspended} style={sessionGuard.suspended?{display:'none'}:undefined}><WorkerApp key={session.clientContext} session={session} view={view} navigate={navigate} refresh={refresh} act={act} logout={logout} message={message} onSessionLost={sessionGuard.invalidate} sessionInvalid={sessionGuard.isLocked} navigationGuard={navigationGuard} onSessionRefresh={refreshSession} scanSignal={workerBriefingSignal} /></div></>;
+  if(pendingWorkspace)return <StaffLanguageContext.Provider value={staffUiLanguage}><WorkspaceAccess key={session.clientContext} plan={session.workspacePlan!} onRecheck={refreshSession} onSignOut={logout} onContact={()=>navigate('contact')}/></StaffLanguageContext.Provider>;
+  const planName=Object.entries(PLAN_NAMES).find(([id])=>id===session.workspacePlan)?.[1] ?? session.workspacePlan;
   const canWrite=canManageStaff(session.staffRole) && session.siteState!=='archived';
   const canSearch=['owner','supervisor','auditor'].includes(session.staffRole || '');
   if(session.staffRole==='administrator' && !view.startsWith('settings')) return <div className="loading-page">Loading site settings...</div>;
@@ -610,7 +617,7 @@ export default function App() {
     .map(item=>({...item,label:staffUi[item.label as keyof typeof staffUi],active:staffNavigationActive(item.key,view)}));
 return <StaffLanguageContext.Provider value={staffUiLanguage}><StaffTimezoneContext.Provider value={session.timezone || 'UTC'}><>{sessionGuard.suspended&&<SessionConnectionNotice language={staffUiLanguage} onRetry={sessionGuard.retry} busy={sessionGuard.retrying}/>}<div hidden={sessionGuard.suspended} style={sessionGuard.suspended?{display:'none'}:undefined} className={`staff-shell ${sidebarOpen?'':'sidebar-hidden'}`} lang={staffUiLanguage} dir={staffUiLanguage==='en'?'ltr':'rtl'} inert={sessionGuard.checking} aria-busy={sessionGuard.checking} onClickCapture={blockStaffInput} onSubmitCapture={blockStaffInput} onKeyDownCapture={blockStaffInput}>
   <a className="skip-link" href="#staff-main" onClick={event=>{event.preventDefault();document.getElementById('staff-main')?.focus();}}>{staffUiLanguage==='ar'?'انتقل إلى المحتوى الرئيسي':staffT("Skip to main content")}</a>
-  <DashboardSidebar open={sidebarOpen} brand={<Brand/>} items={staffNavigation} name={session.name} email={session.email} identity={staffIdentityLabel(session.staffRole,staffUiLanguage,true)} settingsLabel={staffUi.settings} signOutLabel={staffUi.signOut} closeLabel={sidebarText.hide} accountLabel={sidebarText.account} onClose={()=>{setSidebarOpen(false);requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>('.sidebar-open-button')?.focus());}} navigate={path=>{navigate(path);if(window.innerWidth<=1024)setSidebarOpen(false);}} logout={logout} disabled={siteTransition}/>
+  <DashboardSidebar open={sidebarOpen} brand={<Brand/>} items={staffNavigation} name={session.name} email={session.email} plan={planName?staffT(planName):undefined} identity={staffIdentityLabel(session.staffRole,staffUiLanguage,true)} settingsLabel={staffUi.settings} signOutLabel={staffUi.signOut} closeLabel={sidebarText.hide} accountLabel={sidebarText.account} onClose={()=>{setSidebarOpen(false);requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>('.sidebar-open-button')?.focus());}} navigate={path=>{navigate(path);if(window.innerWidth<=1024)setSidebarOpen(false);}} logout={logout} disabled={siteTransition}/>
   <button className="sidebar-backdrop" aria-label={sidebarText.close} aria-hidden={!sidebarOpen} inert={!sidebarOpen} onClick={()=>setSidebarOpen(false)}/>
   <div className="staff-main"><header className="topbar">{!sidebarOpen&&<button className="icon-button sidebar-open-button" aria-label={sidebarOpen?sidebarText.hide:sidebarText.show} aria-expanded={sidebarOpen} aria-controls="dashboard-sidebar" onClick={()=>setSidebarOpen(open=>!open)}><PanelLeft size={21}/></button>}
     <AccountSiteSwitcher language={staffUiLanguage} organization={session.organization} site={session.site} disabled={siteTransition} onSelect={changeSite}/>

@@ -1,3 +1,4 @@
+import {PLAN_NAMES} from '../server/pilot-policy.mjs';
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useState} from 'react';
 import {CircleDollarSign,Clock3,RefreshCw,TriangleAlert,Users} from 'lucide-react';
@@ -44,7 +45,7 @@ export function PlanUsage({refresh=0,authority}:{refresh?:number;authority:Staff
     {loading&&!data&&<p data-page-loading role="status">{staffT("Loading plan and usage...")}</p>}
     {(data&&<>
       <section className="panel entitlement-overview">
-        <div className="usage-plan"><Users size={24}/><div><h2>{staffT("Workspace plan")}</h2><strong className="usage-plan-name">{staffT(data.entitlement.plan==='pilot_pending'?'Pilot awaiting approval':data.entitlement.plan==='pilot'?'Company pilot':data.plan.name)}</strong><p>{data.plan.capabilities.map(value=>staffT(value)).join(' · ')}</p></div><span className={`status ${entitlementClass(data.entitlement)}`}><span className="status-dot"/>{(data.entitlement.state==='trial'&&data.entitlement.effectiveState!=='read_only'?staffT('Pilot · {days} left',{days:staffT.days(data.entitlement.daysRemaining??0)}):staffT(entitlementLabel(data.entitlement)))}</span></div>
+        <div className="usage-plan"><Users size={24}/><div><h2>{staffT("Workspace plan")}</h2><strong className="usage-plan-name">{staffT(data.entitlement.plan==='pilot_pending'?'Pilot awaiting approval':data.entitlement.plan==='pilot'?'Company pilot':Object.entries(PLAN_NAMES).find(([id])=>id===data.entitlement.plan)?.[1]??data.entitlement.plan??data.plan.name)}</strong><p>{data.plan.capabilities.map(value=>staffT(value)).join(' · ')}</p></div><span className={`status ${entitlementClass(data.entitlement)}`}><span className="status-dot"/>{(data.entitlement.state==='trial'&&data.entitlement.effectiveState!=='read_only'?staffT('Pilot · {days} left',{days:staffT.days(data.entitlement.daysRemaining??0)}):staffT(entitlementLabel(data.entitlement)))}</span></div>
         {data.entitlement.configured?<dl className="entitlement-facts">
           <div><dt>{staffT("Plan")}</dt><dd>{data.entitlement.plan==='pilot_pending'?staffT('Pilot awaiting approval'):data.entitlement.plan==='pilot'?staffT('Company pilot'):data.entitlement.plan}</dd></div>
           <div><dt>{staffT("Access state")}</dt><dd>{(data.entitlement.effectiveState==='read_only'?staffT("Read-only"):staffT.state(data.entitlement.effectiveState))}</dd></div>

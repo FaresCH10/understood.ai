@@ -1,3 +1,4 @@
+import {isPendingWorkspacePlan} from './pilot-policy.mjs';
 import {createHash} from 'node:crypto';
 import {reviewRequestId} from './briefing-input.mjs';
 import {ENTITLEMENT_STATES} from './entitlement-model.mjs';
@@ -53,7 +54,7 @@ export function operatorEntitlementInput(input) {
       || input.state==='read_only' && input.activationRequestId!==null)
       throw Error('Invalid operator command');
       if(input.plan==='pilot'&&input.state!=='read_only'&&(input.state!=='trial'||input.workerLimit>25))throw Error('Invalid operator command');
-      if(input.plan==='pilot_pending'&&input.state!=='read_only')throw Error('Invalid operator command');
+      if(isPendingWorkspacePlan(input.plan)&&input.state!=='read_only')throw Error('Invalid operator command');
       return {kind:'entitlement',orgId:input.orgId,revision:input.revision,state:input.state,endsAt:input.endsAt,workerLimit:input.workerLimit,
       plan:input.plan,termsReference:input.termsReference,reason:input.reason,activationRequestId:input.activationRequestId,confirmed:true};
   }

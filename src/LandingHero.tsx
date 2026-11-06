@@ -43,7 +43,7 @@ export function LandingHero({locale,registrationAvailable,motionPaused}:{locale:
         <p className="hero-intro-kicker">{t.heroKicker}</p>
         <h1 id="landing-title">{[t.heroTitle,t.heroMiddle,t.heroAccent].map(line=><span className="hero-heading-line" key={line}><span>{line}</span></span>)}</h1>
         <p className="hero-intro-description">{t.heroBody}</p>
-        <div className="hero-intro-actions"><a className="landing-button landing-button--primary" href="#pilot">{t.pilotCta}<ArrowRight size={18} className="landing-forward" aria-hidden="true"/></a><a className="landing-button landing-button--outline" href="#how-it-works"><Play size={16} aria-hidden="true"/>{t.demoCta}</a></div>
+        <div className="hero-intro-actions"><a className="landing-button landing-button--primary" href="#plans">{t.trialCta}<ArrowRight size={18} className="landing-forward" aria-hidden="true"/></a><a className="landing-button landing-button--outline" href="#how-it-works"><Play size={16} aria-hidden="true"/>{t.demoCta}</a></div>
         <ul className="hero-intro-assurances">{[registrationAvailable?t.heroNoCard:t.strip[0],t.heroWorkerAccess,t.heroSharedDevices].map(text=><li key={text}><Check size={15} aria-hidden="true"/>{text}</li>)}</ul>
       </div>
       <figure className="hero-intro-scene">

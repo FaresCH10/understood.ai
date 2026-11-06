@@ -1,3 +1,4 @@
+import {assertPlanUpgrade} from '../pilot-policy.mjs';
 import {domainTransaction,domainAudit,requirePrincipal} from './domain.mjs';
 import {reviewRequestId} from '../briefing-input.mjs';
 import {activationRequestInput,sameActivationRequest} from '../activation-request-input.mjs';
@@ -34,7 +35,9 @@ export function saveActivationRequest(pool,session,input,{schema='public'}={}) {
     }
     if((await client.query("SELECT 1 FROM organization_activation_requests WHERE org_id=$1 AND state='pending'",[session.org_id])).rows.length)
       throw Error('Activation request already pending');
-    const entitlementRevision=(await readEntitlement(client,session.org_id))?.revision ?? 0;
+    const entitlement=(await readEntitlement(client,session.org_id));
+    assertPlanUpgrade(value.note,session.role,entitlement?.plan);
+    const entitlementRevision=entitlement?.revision ?? 0;
     let row;
     try {
       row=(await client.query(`INSERT INTO organization_activation_requests

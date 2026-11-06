@@ -1,0 +1,16 @@
+export const PILOT_DAYS: number;
+export const PILOT_WORKER_LIMIT: number;
+export const PILOT_PLAN: 'pilot';
+export const PENDING_PILOT_PLAN: 'pilot_pending';
+export const PAID_PLANS: readonly ['pro','business','enterprise'];
+export type PaidPlan = typeof PAID_PLANS[number];
+export const PLAN_NAMES: Readonly<Record<'pilot' | PaidPlan,string>>;
+export function isPilotPlan(plan: unknown): boolean;
+export function isPaidPlan(plan: unknown): plan is PaidPlan;
+export function pendingPaidPlan(plan: unknown): PaidPlan | undefined;
+export function isPendingWorkspacePlan(plan: unknown): boolean;
+export function higherPaidPlans(plan: unknown): PaidPlan[];
+export function planUpgradeNote(plan: string): string;
+export function requestedUpgradePlan(note: unknown): PaidPlan | undefined;
+export function assertPlanUpgrade(note: string | null, role: string, currentPlan: unknown): void;
+export function registrationEntitlement(plan: unknown): {plan:string;limit:number;note:string};

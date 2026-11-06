@@ -35,7 +35,7 @@ const count=(db,table)=>db.prepare(`SELECT COUNT(*) n FROM ${table}`).get().n;
 test('registration validates owner input, blocks existing accounts and returns one generic response for duplicates',async()=>{
   const db=dbFixture();try {
     for(const override of [{acceptTerms:false},{acceptPrivacy:undefined},{country:'ZZ'},{phone:'call me'},{password:'short'},
-      {email:'not-an-email'},{ownerName:' A '},{companyName:' '},{requestId:'not-a-uuid'},{role:'owner'}])
+      {email:'not-an-email'},{ownerName:' A '},{companyName:' '},{requestId:'not-a-uuid'},{role:'owner'},{plan:'business_pending'}])
       await assert.rejects(requestRegistration(db,value(override),'127.0.0.1',config),/Invalid registration input/);
     for(const input of [null,[],{...value(),requestId:undefined}])
       await assert.rejects(requestRegistration(db,input,'127.0.0.1',config),/Invalid registration input/);
@@ -331,5 +331,11 @@ test('Neon verification HTTP enforces origin, input shape and separate sign-in',
   assert.equal((await call('/api/auth/registrations/verify-code',{...input,role:'owner'})).status,400);
   const response=await call('/api/auth/registrations/verify-code');assert.equal(response.status,200);assert.equal(response.headers.get('set-cookie'),null);
   assert.equal((await response.json()).signInRequired,true);
+  const login=await call('/api/auth/staff/login',{email:request.email,password});
+  assert.equal(login.status,200);
+  const headers={cookie:login.headers.get('set-cookie').split(';')[0]};
+  const session=await (await fetch(base+'/api/session',{headers})).json();
+  assert.equal(session.workspacePlan,'pilot_pending');
+  assert.equal((await fetch(base+'/api/overview',{headers:{...headers,'x-client-session-context':session.clientContext}})).status,403);
  }finally{globalThis.fetch=original;await new Promise(resolve=>server.close(resolve));db.close();}
 });

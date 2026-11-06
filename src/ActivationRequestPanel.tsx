@@ -1,3 +1,4 @@
+import {higherPaidPlans,PLAN_NAMES,planUpgradeNote} from '../server/pilot-policy.mjs';
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useMemo,useState,type FormEvent} from 'react';
 import {RefreshCw,Send} from 'lucide-react';
@@ -13,6 +14,8 @@ export default function ActivationRequestPanel({authority,entitlement,onChanged}
   const staffT=useStaffStaticText();
   const session=useMemo(()=>({clientContext:authority.session.clientContext!,expiresAt:authority.session.expiresAt!}),[authority.session.clientContext,authority.session.expiresAt]);
   const [recovery]=useState(()=>{try{return {pending:readActivationRequest(sessionStorage,session),error:''};}catch(reason){return {pending:null,error:(reason as Error).message};}});
+  const [upgradePlan,setUpgradePlan]=useState('');
+  const upgradeOptions=authority.session.staffRole==='owner'?higherPaidPlans(entitlement.plan):[];
   const [note,setNote]=useState(''),[confirmed,setConfirmed]=useState(false),[notice,setNotice]=useState('');
   const {current}=useStaffRequest(authority),scope=authority.session.staffScope;
   const definition=useMemo<ArtifactDefinition<PendingActivationRequest,ActivationRecord>>(()=>({endpoint:'/api/entitlement/requests',path:()=>'',roles,
@@ -22,7 +25,7 @@ export default function ActivationRequestPanel({authority,entitlement,onChanged}
   const mutation=useArtifactMutation(authority,scope,definition,(storage,_scope,value)=>{
     if(value.clientContext!==session.clientContext || value.expiresAt!==session.expiresAt)throw Error('The original activation request session changed.');storeActivationRequest(storage,value);
   },!recovery.error && roles.includes(authority.session.staffRole || ''),result=>{
-    setNote('');setConfirmed(false);
+    setNote('');setUpgradePlan('');setConfirmed(false);
     setNotice(result.state==='pending'
       ? 'Activation request recorded for platform operations. No plan, access or payment changed.'
       : result.state==='accepted'?'Platform operations accepted this activation request. The new access state is shown above.'
@@ -32,18 +35,19 @@ export default function ActivationRequestPanel({authority,entitlement,onChanged}
   const pending=mutation.pending.current,busy=mutation.busy,error=mutation.error,locked=busy || !!pending || !!recovery.error;
   useEffect(()=>{if(!recovery.pending)return;const abort=new AbortController();queueMicrotask(()=>{if(!abort.signal.aborted)void mutation.check(abort.signal);});return()=>abort.abort();},[mutation.api,recovery.pending]);
   function submit(event:FormEvent){event.preventDefault();if(!confirmed || locked || !current())return;setNotice('');setConfirmed(false);
-    const trimmed=note.trim();void mutation.write({...session,requestId:crypto.randomUUID(),body:{note:trimmed || null,confirmed:true}});}
+    if(upgradeOptions.length&&!upgradeOptions.some(plan=>plan===upgradePlan))return;
+    const trimmed=upgradeOptions.length?planUpgradeNote(upgradePlan):note.trim();void mutation.write({...session,requestId:crypto.randomUUID(),body:{note:trimmed || null,confirmed:true}});}
   if(!roles.includes(authority.session.staffRole || ''))return null;
   const serverPending=entitlement.request;
-  const title=entitlement.plan==='pilot_pending'?'Request pilot approval':entitlement.effectiveState==='read_only'?'Discuss rollout or extension':entitlement.state==='active'?'Request plan change':'Request pilot extension';
-  return <section className="panel activation-requests"><h2>{staffT("Activation & plan")}</h2>
+  const title=upgradeOptions.length?'Request upgrade':entitlement.plan==='pilot_pending'?'Request pilot approval':entitlement.effectiveState==='read_only'?'Discuss rollout or extension':entitlement.state==='active'?'Request plan change':'Request pilot extension';
+  return <section className="panel activation-requests"><h2>{staffT(upgradeOptions.length?"Upgrade plan":"Activation & plan")}</h2>
     <p className="muted">{staffT("Requests are recorded for platform operations and reviewed by an authorized operator. They do not change access, purchase a plan or take payment by themselves.")}</p>
     {recovery.error?<p role="alert" className="record-error">{staffT.error(recovery.error)}</p>:null}
     {pending?<div role="region" aria-label={staffT("Saved activation request")}><h3>{staffT("Saved request")}</h3><p className="usage-saved-intent" dir="auto">{(pending.body.note||staffT("No note added."))}</p><p role="status">{busy?staffT("Checking request..."):mutation.checked?staffT("No accepted receipt was found."):staffT("Acceptance has not been verified.")}</p>
       {mutation.checked && <label className="billing-confirm"><input type="checkbox" checked={confirmed} disabled={busy} onChange={event=>setConfirmed(event.target.checked)}/>{staffT("Retry the original request")}</label>}
       <div className="actions"><button className="button outline" disabled={busy} onClick={()=>{setConfirmed(false);void mutation.check();}}><RefreshCw size={18}/>{staffT("Check receipt")}</button>{mutation.checked && <button className="button primary" disabled={busy || !confirmed} onClick={()=>{setConfirmed(false);void mutation.write(pending);}}><Send size={18}/>{staffT("Retry unchanged request")}</button>}</div>
     </div>:null}
-    {serverPending?<div className="usage-request-row activation-pending" role="status"><div><strong>{staffT("Activation request pending")}</strong><span className="muted">{staffT.date(serverPending.requestedAt)}</span></div>{serverPending.note && <p dir="auto">{serverPending.note}</p>}<small className="muted">{staffT("Waiting for platform operations. No changes applied.")}</small></div>:!pending && !recovery.error && <form onSubmit={submit}><label>{staffT("Note for platform operations (optional)")}<textarea maxLength={500} rows={3} value={note} disabled={locked} onChange={event=>{setNote(event.target.value);setConfirmed(false);}}/></label><label className="billing-confirm"><input type="checkbox" checked={confirmed} disabled={locked} onChange={event=>setConfirmed(event.target.checked)}/>{staffT("Record this activation request")}</label><button className="button primary" disabled={locked || !confirmed}><Send size={18}/>{staffT(title)}</button></form>}
+    {serverPending?<div className="usage-request-row activation-pending" role="status"><div><strong>{staffT("Activation request pending")}</strong><span className="muted">{staffT.date(serverPending.requestedAt)}</span></div>{serverPending.note && <p dir="auto">{serverPending.note}</p>}<small className="muted">{staffT("Waiting for platform operations. No changes applied.")}</small></div>:!pending && !recovery.error && <form onSubmit={submit}>{upgradeOptions.length?<label className="field">{staffT("Choose a higher plan")}<select required value={upgradePlan} disabled={locked} onChange={event=>{setUpgradePlan(event.target.value);setConfirmed(false);}}><option value="">{staffT("Select a plan")}</option>{upgradeOptions.map(plan=><option key={plan} value={plan}>{PLAN_NAMES[plan]}</option>)}</select></label>:<label>{staffT("Note for platform operations (optional)")}<textarea maxLength={500} rows={3} value={note} disabled={locked} onChange={event=>{setNote(event.target.value);setConfirmed(false);}}/></label>}<label className="billing-confirm"><input type="checkbox" checked={confirmed} disabled={locked} onChange={event=>setConfirmed(event.target.checked)}/>{staffT("Record this activation request")}</label><button className="button primary" disabled={locked || !confirmed || (!!upgradeOptions.length&&!upgradePlan)}><Send size={18}/>{staffT(title)}</button></form>}
     {error && <p role="alert" className="record-error">{staffT.error(error)}</p>}{notice && <p role="status">{staffT.message(notice)}</p>}
   </section>;
 }

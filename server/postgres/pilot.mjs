@@ -6,24 +6,48 @@ import {sendAuthMail} from '../auth-mail.mjs';
 import {pilotInput,pilotReceiptInput,pilotReceipt,pilotMessage} from '../pilot-input.mjs';
 import {dispatchAllowed} from './operations-gates.mjs';
 
-export async function savePilot(pool,input,address,{schema='public',mail={available:false},destination=null}={}) {
+export async function savePilot(pool,input,address,{schema='public',mail={available:false},destination=null,send=null}={}) {
   const value=pilotInput(input);
   if(!await domainTransaction(pool,schema,client=>consumeAuthBudget(client,[tokenHash(`pilot:ip:${address}`),tokenHash(`pilot:email:${value.content.email}`)],5)))throw Error('Pilot request limit reached');
-  return domainTransaction(pool,schema,async client=>{
+  const {row,sendNow}=await domainTransaction(pool,schema,async client=>{
     // Bounds storage and serializes simultaneous requests for the same public receipt.
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['understood:pilot-admission']);
     const old=(await client.query('SELECT * FROM pilot_inquiries WHERE id=$1',[value.id])).rows[0];
-    if(old){if(old.receipt_hash!==value.receiptHash || old.request_hash!==value.requestHash)throw Error('Pilot request conflict');return pilotReceipt(old);}
+    if(old){if(old.receipt_hash!==value.receiptHash || old.request_hash!==value.requestHash)throw Error('Pilot request conflict');return {row:old};}
     if((await client.query('SELECT COUNT(*)::int n FROM pilot_inquiries')).rows[0].n>=10000)throw Error('Pilot storage unavailable');
-    const state=mail.available && destination ? 'queued':'saved';
-    return pilotReceipt((await client.query(`INSERT INTO pilot_inquiries(id,receipt_hash,request_hash,content_json,destination,state,created_at,expires_at,next_at)
-      VALUES($1,$2,$3,$4,$5,$6,clock_timestamp(),clock_timestamp()+interval '30 days',clock_timestamp()) RETURNING *`,
-      [value.id,value.receiptHash,value.requestHash,JSON.stringify(value.content),state==='queued'?destination:null,state])).rows[0]);
+    let state=mail.available && destination?'queued':'saved';
+    if(send && destination)state=await dispatchAllowed(client,null)?'processing':'failed';
+    // SMTP has no idempotency guarantee. Reserve the only send during insertion
+    // and leave the outbox destination empty so a background worker cannot replay it.
+    const row=(await client.query(`INSERT INTO pilot_inquiries(id,receipt_hash,request_hash,content_json,destination,state,created_at,expires_at,next_at,lease_until,attempts)
+      VALUES($1,$2,$3,$4,$5,$6,clock_timestamp(),clock_timestamp()+interval '30 days',clock_timestamp(),
+        CASE WHEN $6='processing' THEN clock_timestamp()+interval '30 seconds' END,CASE WHEN $6='processing' THEN 1 ELSE 0 END) RETURNING *`,
+      [value.id,value.receiptHash,value.requestHash,JSON.stringify(value.content),state==='queued'?destination:null,state])).rows[0];
+    return {row,sendNow:state==='processing'};
   });
+  if(!sendNow)return directReceipt(row);
+
+  let providerId=null;
+  try {({providerId}=await send(row.id,pilotMessage({...row,destination})));} catch { /* Keep the saved inquiry even if mail fails. */ }
+  const state=providerId?'sent':'failed';
+  const updated=await domainTransaction(pool,schema,async client=>(await client.query(`UPDATE pilot_inquiries
+    SET state=$2,provider_id=$3,lease_until=NULL WHERE id=$1 AND state='processing' AND destination IS NULL RETURNING *`,
+    [row.id,state,providerId])).rows[0]);
+  return directReceipt(updated ?? row);
 }
+
+function directReceipt(row) {
+  // A terminated Vercel invocation cannot finish the receipt. Treat its expired
+  // reservation as unconfirmed without resending an email Gmail may have accepted.
+  if(row?.state==='processing' && row.destination===null && new Date(row.lease_until).getTime()<=Date.now()) {
+    return pilotReceipt({...row,state:'failed'});
+  }
+  return pilotReceipt(row);
+}
+
 export async function readPilot(pool,id,secret,{schema='public'}={}) {
   const value=pilotReceiptInput(id,secret);
-  return domainTransaction(pool,schema,async client=>pilotReceipt((await client.query('SELECT id,state,created_at,expires_at FROM pilot_inquiries WHERE id=$1 AND receipt_hash=$2',[value.id,value.receiptHash])).rows[0]));
+  return domainTransaction(pool,schema,async client=>directReceipt((await client.query('SELECT id,state,destination,lease_until,created_at,expires_at FROM pilot_inquiries WHERE id=$1 AND receipt_hash=$2',[value.id,value.receiptHash])).rows[0]));
 }
 export async function processOnePilot(pool,mail,{schema='public',destination=null,fetchImpl=fetch}={}) {
   const row=await domainTransaction(pool,schema,async client=>{

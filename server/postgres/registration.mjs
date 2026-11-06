@@ -1,3 +1,4 @@
+import {registrationEntitlement} from '../pilot-policy.mjs';
 import {registrationAcceptance,sendRegistrationVerification,checkRegistrationCode} from '../registration-verification.mjs';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {inSchema} from './auth.mjs';
@@ -6,7 +7,7 @@ import {sealMail,openMail,sendAuthMail} from '../auth-mail.mjs';
 import {consumeAuthBudget} from './auth-budget.mjs';
 import {authMailCapacity} from './auth-mail-budget.mjs';
 import {registrationRequestInput,registrationResendInput,registrationVerifyInput,registrationCodeInput,registrationEmailHash,
-  REGISTRATION_TERMS_VERSION,REGISTRATION_PRIVACY_VERSION,REGISTRATION_TRIAL_HOURS,REGISTRATION_TRIAL_WORKER_LIMIT} from '../registration-input.mjs';
+  REGISTRATION_TERMS_VERSION,REGISTRATION_PRIVACY_VERSION} from '../registration-input.mjs';
 
 
 const unavailable=()=>new Error('Registration verification unavailable');
@@ -63,7 +64,7 @@ export async function requestRegistration(pool,input,remoteAddress,config,{schem
     const now=(await client.query('SELECT clock_timestamp() AS now')).rows[0].now;
     const id=existing?.id ?? value.requestId;
     const envelope=sealMail(config,id,{email:value.email,ownerName:value.ownerName,companyName:value.companyName,country:value.country,
-      phone:value.phone,passwordSalt:record.salt,passwordHash:record.derived,termsVersion:REGISTRATION_TERMS_VERSION,
+      phone:value.phone,plan:value.plan,passwordSalt:record.salt,passwordHash:record.derived,termsVersion:REGISTRATION_TERMS_VERSION,
       privacyVersion:REGISTRATION_PRIVACY_VERSION,acknowledgedAt:now.toISOString()});
     let expiresAt;
     if(existing) {
@@ -120,7 +121,8 @@ function registrationScope(registration,message) {
 }
 async function verified(client,registration,now) {
   const id=randomUUID(),orgId=randomUUID(),siteId=randomUUID();
-  const endsAt=null; // Pilot access starts only after operator approval.
+  const endsAt=null;
+  const {plan,limit,note}=registrationEntitlement(registration.plan);
   await client.query('INSERT INTO organizations(id,name) VALUES($1,$2)',[orgId,registration.companyName]);
   await client.query('INSERT INTO sites(id,org_id,name,timezone) VALUES($1,$2,$3,$4)',[siteId,orgId,registration.companyName,'UTC']);
   await client.query("INSERT INTO staff(id,org_id,site_id,name,role) VALUES($1,$2,$3,$4,'owner')",[id,orgId,siteId,registration.ownerName]);
@@ -131,16 +133,16 @@ async function verified(client,registration,now) {
     [id,registration.email,registration.passwordSalt,registration.passwordHash,now]);
   const terms=`${registration.termsVersion ?? REGISTRATION_TERMS_VERSION};${registration.privacyVersion ?? REGISTRATION_PRIVACY_VERSION}`;
   await client.query(`INSERT INTO organization_entitlements(org_id,state,started_at,ends_at,worker_limit,plan,terms_reference,
-    revision,updated_by,updated_at) VALUES($1,'read_only',$2,$3,$4,'pilot_pending',$5,1,'registration',$2)`,
-  [orgId,now,endsAt,REGISTRATION_TRIAL_WORKER_LIMIT,terms]);
+    revision,updated_by,updated_at) VALUES($1,'read_only',$2,$3,$4,$5,$6,1,'registration',$2)`,
+  [orgId,now,endsAt,limit,plan,terms]);
   await client.query(`INSERT INTO organization_entitlement_transitions(org_id,revision,state,started_at,ends_at,worker_limit,plan,
     terms_reference,reason,actor_type,actor_id,request_id,created_at)
-    VALUES($1,1,'read_only',$2,$3,$4,'pilot_pending',$5,'Verified owner registration; pilot approval pending','registration',$6,$6,$2)`,
-  [orgId,now,endsAt,REGISTRATION_TRIAL_WORKER_LIMIT,terms,registration.id]);
+    VALUES($1,1,'read_only',$2,$3,$4,$5,$6,$7,'registration',$8,$8,$2)`,
+  [orgId,now,endsAt,limit,plan,terms,note,registration.id]);
   await client.query(`INSERT INTO audit(id,org_id,site_id,actor_type,actor_id,action,object_id)
     VALUES($1,$2,$3,'system','registration','organization.registered',$4)`,[randomUUID(),orgId,siteId,registration.id]);
   await client.query(`INSERT INTO organization_activation_requests(request_id,org_id,site_id,requested_by,note,entitlement_revision,state,created_at)
-    VALUES($1,$2,$3,$4,'Pilot approval requested after email verification.',1,'pending',$5)`,[registration.id,orgId,siteId,id,now]);
+    VALUES($1,$2,$3,$4,$5,1,'pending',$6)`,[registration.id,orgId,siteId,id,note,now]);
   return {orgId,siteId,ownerId:id,endsAt};
 }
 export async function verifyRegistration(pool,input,remoteAddress,config,{schema='public'}={}) {
@@ -244,7 +246,7 @@ export async function processOneRegistration(pool,config,{schema='public',send=s
       token={token_hash:tokenHash(secret)};
       await client.query('INSERT INTO registration_tokens(token_hash,registration_id,mail_id,expires_at) VALUES($1,$2,$3,$4)',
         [token.token_hash,row.registration_id,row.id,row.expires_at]);
-      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirm your email to prepare your pilot workspace. Access remains read-only until approval. The 30-day pilot covers one site and up to 25 workers; its clock starts when activated. No automatic charge. If you did not create this account, ignore this email.`;
+      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirm your email to finish creating your Understood account. Workspace access starts after your pilot is approved or your plan is activated. If you did not create this account, ignore this email.`;
       message={email:message.email,subject:'Verify your Understood account',text};
       await client.query('UPDATE registration_mail SET payload=$1 WHERE id=$2',[sealMail(config,row.id,message),row.id]);
     }

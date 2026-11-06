@@ -59,7 +59,7 @@ async function post(path:string,body:unknown) {
   }
   return value;
 }
-export function requestAccount(body:{requestId:string;ownerName:string;email:string;password:string;companyName:string;country:string;phone?:string;acceptTerms:boolean;acceptPrivacy:boolean}) {
+export function requestAccount(body:{requestId:string;ownerName:string;email:string;password:string;companyName:string;country:string;phone?:string;acceptTerms:boolean;acceptPrivacy:boolean;plan?:string}) {
   return post('/auth/registrations',body);
 }
 export function resendAccount(body:{requestId:string;email:string}) {

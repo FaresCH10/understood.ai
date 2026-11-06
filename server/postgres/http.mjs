@@ -1,3 +1,4 @@
+import {isPendingWorkspacePlan} from '../pilot-policy.mjs';
 import {EVIDENCE_MAX_JSON_BYTES} from '../evidence-policy.mjs';
 import {requiredWorkerCreation} from '../people.mjs';
 import {crewMembershipHttpError} from '../people.mjs';
@@ -288,7 +289,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(!path.startsWith('/api/') && publicBuild)return publicBuild(req,res,url);
       if (req.method!=='GET') verifyMutationOrigin(req,config);
       if(await handleOperationsRoute(pool,req,res,url,{schema,enabled:options.operatorAccess===true,providerVerification:options.providerVerification,pipeline,secure,clientAddress:address}))return;
-      if(await handlePilotRoute(req,res,url,{save:(input)=>savePilot(pool,input,address,{...repository,mail,destination}),read:(id,secret)=>readPilot(pool,id,secret,repository)}))return;
+      if(await handlePilotRoute(req,res,url,{save:(input)=>savePilot(pool,input,address,{...repository,mail,destination,send:options.sendPilot}),read:(id,secret)=>readPilot(pool,id,secret,repository)}))return;
       if (path==='/api/demo/session') return send(res,404,{error:'Not found'});
       if(path==='/api/auth/recovery' && req.method==='POST') {
         if(url.search) throw new Error('Invalid recovery input');
@@ -370,6 +371,8 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         throw error;
       }
       verifyClientSession(req,session,path);
+      if(session.principal_type==='staff' && path!=='/api/session' && isPendingWorkspacePlan(session.workspace_plan))
+        return send(res,403,{error:'Workspace access is pending'});
       if(!archivedWriteAllowed(path,req.method))await domainTransaction(pool,repository.schema,client=>requireSiteOperational(client,session.org_id,session.site_id));
       if(await handleSourceAudioRoute(req,res,session,url,{
         list:(s,filters)=>listSourceAudio(pool,s,filters,repository),
