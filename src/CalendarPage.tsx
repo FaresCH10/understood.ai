@@ -53,6 +53,7 @@ export function CalendarPage({authority,refresh,language,navigate}:CalendarPageP
     try {return {data:checkedCalendar(read.data,month),error:read.error};}
     catch(reason) {return {data:null as CalendarPayload|null,error:(reason as Error).message};}
   },[read.data,read.error,month]);
+  const [mobileMonth,setMobileMonth]=useState(false);
   const data=parsed.data,error=parsed.error,rtl=language!=='en';
   const t=(key:CalendarTextKey,values:Record<string,string|number>={})=>calendarText(language,key,values);
   const counted=(count:number,key:CalendarTextKey,one:string,many:string)=>language==='en'?`${count} ${count===1?one:many}`:t(key,{count});
@@ -293,7 +294,7 @@ export function CalendarPage({authority,refresh,language,navigate}:CalendarPageP
         <span className="calendar-chip is-activity"><Sparkles size={15}/>{updateCount} {t('updates')}</span>
       </div>
     </div>
-    <section className="calendar-month-panel" aria-label={`${t('Calendar month')} ${monthLabel}`}>
+    <div className="calendar-mobile-view"><button className="button outline" aria-pressed={!mobileMonth} onClick={()=>setMobileMonth(false)}>{rtl?'الأجندة':'Agenda'}</button><button className="button outline" aria-pressed={mobileMonth} onClick={()=>setMobileMonth(true)}>{rtl?'الشهر':'Month'}</button></div><section className="calendar-mobile-agenda" hidden={mobileMonth}>{grid.filter((date):date is string=>!!date).filter(date=>date===today||(instructionsByDate.get(date)?.length||0)>0||(eventsByDate.get(date)?.length||0)>0).map(date=><button className="calendar-agenda-day" key={date} onClick={()=>{setOpenGroups(new Set());setSelected(date);}}><strong>{calendarDayHeading(date,language)}</strong><span>{dayPair(instructionsByDate.get(date)?.length||0,eventsByDate.get(date)?.length||0)||t('Today')}</span>{(instructionsByDate.get(date)||[]).slice(0,2).map(item=><span key={item.id}>{item.title}</span>)}</button>)}{!grid.some(date=>date&&(date===today||(instructionsByDate.get(date)?.length||0)>0||(eventsByDate.get(date)?.length||0)>0))&&<p>{rtl?'لا يوجد نشاط هذا الشهر':'No activity this month.'}</p>}</section><section data-mobile-month={mobileMonth} className="calendar-month-panel" aria-label={`${t('Calendar month')} ${monthLabel}`}>
       <div className="calendar-weekdays" aria-hidden="true">{weekdays.map((day,index)=><span key={day} data-narrow={narrowWeekdays[index]}>{day}</span>)}</div>
       <div className="calendar-grid" ref={gridRef} role="group" aria-label={monthLabel}>
         {grid.map((date,index)=>{

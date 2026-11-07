@@ -1,3 +1,4 @@
+import {MobileDisclosure} from './MobileDisclosure';
 import {generateWorkerPassword} from './worker-password';
 import React, { createContext,lazy,Suspense,useContext,useEffect,useMemo, useRef, useState } from 'react';
 import { Archive,ArchiveRestore, Check, SlidersHorizontal, ChevronDown, ChevronLeft, ChevronRight, Hash, Languages, Pencil, Plus, Search, Upload, UserRound,UserCheck, UserX, Users, X } from 'lucide-react';
@@ -365,13 +366,13 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
     <div className="page-header"><div><h1>{initialWorkerId ? selected?.name || selected?.code || t.workerDetails : t.workers}</h1><p>{initialWorkerId ? selected?.code : t.intro}</p></div>
       {!initialWorkerId && <div className="actions people-header-actions"><button className="button outline" onClick={onImport}><Upload size={19}/>{t.importCsv}</button><button className="button primary" onClick={startAdd}><Plus size={19}/>{t.addWorker}</button></div>}
     </div>
-    {!initialWorkerId && workerIdSettings && <section className="worker-id-settings" aria-label={t.workerIdSettings}>
+    {!initialWorkerId && workerIdSettings && <MobileDisclosure title={t.workerIdSettings}><section className="worker-id-settings" aria-label={t.workerIdSettings}>
       <span className="worker-id-settings-icon"><Hash size={18}/></span>
       <div className="worker-id-settings-copy"><strong>{t.workerIdSettings}</strong>
         <p><span>{t.workerIdPrefixLabel}:</span> <bdi>{workerIdSettings.prefix}</bdi> · <span>{t.workerIdNextLabel}:</span> <bdi>{workerIdSettings.nextCode}</bdi> · <span>{t.workerIdFormatLabel}:</span> <bdi>{workerIdSettings.format}</bdi></p>
       </div>
       {workerIdSettings.canEdit && <button type="button" className="button subtle" disabled={busy} onClick={openPrefix}><Pencil size={16}/>{t.changePrefix}</button>}
-    </section>}
+    </section></MobileDisclosure>}
     {!initialWorkerId && workerIdSettings?.canEdit && <dialog ref={prefixDialog} className="withdraw-dialog" aria-labelledby="worker-prefix-title" aria-describedby="worker-prefix-impact" onKeyDown={keepDialogFocus} onCancel={(event)=>{if(prefixBusy)event.preventDefault();}}>
       <form onSubmit={savePrefix}>
         <div className="withdraw-heading"><h2 id="worker-prefix-title">{t.changePrefixTitle}</h2><button type="button" className="icon-button" title={t.closeForm} aria-label={t.closeForm} disabled={prefixBusy} onClick={()=>prefixDialog.current?.close()}><X size={20}/></button></div>
@@ -405,7 +406,7 @@ export function PeoplePage({ refresh = 0, onImport,canManage,canDelete,credentia
           <tbody>{workers.items.map((worker) => <tr key={worker.id} className="worker-profile-row" onClick={()=>navigate(`people/worker/${encodeURIComponent(worker.id)}`)}>
             <td><button className="people-row-button" onClick={event => {event.stopPropagation();navigate(`people/worker/${encodeURIComponent(worker.id)}`);}}><UserRound size={18} /> <span className="people-worker-identity"><strong><bdi>{worker.name || worker.code}</bdi></strong>{worker.name && <small><bdi>{worker.code}</bdi></small>}</span></button></td>
             <td data-label={t.language}>{worker.language_selected ? <>{languages[worker.language]}{worker.pending_language_request && <small className="language-pending">{t.pendingChangeTo} {languages[worker.pending_language_request.requestedLanguage]}</small>}</> : <span className="status status-amber"><span className="status-dot" />{t.notSelected}</span>}</td><td data-label={t.accessStatus}><span className={`status ${worker.active ? 'status-green' : 'status-amber'}`}><span className="status-dot" />{worker.active ? t.active : t.disabled}</span></td>
-            <td data-label={t.crew}><bdi>{worker.crew_name || '—'}</bdi></td><td><button className="icon-button direction-arrow" aria-label={`${t.details}: ${worker.code}`} onClick={event => {event.stopPropagation();navigate(`people/worker/${encodeURIComponent(worker.id)}`);}}><ChevronRight size={19} /></button></td>
+            <td className={!worker.crew_name?"mobile-empty-crew":undefined} data-label={t.crew}><bdi>{worker.crew_name || '—'}</bdi></td><td><button className="icon-button direction-arrow" aria-label={`${t.details}: ${worker.code}`} onClick={event => {event.stopPropagation();navigate(`people/worker/${encodeURIComponent(worker.id)}`);}}><ChevronRight size={19} /></button></td>
           </tr>)}</tbody>
         </table></div> : <p className="empty-state">{t.noWorkers}</p>}
         <div className="people-pagination"><span>{peopleShowingText(locale,workers?.items.length || 0,workers?.total || 0)}</span><div>

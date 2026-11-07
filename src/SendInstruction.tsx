@@ -1,3 +1,4 @@
+import {MobileDisclosure} from './MobileDisclosure';
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useStaffText} from './staff-language';
 import RecipientMembers from './RecipientMembers';
@@ -81,6 +82,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const staffT=useStaffStaticText();
  const tr=useStaffText();
   const {request,current}=useStaffRequest(authority);
+  const [mobileStep,setMobileStep]=useState(0);
   const [recovery]=useState(()=>{try{return {pending:readPending(scope),error:''};}catch(error){return {pending:null,error:(error as Error).message};}});
   const restoredPending=recovery.pending;
   const [pending,setPending]=useState<PendingSend|null>(restoredPending);
@@ -292,7 +294,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
     {pending && !error && <div className="notice notice-amber" role="status"><strong>{staffT("An earlier send was not confirmed.")}</strong> {staffT("Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
     {pending && error && <div className="notice notice-amber" role="status"><strong>{staffT("Send outcome not confirmed.")}</strong> {staffT("The original request is retained. Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
     {error && !pending && <div className="notice notice-amber" role="alert">{staffT.error(error)}</div>}
-    <section className="panel send-composer" aria-labelledby="send-source-title">
+    <section className="panel send-composer" data-mobile-step={mobileStep} aria-labelledby="send-source-title"><nav className="send-mobile-steps" aria-label={tr("Send an instruction")}>{['Content','Recipients','Review'].map((label,index)=><button key={label} aria-current={mobileStep===index?'step':undefined} disabled={busy} onClick={()=>setMobileStep(index)}>{index+1}. {staffT.locale==='ar'?['المحتوى','المستلمون','المراجعة'][index]:label}</button>)}</nav><div className="send-step-content">
       <label className="field" htmlFor="send-title"><span>{tr("Title")} <span aria-hidden="true">*</span></span>
         <input id="send-title" name="title" type="text" required minLength={3} maxLength={titleMax}
           value={title} disabled={busy || !!pending || !draftLoaded} onChange={event=>setTitle(event.target.value)} placeholder={staffT("Give this instruction a clear title")} />
@@ -304,7 +306,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
         <div className="send-record-actions"><button type="button" className="button outline" disabled={busy||!!pending||!draftLoaded} onClick={()=>setVoiceOpen(true)}><Mic size={18}/>{tr("Record")}</button>{draftNotice&&<span className="muted send-draft-status" role="status">{draftNotice}</span>}</div>
         <p id="send-source-count" className="muted send-counter">{trimmedSource.length < sourceMin ? tr('At least 10 characters.') : <><bdi>{trimmedSource.length} / {sourceMax}</bdi> {tr('characters')}</>}</p>
       </div>
-      <label className="field">{tr("Who should receive it?")}
+      </div><div className="send-step-recipients"><label className="field">{tr("Who should receive it?")}
         <select value={audienceType} disabled={busy || !!pending || !draftLoaded} onChange={event=>setAudienceType(event.target.value as 'all'|'crew'|'members')}>
           <option value="all">{tr("All active workers")}</option><option value="crew">{tr("Crews")}</option><option value="members">{tr("Members")}</option>
         </select>
@@ -317,8 +319,9 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       {audienceError && <p className="notice notice-amber" role="alert">{audienceError}</p>}
       {selectedAudience && selectedAudience.total===0 && <p className="notice notice-amber" role="status">{staffT("There are no workers with a selected language in this audience.")}</p>}
 
-      <AttachmentComposer key={requestId.current} authority={authority} requestId={requestId.current} disabled={busy||!!pending||!draftLoaded} ready={draftReady} saveDraft={saveDraft} onBusy={setAttachmentBusy} languages={Object.keys(selectedAudience?.byLanguage||{}).sort()}/>
+      </div><div className="send-step-review"><MobileDisclosure title={staffT.locale==='ar'?'المرفقات (اختياري)':'Attachments (optional)'}><AttachmentComposer key={requestId.current} authority={authority} requestId={requestId.current} disabled={busy||!!pending||!draftLoaded} ready={draftReady} saveDraft={saveDraft} onBusy={setAttachmentBusy} languages={Object.keys(selectedAudience?.byLanguage||{}).sort()}/></MobileDisclosure>
 
+      <div className="send-mobile-review"><strong>{effectiveTitle}</strong><p dir="auto">{source}</p><span>{selectedAudience?.total ?? 0} {staffT.locale==='ar'?'مستلم':'recipients'}</span></div>
       <div className="send-option-grid">
         <div className="send-mode-stack">
           <label className="send-toggle">
@@ -353,6 +356,6 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
           {attachmentBusy&&<li><Circle size={16} aria-hidden="true"/><span>{staffT("Wait for the attachment to finish uploading.")}</span></li>}
         </ul>
       </div>}
-    </section>
+      </div><div className="send-mobile-footer"><button className="button outline" disabled={mobileStep===0||busy} onClick={()=>setMobileStep(value=>value-1)}>{staffT.locale==='ar'?'السابق':'Back'}</button>{mobileStep<2&&<button className="button primary" disabled={mobileStep===0?(!titleValid||!!sourceIssue):!audienceReady} onClick={()=>{setMobileStep(value=>value+1);document.querySelector('.send-composer')?.scrollIntoView({block:'start'});}}>{staffT.locale==='ar'?'متابعة':'Continue'}</button>}</div></section>
   </>;
 }
