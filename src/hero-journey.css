@@ -46,7 +46,7 @@
 .journey-scene--hospitality .journey-messages{top:70px}
 .journey-scene--food .journey-messages{top:40px}
 .journey-message{position:relative;background:#fff;border:1px solid #dce6e1;border-radius:11px;padding:15px 16px;box-shadow:0 5px 18px #173e2f0a}
-.journey-message::after{content:'';position:absolute;left:20px;bottom:-8px;transform:rotate(45deg);width:14px;height:14px;background:#fff;border-right:1px solid #dce6e1;border-bottom:1px solid #dce6e1;border-bottom-right-radius:3px}
+.journey-message::after{content:'';position:absolute;left:-7px;top:42px;transform:rotate(45deg);width:14px;height:14px;background:#fff;border-left:1px solid #dce6e1;border-bottom:1px solid #dce6e1}
 .journey-language{display:inline-block;font-size:12px;line-height:1.4;font-weight:650;padding:3px 8px;border-radius:5px;background:#e7f0ff;color:#244d87}
 .journey-message>div{display:flex;align-items:flex-start;gap:9px;margin-top:10px}
 .marketing-site .journey-message p{font-family:'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.6;flex:1;min-width:0;margin:0;color:#203930}
@@ -73,3 +73,31 @@
 .journey-scene--site .journey-person,.journey-scene--hospitality .journey-person{left:0;bottom:0;width:100%;height:100%;object-fit:contain;object-position:left bottom}
 @media(min-width:801px){.journey-scene--site .journey-messages,.journey-scene--hospitality .journey-messages{right:16px;top:20px;max-width:calc(100% - 32px)}}
 @media(prefers-reduced-motion:reduce){.journey-signal{display:none}}
+@media(max-width:540px){
+  .journey-visual{width:100%}
+  .journey-artwork{height:clamp(280px,84vw,400px)}
+  .journey-scene .journey-messages{width:min(240px,82%);margin-top:-18px;gap:12px}
+  .journey-message{padding:10px 12px}
+  .journey-language{font-size:11px;padding:3px 6px}
+  .journey-message>div{gap:6px;margin-top:7px}
+  .marketing-site .journey-message p{font-size:13px;line-height:1.55}
+  .marketing-site .journey-message p[lang=ur],.marketing-site .journey-message p[lang=ar]{font-size:14px;line-height:1.75}
+  .journey-message svg{width:17px;height:17px}
+  .journey-copy,.journey-introduction>p{padding-inline-end:0!important}
+  .journey-visual>figcaption{max-width:100%}
+}
+/* Keep the messages over the artwork, with tails facing the held device. */
+@media(max-width:800px){
+  .journey-scene .journey-messages{position:absolute;left:12px;right:auto;top:auto;bottom:16px;width:min(240px,68%);margin:0;gap:12px}
+  .journey-message::after{left:auto;right:-7px;top:42px;border:0;border-top:1px solid #dce6e1;border-right:1px solid #dce6e1}
+}
+@media(max-width:540px){
+  .journey-scene .journey-messages{width:min(184px,calc(100% - 40px));gap:8px}
+  .journey-message{padding:8px 10px}
+  .journey-language{font-size:10px;padding:2px 5px}
+  .journey-message>div{gap:5px;margin-top:6px}
+  .marketing-site .journey-message p{font-size:12px;line-height:1.45}
+  .marketing-site .journey-message p[lang=ur],.marketing-site .journey-message p[lang=ar]{font-size:13px;line-height:1.6}
+  .journey-message svg{width:14px;height:14px}
+  .journey-message::after{width:10px;height:10px;right:-5px;top:34px}
+}

@@ -28,7 +28,6 @@ export function LandingHero({locale,registrationAvailable,motionPaused}:{locale:
         .from('.hero-intro-scene>figcaption',{autoAlpha:0,duration:.35},1.85);
       const worker=root.current!.querySelector<HTMLImageElement>('.hero-intro-worker')!,showScene=()=>{scene.play();};
       if(worker.complete)showScene();else{worker.addEventListener('load',showScene,{once:true});worker.addEventListener('error',showScene,{once:true});}
-      gsap.to('.hero-worker-parallax',{y:-18,ease:'none',scrollTrigger:{id:'landing-hero-parallax',trigger:root.current,start:'top top',end:'bottom top',scrub:1}});
       const refresh=()=>ScrollTrigger.refresh();
       const images=[...root.current!.querySelectorAll('img')];images.forEach(image=>image.addEventListener('load',refresh));
       return()=>{images.forEach(image=>image.removeEventListener('load',refresh));worker.removeEventListener('load',showScene);worker.removeEventListener('error',showScene);};

@@ -86,3 +86,15 @@
 @media(max-width:800px){.plans-studio-heading{grid-template-columns:1fr;gap:16px;margin-bottom:24px}.plans-toolbar{padding:16px 18px;gap:16px}.plans-billing-group,.plans-calculator{flex-basis:100%;min-width:0;max-width:none}.plans-billing-group{width:100%}.plans-card-grid{grid-template-columns:1fr;gap:18px}.plans-card{padding:28px 22px 22px}.plans-card-price{min-height:0}.marketing-site .plans-card-description{min-height:0}.plans-studio-faq{grid-template-columns:1fr;gap:22px;margin-top:42px}.marketing-site .plans-studio-heading>p{font-size:16.5px}}
 @media(max-width:480px){.plans-toolbar{padding:14px}.plans-billing button{font-size:13px;gap:5px;padding:7px 8px}.plans-calculator-heading output{font-size:22px}.plans-example-total{font-size:21px}.plans-card{padding:26px 20px 20px}}
 @media(prefers-reduced-motion:reduce){.plans-card,.plans-billing button{transition:none}.plans-studio-faq summary svg{transition:none}}
+@media(min-width:601px) and (max-width:800px){
+  .plans-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:800px){
+  .plans-billing button{min-height:44px}
+  .plans-calculator input[type=range]{height:44px}
+}
+@media(max-width:380px){
+  .plans-billing button{flex-direction:column;gap:3px;padding-block:9px;font-size:14px}
+  .plans-billing button small{font-size:12px}
+  .plans-card{padding-inline:20px}
+}

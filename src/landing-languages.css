@@ -43,3 +43,15 @@
 @media(max-width:850px){.language-showcase-heading{grid-template-columns:1fr;gap:18px}.language-showcase-board{grid-template-columns:1fr}.language-showcase-display{display:grid;grid-template-columns:1fr 1.2fr;column-gap:28px;padding:28px}.language-showcase-count{grid-column:1/-1}.language-live-content{display:contents}.language-native-heading{grid-column:1;margin:20px 0;align-self:center}.language-interface-preview{grid-column:2;grid-row:2/4;margin-top:24px}.marketing-site .language-preview-note{grid-column:1;align-self:start;margin-top:0}.language-choice-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.language-choice>span:first-child{font-size:16px}.language-showcase-benefits{justify-content:flex-start}}
 @media(max-width:600px){.language-showcase-display{display:flex;padding:24px}.language-live-content{display:block}.language-native-heading{margin:22px 0;min-height:65px}.language-interface-preview{margin-top:0}.language-preview-body{min-height:180px}.marketing-site .language-preview-note{margin-top:18px}.language-showcase-picker{padding:24px 18px}.language-choice-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.language-choice{padding:12px 8px;min-height:78px}.language-choice>span:first-child{font-size:16px}.language-choice>span:nth-child(2){font-size:12px}.language-showcase-benefits{display:grid;gap:12px}.language-showcase-heading{margin-bottom:28px}.marketing-site .language-showcase-heading>p{font-size:17px}.language-preview-brand{padding:15px}.language-preview-body{padding:20px 15px}}
 @media(prefers-reduced-motion:reduce){.language-choice{transition:none}}
+@media(max-width:600px){
+  .language-choice>span:nth-child(2){overflow-wrap:anywhere}
+  .language-picker-heading{gap:12px}
+  .language-picker-heading>svg{flex:none}
+  .language-preview-brand{align-items:flex-start}
+  .language-preview-brand>span:last-child{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;text-align:end}
+}
+@media(max-width:420px){
+  .language-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .language-showcase-display{padding:22px 18px}
+  .language-showcase-picker{padding:24px 16px}
+}

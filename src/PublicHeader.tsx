@@ -10,6 +10,13 @@ export function PublicHeader({locale,onLocale,view,registrationAvailable}:{local
   const t=landingCopy[locale],header=useRef<HTMLElement>(null),menuButton=useRef<HTMLButtonElement>(null);
   const [menuOpen,setMenuOpen]=useState(false);
   useLanguageGlobeMotion(header,'.landing-site-language');
+  useEffect(()=>{setMenuOpen(false);},[view,locale]);
+  useEffect(()=>{
+    const desktop=window.matchMedia('(min-width: 1101px)');
+    const close=(event:MediaQueryListEvent)=>{if(event.matches)setMenuOpen(false);};
+    desktop.addEventListener('change',close);
+    return()=>desktop.removeEventListener('change',close);
+  },[]);
   useEffect(()=>{
     const outside=(event:PointerEvent)=>{if(event.target instanceof Node&&!header.current?.contains(event.target)){setMenuOpen(false);header.current?.querySelectorAll('details[open]').forEach(element=>element.removeAttribute('open'));}};
     document.addEventListener('pointerdown',outside);
