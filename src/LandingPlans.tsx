@@ -28,6 +28,8 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
   const root=useRef<HTMLElement>(null),t=landingCopy[locale],ar=locale==='ar';
   const [billing,setBilling]=useState<'annual'|'monthly'>('annual');
   const [workers,setWorkers]=useState(250);
+  const [expandedPlans,setExpandedPlans]=useState<Record<string,boolean>>({});
+  const [calculatorOpen,setCalculatorOpen]=useState(false);
   const totalStates=useRef<Record<string,{value:number}>>({});
   const labels=ar?{
     heading:'ابدأ بفريق واحد. وتوسّع إلى كل موقع.',
@@ -109,7 +111,8 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
   const sliderStyle={'--plans-progress':`${progress}%`} as CSSProperties;
   return <section ref={root} id="plans" className="landing-section landing-container plans-studio" aria-labelledby="plans-title">
     <header className="plans-studio-heading"><h2 id="plans-title">{labels.heading}</h2><p>{labels.intro}</p></header>
-    <div className="plans-toolbar">
+    <button type="button" className="mobile-pricing-toggle" aria-expanded={calculatorOpen} aria-controls="plans-calculator-controls" onClick={()=>setCalculatorOpen(value=>!value)}>{ar?'احسب تكلفة فريقك':'Estimate your team’s cost'}<ChevronDown size={17}/></button>
+    <div id="plans-calculator-controls" className={`plans-toolbar ${calculatorOpen?'is-expanded':''}`}>
       <div className="plans-billing-group">
         <span className="plans-toolbar-label" id="plans-billing-label">{labels.billing}</span>
         <div className="plans-billing" role="group" aria-labelledby="plans-billing-label">
@@ -145,6 +148,8 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
               {plan.base>0&&<p className="plans-price-seat">+ <bdi dir="ltr">${plan.seat.toFixed(2)}</bdi> {labels.seat}</p>}
               <p className="plans-price-min">{labels.minimum(plan.min)}</p>
             </div>}
+            <button type="button" className="mobile-plan-toggle" aria-expanded={!!expandedPlans[plan.id]} aria-controls={`plan-details-${plan.id}`} onClick={()=>setExpandedPlans(value=>({...value,[plan.id]:!value[plan.id]}))}>{ar?'تفاصيل الخطة':'Plan details'}<ChevronDown size={16}/></button>
+            <div id={`plan-details-${plan.id}`} className={`plans-card-details ${expandedPlans[plan.id]?'is-expanded':''}`}>
             <p className="plans-card-description">{copy.description}</p>
             <span className="plans-card-rule" aria-hidden="true"/>
             <ul className="plans-card-features">{copy.features.map(point=><li key={point}><Check size={17} aria-hidden="true"/>{point}</li>)}</ul>
@@ -154,11 +159,13 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
               <small>{labels.forWorkers} <bdi>{formatNumber(billable)}</bdi> {labels.workerNoun} · {billing==='annual'?labels.billedAnnual:labels.billedMonthly}</small>
               {billable!==workers&&<small className="plans-example-min">{labels.minimumApplies}</small>}
             </div>}
+            </div>
             <div className="plans-card-action"><a className={`landing-button ${plan.featured?'landing-button--light':'landing-button--outline'}`} href={href}>{cta}<ArrowRight size={18} className="landing-forward" aria-hidden="true"/></a><p>{copy.note}</p></div>
           </article>
         </div>;
       })}
     </div>
+    <a className="mobile-full-pricing landing-text-link" href="#pricing">{ar?'عرض مقارنة الخطط كاملة':'See full pricing and comparison'}<ArrowRight size={17}/></a>
     <p className="plans-pricing-note">{labels.pricingNote}</p>
     <p className="plans-inquiry-note">{t.pilotNote}</p>
     <div className="plans-studio-faq"><h3>{labels.faq}</h3><div>{t.faqs.map(item=><details key={item.q}><summary>{item.q}<ChevronDown size={18} aria-hidden="true"/></summary><p>{item.a}</p></details>)}</div></div>

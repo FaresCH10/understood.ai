@@ -14,7 +14,7 @@ export function LandingPage({view,locale,registrationAvailable}:{view:string;loc
   useEffect(()=>{
     const frame=requestAnimationFrame(()=>{
       ScrollTrigger.refresh();
-      const target=publicLandingTarget(view),section=root.current?.querySelector<HTMLElement>(`#${target}`);
+      const requested=publicLandingTarget(view),target=requested==='platform'&&window.matchMedia('(max-width:767px)').matches?'how-it-works':requested,section=root.current?.querySelector<HTMLElement>(`#${target}`);
       if(target==='landing-top')window.scrollTo({top:0,behavior:'instant'});
       else if(section)section.scrollIntoView({behavior:'instant',block:'start'});
     });

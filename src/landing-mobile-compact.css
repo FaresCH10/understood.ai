@@ -1,0 +1,68 @@
+.mobile-industry-picker,.mobile-language-select,.mobile-plan-toggle,.mobile-pricing-toggle,.mobile-full-pricing{display:none}
+.marketing-site .mobile-full-pricing{display:none}
+.plans-card-details{display:contents}
+.landing-full-pricing{padding-top:32px}
+.landing-full-pricing h1{margin-top:24px}
+@media(max-width:767px){
+  .marketing-site .landing-page .landing-section{padding-block:38px}
+  .landing-page .platform-purpose,.landing-page .landing-capability-strip{display:none}
+  .landing-nav>a[href='#platform'],.landing-footer nav>a[href='#platform']{display:none}
+  .landing-page .hero-journey{padding-block:32px 24px}
+  .landing-page .journey-introduction{gap:12px;padding-bottom:18px}
+  .landing-page .journey-introduction>p{display:none}
+  .mobile-industry-picker{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+  .mobile-industry-picker button{flex:1 1 40%;min-height:44px;padding:9px 12px;border:1px solid #b7cec1;border-radius:6px;background:#fff;color:#104f43;font-size:13px;line-height:1.4}
+  .mobile-industry-picker button[aria-pressed=true]{background:#104f43;color:#fff}
+  .landing-page .journey-scene[data-mobile-active=false]{display:none}
+  .landing-page .journey-scenes{margin-block:0;gap:0}
+  .landing-page .journey-scene{gap:8px}
+  .landing-page .journey-sector,.landing-page .journey-copy>p,.landing-page .journey-end,.landing-page .journey-connection,.landing-page .journey-ornaments{display:none}
+  .landing-page .journey-copy h3{font-size:25px;margin-bottom:12px}
+  .landing-page .journey-visual{width:100%;max-width:530px;align-self:center}
+  .landing-page .landing-unified-heading{gap:12px;margin-bottom:24px}
+  .landing-page .unified-workflow-layout{gap:24px}
+  .landing-page .unified-workflow-steps{gap:16px}
+  .landing-page .unified-workflow-steps h3{margin-block:0 8px;font-size:19px}
+  .landing-page .unified-workflow-steps p{display:none}
+  .landing-page .unified-step-marker{width:38px;height:38px}
+  .landing-page .unified-workflow-track{inset-inline-start:18px}
+  .landing-page .language-showcase-board{display:flex;flex-direction:column}
+  .landing-page .language-showcase-picker{order:-1;padding:18px}
+  .landing-page .language-picker-heading,.landing-page .language-showcase-picker>p,.landing-page .language-choice-grid{display:none}
+  .landing-page .mobile-language-select{display:grid;gap:8px;font-size:14px;font-weight:600}
+  .mobile-language-select select{width:100%;min-height:48px;padding:10px;border:1px solid #afc8ba;border-radius:5px;background:#fff;color:#132b25;font-size:16px}
+  .landing-page .language-showcase-display{display:block;padding:20px}
+  .landing-page .language-live-content{display:block}
+  .landing-page .language-native-heading,.landing-page .language-preview-note,.landing-page .language-showcase-benefits{display:none}
+  .landing-page .language-interface-preview{margin-top:16px}
+  .landing-page .language-preview-body{min-height:0;padding:18px}
+  .landing-page .language-showcase-coverage{margin-top:16px}
+  .landing-page .unified-company-layout{gap:20px}
+  .landing-page .unified-company-preview,.landing-page .unified-company-industries{display:none}
+  .landing-page .unified-company-points{gap:16px}
+  .landing-page .unified-company-points h3{margin-top:0;font-size:19px}
+  .landing-page .unified-company-points p{font-size:14px}
+  .landing-page .mobile-pricing-toggle,.landing-page .mobile-plan-toggle{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:10px 0;border:0;background:transparent;color:inherit;font-size:14px;cursor:pointer;text-align:start}
+  .landing-page .mobile-pricing-toggle{width:100%;margin-bottom:16px;color:#104f43}
+  .landing-page .plans-toolbar:not(.is-expanded),.landing-page .plans-card-details:not(.is-expanded){display:none}
+  .landing-page .plans-card-details.is-expanded{display:block}
+  .landing-page .plans-card-grid{grid-template-columns:1fr;gap:16px}
+  .landing-page .plans-card{padding:20px;box-shadow:none}
+  .landing-page .plans-card-heading{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .landing-page .plans-card-heading>span{font-size:12px;text-align:end}
+  .landing-page .plans-card-price{margin:14px 0 8px;min-height:0}
+  .landing-page .plans-price-main strong{font-size:30px}
+  .landing-page .plans-card-action{margin-top:12px}
+  .landing-page .plans-card-action>p{display:none}
+  .marketing-site .landing-page .mobile-full-pricing{display:flex;min-height:44px;margin-top:20px}
+  .landing-page .plans-studio-faq{margin-top:28px;gap:16px}
+  .landing-page .plans-inquiry-note{display:none}
+  .landing-page .landing-contact{padding-block:24px;margin-top:0;background:#f1f6f0;color:#132b25}
+  .landing-page .landing-contact h2{color:#132b25;font-size:24px;margin:0}
+  .landing-page .landing-contact p{display:none}
+  .landing-page .landing-contact-inner{gap:16px}
+  .landing-footer{padding-block:24px}
+  .landing-footer-top>div>p,.landing-footer nav{display:none}
+  .landing-footer-bottom{gap:12px;margin-top:16px}
+  .landing-footer-bottom>div{gap:4px 18px}
+}

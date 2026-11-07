@@ -9,7 +9,7 @@ export const PUBLIC_SECTIONS=[
 ] as const;
 
 export function isPublicLandingView(view:string){
-  return isHelpView(view)||view==='contact'||view==='home'||view==='platform/worker'||view==='platform/supervisor'||view==='company-controls'||PUBLIC_SECTIONS.some(section=>section.id===view);
+  return isHelpView(view)||view==='pricing'||view==='contact'||view==='home'||view==='platform/worker'||view==='platform/supervisor'||view==='company-controls'||PUBLIC_SECTIONS.some(section=>section.id===view);
 }
 
 export function publicLandingTarget(view:string){

@@ -1,5 +1,5 @@
 import {JourneyOrnaments} from './JourneyOrnaments';
-import {useRef} from 'react';
+import {useRef,useState} from 'react';
 import {ArrowRight,Volume2} from 'lucide-react';
 import {gsap,useGSAP,ScrollTrigger} from './gsap-scroll';
 import type {LandingLocale} from './landing-content';
@@ -14,6 +14,7 @@ const scenes=[
 const languageNames={Urdu:'الأردية',English:'الإنجليزية',Arabic:'العربية',Indonesian:'الإندونيسية',Russian:'الروسية'};
 
 export function HeroJourney({locale,motionPaused}:{locale:LandingLocale;motionPaused:boolean}){
+  const [selectedScene,setSelectedScene]=useState('retail');
   const root=useRef<HTMLElement>(null),svg=useRef<SVGSVGElement>(null),track=useRef<SVGPathElement>(null),trace=useRef<SVGPathElement>(null),signal=useRef<SVGCircleElement>(null);
   useGSAP(()=>{
     const section=root.current!,path=trace.current!,dot=signal.current!,progress={value:1};
@@ -39,7 +40,7 @@ export function HeroJourney({locale,motionPaused}:{locale:LandingLocale;motionPa
     };
     measure();
     const media=gsap.matchMedia();
-    if(!motionPaused)media.add('(prefers-reduced-motion: no-preference)',()=>{
+    if(!motionPaused)media.add('(min-width:768px) and (prefers-reduced-motion: no-preference)',()=>{
       gsap.fromTo(progress,{value:0},{value:1,ease:'none',onUpdate:draw,scrollTrigger:{id:'hero-journey-line',trigger:section,start:'top 70%',end:'bottom 70%',scrub:.65}});
       gsap.utils.toArray<SVGSVGElement>('.journey-ornament',section).forEach((ornament,index)=>{
         gsap.fromTo(ornament,{y:index%2?-18:18},{y:index%2?18:-18,ease:'none',scrollTrigger:{trigger:section,start:'top bottom',end:'bottom top',scrub:1}});
@@ -67,7 +68,8 @@ export function HeroJourney({locale,motionPaused}:{locale:LandingLocale;motionPa
     <JourneyOrnaments/>
     <svg ref={svg} className="journey-connection" aria-hidden="true" focusable="false" preserveAspectRatio="none"><path ref={track} className="journey-line-track"/><path ref={trace} className="journey-line-progress" pathLength="1"/><circle ref={signal} className="journey-signal" r="6"/></svg>
     <div className="landing-container journey-introduction"><h2 id="journey-title">{locale==='ar'?<>فرق مختلفة.<br/><span>وضوح مشترك.</span></>:<>Different teams.<br/><span>The same clarity.</span></>}</h2><p>{locale==='ar'?'من المستودع إلى الوردية التالية، تصل التعليمات باللغات التي يستخدمها فريقك.':'From the stockroom to the next shift, an instruction travels in the languages your team uses.'}</p></div>
-    <ol className="journey-scenes landing-container">{scenes.map((scene,index)=>{const copy=scene[locale];return <li className={`journey-scene journey-scene--${scene.id}`} id={`journey-${scene.id}`} key={scene.id} data-side={index%2===0?'left':'right'}>
+    <div className="mobile-industry-picker landing-container" role="group" aria-label={locale==='ar'?'مجالات العمل':'Industries'}>{scenes.map(scene=><button type="button" key={scene.id} aria-pressed={selectedScene===scene.id} aria-controls={`journey-${scene.id}`} onClick={()=>setSelectedScene(scene.id)}>{scene[locale].sector}</button>)}</div>
+    <ol className="journey-scenes landing-container">{scenes.map((scene,index)=>{const copy=scene[locale];return <li className={`journey-scene journey-scene--${scene.id}`} id={`journey-${scene.id}`} key={scene.id} data-side={index%2===0?'left':'right'} data-mobile-active={selectedScene===scene.id}>
       <div className="journey-copy"><span className="journey-sector">{copy.sector}</span><h3>{copy.title}</h3><p>{copy.body}</p></div>
       <figure className="journey-visual"><div className="journey-artwork"><div className="journey-photo-window"><img className="journey-place" src={`/landing/journey/${scene.id}-place.jpg`} alt="" width="1600" height="1000" loading="lazy"/></div><div className="journey-person-window"><div className="journey-person-entrance"><img className="journey-person" src={`/landing/journey/${scene.id}.png`} alt="" width={scene.width} height={scene.height} loading="lazy"/></div></div>
         <div className="journey-messages">{scene.messages.map(message=><div className="journey-message" key={message.language}><span className="journey-language">{locale==='ar'?languageNames[message.label]:message.label}</span><div><p lang={message.language} dir={message.direction}>{message.text}</p><Volume2 size={21} aria-hidden="true"/></div></div>)}</div></div>

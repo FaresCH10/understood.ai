@@ -270,3 +270,34 @@
   .registration-fields{grid-template-columns:minmax(0,1fr)}
   .auth-card .registration-start :is(input:not([type=checkbox]),select){font-size:16px}
 }
+
+/* Keep phone authentication focused on the form and a single brand mark. */
+@media(max-width:767px){
+  .auth-shell{display:block;padding:24px 16px}
+  .auth-shell .auth-story,.auth-shell .auth-scenery{display:none}
+  .auth-form-column{max-width:480px;margin-inline:auto}
+  .auth-mobile-brand{margin-bottom:20px}
+  .auth-card{padding:24px 20px}
+  .auth-card input:not([type=checkbox]):not([type=radio]),.auth-card select{font-size:16px}
+  .auth-card-footnote{flex-wrap:wrap;gap:4px 10px;text-align:center}
+  .auth-card .worker-entry-languages label{min-height:44px}
+  .auth-help-links{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px}
+  .auth-help-links details{flex:1 0 100%;order:1}
+  .auth-help-links summary{justify-content:flex-start;text-align:start}
+  .auth-help-links details>p{margin:8px 0 0}
+}
+
+@media(max-width:767px){
+  .auth-shell--worker .worker-entry-heading h1{font-size:clamp(24px,6vw,28px);line-height:1.25;letter-spacing:-.015em;text-wrap:balance;margin-bottom:10px}
+  .auth-shell--worker .worker-entry-heading>p{font-size:14px;line-height:1.6;margin-bottom:20px}
+  .auth-shell--worker .auth-role-tabs a{font-size:13px}
+  .auth-shell--worker .worker-entry-form{gap:16px}
+  .auth-shell--worker .worker-entry-form .field{font-size:14px;line-height:1.5;gap:8px}
+  .auth-shell--worker .worker-access-entry .muted{font-size:13px;line-height:1.6;color:#52665a;text-wrap:pretty}
+  .auth-shell--worker .worker-company-memory .signin-remember{font-size:13px;line-height:1.5;min-height:44px;align-items:flex-start}
+  .auth-shell--worker .worker-company-memory input{margin-top:2px}
+  .auth-shell--worker .worker-company-memory .muted{padding-inline-start:23px}
+  .auth-shell--worker .worker-entry-modes .button,.auth-shell--worker .worker-entry-action,.auth-shell--worker .worker-entry-continue{font-size:13px;line-height:1.5}
+  .auth-shell--worker .worker-entry-action{padding:12px}
+  .auth-shell--worker .worker-access-entry[dir=rtl] .worker-entry-heading h1{letter-spacing:0;line-height:1.5}
+}

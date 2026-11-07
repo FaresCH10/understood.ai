@@ -50,6 +50,7 @@ export function LandingLanguages({locale}:{locale:LandingLocale}){
         <p className="language-preview-note">{c.note}</p>
       </div>
       <div className="language-showcase-picker"><div className="language-picker-heading"><h3 id="language-picker-title">{c.choose}</h3><ArrowUpRight size={22} aria-hidden="true"/></div><p>{c.hint}</p>
+        <label className="mobile-language-select">{c.choose}<select value={selected} onChange={event=>setSelected(event.target.value)}>{WORKER_LOCALES.map(item=><option key={item.code} value={item.code}>{item.name} · {item.englishName}</option>)}</select></label>
         <div className="language-choice-grid" role="group" aria-labelledby="language-picker-title">{WORKER_LOCALES.map(item=><button type="button" className="language-choice" key={item.code} aria-label={item.englishName} aria-pressed={selected===item.code} onClick={()=>setSelected(item.code)}><span lang={item.code} dir={item.direction}>{item.name}</span><span>{item.englishName}</span>{selected===item.code&&<Check size={13} aria-hidden="true"/>}</button>)}</div>
         <p className="language-script-note">{c.scripts}</p>
       </div>

@@ -37,6 +37,7 @@
 .landing-nav-dropdown>a:hover{background:#f1f6f2}
 .landing-nav-actions{display:flex;align-items:center;gap:18px;flex:none}
 .landing-site-language{display:flex;align-items:center;gap:5px;color:#3d5749;position:relative}
+.landing-mobile-language{display:none}
 .landing-site-language select{font-size:13px;padding:7px 15px 7px 3px;background:transparent;border:0;color:#244634;min-width:0;max-width:82px;min-height:40px;cursor:pointer}
 .landing-nav-signin{font-size:14px;font-weight:600;color:var(--landing-green);white-space:nowrap}
 .marketing-site .landing-nav-trial{font-size:13px;min-height:41px;padding:9px 15px;white-space:nowrap}
@@ -259,6 +260,9 @@
   .landing-site-language{gap:2px}
   .landing-site-language select{max-width:82px;padding-inline:2px;font-size:16px}
   .landing-menu-button{width:44px;height:44px}
+  .landing-desktop-language{display:none}
+  .landing-nav .landing-mobile-language{display:flex;gap:8px;align-self:flex-start;padding-top:8px}
+  .landing-nav-signin{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 10px;border:1px solid var(--landing-border);border-radius:5px;font-size:13px;line-height:1.4}
   .landing-capability-strip>.landing-container{gap:18px 14px}
   .landing-capability-strip span{align-items:flex-start;font-size:13px}
   .landing-capability-strip svg{margin-top:2px}
