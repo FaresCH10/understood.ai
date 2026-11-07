@@ -84,7 +84,9 @@ test('UI message interpolation preserves user-authored values and never cascades
 test('response and improvement render boundaries preserve canonical query, request and evidence fields',async()=>{
   const responses=await readFile(new URL('../src/PublicationResponses.tsx',import.meta.url),'utf8');
   const improvement=await readFile(new URL('../src/SelfHealingLoop.tsx',import.meta.url),'utf8');
-  assert.match(responses,/URLSearchParams\(\{search,language,status,page:String\(page\),pageSize:'20'\}/);
+  assert.match(responses,/URLSearchParams\(\{search,language,status,page:String\(page\),pageSize:String\(pageSize\)\}/);
+  assert.match(responses,/window\.matchMedia\('\(max-width:600px\)'\)\.matches\?10:20/);
+  assert.match(responses,/<Paging page=\{page\} total=\{data\.total\} size=\{pageSize\}/);
   assert.match(responses,/ui\.date\(row\.receivedAt\)/);assert.match(responses,/ui\.language\(locale\.code\)/);
   assert.match(responses,/dir="auto">\{data\.question\}/);assert.match(responses,/dir="auto" key=\{index\}>\{fact\}/);
   assert.match(improvement,/\{requestId:requestId\.current,title,source\}/);
