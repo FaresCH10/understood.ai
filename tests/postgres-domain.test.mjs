@@ -78,14 +78,14 @@ test('PostgreSQL exact worker receipt lookup reauthorizes, minimizes fields and 
   try{
     const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id);
     const typedId=randomUUID(),helpId=randomUUID(),audioId=randomUUID(),stagingId=randomUUID();
+    const audio=await receiveRecording(pool,worker,assignment,audioId,wav(),memoryStorage(),options);
+    await db.query("UPDATE recordings SET status='failed',error='Private provider error' WHERE id=$1",[audio.id]);
+    await assert.rejects(receiveRecording(pool,worker,assignment,stagingId,wav(),{async save(){throw Error('Storage failure');},async remove(){}},options),/not received/);
     const typed=await submitAnswer(pool,worker,assignment,typedId,answer,options);
     assert.deepEqual(await workerRequestReceipt(pool,worker,assignment,'answer',typedId,options),{id:typed.id,outcome:null,assessmentStatus:'pending',duplicate:true});
     await processOneAssessment(pool,{assess:async()=>matched},options);
     await requestHelp(pool,worker,assignment,{requestId:helpId,text:'Synthetic help text'},options);
     await db.query("UPDATE clarifications SET status='resolved',notes='Private notes' WHERE id=$1",[helpId]);
-    const audio=await receiveRecording(pool,worker,assignment,audioId,wav(),memoryStorage(),options);
-    await db.query("UPDATE recordings SET status='failed',error='Private provider error' WHERE id=$1",[audio.id]);
-    await assert.rejects(receiveRecording(pool,worker,assignment,stagingId,wav(),{async save(){throw Error('Storage failure');},async remove(){}},options),/not received/);
     await db.query("UPDATE publications SET state='withdrawn' WHERE id=$1",[pub.id]);
     const grant=await issueWorkerGrant(pool,owner,'w1',30,options);
     const tables=['attempts','submission_receipts','clarifications','help_requests','recordings','assignments','publications','audit'];
@@ -329,20 +329,18 @@ test('PostgreSQL response drilldown isolates exact publication and paged receipt
     const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id);
     let list=await listPublicationResponses(pool,owner,pub.id,{pageSize:1},options);assert.equal(list.total,2);assert.equal(list.items.length,1);assert.equal(list.items[0].status,'awaiting_response');
     assert.ok(!/rubric|answerText|reasons|storage|question/.test(JSON.stringify(list)));
-    await submitAnswer(pool,worker,assignment,randomUUID(),answer,options);
-    assert.equal((await listPublicationResponses(pool,owner,pub.id,{status:'assessment_pending'},options)).total,1);
-    await processOneAssessment(pool,{assess:async () => matched},options);
     const audio=await receiveRecording(pool,worker,assignment,randomUUID(),wav(),memoryStorage(),options);
+    assert.equal((await listPublicationResponses(pool,owner,pub.id,{status:'assessment_pending'},options)).total,1);
     list=await listPublicationResponses(pool,owner,pub.id,{search:'001'},options);assert.equal(list.items[0].status,'assessment_pending');assert.equal(list.items[0].outcome,null);
     await db.query("UPDATE recordings SET status='failed' WHERE id=$1",[audio.id]);
     assert.equal((await listPublicationResponses(pool,owner,pub.id,{status:'failed_audio'},options)).total,1);
     assert.equal((await staffWorkerAssignments(pool,owner,'w1',{},options)).items[0].status,'failed_audio');
     await submitAnswer(pool,worker,assignment,randomUUID(),answer,options);
-    let detail=await getPublicationResponse(pool,owner,pub.id,assignment,{pageSize:1},options);assert.equal(detail.total,3);assert.equal(detail.receipts[0].isLatest,true);assert.equal(detail.receipts[0].outcome,null);
+    let detail=await getPublicationResponse(pool,owner,pub.id,assignment,{pageSize:1},options);assert.equal(detail.total,2);assert.equal(detail.receipts[0].isLatest,true);assert.equal(detail.receipts[0].outcome,null);
     await processOneAssessment(pool,{assess:async () => matched},options);
     detail=await getPublicationResponse(pool,owner,pub.id,assignment,{pageSize:1},options);assert.equal(detail.receipts[0].outcome,'matched');assert.equal(detail.receipts[0].evidence.length,2);
     detail=await getPublicationResponse(pool,owner,pub.id,assignment,{page:2,pageSize:1},options);assert.equal(detail.receipts[0].recordingId,audio.id);assert.equal(detail.receipts[0].isLatest,false);
-    const own=await workerSubmissions(pool,worker,assignment,{pageSize:1},options);assert.equal(own.total,3);assert.equal(own.receipts[0].outcome,'matched');assert.equal(own.receipts[0].isLatest,true);
+    const own=await workerSubmissions(pool,worker,assignment,{pageSize:1},options);assert.equal(own.total,2);assert.equal(own.receipts[0].outcome,'matched');assert.equal(own.receipts[0].isLatest,true);
     assert.deepEqual(Object.keys(own.receipts[0]).sort(),['id','kind','receivedAt','isLatest','answerText','outcome','recordingId','audioStatus'].sort());
     assert.ok(!/reasons|evidence|notes|facts|rubric|sequence|storage|sha256/.test(JSON.stringify(own)));
     assert.equal((await workerSubmissions(pool,worker,assignment,{page:2,pageSize:1},options)).receipts[0].recordingId,audio.id);
@@ -355,12 +353,12 @@ test('PostgreSQL response drilldown isolates exact publication and paged receipt
     await assert.rejects(getPublicationResponse(pool,other,pub.id,assignment,{},options),/Publication unavailable/);
     await assert.rejects(getPublicationResponse(pool,owner,pub.id,'foreign-assignment',{},options),/Response unavailable/);
     await assert.rejects(getPublicationResponse(pool,owner,pub.id,assignment,null,options),/Invalid response filter/);
-    assert.equal((await getPublicationResponse(pool,{...owner,principal_id:'auditor',role:'auditor'},pub.id,assignment,{},options)).total,3);
+    assert.equal((await getPublicationResponse(pool,{...owner,principal_id:'auditor',role:'auditor'},pub.id,assignment,{},options)).total,2);
     await db.query("UPDATE briefings SET state='ready' WHERE id='brief'");
     const newer=await publish(pool,owner,'brief',request(2),options);
     await assert.rejects(getPublicationResponse(pool,owner,newer.id,assignment,{},options),/Response unavailable/);
     const auditBefore=(await db.query('SELECT COUNT(*)::int n FROM audit')).rows[0].n;
-    detail=await getPublicationResponse(pool,owner,pub.id,assignment,{},options);assert.equal(detail.publication.state,'superseded');assert.equal(detail.total,3);
+    detail=await getPublicationResponse(pool,owner,pub.id,assignment,{},options);assert.equal(detail.publication.state,'superseded');assert.equal(detail.total,2);
     assert.equal((await workerSubmissions(pool,worker,assignment,{},options)).assignment.state,'superseded');
     const directory=await staffWorkerAssignments(pool,owner,'w1',{pageSize:1},options);assert.equal(directory.total,2);assert.equal(directory.items[0].publicationId,newer.id);assert.equal(directory.items[0].status,'awaiting_response');
     const older=await staffWorkerAssignments(pool,owner,'w1',{page:2,pageSize:1},options);assert.equal(older.items[0].publicationId,pub.id);assert.equal(older.items[0].state,'superseded');assert.equal(older.items[0].status,'matched');
@@ -388,7 +386,7 @@ test('PostgreSQL response drilldown isolates exact publication and paged receipt
       const workerCookie=cookieOf(await request('/auth/worker/redeem',null,post({token:grant.token})));
       const ownPath=`/worker/briefings/${assignment}/submissions`;
       assert.equal((await request(ownPath,staff)).status,403);assert.equal((await request(`${ownPath}?status=all`,workerCookie)).status,400);
-      const result=await (await request(`${ownPath}?pageSize=1`,workerCookie)).json();assert.equal(result.total,3);assert.equal(result.assignment.state,'superseded');assert.ok(!/rubric|reasons|evidence|notes|sequence/.test(JSON.stringify(result)));
+      const result=await (await request(`${ownPath}?pageSize=1`,workerCookie)).json();assert.equal(result.total,2);assert.equal(result.assignment.state,'superseded');assert.ok(!/rubric|reasons|evidence|notes|sequence/.test(JSON.stringify(result)));
       assert.equal((await request(directoryPath,workerCookie)).status,403);
     });
     await db.query("UPDATE workers SET language='ar',active=false WHERE id='w1'");
@@ -1087,7 +1085,8 @@ test('PostgreSQL typed receipt is pending, deduplicated, scoped and fenced from 
 test('PostgreSQL assessment uses exact frozen rubric and preserves original attempts and receipt ordering',async () => {
   const f=await fixture(); const {db,pool}=f;
   try {
-    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id);
+    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id),secondAssignment=await f.assignment(pub.id,'w2');
+    const worker2={...worker,principal_id:'w2'};
     const first=await submitAnswer(pool,worker,assignment,'submission-1',answer,options);
     await db.query("UPDATE briefings SET source='changed draft' WHERE id='brief'");
     let seen;
@@ -1096,14 +1095,15 @@ test('PostgreSQL assessment uses exact frozen rubric and preserves original atte
     assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[first.id])).rows[0].outcome,'matched');
     await assert.rejects(db.query("UPDATE attempts SET outcome='clarification' WHERE id=$1",[first.id]),/immutable/);
     await assert.rejects(db.query("UPDATE attempts SET answer_text='rewritten' WHERE id=$1",[first.id]),/immutable/);
-    const second=await submitAnswer(pool,worker,assignment,'submission-2','Not sure',options);
+    await assert.rejects(submitAnswer(pool,worker,assignment,'submission-2',answer,options),/approved repeat/);
+    const second=await submitAnswer(pool,worker2,secondAssignment,'submission-2','Not sure',options);
     const report=await readPublicationReport(pool,owner,{...options,publicationId:pub.id});
-    assert.equal(report.metrics.matches,0); assert.equal(report.metrics.unassessed,1);
+    assert.equal(report.metrics.matches,1); assert.equal(report.metrics.unassessed,1);
     await processOneAssessment(pool,{async assess() {return {outcome:'clarification',reasons:['missing_asked_fact'],evidence:[]};}},options);
     assert.equal((await db.query('SELECT COUNT(*)::int n FROM clarifications WHERE attempt_id=$1',[second.id])).rows[0].n,1);
     assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[first.id])).rows[0].outcome,'matched');
     const final=await readPublicationReport(pool,owner,{...options,publicationId:pub.id});
-    assert.equal(final.metrics.clarifications,1); assert.equal(final.metrics.responses,1);
+    assert.equal(final.metrics.clarifications,1); assert.equal(final.metrics.responses,2); assert.equal(final.metrics.matches,1);
     assert.equal(await processOneAssessment(pool,{async assess() {throw new Error('No job');}},options),false);
   } finally {await db.close();}
 });
@@ -1111,7 +1111,8 @@ test('PostgreSQL assessment uses exact frozen rubric and preserves original atte
 test('PostgreSQL invalid assessment, interruption and stale leases never manufacture a match',async () => {
   const f=await fixture(); const {db,pool}=f;
   try {
-    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id);
+    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id),secondAssignment=await f.assignment(pub.id,'w2');
+    const worker2={...worker,principal_id:'w2'};
     const attempt=await submitAnswer(pool,worker,assignment,'submission-1',answer,options);
     for (let n=0;n<3;n++) {
       await processOneAssessment(pool,{async assess() {return {...matched,evidence:[{factIndex:0,quote:'invented'}]};}},options);
@@ -1120,8 +1121,9 @@ test('PostgreSQL invalid assessment, interruption and stale leases never manufac
     const failed=(await db.query('SELECT status,attempts,error FROM assessment_jobs')).rows[0];
     assert.equal(failed.status,'failed'); assert.equal(failed.attempts,3); assert.equal(failed.error,'Answer assessment failed');
     assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[attempt.id])).rows[0].outcome,null);
-    assert.equal((await db.query('SELECT COUNT(*)::int n FROM clarifications')).rows[0].n,0);
-    await submitAnswer(pool,worker,assignment,'submission-2',answer,options);
+    assert.deepEqual((await db.query('SELECT assignment_id,reason FROM clarifications')).rows,[{assignment_id:assignment,reason:'Answer check failed'}]);
+    await assert.rejects(submitAnswer(pool,worker,assignment,'submission-2',answer,options),/approved repeat/);
+    await submitAnswer(pool,worker2,secondAssignment,'submission-2',answer,options);
     await processOneAssessment(pool,{async assess() {
       await db.query("UPDATE assessment_jobs SET lease_until=clock_timestamp()-interval '1 second' WHERE status='processing'");
       return matched;
@@ -1129,7 +1131,9 @@ test('PostgreSQL invalid assessment, interruption and stale leases never manufac
     assert.equal((await db.query("SELECT outcome FROM attempts WHERE submission_id='submission-2'")).rows[0].outcome,null);
     await processOneAssessment(pool,{async assess() {return matched;}},options);
     assert.equal((await db.query("SELECT outcome FROM attempts WHERE submission_id='submission-2'")).rows[0].outcome,'matched');
-    await submitAnswer(pool,worker,assignment,'submission-3',answer,options);
+    await db.query("UPDATE briefings SET state='ready' WHERE id='brief'");
+    const pub2=await publish(pool,owner,'brief',request(2),options),assignment3=await f.assignment(pub2.id,'w1');
+    await submitAnswer(pool,worker,assignment3,'submission-3',answer,options);
     await processOneAssessment(pool,{async assess() {
       await db.query("UPDATE workers SET active=false WHERE id='w1'");
       return matched;
@@ -1141,32 +1145,42 @@ test('PostgreSQL invalid assessment, interruption and stale leases never manufac
 test('PostgreSQL private audio stores before receipt, preserves order and denies foreign/private reads',async () => {
   const f=await fixture(); const {db,pool}=f;
   try {
-    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id);
+    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id),assignment2=await f.assignment(pub.id,'w2');
+    const worker2={...worker,principal_id:'w2'};
     let duringSave;
     const storage=memoryStorage(async () => {
       duringSave=await readPublicationReport(pool,owner,{...options,publicationId:pub.id});
       await submitAnswer(pool,worker,assignment,'typed-during-save',answer,options);
     });
     const submission=randomUUID(),bytes=wav();
-    const received=await receiveRecording(pool,worker,assignment,submission,bytes,storage,options);
-    assert.equal(duringSave.metrics.responses,0); assert.equal(received.status,'received'); assert.ok(received.receivedAt);
-    assert.equal((await getRecording(pool,worker,received.id,options)).aiStatus,'pending');
-    assert.deepEqual(await getRecordingAudio(pool,worker,received.id,storage,options),bytes);
-    for (const denied of [{...worker,principal_id:'w2'},{...owner,principal_id:'other',org_id:'b',site_id:'b'},{...owner,site_id:'c'}]) await assert.rejects(getRecordingAudio(pool,denied,received.id,storage,options),/unavailable|Forbidden/);
-    const replay=await receiveRecording(pool,worker,assignment,submission,bytes,storage,options);
-    assert.equal(replay.duplicate,true); assert.equal(storage.objects.size,1);
+    await assert.rejects(receiveRecording(pool,worker,assignment,submission,bytes,storage,options),/not received/);
+    assert.equal(duringSave.metrics.responses,0); assert.equal(storage.objects.size,0);
+    assert.equal((await db.query('SELECT status FROM recordings WHERE submission_id=$1',[submission])).rows[0].status,'failed');
+    assert.deepEqual((await db.query('SELECT kind FROM submission_receipts ORDER BY sequence')).rows.map((row) => row.kind),['typed']);
+    let report=await readPublicationReport(pool,owner,{...options,publicationId:pub.id});
+    assert.equal(report.metrics.responses,1); assert.equal(report.metrics.unassessed,1);
+    assert.equal(report.rows.find((row) => row[0]==='001')[2],'assessment_pending');
+    const storage2=memoryStorage();
+    const received=await receiveRecording(pool,worker2,assignment2,submission,bytes,storage2,options);
+    assert.equal(received.status,'received'); assert.ok(received.receivedAt);
+    assert.equal((await getRecording(pool,worker2,received.id,options)).aiStatus,'pending');
+    assert.deepEqual(await getRecordingAudio(pool,worker2,received.id,storage2,options),bytes);
+    for (const denied of [{...worker2,principal_id:'w1'},{...owner,principal_id:'other',org_id:'b',site_id:'b'},{...owner,site_id:'c'}]) await assert.rejects(getRecordingAudio(pool,denied,received.id,storage2,options),/unavailable|Forbidden/);
+    const replay=await receiveRecording(pool,worker2,assignment2,submission,bytes,storage2,options);
+    assert.equal(replay.duplicate,true); assert.equal(storage2.objects.size,1);
     const changed=Buffer.from(bytes); changed.writeInt16LE(1234,44);
-    await assert.rejects(receiveRecording(pool,worker,assignment,submission,changed,storage,options),/conflict/);
-    const report=await readPublicationReport(pool,owner,{...options,publicationId:pub.id});
-    assert.equal(report.metrics.responses,1); assert.equal(report.metrics.unassessed,1); assert.equal(report.rows[0][2],'received');
+    await assert.rejects(receiveRecording(pool,worker2,assignment2,submission,changed,storage2,options),/conflict/);
+    report=await readPublicationReport(pool,owner,{...options,publicationId:pub.id});
+    assert.equal(report.metrics.responses,2); assert.equal(report.metrics.unassessed,2);
+    assert.equal(report.rows.find((row) => row[0]==='002')[2],'received');
     const receipts=(await db.query('SELECT kind FROM submission_receipts ORDER BY sequence')).rows;
     assert.deepEqual(receipts.map((row) => row.kind),['typed','audio']);
-    await submitAnswer(pool,worker,assignment,'typed-after-audio',answer,options);
-    assert.equal((await readPublicationReport(pool,owner,{...options,publicationId:pub.id})).rows[0][2],'assessment_pending');
+    await assert.rejects(submitAnswer(pool,worker2,assignment2,'typed-after-audio',answer,options),/approved repeat/);
+    assert.equal((await readPublicationReport(pool,owner,{...options,publicationId:pub.id})).rows.find((row) => row[0]==='002')[2],'received');
     await db.query("UPDATE publications SET state='withdrawn' WHERE id=$1",[pub.id]);
-    assert.equal((await receiveRecording(pool,worker,assignment,submission,bytes,storage,options)).duplicate,true);
-    assert.deepEqual(await getRecordingAudio(pool,owner,received.id,storage,options),bytes);
-    await assert.rejects(receiveRecording(pool,worker,assignment,randomUUID(),bytes,storage,options),/unavailable/);
+    assert.equal((await receiveRecording(pool,worker2,assignment2,submission,bytes,storage2,options)).duplicate,true);
+    assert.deepEqual(await getRecordingAudio(pool,owner,received.id,storage2,options),bytes);
+    await assert.rejects(receiveRecording(pool,worker2,assignment2,randomUUID(),bytes,storage2,options),/unavailable/);
   } finally {await db.close();}
 });
 
@@ -1209,7 +1223,7 @@ test('PostgreSQL lost receipt commit acknowledgement preserves accepted audio, n
   } finally {await db.close();}
 });
 
-test('PostgreSQL voice worker checks frozen evidence once and older audio cannot replace a newer typed answer',async () => {
+test('PostgreSQL voice worker checks frozen evidence once and rejects a second answer without an approved repeat',async () => {
   const f=await fixture(); const {db,pool}=f;
   try {
     const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id),storage=memoryStorage();
@@ -1222,22 +1236,19 @@ test('PostgreSQL voice worker checks frozen evidence once and older audio cannot
     assert.equal(transcribes,1); assert.equal(seen[1],syntheticPrepare(CANONICAL_SOURCE).question);
     assert.equal((await readPublicationReport(pool,owner,{...options,publicationId:pub.id})).metrics.matches,1);
     assert.equal(await processOneRecording(pool,adapter,storage,options),false);
-    const second=await receiveRecording(pool,worker,assignment,randomUUID(),wav(),storage,options);
-    await processOneRecording(pool,{...adapter,async assess() {
-      await submitAnswer(pool,worker,assignment,'typed-newer-than-audio','Not sure',options);
-      return matched;
-    }},storage,options);
-    assert.equal((await getRecording(pool,worker,second.id,options)).status,'transcribed');
+    await assert.rejects(receiveRecording(pool,worker,assignment,randomUUID(),wav(),storage,options),/approved repeat/);
     const report=await readPublicationReport(pool,owner,{...options,publicationId:pub.id});
-    assert.equal(report.metrics.matches,0); assert.equal(report.metrics.unassessed,1); assert.equal(report.metrics.responses,1);
-    assert.equal((await db.query('SELECT COUNT(*)::int n FROM attempts')).rows[0].n,3);
+    assert.equal(report.metrics.matches,1); assert.equal(report.metrics.unassessed,0); assert.equal(report.metrics.responses,1);
+    assert.equal((await db.query('SELECT COUNT(*)::int n FROM attempts')).rows[0].n,1);
+    assert.equal((await db.query('SELECT COUNT(*)::int n FROM recordings')).rows[0].n,1);
   } finally {await db.close();}
 });
 
 test('PostgreSQL recording worker retries without leaking provider errors and stale results cannot commit',async () => {
   const f=await fixture(); const {db,pool}=f;
   try {
-    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id),storage=memoryStorage();
+    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id),assignment2=await f.assignment(pub.id,'w2'),storage=memoryStorage();
+    const worker2={...worker,principal_id:'w2'};
     const first=await receiveRecording(pool,worker,assignment,randomUUID(),wav(),storage,options);
     let transcribes=0;
     const adapter={async transcribe() {transcribes++; return {text:answer};},async assess() {throw new Error('Secret provider URL or API key');}};
@@ -1257,7 +1268,7 @@ test('PostgreSQL recording worker retries without leaking provider errors and st
     assert.equal((await db.query('SELECT transcript FROM recordings WHERE id=$1',[stale.id])).rows[0].transcript,null);
     await processOneRecording(pool,valid,storage,options);
     assert.equal((await getRecording(pool,worker,stale.id,options)).status,'transcribed');
-    const late=await receiveRecording(pool,worker,assignment,randomUUID(),wav(),storage,options);
+    const late=await receiveRecording(pool,worker2,assignment2,randomUUID(),wav(),storage,options);
     await processOneRecording(pool,{...valid,async assess() {
       await db.query("UPDATE recordings SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1",[late.id]);
       return matched;
@@ -1271,7 +1282,8 @@ test('PostgreSQL recording worker retries without leaking provider errors and st
 test('PostgreSQL recording dispatch fences paused claims, storage races and allowlist rejection even with a cached transcript',async()=>{
   const f=await fixture(),{db,pool}=f;
   try {
-    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id),storage=memoryStorage();
+    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id),assignment2=await f.assignment(pub.id,'w2'),storage=memoryStorage();
+    const worker2={...worker,principal_id:'w2'};
     const received=await receiveRecording(pool,worker,assignment,randomUUID(),wav(),storage,options);let transcribes=0,assessments=0;
     const adapter={transcribe:async()=>{transcribes++;return {text:answer};},assess:async()=>{assessments++;return matched;}};
     await db.exec("INSERT INTO system_controls(id,revision,jobs_paused,provider_paused) VALUES('global',1,false,true)");
@@ -1287,12 +1299,12 @@ test('PostgreSQL recording dispatch fences paused claims, storage races and allo
     await processOneRecording(pool,adapter,storage,options);assert.equal(transcribes,0);assert.equal(assessments,0);
     storage.read=read;await db.exec("UPDATE system_controls SET provider_paused=false;UPDATE recordings SET lease_until=clock_timestamp()-interval '1 second'");
     await processOneRecording(pool,adapter,storage,options);assert.equal(transcribes,1);assert.equal(assessments,1);
-    const denied=await receiveRecording(pool,worker,assignment,randomUUID(),wav(),storage,options);
+    const denied=await receiveRecording(pool,worker2,assignment2,randomUUID(),wav(),storage,options);
     await db.query("UPDATE recordings SET transcript='Potentially private cached text' WHERE id=$1",[denied.id]);
     await processOneRecording(pool,{...adapter,permitsRecording:()=>false},storage,options);
     assert.equal(transcribes,1);assert.equal(assessments,1);
     assert.equal((await db.query('SELECT status FROM recordings WHERE id=$1',[denied.id])).rows[0].status,'blocked');
-    const purged=await receiveRecording(pool,worker,assignment,randomUUID(),wav(),storage,options);
+    const purged=await receiveRecording(pool,worker2,assignment2,randomUUID(),wav(),storage,options);
     storage.read=async row=>{const bytes=await read(row);await db.query("INSERT INTO recording_purges(recording_id,org_id,site_id,status,created_at) VALUES($1,'a','a','queued',clock_timestamp())",[row.id]);return bytes;};
     await processOneRecording(pool,adapter,storage,options);assert.equal(transcribes,1);assert.equal(assessments,1);
     await db.query("UPDATE recordings SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1",[purged.id]);

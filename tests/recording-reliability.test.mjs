@@ -46,28 +46,25 @@ test('failed private storage never counts as a response or returns a receipt on 
   } finally { db.close(); }
 });
 
-test('same-millisecond typed and audio submissions are ordered by durable receipt sequence', async (context) => {
+test('same-millisecond audio receipts are ordered by durable receipt sequence', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: new Date('2026-10-03T17:00:00.000Z') });
   const db = openDatabase(':memory:'); seed(db);
   const root = await mkdtemp(join(tmpdir(), 'understood-receipt-order-'));
   try {
     const first = await receiveRecording(db, worker, 'assignment-30', '8dabde2a-e173-4cf0-b973-8110bb4cb532', wav(), root);
-    const typed = submitAnswer(db, worker, 'assignment-30', 'later-typed-same-millisecond', 'Finished blue; unfinished yellow.');
-    assert.equal(typed.outcome, 'matched');
-    const receipts = db.prepare('SELECT kind,received_at,sequence FROM submission_receipts WHERE assignment_id=? ORDER BY sequence').all('assignment-30');
-    assert.equal(receipts[0].received_at, receipts[1].received_at);
-    assert.equal(receipts[0].kind, 'audio'); assert.equal(receipts[1].kind, 'typed');
-    assert.equal(metrics(db, 'cedar', 'shelf-v3').matches, 22);
-    assert.equal(metrics(db, 'cedar', 'shelf-v3').unassessed, 0);
-    await processOneRecording(db, {
-      async transcribe() { return { text: 'I do not know.' }; },
-      async assess() { return { outcome: 'clarification', reasons: ['missing_asked_fact'] }; },
-    }, root);
-    assert.equal(db.prepare('SELECT status FROM recordings WHERE id=?').get(first.id).status, 'transcribed');
-    assert.equal(metrics(db, 'cedar', 'shelf-v3').matches, 22);
+    await assert.throws(() => submitAnswer(db, worker, 'assignment-30', 'later-typed-same-millisecond', 'Finished blue; unfinished yellow.'), /approved repeat/);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM attempts WHERE assignment_id=?').get('assignment-30').n, 0);
+    db.prepare("UPDATE recordings SET status='failed' WHERE id=?").run(first.id);
     await receiveRecording(db, worker, 'assignment-30', '9dabde2a-e173-4cf0-b973-8110bb4cb532', wav(), root);
+    const receipts = db.prepare('SELECT kind,received_at,sequence,submission_id FROM submission_receipts WHERE assignment_id=? ORDER BY sequence').all('assignment-30');
+    assert.equal(receipts.length, 2);
+    assert.equal(receipts[0].received_at, receipts[1].received_at);
+    assert.deepEqual(receipts.map((row) => row.kind), ['audio', 'audio']);
+    assert.equal(receipts[1].submission_id, '9dabde2a-e173-4cf0-b973-8110bb4cb532');
+    assert.ok(receipts[0].sequence < receipts[1].sequence);
     assert.equal(metrics(db, 'cedar', 'shelf-v3').matches, 21);
     assert.equal(metrics(db, 'cedar', 'shelf-v3').unassessed, 1);
+    assert.equal(metrics(db, 'cedar', 'shelf-v3').responses, 25);
   } finally { db.close(); await rm(root, { recursive: true, force: true }); }
 });
 
@@ -188,14 +185,14 @@ test('a stale assessment cannot commit after another worker reclaims the lease',
   } finally { db.close(); await rm(root, { recursive: true, force: true }); }
 });
 
-test('late completion of older audio does not replace a newer typed outcome', async () => {
+test('typed submission during in-flight audio assessment requires an approved repeat and cannot replace its outcome', async () => {
   const db = openDatabase(':memory:'); seed(db);
   const root = await mkdtemp(join(tmpdir(), 'understood-outcome-reliability-'));
   const assessmentStarted = deferred();
   const releaseAssessment = deferred();
+  const audioSubmission = 'f631e7ab-bff2-4514-ad79-c1b7f35a778a';
   try {
-    const receipt = await receiveRecording(db, worker, 'assignment-30',
-      'f631e7ab-bff2-4514-ad79-c1b7f35a778a', wav(), root);
+    const receipt = await receiveRecording(db, worker, 'assignment-30', audioSubmission, wav(), root);
     db.prepare('UPDATE recordings SET received_at=? WHERE id=?').run('2020-01-01T00:00:00.000Z', receipt.id);
     const adapter = {
       async transcribe() { return { text: 'Finished items go on blue and unfinished items on yellow.' }; },
@@ -203,18 +200,18 @@ test('late completion of older audio does not replace a newer typed outcome', as
     };
     const audioRun = processOneRecording(db, adapter, root);
     await assessmentStarted.promise;
-    const typed = submitAnswer(db, worker, 'assignment-30', 'typed-after-audio-30', 'Finished items go on the blue shelf.');
-    assert.equal(typed.outcome, 'clarification');
+    await assert.throws(() => submitAnswer(db, worker, 'assignment-30', 'typed-after-audio-30', 'Finished items go on the blue shelf.'), /approved repeat/);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM submission_receipts WHERE assignment_id=?').get('assignment-30').n, 1);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM attempts WHERE assignment_id=?').get('assignment-30').n, 0);
     releaseAssessment.resolve({ outcome: 'matched', reasons: ['asked_facts_present'], evidence: [] });
     assert.equal(await audioRun, true);
-    const attempts = db.prepare('SELECT submission_id,outcome,received_at FROM attempts WHERE assignment_id=? ORDER BY received_at DESC')
-      .all('assignment-30');
-    assert.equal(attempts.length, 2);
-    assert.equal(attempts[0].submission_id, 'typed-after-audio-30');
-    assert.equal(attempts[0].outcome, 'clarification');
-    assert.equal(attempts[1].received_at, '2020-01-01T00:00:00.000Z');
+    const attempts = db.prepare('SELECT submission_id,outcome,received_at FROM attempts WHERE assignment_id=?').all('assignment-30');
+    assert.equal(attempts.length, 1);
+    assert.equal(attempts[0].submission_id, audioSubmission);
+    assert.equal(attempts[0].outcome, 'matched');
+    assert.equal(attempts[0].received_at, '2020-01-01T00:00:00.000Z');
     assert.deepEqual(metrics(db, 'cedar', 'shelf-v3'), {
-      assigned: 30, responses: 25, matches: 21, clarifications: 4, unassessed: 0, pending: 5, completion: 83,
+      assigned: 30, responses: 25, matches: 22, clarifications: 3, unassessed: 0, pending: 5, completion: 83,
     });
   } finally { db.close(); await rm(root, { recursive: true, force: true }); }
 });

@@ -146,6 +146,7 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} conversation roll
     assert.equal((await f.call('listCaseMessages',worker,f.id)).total,0);
     if(pg)await f.db.exec('DROP TRIGGER deny_message_audit ON audit');else f.db.exec('DROP TRIGGER deny_message_audit');
     await f.call('sendCaseMessage',owner,f.id,input);
+    if(!pg)await f.resolve('clarification-14');
     const arWorker={...worker,principal_id:'worker-14'},arId=randomUUID();await f.help(arWorker,'assignment-14',{requestId:arId,text:'Synthetic Arabic help'});
     await assert.rejects(async()=>f.call('sendCaseMessage',owner,arId,{requestId:randomUUID(),text:'English is not an Arabic translation'}),/translation unavailable/);
     const native=await f.call('sendCaseMessage',arWorker,arId,{requestId:randomUUID(),text:'أحتاج إلى المساعدة'});assert.equal(native.language,'ar');

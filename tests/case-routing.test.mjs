@@ -46,8 +46,10 @@ async function fixture(pg) {
 for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} worker Help history pages every own case beyond the old100-row limit without changing evidence or leaking notes`,async()=>{
   const f=await fixture(pg);try{
     const ids=[];
-    for(let i=0;i<7;i++){const id=randomUUID();ids.push(id);await f.call('requestHelp',worker,'assignment-30',{requestId:id,text:`Synthetic independent help ${i}`});}
-    await f.call('resolveClarification',owner,ids[0],{notes:'Private synthetic supervisor notes'});
+    for(let i=0;i<7;i++){
+      const id=randomUUID();ids.push(id);await f.call('requestHelp',worker,'assignment-30',{requestId:id,text:`Synthetic independent help ${i}`});
+      if(i<6)await f.call('resolveClarification',owner,id,{notes:i===0?'Private synthetic supervisor notes':`Synthetic resolution ${i}`});
+    }
     for(let i=0;i<101;i++)await f.q(`INSERT INTO clarifications(id,org_id,${pg?'site_id,':''}assignment_id,reason,status,notes,created_at)
       VALUES(${f.p(1)},'cedar',${pg?"'beirut',":''}'assignment-30','Synthetic historical follow-up','open','Private historical notes',${f.p(2)})`,[randomUUID(),'2026-01-01T00:00:00.000Z']);
     const inventory=async()=>Promise.all(['clarifications','help_requests','case_routing','attempts','audit','submission_receipts'].map(async table=>(await f.q(`SELECT * FROM ${table} ORDER BY 1`)).rows));

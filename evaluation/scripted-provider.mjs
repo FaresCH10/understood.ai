@@ -9,7 +9,7 @@ const reply=value=>Response.json({candidates:[{finishReason:'STOP',content:{part
 
 // This transport never delegates to fetch. Unknown, reordered or changed inputs fail.
 export function scriptedProvider() {
-  const queue=[],trace=[];let fileSequence=0;
+  const queue=[],trace=[],spoken=new Map();let fileSequence=0;
   const add=(stage,verify,response)=>queue.push({stage,verify,response});
   return {
     structured(stage,input,result,schemaKey) {
@@ -33,6 +33,37 @@ export function scriptedProvider() {
           response_format:{type:'audio',mime_type:'audio/wav',sample_rate:16000},generation_config:{speech_config:[{voice:'Kore'}]}});
         return {inputHash:bundleHash(text),model:GEMINI_MODELS.speech};
       },()=>Response.json({status:'completed',model:GEMINI_MODELS.speech,steps:[{type:'model_output',content:[{type:'audio',mime_type:'audio/wav',data:output.toString('base64')}]}]}));
+    },
+    // Question speech legitimately embeds a randomly shuffled four-choice set;
+    // verify the set and numbering without assuming the shuffle order.
+    speechQuestion(stage,question,choices,bytes) {
+      const output=Buffer.from(bytes),expected=choices.map(choice=>choice.trim()).sort();
+      add(stage,(url,options)=>{
+        assert.equal(url,`${API}/v1beta/interactions`);
+        assert.equal(options.method,'POST');const body=JSON.parse(options.body),text=body.input?.[0]?.content?.[0]?.text;
+        assert.equal(typeof text,'string');
+        const [first,...lines]=text.split('\n');
+        assert.equal(first,question);
+        assert.equal(lines.length,4);
+        const offered=lines.map((line,index)=>{
+          const match=/^([1-4])\. (.+)$/.exec(line);
+          assert.ok(match,`Choice ${index+1} is not a numbered option`);
+          assert.equal(Number(match[1]),index+1);
+          return match[2];
+        });
+        assert.equal(new Set(offered).size,4);
+        assert.deepEqual([...offered].sort(),expected);
+        const {input,...rest}=body;
+        assert.deepEqual(rest,{model:GEMINI_MODELS.speech,store:false,
+          response_format:{type:'audio',mime_type:'audio/wav',sample_rate:16000},generation_config:{speech_config:[{voice:'Kore'}]}});
+        assert.deepEqual(input,[{type:'user_input',content:[{type:'text',text}]}]);
+        spoken.set(stage,text);
+        return {inputHash:bundleHash(text),model:GEMINI_MODELS.speech};
+      },()=>Response.json({status:'completed',model:GEMINI_MODELS.speech,steps:[{type:'model_output',content:[{type:'audio',mime_type:'audio/wav',data:output.toString('base64')}]}]}));
+    },
+    speechText(stage) {
+      if(!spoken.has(stage))throw Error(`No verified speech text for ${stage}`);
+      return spoken.get(stage);
     },
     transcription(stage,bytes,text) {
       const expected=Buffer.from(bytes),name=`files/synthetic-${++fileSequence}`,uri=`${API}/v1beta/${name}`,upload=`${API}/upload/synthetic-${fileSequence}`;

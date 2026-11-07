@@ -57,7 +57,7 @@ async function mixedFixture(pg,t) {
   const source=pg?await sourcePg(pool,owner,input,bytes,bytes,storage):await sourceSqlite(db,owner,input,bytes,bytes,storage);
   const journal=pg?journalPg(pool):journalSqlite(db);
   await journal.reserve(owner,sourceAudioInput({...input,requestId:randomUUID(),title:'Unaccepted upload'},bytes,bytes));
-  const voiceWorker=pg?'w1':'worker-30',typedWorker=pg?'w2':'worker-1';
+  const voiceWorker=pg?'w1':'worker-30',typedWorker=pg?'w2':'worker-24';
   const assignments=await query('SELECT id,worker_id FROM assignments WHERE org_id=$1',['cedar']);
   const voiceAssignment=assignments.find(row=>row.worker_id===voiceWorker),typedAssignment=assignments.find(row=>row.worker_id===typedWorker);
   const worker=id=>({...owner,principal_type:'worker',principal_id:id});

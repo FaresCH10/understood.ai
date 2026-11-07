@@ -266,6 +266,11 @@ async function runPresentationContract(backend){
     const urReadyId=translatedInstruction.presentation.id;
     assert.match((await backend.binding(ctx,asWorker('w-ur'),'a-ur-main',urReadyId)).question,/./);
 
+    await backend.setWorkerLanguage(ctx,'w-ar','ur');
+    await assert.rejects(backend.binding(ctx,session,'a-main',readyId),/Presentation language changed/);
+    await assert.rejects(backend.submit(ctx,session,'a-main','submission-bound-0003','New answer',readyId),/Presentation language changed/);
+    await backend.setWorkerLanguage(ctx,'w-ar','ar');
+
     const typed=await backend.submit(ctx,session,'a-main','submission-bound-0001',answerText,readyId);
     assert.equal(typed.duplicate,false);
     const binding=await backend.bindingRow(ctx,typed.id);
@@ -276,12 +281,9 @@ async function runPresentationContract(backend){
     const duplicate=await backend.submit(ctx,session,'a-main','submission-bound-0001',answerText,readyId);
     assert.equal(duplicate.duplicate,true);assert.equal(duplicate.id,typed.id);
     await assert.rejects(backend.submit(ctx,session,'a-main','submission-bound-0001','Different text',readyId),/Submission ID conflict/);
-    await assert.rejects(backend.submit(ctx,session,'a-main','submission-bound-0002','Any text',failed.presentation.id),/Presentation unavailable/);
+    await assert.rejects(backend.submit(ctx,asWorker('w-ur'),'a-ur','submission-bound-0002','Any text',failed.presentation.id),/Presentation unavailable/);
 
     await backend.setWorkerLanguage(ctx,'w-ar','ur');
-    await assert.rejects(backend.binding(ctx,session,'a-main',readyId),/Presentation language changed/);
-    await assert.rejects(backend.submit(ctx,session,'a-main','submission-bound-0003','New answer',readyId),/Presentation language changed/);
-
     const translatedAnswerRequest=randomUUID();
     const translatedAnswer=await backend.create(ctx,session,'a-main',
       {requestId:translatedAnswerRequest,sourceKind:'answer',sourceId:'submission-bound-0001'},
@@ -301,19 +303,20 @@ async function runPresentationContract(backend){
       {translator:{translate:async()=>assert.fail('Cached presentation must not regenerate')}});
     assert.equal(cachedAnswer.status,'ready');assert.equal(cachedAnswer.presentation.id,answerPresentationId);
 
-    const other=await backend.submit(ctx,session,'a-main','submission-answer-other','Unbound answer');
-    await assert.rejects(backend.create(ctx,session,'a-main',
+    const urWorker=asWorker('w-ur');
+    const other=await backend.submit(ctx,urWorker,'a-ur-main','submission-answer-other','Unbound answer');
+    await assert.rejects(backend.create(ctx,urWorker,'a-ur-main',
       {requestId:answerPresentationId,sourceKind:'answer',sourceId:'submission-answer-other'}),
     /Presentation request conflict/);
 
-    const answerFailed=await backend.create(ctx,session,'a-main',
+    const answerFailed=await backend.create(ctx,urWorker,'a-ur-main',
       {requestId:randomUUID(),sourceKind:'answer',sourceId:'submission-answer-other'},
       {translator:{translate:async()=>{throw new Error('Synthetic provider outage');}}});
     assert.equal(answerFailed.status,'failed');assert.equal(answerFailed.reason,'translation_failed');
 
-    const invalidAttempt=await backend.submit(ctx,session,'a-main','submission-answer-invalid','Another answer');
+    const invalidAttempt=await backend.submit(ctx,urWorker,'a-ur','submission-answer-invalid','Another answer');
     assert.ok(invalidAttempt.id);
-    const answerInvalid=await backend.create(ctx,session,'a-main',
+    const answerInvalid=await backend.create(ctx,urWorker,'a-ur',
       {requestId:randomUUID(),sourceKind:'answer',sourceId:'submission-answer-invalid'},
       {translator:{translate:async()=>({content:{text:'Latin text for an Urdu target'},provider:'synthetic-test-v1'})}});
     assert.equal(answerInvalid.status,'failed');assert.equal(answerInvalid.reason,'translation_invalid');
@@ -381,7 +384,7 @@ async function runReadOnlyPresentationContract(backend){
     assert.equal(ready.status,'ready');
 
     const answer1=await backend.submit(ctx,worker,'a-ur','submission-readonly-0001',answerText);
-    const answer2=await backend.submit(ctx,worker,'a-ur','submission-readonly-0002','Second synthetic answer');
+    const answer2=await backend.submit(ctx,worker,'a-ur-main','submission-readonly-0002','Second synthetic answer');
     assert.ok(answer1.id);assert.ok(answer2.id);
     const pendingRow={id:randomUUID(),workerId:'w-ur',assignmentId:'a-ur',publicationId:'p-en',version:1,
       sourceKind:'answer',sourceId:'submission-readonly-0001',originalLanguage:'en',targetLanguage:'ur',
@@ -412,7 +415,7 @@ async function runReadOnlyPresentationContract(backend){
     assert.equal(String(pendingAfter.lease_until),String(pendingBefore.lease_until));
 
     const count=await backend.artifactCount(ctx);
-    const fresh=await backend.create(ctx,worker,'a-ur',
+    const fresh=await backend.create(ctx,worker,'a-ur-main',
       {requestId:randomUUID(),sourceKind:'answer',sourceId:'submission-readonly-0002'},
       {translator:{translate:async()=>assert.fail('Read-only generation must not call the translator')}});
     assert.equal(fresh.status,'deferred');assert.equal(fresh.reason,'generation_paused');
@@ -424,10 +427,11 @@ async function runReadOnlyPresentationContract(backend){
     const reclaimed=await backend.create(ctx,worker,'a-ur',
       {requestId:randomUUID(),sourceKind:'answer',sourceId:'submission-readonly-0001'},{translator:{translate}});
     assert.equal(reclaimed.status,'ready');assert.equal(reclaimed.presentation.id,pendingRow.id);
-    const generated=await backend.create(ctx,worker,'a-ur',
+    const generated=await backend.create(ctx,worker,'a-ur-main',
       {requestId:randomUUID(),sourceKind:'answer',sourceId:'submission-readonly-0002'},{translator:{translate}});
     assert.equal(generated.status,'ready');
-    assert.equal((await backend.list(ctx,worker,'a-ur')).items.length,3);
+    assert.equal((await backend.list(ctx,worker,'a-ur')).items.length,2);
+    assert.equal((await backend.list(ctx,worker,'a-ur-main')).items.length,1);
   }finally{
     await backend.close(ctx);
   }

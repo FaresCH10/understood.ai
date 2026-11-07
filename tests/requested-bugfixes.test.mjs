@@ -75,6 +75,9 @@ test('instruction-specific choices reject invented IDs, record correct choices a
     assert.equal(submitAnswer(db,worker,assignment.id,randomUUID(),wrong.id).outcome,'clarification');
     assert.equal(db.prepare('SELECT count(*) n FROM clarifications WHERE assignment_id=?').get(assignment.id).n,1);
     assert.equal(db.prepare("SELECT count(*) n FROM audit WHERE action='answer.needs_attention' AND org_id='cedar'").get().n>0,true);
-    assert.equal(submitAnswer(db,worker,assignment.id,randomUUID(),snapshot.rubric.correctChoiceId).outcome,'matched');
+    assert.throws(()=>submitAnswer(db,worker,assignment.id,randomUUID(),snapshot.rubric.correctChoiceId),/approved repeat/);
+    const worker2={principal_type:'worker',principal_id:'worker-2',org_id:'cedar',site_id:'beirut'};
+    const assignment2=db.prepare('SELECT * FROM assignments WHERE publication_id=? AND worker_id=?').get(sent.publicationId,'worker-2');
+    assert.equal(submitAnswer(db,worker2,assignment2.id,randomUUID(),snapshot.rubric.correctChoiceId).outcome,'matched');
   }finally{db.close();}
 });

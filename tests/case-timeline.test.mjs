@@ -34,11 +34,11 @@ async function fixture(pg){
     await db.exec(`INSERT INTO organizations VALUES('cedar','Synthetic'),('foreign','Foreign');
       INSERT INTO sites VALUES('beirut','cedar','Synthetic','UTC'),('foreign','foreign','Foreign','UTC');
       INSERT INTO staff(id,org_id,site_id,name,role) VALUES('maya','cedar','beirut','Synthetic Owner','owner'),('audit','cedar','beirut','Synthetic Auditor','auditor'),('foreign','foreign','foreign','Foreign private name','owner');
-      INSERT INTO workers(id,org_id,site_id,code,language) VALUES('worker-30','cedar','beirut','Worker 030','en');
+      INSERT INTO workers(id,org_id,site_id,code,language) VALUES('worker-30','cedar','beirut','Worker 030','en'),('worker-31','cedar','beirut','Worker 031','en');
       INSERT INTO briefings(id,org_id,site_id,title,source,state) VALUES('shelf','cedar','beirut','Synthetic','Synthetic source','draft');
       INSERT INTO publications(id,org_id,site_id,briefing_id,version,snapshot_json,state) VALUES('shelf-v3','cedar','beirut','shelf',3,'{"question":"Where?","rubric":{"askedFacts":["Finished blue","Unfinished yellow"]}}','published');
-      INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES('assignment-30','cedar','beirut','shelf-v3','worker-30','en');`);
-  }else{seed(db);ensureRecordingSchema(db);ensureCaseMessageSchema(db);db.exec("INSERT INTO staff VALUES('audit','cedar','beirut','Synthetic Auditor','auditor',1)");}
+      INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES('assignment-30','cedar','beirut','shelf-v3','worker-30','en'),('assignment-31','cedar','beirut','shelf-v3','worker-31','en');`);
+  }else{seed(db);ensureRecordingSchema(db);ensureCaseMessageSchema(db);db.exec("INSERT INTO staff VALUES('audit','cedar','beirut','Synthetic Auditor','auditor',1);INSERT INTO workers(id,org_id,site_id,code,name,language,active) VALUES('worker-31','cedar','beirut','Worker 031','Synthetic Other','en',1);INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,due_at,created_at,language) VALUES('assignment-31','cedar','beirut','shelf-v3','worker-31',NULL,'2026-01-01T00:00:00.000Z','en')");}
   const q=async(sql,args=[])=>pg?db.query(sql,args):{rows:db.prepare(sql).all(...args)};
   await q("INSERT INTO site_settings(site_id,org_id,revision,primary_contact_id) VALUES('beirut','cedar',0,'maya')");
   const original=pg?await pgAnswer(pool,worker,'assignment-30',randomUUID(),'Synthetic private original'):localAnswer(db,worker,'assignment-30',randomUUID(),'Synthetic private original');
@@ -64,8 +64,9 @@ for(const pg of [false,true])test(`${pg?'PostgreSQL':'SQLite'} timeline is scope
     let rows=await f.all();assert.ok(rows.some(row=>row.kind==='response_received'));assert.ok(rows.some(row=>row.kind==='owner_routed'));
     assert.equal(rows.filter(row=>row.kind==='assessment_recorded').length,pg?1:0); // SQLite synchronous legacy assessments have no separate audit clock.
     assert.equal(rows.some(row=>row.kind==='resolution_recorded'),false);
-    const help=randomUUID();await f.call('requestHelp',worker,'assignment-30',{requestId:help,text:'Synthetic unrelated private help'});
-    await f.message(help,'Synthetic unrelated conversation');
+    const otherWorker={...worker,principal_id:'worker-31'},help=randomUUID();
+    await f.call('requestHelp',otherWorker,'assignment-31',{requestId:help,text:'Synthetic unrelated private help'});
+    await f.message(help,'Synthetic unrelated conversation',otherWorker);
     await f.message(f.id,'Synthetic PRIVATE message text must not enter the timeline');
     await f.call('assignClarification',owner,f.id,{requestId:randomUUID(),ownerId:null,expectedOwnerId:'maya'});
     await f.call('resolveClarification',owner,f.id,{requestId:randomUUID(),notes:'Synthetic PRIVATE resolution text'});

@@ -56,8 +56,8 @@ export async function selfHealingContract(f) {
   view=await (await f.call('owner',path)).json();
   assert.equal(view.followup.state,'published');assert.equal(view.followup.publicationId,followup.id);
   assert.equal(view.followup.counts.matchRate,100);assert.equal(view.followup.counts.assessed,3);assert.equal(view.signal.matchRate,33);
-  await f.answer(rows[0],true);
-  view=await (await f.call('owner',path)).json();assert.equal(view.current.assessed,3);assert.equal(view.current.matched,2);assert.equal(view.signal.matched,1);
+  await assert.rejects(f.answer(rows[0],true),/approved repeat/);
+  view=await (await f.call('owner',path)).json();assert.equal(view.current.assessed,3);assert.equal(view.current.matched,1);assert.equal(view.signal.matched,1);
   await f.removeWorker(rows[1].worker_id);
   view=await (await f.call('owner',path)).json();
   assert.equal(view.current.assessed,2);assert.equal(view.followup.counts.assessed,2);assert.equal(view.signal.assessed,3);

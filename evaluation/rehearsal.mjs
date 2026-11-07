@@ -164,7 +164,10 @@ async function runSyntheticPipeline({onStage,storage,storageAdapter,onInventory=
         factEvidence:publication.askedFacts.map((quote,factIndex)=>({factIndex,quote})),askedFactIndexes:[0,1],reasons:[]},'factEvidence');
       mock.structured('translate',{content:english,terms:[]},arabic,'title');
       mock.structured('translation-check',{content:english,translation:arabic,language:'ar',terms:[]},faithful,'faithful');
-      for(const [language,value] of [['en',english],['ar',arabic]])for(const kind of ['body','question'])mock.speech(`speech.${language}.${kind}`,kind==='body'?value.text:value.question,speechBytes);
+      for(const [language,value] of [['en',english],['ar',arabic]]) {
+        mock.speech(`speech.${language}.body`,value.text,speechBytes);
+        mock.speechQuestion(`speech.${language}.question`,value.question,value.answerChoices,speechBytes);
+      }
       const glossary=await readGlossarySnapshot({query:(sql,args)=>db.query(sql,args)},scope.orgId,scope.siteId);
       const input={source:publication.source,title:english.title,revision:1,languages:['en','ar'],review:null,glossary};
       const preparationAdapter=resolvePreparationAdapter({...env,UNDERSTOOD_PREPARATION_ADAPTER:'gemini-free',
@@ -175,7 +178,7 @@ async function runSyntheticPipeline({onStage,storage,storageAdapter,onInventory=
       const bundle=(await db.query("SELECT * FROM generated_bundles WHERE briefing_id=$1 AND revision=1 AND state='attached'",[draftId])).rows[0];
       const operations=(await preparationBundleOperations(db,bundle)).sort((a,b)=>a.preparation_context_json.step-b.preparation_context_json.step);
       const argumentsByStep=[[publication.source,{review:null,multipleChoice:true}],[publication.source,content],[english,'ar',{terms:[]}],[english,arabic,'ar',{terms:[]}],
-        [english.text,'en'],[english.question,'en'],[arabic.text,'ar'],[arabic.question,'ar']];
+        [english.text,'en'],[mock.speechText('speech.en.question'),'en'],[arabic.text,'ar'],[mock.speechText('speech.ar.question'),'ar']];
       assert.equal(operations.length,8);
       preparationEvidence=[];
       for(const [index,operation] of operations.entries()) {

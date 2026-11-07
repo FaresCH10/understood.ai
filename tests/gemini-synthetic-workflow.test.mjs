@@ -22,7 +22,10 @@ function script() {
     factEvidence:facts.map((quote,factIndex)=>({factIndex,quote})),askedFactIndexes:[0,1],reasons:[]},'factEvidence');
   mock.structured('translate',{content:english,terms:[]},arabic,'title');
   mock.structured('translation-check',{content:english,translation:arabic,language:'ar',terms:[]},{faithful:true,complete:true,languageCorrect:true,terminologyApplied:true,reasons:[]},'faithful');
-  for(const [language,item] of [['en',english],['ar',arabic]])for(const kind of ['body','question'])mock.speech('speech.'+language+'.'+kind,kind==='body'?item.text:item.question,wav());
+  for(const [language,item] of [['en',english],['ar',arabic]]) {
+    mock.speech('speech.'+language+'.body',item.text,wav());
+    mock.speechQuestion('speech.'+language+'.question',item.question,item.answerChoices,wav());
+  }
   mock.speech('fixture.voice',COMPLETE_ANSWER,wav());mock.transcription('answer.voice',wav(),COMPLETE_ANSWER);
   mock.structured('voice.assess',{answer:COMPLETE_ANSWER,question:QUESTION,askedFacts},{outcome:'matched',reasons:['asked_facts_present'],evidence:askedFacts.map((_,factIndex)=>({factIndex,quote:COMPLETE_ANSWER}))},'outcome');
   mock.structured('typed.assess',{answer:INCOMPLETE_ANSWER,question:QUESTION,askedFacts},{outcome:'clarification',reasons:['missing_asked_fact'],evidence:[{factIndex:0,quote:INCOMPLETE_ANSWER}]},'outcome');

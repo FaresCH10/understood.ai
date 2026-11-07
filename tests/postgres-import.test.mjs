@@ -233,7 +233,7 @@ test('synthetic cutover preserves redacted answers and their immutable stage rec
     const retained=sqlite.prepare('SELECT id,answer_text FROM attempts ORDER BY id LIMIT 1').get();
     const retainedEvidence=[{factIndex:0,quote:retained.answer_text.slice(0,20)}];
     sqlite.prepare('UPDATE attempts SET reasons_json=? WHERE id=?').run(JSON.stringify({reasons:['Retained synthetic reason'],evidence:retainedEvidence}),retained.id);
-    submitAnswer(sqlite,worker,'assignment-30',randomUUID(),'Finished on blue; unfinished on yellow.');
+    submitAnswer(sqlite,worker,'assignment-30',randomUUID(),'Finished items go on the blue shelf and unfinished items on the yellow shelf.');
     const caseId=randomUUID();requestHelp(sqlite,worker,'assignment-30',{requestId:caseId,text:'Synthetic help before deletion'});
     const message={requestId:randomUUID(),text:'Synthetic conversation before deletion'};
     const originalMessage=sendCaseMessage(sqlite,worker,caseId,message);
@@ -287,7 +287,7 @@ test('retention cutover preserves receipts and tombstones without restoring purg
   const pg=new PGlite(),pool=poolFor(pg);
   try{
     const first=await receiveRecording(sqlite,worker,'assignment-30',randomUUID(),wav(),join(root,'audio'));
-    const second=await receiveRecording(sqlite,worker,'assignment-30',randomUUID(),wav(),join(root,'audio'));
+    const second=await receiveRecording(sqlite,{...worker,principal_id:'worker-29'},'assignment-29',randomUUID(),wav(),join(root,'audio'));
     const policy={requestId:randomUUID(),revision:0,audioDays:30,confirmed:true};
     saveRetention(sqlite,maya,policy);
     context.mock.timers.tick(40*86400000);
@@ -407,10 +407,10 @@ test('PostgreSQL synthetic migration dry-runs, preserves evidence and scopes rep
     issueWorkerGrant(sqlite, maya, 'worker-30');
     const audio = await receiveRecording(sqlite,worker,'assignment-30',randomUUID(),wav(),join(root,'audio'));
     sqlite.prepare("UPDATE recordings SET status='failed',attempts=3 WHERE id=?").run(audio.id);
+    submitAnswer(sqlite,worker,'assignment-30',randomUUID(),'Finished items go on the blue shelf and unfinished items on the yellow shelf.');
     const retryContext=getProcessingRetryContext(sqlite,maya,`response_transcription:${audio.id}`),processingRetry={requestId:randomUUID(),jobId:retryContext.jobId,publicationId:retryContext.publicationId,assignmentId:retryContext.assignmentId,generation:retryContext.generation,confirmed:true};
     retryProcessing(sqlite,maya,retryContext.jobId,processingRetry);
     const processingRetryReceipt=getProcessingRetryReceipt(sqlite,maya,retryContext.jobId,processingRetry.requestId);
-    submitAnswer(sqlite,worker,'assignment-30',randomUUID(),'Finished on blue; unfinished on yellow.');
     const exported = requestExport(sqlite,maya,{ requestId:randomUUID(),publicationId:'shelf-v3' }); processOneExport(sqlite);
     const notificationEvent=sqlite.prepare("SELECT id FROM audit WHERE action='export.ready'").get().id;
     const notificationReadAt=new Date().toISOString();
@@ -433,14 +433,14 @@ test('PostgreSQL synthetic migration dry-runs, preserves evidence and scopes rep
     ensureTemplateSchema(sqlite);const templateRequest={requestId:randomUUID(),title:'Imported template',description:'',source:CANONICAL_SOURCE,question:'',facts:[],askedFacts:[],confirmed:true};
     changeTemplate(sqlite,maya,'create',null,templateRequest);
     const templateUse={requestId:randomUUID(),title:'Imported template briefing',revision:1,confirmed:true};changeTemplate(sqlite,maya,'use',templateRequest.requestId,templateUse);
-    const helpId=randomUUID(),helpText='Not sure about the second shelf';
-    sqlite.prepare('INSERT INTO clarifications VALUES(?,?,?,?,?,?,?,?,?)').run(helpId,'cedar','assignment-30',null,'Help requested',null,'open',helpText,new Date().toISOString());
-    ensureClarificationSchema(sqlite);
     const modernHelpId=randomUUID();requestHelp(sqlite,worker,'assignment-30',{requestId:modernHelpId,text:'Modern original help text'});
     const conversationInput={requestId:randomUUID(),text:'Synthetic original conversation for cutover'};
     const conversationReceipt=sendCaseMessage(sqlite,worker,modernHelpId,conversationInput);
     const routingBefore=sqlite.prepare('SELECT due_at,manual,routed_owner_id FROM case_routing WHERE case_id=?').get(modernHelpId);
     resolveLocalHelp(sqlite,maya,modernHelpId,{notes:'Resolved before migration; original text stays saved.'});
+    ensureClarificationSchema(sqlite);
+    const helpId=randomUUID(),helpText='Not sure about the second shelf';
+    sqlite.prepare('INSERT INTO clarifications VALUES(?,?,?,?,?,?,?,?,?)').run(helpId,'cedar','assignment-30',null,'Help requested',null,'open',helpText,new Date().toISOString());
     sqlite.prepare("UPDATE workers SET language='en' WHERE id='worker-30'").run();
     const beforeReport = reportActivity(sqlite,maya,sqlite.prepare("SELECT * FROM publications WHERE id='shelf-v3'").get());
     const before = beforeReport.metrics, beforeRows = beforeReport.rows;

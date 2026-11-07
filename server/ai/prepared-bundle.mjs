@@ -253,7 +253,13 @@ export async function prepareLanguageBundle({source,title=null,revision,language
         const old=previous.manifest;
         for(const [code,item] of Object.entries(localized)){
           const values=rawLocalized[code].answerChoices;
-          if(!values){item.choices=structuredClone(old.languages[code].choices);continue;}
+          if(!values){
+            const retained=structuredClone(old.languages[code].choices);
+            // A regenerated translation changes the text its correct preview choice must match.
+            if(code===regeneration?.language && regeneration.kind==='translation')
+              retained.find(choice=>choice.id===old.rubric.correctChoiceId).text=item.text;
+            item.choices=retained;continue;
+          }
           const oldChoices=old.languages[code].choices;
           const ids=[old.rubric.correctChoiceId,...oldChoices.filter(c=>c.id!==old.rubric.correctChoiceId).map(c=>c.id)];
           item.choices=oldChoices.map(c=>({id:c.id,text:values[ids.indexOf(c.id)]}));

@@ -316,7 +316,8 @@ test('translated draft edits regenerate checked exact-text audio, fence old URLs
     await processOnePreparation(f.pool,{...options,integrationMode:'synthetic',adapter,storage,languages:['en','ar']});
     const after=await getBriefing(f.pool,owner,'brief',options);assert.equal(after.state,'ready');assert.equal(after.prepared.dependencies.revision,2);
     assert.deepEqual(checked,[{source:{title:'Shelves',text:source,question:'Where do both items go?'},target:edited,language:'ar'}]);
-    assert.ok(spoken.some(value=>value.language==='ar' && value.text===edited.text));assert.ok(spoken.some(value=>value.language==='ar' && value.text===edited.question));
+    assert.ok(spoken.some(value=>value.language==='ar' && value.text===edited.text));
+    assert.ok(spoken.some(value=>{const [question,...choices]=value.text.split('\n');return value.language==='ar' && question===edited.question && choices.length===4 && choices.some((line,index)=>line===`${index+1}. ${edited.text}`);}));
     assert.match(after.artifactAudio.ar.body,/\/draft\/2\/ar\/body$/);
     assert.deepEqual(await getStaffArtifactSpeech(f.pool,owner,'brief','draft','2','ar','body',storage,options),await speech());
     assert.deepEqual((await f.db.query('SELECT snapshot_json FROM publications WHERE id=$1',[publication.id])).rows[0].snapshot_json,original);

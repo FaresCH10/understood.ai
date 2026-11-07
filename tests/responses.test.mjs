@@ -40,15 +40,15 @@ test('SQLite exact worker receipt lookup is private, read-only, scoped and accep
   const login=async principal=>(await loginPrincipal(base, principal)).headers.get('set-cookie').split(';')[0];
   try{
     const typedId=randomUUID(),helpId=randomUUID(),audioId=randomUUID();
-    const typed=submitAnswer(db,worker,'assignment-30',typedId,'Finished blue; unfinished yellow.');
-    requestHelp(db,worker,'assignment-30',{requestId:helpId,text:'Synthetic help text'});
-    db.prepare("UPDATE clarifications SET status='resolved',notes='Private supervisor notes' WHERE id=?").run(helpId);
     const audio=await receiveRecording(db,worker,'assignment-30',audioId,wav(),root);
     db.prepare("UPDATE recordings SET status='failed',error='Private provider error' WHERE id=?").run(audio.id);
     const stagingId=randomUUID();
     const staged=await receiveRecording(db,worker,'assignment-30',stagingId,wav(),root);
     db.prepare('DELETE FROM submission_receipts WHERE submission_id=?').run(stagingId);
     db.prepare("UPDATE recordings SET status='storing',received_at=NULL WHERE id=?").run(staged.id);
+    const typed=submitAnswer(db,worker,'assignment-30',typedId,'Finished blue; unfinished yellow.');
+    requestHelp(db,worker,'assignment-30',{requestId:helpId,text:'Synthetic help text'});
+    db.prepare("UPDATE clarifications SET status='resolved',notes='Private supervisor notes' WHERE id=?").run(helpId);
     db.prepare("UPDATE publications SET state='withdrawn' WHERE id='shelf-v3'").run();
     const own=await login('worker-30'),other=await login('worker-14'),staffCookie=await login('maya');
     const context=(await (await fetch(base+'/session',{headers:{cookie:own}})).json()).clientContext;
@@ -134,7 +134,6 @@ test('SQLite response history is scoped, receipt-ordered, paged and read-only ac
     page=listPublicationResponses(db,staff,'shelf-v3',{page:2});assert.equal(page.items.length,10);
     page=listPublicationResponses(db,staff,'shelf-v3',{search:'030'});assert.equal(page.total,1);assert.equal(page.items[0].status,'awaiting_response');
     assert.ok(!/answerText|rubric|reasons|storage|facts|question/.test(JSON.stringify(page)));
-    submitAnswer(db,worker,'assignment-30',randomUUID(),'Finished blue; unfinished yellow.');
     const audio=await receiveRecording(db,worker,'assignment-30',randomUUID(),wav(),root);
     assert.equal(listPublicationResponses(db,staff,'shelf-v3',{status:'assessment_pending'}).items.find((row) => row.assignmentId==='assignment-30').outcome,null);
     db.prepare("UPDATE recordings SET status='failed' WHERE id=?").run(audio.id);
@@ -144,7 +143,7 @@ test('SQLite response history is scoped, receipt-ordered, paged and read-only ac
     // Receipt order, not client timestamps, controls the latest response.
     db.prepare("UPDATE attempts SET received_at='2000-01-01T00:00:00Z' WHERE assignment_id='assignment-30'").run();
     const before=db.prepare("SELECT * FROM submission_receipts WHERE assignment_id='assignment-30' ORDER BY sequence").all();
-    let own=workerSubmissions(db,worker,'assignment-30',{pageSize:1});assert.equal(own.total,3);assert.equal(own.receipts[0].isLatest,true);assert.equal(own.receipts[0].outcome,'matched');
+    let own=workerSubmissions(db,worker,'assignment-30',{pageSize:1});assert.equal(own.total,2);assert.equal(own.receipts[0].isLatest,true);assert.equal(own.receipts[0].outcome,'matched');
     assert.deepEqual(Object.keys(own.receipts[0]).sort(),['id','kind','receivedAt','isLatest','answerText','outcome','recordingId','audioStatus'].sort());
     assert.ok(!/rubric|facts|reasons|evidence|notes|sequence|storage|sha256/.test(JSON.stringify(own)));
     own=workerSubmissions(db,worker,'assignment-30',{page:2,pageSize:1});assert.equal(own.receipts[0].recordingId,audio.id);assert.equal(own.receipts[0].isLatest,false);
@@ -155,22 +154,22 @@ test('SQLite response history is scoped, receipt-ordered, paged and read-only ac
     assert.equal((await request('/worker/briefings/assignment-14/submissions',workerCookie)).status,404);
     assert.equal((await request('/worker/briefings/assignment-30/submissions?org_id=harbor',workerCookie)).status,400);
     let detail=getPublicationResponse(db,staff,'shelf-v3','assignment-30',{pageSize:1});
-    assert.equal(detail.total,3);assert.equal(detail.receipts[0].isLatest,true);assert.equal(detail.receipts[0].outcome,'matched');
+    assert.equal(detail.total,2);assert.equal(detail.receipts[0].isLatest,true);assert.equal(detail.receipts[0].outcome,'matched');
     assert.equal(detail.assignment.language,'ur');assert.equal(detail.facts.length,3);
     detail=getPublicationResponse(db,staff,'shelf-v3','assignment-30',{page:2,pageSize:1});assert.equal(detail.receipts[0].recordingId,audio.id);assert.equal(detail.receipts[0].isLatest,false);
-    detail=getPublicationResponse(db,staff,'shelf-v3','assignment-30',{page:3,pageSize:1});assert.equal(detail.receipts[0].kind,'typed');
-    detail=getPublicationResponse(db,staff,'shelf-v3','assignment-30',{page:5000});assert.equal(detail.receipts.length,0);assert.equal(detail.total,3);
+    detail=getPublicationResponse(db,staff,'shelf-v3','assignment-30',{page:3,pageSize:1});assert.equal(detail.receipts.length,0);
+    detail=getPublicationResponse(db,staff,'shelf-v3','assignment-30',{page:5000});assert.equal(detail.receipts.length,0);assert.equal(detail.total,2);
     assert.throws(() => getPublicationResponse(db,worker,'shelf-v3','assignment-30'),/Forbidden/);
     assert.throws(() => getPublicationResponse(db,{...staff,role:'auditor'},'shelf-v3','assignment-30'),/Forbidden/);
     db.prepare("INSERT INTO staff VALUES('reader','cedar','beirut','Reader','auditor',1)").run();
-    assert.equal(getPublicationResponse(db,{...staff,principal_id:'reader',role:'auditor'},'shelf-v3','assignment-30').total,3);
+    assert.equal(getPublicationResponse(db,{...staff,principal_id:'reader',role:'auditor'},'shelf-v3','assignment-30').total,2);
     assert.throws(() => staffWorkerAssignments(db,{...staff,principal_id:'reader',role:'auditor'},'worker-30'),/Forbidden/);
     for(const session of [{...staff,principal_id:'missing'},{...staff,site_id:'tripoli'},{...staff,org_id:'harbor'},worker]) assert.throws(() => staffWorkerAssignments(db,session,'worker-30'),/Forbidden/);
     withdrawPublication(db,staff,'shelf',{requestId:randomUUID(),publicationId:'shelf-v3',version:3,reason:'Read-only history test'});
     const count=db.prepare('SELECT COUNT(*) n FROM audit').get().n;
-    const read=await (await request(`${path}/assignment-30`,maya)).json();assert.equal(read.publication.state,'withdrawn');assert.equal(read.receipts.length,3);
+    const read=await (await request(`${path}/assignment-30`,maya)).json();assert.equal(read.publication.state,'withdrawn');assert.equal(read.receipts.length,2);
     assert.equal((await (await request(path,maya)).json()).total,30);
-    const ownHttp=await (await request('/worker/briefings/assignment-30/submissions?pageSize=1',workerCookie)).json();assert.equal(ownHttp.assignment.state,'withdrawn');assert.equal(ownHttp.total,3);assert.equal(ownHttp.receipts.length,1);
+    const ownHttp=await (await request('/worker/briefings/assignment-30/submissions?pageSize=1',workerCookie)).json();assert.equal(ownHttp.assignment.state,'withdrawn');assert.equal(ownHttp.total,2);assert.equal(ownHttp.receipts.length,1);
     const workerSession=await (await request('/session',workerCookie)).json();assert.equal(ownHttp.clientContext,workerSession.clientContext);
     assert.equal((await fetch(base+'/api/worker/briefings/assignment-30/submissions',{headers:{cookie:workerCookie,'x-client-session-context':'f'.repeat(64)}})).status,409);
     assert.ok(!/reasons|evidence|notes|facts|rubric|sequence/.test(JSON.stringify(ownHttp)));

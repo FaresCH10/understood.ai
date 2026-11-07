@@ -479,7 +479,9 @@ test('PostgreSQL multiple-choice assessment uses the frozen key and routes incor
     assert.equal(await processOneAssessment(pool,adapter,scope),true);
     assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[first.id])).rows[0].outcome,'clarification');
     assert.equal((await db.query('SELECT count(*)::int n FROM clarifications WHERE assignment_id=$1',[assignment])).rows[0].n,1);
-    const second=await submitAnswer(pool,worker,assignment,randomUUID(),snapshot.rubric.correctChoiceId,scope);
+    await assert.rejects(submitAnswer(pool,worker,assignment,randomUUID(),snapshot.rubric.correctChoiceId,scope),/approved repeat/);
+    const secondAssignment=(await db.query("SELECT id FROM assignments WHERE publication_id=$1 AND worker_id='w2'",[sent.publicationId])).rows[0].id;
+    const second=await submitAnswer(pool,{...worker,principal_id:'w2'},secondAssignment,randomUUID(),snapshot.rubric.correctChoiceId,scope);
     assert.equal(await processOneAssessment(pool,adapter,scope),true);
     assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[second.id])).rows[0].outcome,'matched');
     assert.equal(providerCalls,0);

@@ -103,12 +103,13 @@ test('scheduled recording pipeline meters allowlisted transcription and assessme
   }});
   const storage={save:async(row,bytes)=>objects.set(row.id,Buffer.from(bytes)),read:async row=>objects.get(row.id),remove:async row=>objects.delete(row.id)};
   try {
-    await run(client=>client.query(`INSERT INTO workers(id,org_id,site_id,code,language) VALUES('w','cedar','beirut','001','en');
+    await run(client=>client.query(`INSERT INTO workers(id,org_id,site_id,code,language) VALUES('w','cedar','beirut','001','en'),('w2','cedar','beirut','002','en');
       INSERT INTO briefings(id,org_id,site_id,title,source,state) VALUES('b','cedar','beirut','Synthetic','Synthetic','draft');
       INSERT INTO publications(id,org_id,site_id,briefing_id,version,snapshot_json,state) VALUES('p','cedar','beirut','b',1,
       '{"question":"Where?","rubric":{"askedFacts":["finished -> blue shelf","unfinished -> yellow shelf"]}}','published');
-      INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES('a','cedar','beirut','p','w','en')`));
+      INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES('a','cedar','beirut','p','w','en'),('a2','cedar','beirut','p','w2','en')`));
     const worker={principal_type:'worker',principal_id:'w',org_id:'cedar',site_id:'beirut'};
+    const worker2={principal_type:'worker',principal_id:'w2',org_id:'cedar',site_id:'beirut'};
     const receipt=await receiveRecording(pool,worker,'a',randomUUID(),audio,storage);
     const task=rehearsalTasks(pool,storage,{schema:'public',recordingAdapter:adapter}).recording;
     await saveProviderPolicy(pool,identity,policy(null,0,10));await saveProviderPolicy(pool,identity,policy('cedar',0,3));
@@ -140,7 +141,7 @@ test('scheduled recording pipeline meters allowlisted transcription and assessme
     assert.equal(history.items.filter(row=>row.currentRun).length,0);assert.equal(new Set(history.items.map(row=>row.runId)).size,2);
     assert.equal(history.items.flatMap(row=>row.requests).length,6);assert.equal(history.items.flatMap(row=>row.requests).filter(row=>row.state==='uncertain').length,1);
     assert.doesNotMatch(JSON.stringify(history),/Finished blue|unfinished yellow|input_hash|claim_token|lease_token|sha256|synthetic-test-key|snapshot_json|storage/);
-    const second=await receiveRecording(pool,worker,'a',randomUUID(),audio,storage);pauseUpload=true;await task();
+    const second=await receiveRecording(pool,worker2,'a2',randomUUID(),audio,storage);pauseUpload=true;await task();
     assert.equal(calls,9);assert.equal(assessmentCalls,2);assert.equal(await task(),false);
     const stopped=(await run(client=>client.query('SELECT status,transcript FROM recordings WHERE id=$1',[second.id]))).rows[0];
     assert.equal(stopped.status,'received');assert.equal(stopped.transcript,null);
