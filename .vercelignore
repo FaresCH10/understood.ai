@@ -6,6 +6,7 @@
 .vercel-probe
 data
 dist
+dist-operator
 node_modules
 artifacts
 images

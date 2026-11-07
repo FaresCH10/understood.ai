@@ -10,7 +10,7 @@ export const operatorSections:{id:OperatorDestination;label:string;description:s
   {id:'support',label:'Support desk',description:'Diagnose supervisor and worker access in a specific workspace.',group:'Monitor'},
   {id:'jobs',label:'Processing jobs',description:'Inspect processing failures and review eligible retries.',group:'Monitor'},
   {id:'tenants',label:'Workspaces',description:'Inspect sites, worker access and workspace admission.',group:'Manage'},
-  {id:'entitlements',label:'Plans & activation',description:'Review activation requests, plan terms and worker limits.',group:'Manage'},
+  {id:'entitlements',label:'Entitlements',description:'Review pilot and paid plan requests, and manage workspace access terms and worker limits.',group:'Manage'},
   {id:'translation-feedback',label:'Translation feedback',description:'Review reported translation issues across companies.',group:'Manage'},
   {id:'providers',label:'AI & quotas',description:'Inspect provider readiness, usage and controlled synthetic checks.',group:'Manage'},
   {id:'controls',label:'Dispatch controls',description:'Pause or resume new operational and AI dispatch.',group:'Manage'},

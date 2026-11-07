@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {request as httpRequest} from 'node:http';
+import {createServer,request as httpRequest} from 'node:http';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {hostedSyntheticConfig} from '../server/postgres/hosted-config.mjs';
@@ -12,6 +12,7 @@ import {domainTransaction} from '../server/postgres/domain.mjs';
 import {provisionOperator} from '../server/postgres/operators.mjs';
 import {provisionStaffCredential,authenticateStaff} from '../server/postgres/auth.mjs';
 import {verifyRuntimePermissions} from '../server/postgres/runtime-permissions.mjs';
+import {createVercelOperatorHandler} from '../server/vercel-operator.mjs';
 
 const origin='https://operations.example.test',customerOrigin='https://customer.example.test';
 const env={UNDERSTOOD_TIER:'staging',UNDERSTOOD_AI_MODE:'synthetic',UNDERSTOOD_ACCESS_MODE:'credential',UNDERSTOOD_DATA_CLASS:'synthetic',
@@ -35,6 +36,29 @@ async function listen(server) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 const close=server=>new Promise(resolve=>server.close(resolve));
+
+test('Vercel operator verifies the restricted profile and rejects customer routes and origins',async()=>{
+  const vercelEnv={...env,VERCEL:'1',VERCEL_ENV:'preview',VERCEL_URL:'operations.example.test'};
+  let connections=0;
+  const pool={async connect(){connections++;throw Error('fixture has no database');}};
+  const options={pool,verify:async()=>{},verifyPermissions:async(_pool,profile)=>{
+    assert.deepEqual(profile,{schema:env.UNDERSTOOD_POSTGRES_SCHEMA,profile:'operator'});
+  }};
+  for(const override of [{VERCEL:'0'},{VERCEL_ENV:'development'},{UNDERSTOOD_OPERATOR_ACCESS:'false'},
+    {UNDERSTOOD_CUSTOMER_ORIGIN:origin},{DATABASE_URL:'customer-secret'},{UNDERSTOOD_PILOT_GMAIL_APP_PASSWORD:'mail-secret'}]) {
+    await assert.rejects(createVercelOperatorHandler({...options,env:{...vercelEnv,...override}}));
+  }
+  const handler=await createVercelOperatorHandler({...options,env:vercelEnv});
+  const server=createServer(handler),base=await listen(server);
+  try {
+    assert.equal((await request(base,'/api/auth/staff/login')).status,404);
+    assert.equal((await request(base,'/api/ops/session',{headers:{host:'customer.example.test'}})).status,403);
+    assert.equal((await request(base,'/api/ops/login',{method:'POST',headers:{origin:customerOrigin},body:'{}'})).status,403);
+    assert.deepEqual(await (await request(base,'/api/ops/session')).json(),{available:true,authenticated:false});
+    assert.equal((await request(base,'/api/ops/entitlements')).status,401);
+    assert.equal(connections,0);
+  }finally{await close(server);}
+});
 
 test('operator configuration requires a distinct HTTPS origin and omits application integration secrets',()=>{
   const config=hostedSyntheticConfig(env,{service:'operator'});

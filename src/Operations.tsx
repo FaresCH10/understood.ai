@@ -30,6 +30,7 @@ const entitlementReasons=['manual_activation','trial_extension','owner_request',
 const isUuid=(value:unknown):boolean=>typeof value==='string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value);
 const isIsoDate=(value:unknown):boolean=>value===null || typeof value==='string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString()===value;
 type EntitlementRow={orgId:string;name:string;entitlement:UsageEntitlement;requestedBy:string|null;requestSiteId:string|null};
+const entitlementLabels:Record<string,string>={unmanaged:'Unmanaged',trial:'Pilot / evaluation',active:'Active',read_only:'Read-only'};
 type EntitlementDraft={orgId:string;name:string;revision:number;state:'trial'|'active'|'read_only';endsAt:string;workerLimit:number;plan:string;termsReference:string;reason:string;pendingId:string|null};
 const pad=(value:number)=>String(value).padStart(2,'0');
 const localInput=(iso:string|null)=>{if(!iso)return '';const date=new Date(iso);return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;};
@@ -95,6 +96,11 @@ function Console({session,signedOut}:{session:Session;signedOut:()=>void}) {
   const [menuOpen,setMenuOpen]=useState(false),[supportOrgId,setSupportOrgId]=useState<string|undefined>(),[listLoading,setListLoading]=useState(false);
   const shell=useRef<HTMLDivElement>(null),navMarker=useRef<HTMLSpanElement>(null),previousTab=useRef(tab),markerPosition=useRef<number|null>(null);
   const sending=useRef(false),mounted=useRef(true);
+  const entitlementReviewHeading=useRef<HTMLHeadingElement>(null),entitlementReviewTrigger=useRef<HTMLButtonElement>(null);
+  const reviewedOrgId=draft?.orgId;
+  useEffect(()=>{
+    if(reviewedOrgId)entitlementReviewHeading.current?.focus();
+  },[reviewedOrgId]);
   function navigate(destination:OperatorDestination){setTab(destination);setMenuOpen(false);setPage(1);setSelected(null);setDraft(null);setRetryJob(null);setConfirmed(false);setError('');setMessage('');}
   useGSAP(()=>{
     const media=gsap.matchMedia();
@@ -166,8 +172,62 @@ function Console({session,signedOut}:{session:Session;signedOut:()=>void}) {
       {tab==='controls' && overview && <section className="operations-section"><h2>Dispatch controls</h2><p className="muted">{overview.limits.reason}</p>{controls && <form onSubmit={e=>{e.preventDefault();save({requestId:crypto.randomUUID(),kind:'system',revision:controls.revision,jobsPaused:controls.jobsPaused,providerPaused:controls.providerPaused,confirmed:true});}}><label className="operations-toggle"><input type="checkbox" role="switch" disabled={locked} checked={controls.jobsPaused} onChange={e=>{setControls({...controls,jobsPaused:e.target.checked});setConfirmed(false);}}/>Pause operational job dispatch</label><label className="operations-toggle"><input type="checkbox" role="switch" disabled={locked} checked={controls.providerPaused} onChange={e=>{setControls({...controls,providerPaused:e.target.checked});setConfirmed(false);}}/>Pause AI provider dispatch</label><p className="muted">Retention, deletion and account recovery remain active. Already-sent external requests cannot be recalled.</p><label className="operations-toggle"><input type="checkbox" disabled={locked} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I confirm these dispatch controls.</label><button className="button primary" disabled={locked || !confirmed || controls.jobsPaused===overview.control.jobsPaused && controls.providerPaused===overview.control.providerPaused}><Pause size={18}/>Save dispatch controls</button></form>}</section>}
       {listLoading && <p className="admin-list-loading" role="status">Updating records…</p>}
       {tab==='tenants' && <><form className="operations-filters" onSubmit={e=>e.preventDefault()}><label className="field"><span><Search size={16}/>Find a workspace</span><input maxLength={100} value={search} onChange={e=>{setSearch(e.target.value);setPage(1);setSelected(null);}}/></label><label className="field">Access state<select value={state} onChange={e=>{setState(e.target.value);setPage(1);setSelected(null);}}><option value="all">All workspaces</option><option value="active">Active</option><option value="suspended">Suspended</option></select></label></form><div className="operations-table operations-tenants"><table><thead><tr><th>Workspace</th><th>Access</th><th>Sites</th><th>Active workers</th><th>Action</th></tr></thead><tbody>{tenants?.items.map(row=><tr key={row.id}><td><strong>{row.name}</strong><small>{row.id}</small></td><td>{row.state}</td><td>{row.sites}</td><td>{row.workers}</td><td><button className="button outline" disabled={locked} onClick={()=>{setSelected(row);setReason('pilot_review');setConfirmed(false);}}>Manage access</button></td></tr>)}</tbody></table>{tenants?.items.length===0 && <p>No workspaces match your search.</p>}</div>{selected && <section className="operations-section"><button className="button outline admin-support-link" onClick={()=>{setSupportOrgId(selected.id);navigate('support');}}><LifeBuoy size={16}/>Open workspace in Support desk<ArrowRight size={16}/></button><OperatorTenantAccess key={selected.id} orgId={selected.id} request={request}/><h2>{selected.state==='active'?'Suspend':'Resume'} {selected.name}</h2><p>{selected.state==='active'?'Suspension revokes current customer sessions and blocks new server access and operational dispatch. It does not erase cached device data.':'Resuming permits new sign-ins and operational dispatch unless global controls remain paused. Revoked sessions stay revoked.'}</p><label className="field">Reason<select value={reason} disabled={locked} onChange={e=>{setReason(e.target.value);setConfirmed(false);}}><option value="pilot_review">Pilot review</option><option value="security_review">Security review</option><option value="owner_request">Owner request</option><option value="maintenance">Maintenance</option></select></label><label className="operations-toggle"><input type="checkbox" disabled={locked} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I confirm the access change for this workspace.</label><button className="button primary" disabled={locked || !confirmed} onClick={()=>save({requestId:crypto.randomUUID(),kind:'tenant',orgId:selected.id,revision:selected.revision,state:selected.state==='active'?'suspended':'active',reason,confirmed:true})}><ShieldCheck size={18}/>{selected.state==='active'?'Suspend access':'Resume access'}</button></section>}</>}
-      {tab==='entitlements' && <><form className="operations-filters" onSubmit={e=>e.preventDefault()}><label className="field"><span><Search size={16}/>Find a workspace</span><input maxLength={100} value={search} onChange={e=>{setSearch(e.target.value);setPage(1);setDraft(null);}}/></label><label className="field">Entitlement state<select value={entitlementFilter} onChange={e=>{setEntitlementFilter(e.target.value);setPage(1);setDraft(null);}}><option value="all">All states</option><option value="unmanaged">Unmanaged</option><option value="trial">Pilot / evaluation</option><option value="active">Active</option><option value="read_only">Read-only</option></select></label></form><div className="operations-table"><table><thead><tr><th>Workspace</th><th>Entitlement</th><th>Days remaining</th><th>Active workers</th><th>Pending request</th><th>Action</th></tr></thead><tbody>{entitlements?.items.map(row=><tr key={row.orgId}><td><strong>{row.name}</strong><small>{row.orgId}</small></td><td>{row.entitlement.configured?`${row.entitlement.state}${row.entitlement.effectiveState!==row.entitlement.state?' · expired':''}`:'Unmanaged'}<small>{row.entitlement.plan ?? 'No plan recorded'}</small></td><td>{row.entitlement.daysRemaining===null?'No end date':`${row.entitlement.daysRemaining} ${row.entitlement.daysRemaining===1?'day':'days'}`}</td><td>{row.entitlement.activeWorkers} / {row.entitlement.workerLimit ?? '—'}</td><td>{row.entitlement.request?<>Pending<small>{row.requestedBy ?? 'Unknown requester'}</small></>:<span className="muted">None</span>}</td><td><button className="button outline" disabled={locked} onClick={()=>editEntitlement(row)}>{row.entitlement.plan==='pilot_pending'?'Review pilot':pendingPaidPlan(row.entitlement.plan)?'Review paid plan':'Manage'}</button></td></tr>)}</tbody></table>{entitlements?.items.length===0 && <p>No workspaces match your search.</p>}</div>
-        {draft && <section className="operations-section"><h2>{draft.name} · entitlement revision {draft.revision}</h2><p className="muted">Pilot approval, extension, paid activation, suspension and expiry are separate from payment. This records plan terms and an immutable transition; it does not collect money or mark an invoice paid.</p>
+      {tab==='entitlements' && <>
+        <section className="admin-entitlements" aria-labelledby="entitlements-list-heading">
+          <div className="admin-entitlements-header">
+            <h2 id="entitlements-list-heading">Workspace entitlements</h2>
+            <p>Find a workspace or filter for requests that need a decision.</p>
+            <form className="operations-filters" onSubmit={e=>e.preventDefault()}>
+              <label className="field">
+                <span><Search size={16} aria-hidden="true"/>Find a workspace</span>
+                <input placeholder="Search by workspace name or ID" maxLength={100} value={search} onChange={e=>{setSearch(e.target.value);setPage(1);setDraft(null);}}/>
+              </label>
+              <label className="field">Filter entitlements
+                <select value={entitlementFilter} onChange={e=>{setEntitlementFilter(e.target.value);setPage(1);setDraft(null);}}>
+                  <option value="all">All entitlements</option>
+                  <option value="pending">Pending requests</option>
+                  {Object.entries(entitlementLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+            </form>
+          </div>
+          <div className="operations-table admin-entitlements-table">
+            <table role="table" aria-label="Workspace entitlement records">
+              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Workspace</th><th role="columnheader" scope="col">Entitlement</th><th role="columnheader" scope="col">Days remaining</th><th role="columnheader" scope="col">Active workers</th><th role="columnheader" scope="col">Request</th><th role="columnheader" scope="col">Action</th></tr></thead>
+              <tbody role="rowgroup">{entitlements?.items.map(row=>{
+                const {entitlement}=row;
+                const pendingPlan=pendingPaidPlan(entitlement.plan);
+                const paid=pendingPlan??requestedUpgradePlan(entitlement.request?.note);
+                const pilot=entitlement.plan==='pilot_pending';
+                const requestLabel=pilot?'Pilot requested':paid?'Plan requested':'Activation requested';
+                const stateLabel=entitlement.effectiveState!==entitlement.state?'Expired':entitlementLabels[entitlement.state] ?? entitlement.state;
+                return <tr role="row" key={row.orgId} className={draft?.orgId===row.orgId?'is-reviewing':undefined}>
+                  <td role="cell"><strong>{row.name}</strong><small>{row.orgId}</small></td>
+                  <td role="cell"><span className={'admin-entitlement-state is-'+entitlement.effectiveState}>{stateLabel}</span>
+                    <small>{pilot?'Pilot':pendingPlan ?? entitlement.plan ?? 'No plan recorded'}</small></td>
+                  <td role="cell"><span className="admin-entitlement-mobile-label" aria-hidden="true">Days remaining</span>{entitlement.daysRemaining===null?'No end date':entitlement.daysRemaining}</td>
+                  <td role="cell"><span className="admin-entitlement-mobile-label" aria-hidden="true">Active workers</span>{entitlement.activeWorkers} / {entitlement.workerLimit ?? '—'}</td>
+                  <td role="cell">{entitlement.request?<><span className="admin-entitlement-state is-pending">{requestLabel}</span><small>{row.requestedBy ?? 'Unknown requester'}</small></>:<span className="muted">No pending request</span>}</td>
+                  <td role="cell"><button className="button outline" disabled={locked || listLoading} onClick={e=>{entitlementReviewTrigger.current=e.currentTarget;editEntitlement(row);}}>
+                    {entitlement.request?(pilot?'Review pilot':paid?'Review paid plan':'Review request'):'Manage'}<ChevronRight size={14} aria-hidden="true"/>
+                  </button></td>
+                </tr>;
+              })}</tbody>
+            </table>
+            {!listLoading && entitlements?.items.length===0 && <p className="admin-entitlements-empty">
+              {entitlementFilter==='pending'?'No pending requests match this view.':'No workspaces match this view.'}
+            </p>}
+          </div>
+        </section>
+        {draft && <section className="operations-section admin-entitlement-review" aria-labelledby="entitlement-review-heading">
+          <div className="admin-section-heading">
+            <div>
+              <h2 id="entitlement-review-heading" ref={entitlementReviewHeading} tabIndex={-1}>{draft.name}</h2>
+              <p>Entitlement revision {draft.revision}</p>
+            </div>
+            <button className="icon-button" title="Close review" aria-label="Close review" onClick={()=>{setDraft(null);setConfirmed(false);entitlementReviewTrigger.current?.focus();}}><X size={18}/></button>
+          </div>
+          <p className="muted">Record the agreed access terms for this workspace. Payments are handled separately.</p>
           <div className="operations-filters"><label className="field">State<select value={draft.state} disabled={locked} onChange={e=>{const next=e.target.value as EntitlementDraft['state'];setDraft({...draft,state:next,endsAt:next==='trial'&&!draft.endsAt?localInput(new Date(Date.now()+PILOT_DAYS*86400000).toISOString()):draft.endsAt});setConfirmed(false);}}><option value="trial">Pilot / evaluation</option><option value="active">Active</option><option value="read_only">Read-only</option></select></label>
             <label className="field">Plan<input maxLength={40} value={draft.plan} disabled={locked} onChange={e=>{setDraft({...draft,plan:e.target.value});setConfirmed(false);}}/></label>
             <label className="field">{draft.state==='read_only'?'Optional end':'Ends at'}<input type="datetime-local" value={draft.endsAt} disabled={locked} onChange={e=>{setDraft({...draft,endsAt:e.target.value});setConfirmed(false);}}/></label>
@@ -175,7 +235,7 @@ function Console({session,signedOut}:{session:Session;signedOut:()=>void}) {
             <label className="field">Terms reference<input maxLength={200} value={draft.termsReference} disabled={locked} onChange={e=>{setDraft({...draft,termsReference:e.target.value});setConfirmed(false);}}/></label>
             <label className="field">Reason<select value={draft.reason} disabled={locked} onChange={e=>{setDraft({...draft,reason:e.target.value});setConfirmed(false);}}><option value="manual_activation">Manual activation</option><option value="trial_extension">Pilot extension</option><option value="owner_request">Owner request</option><option value="pilot_review">Pilot review</option><option value="security_review">Security review</option><option value="maintenance">Maintenance</option></select></label></div>
           {draft.pendingId && <div className="notice notice-amber"><KeyRound size={22}/><div><strong>Activation request pending</strong><p>{draft.state==='read_only'?'A read-only update does not accept this request. Decline it explicitly if it should not be granted.':'Saving this entitlement accepts the pending request and records the decision in the immutable ledger.'}</p></div></div>}
-          <p className="muted">Ends-at uses this browser's local time and is stored in UTC. A pilot requires a future end. Approval starts its access period. The worker limit applies across all sites; existing active workers above a new limit are not disabled.</p>
+          <p className="muted">Enter the end date in your local time. Pilot access starts on approval and requires a future end date. The worker limit applies across all sites.</p>
           <label className="operations-toggle"><input type="checkbox" checked={confirmed} disabled={locked} onChange={e=>setConfirmed(e.target.checked)}/>I confirm this entitlement change for {draft.name}.</label>
           <div className="actions"><button className="button primary" disabled={locked || !confirmed || !entitlementValid} onClick={saveEntitlement}><Save size={18}/>Apply entitlement</button>{draft.pendingId && <button className="button outline" disabled={locked || !confirmed} onClick={declineActivation}>Decline request</button>}</div>
         </section>}

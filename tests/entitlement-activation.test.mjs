@@ -147,6 +147,10 @@ test('PostgreSQL activation is operator-only, revision-bound, ledgered and auto-
     assert.equal(readOnlyUsage.entitlement.effectiveState,'read_only');assert.equal(readOnlyUsage.entitlement.writeAllowed,false);
     const fourth=input('Please reactivate this workspace.');const pendingFour=await savePgActivationRequest(pool,pgOwner,fourth,options);
     assert.equal(pendingFour.state,'pending');
+    const pending=await operationsEntitlements(pool,identity,{state:'pending',pageSize:1},options);
+    assert.equal(pending.total,1);assert.equal(pending.items[0].entitlement.request.id,fourth.requestId);
+    assert.equal((await operationsEntitlements(pool,identity,{state:'pending',search:'nonexistent workspace'},options)).total,0);
+    assert.deepEqual((await operationsEntitlements(pool,identity,{state:'pending',pageSize:1,page:2},options)).items,[]);
     const reactivated=await saveOperatorEntitlement(pool,identity,{requestId:randomUUID(),kind:'entitlement',orgId:'a',revision:3,
       state:'active',endsAt:null,workerLimit:30,plan:'business',termsReference:'terms-v2',reason:'manual_activation',
       activationRequestId:fourth.requestId,confirmed:true},options);
@@ -154,6 +158,7 @@ test('PostgreSQL activation is operator-only, revision-bound, ledgered and auto-
     const listing=await operationsEntitlements(pool,identity,{search:'a',state:'active'},options);
     assert.equal(listing.total,1);assert.equal(listing.items[0].entitlement.state,'active');assert.equal(listing.items[0].entitlement.activeWorkers,0);
     assert.equal(listing.items[0].entitlement.request,null);
+    assert.equal((await operationsEntitlements(pool,identity,{state:'pending'},options)).total,0);
   } finally {await db.close();}
 });
 

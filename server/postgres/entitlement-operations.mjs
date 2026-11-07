@@ -6,7 +6,7 @@ import {lockOperationsGate} from './operations-gates.mjs';
 import {usageEntitlement} from '../usage.mjs';
 import {entitlementSummary,activationRequestSummary} from '../entitlement-model.mjs';
 
-const entitlementStates=['all','unmanaged','trial','active','read_only'];
+const entitlementStates=['all','pending','unmanaged','trial','active','read_only'];
 
 function entitlementFilters(input={}) {
   if(!input || typeof input!=='object' || Array.isArray(input)
@@ -22,7 +22,10 @@ export function operationsEntitlements(pool,identity,input={},{schema='public'}=
   const f=entitlementFilters(input);
   return domainTransaction(pool,schema,async client=>{
     await requireOperatorInTransaction(client,identity);
-    const where="(strpos(lower(o.name),$1)>0 OR strpos(lower(o.id),$1)>0) AND ($2='all' OR COALESCE(e.state,'unmanaged')=$2)",args=[f.search,f.state];
+    const where=`(strpos(lower(o.name),$1)>0 OR strpos(lower(o.id),$1)>0)
+      AND ($2='all' OR COALESCE(e.state,'unmanaged')=$2 OR ($2='pending' AND EXISTS (
+        SELECT 1 FROM organization_activation_requests ar WHERE ar.org_id=o.id AND ar.state='pending'
+      )))`,args=[f.search,f.state];
     const total=(await client.query(`SELECT COUNT(*)::int AS n FROM organizations o
       LEFT JOIN organization_entitlements e ON e.org_id=o.id WHERE ${where}`,args)).rows[0].n;
     const rows=(await client.query(`SELECT o.id AS org_id,o.name,
