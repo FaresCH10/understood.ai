@@ -56,6 +56,11 @@ function clearPending(scope:string|null){
   if(!scope)return;
   try{sessionStorage.removeItem(pendingKey(scope));}catch{/* Storage may be unavailable. */}
 }
+function sameSend(a:PendingSend,b:PendingSend){
+  return a.title===b.title && a.source===b.source && a.responseMode===b.responseMode
+    && a.deliveryMode===b.deliveryMode && a.evidenceMode===b.evidenceMode
+    && JSON.stringify(a.audience)===JSON.stringify(b.audience);
+}
 export function derivedInstructionTitle(source:string){
   const clean=source.normalize('NFKC').replace(/\s+/g,' ').trim();
   if(clean.length<3)return '';
@@ -94,6 +99,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false),[attachmentBusy,setAttachmentBusy]=useState(false);
   const requestId=useRef(restoredPending?.requestId || draftId || crypto.randomUUID());
+  const discarded=useRef<PendingSend|null>(null);
   const sending=useRef(false);
   const sentNotice=useRef(false);
   const trimmedSource=source.trim();
@@ -168,10 +174,17 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   },[result?.state,onSent]);
 
   function reset(){
-    requestId.current=crypto.randomUUID();hasSavedDraft.current=false;setDraftReady(false);setWorkerIds([]);setDraftNotice('');setDraftLoaded(true);history.replaceState(null,'',`${location.pathname}${location.search}#send/${requestId.current}`);
+    requestId.current=crypto.randomUUID();discarded.current=null;hasSavedDraft.current=false;setDraftReady(false);setWorkerIds([]);setDraftNotice('');setDraftLoaded(true);history.replaceState(null,'',`${location.pathname}${location.search}#send/${requestId.current}`);
     clearPending(scope);setPending(null);setResult(null);setRetryReceipt(null);setError('');
     setSource('');setTitle('');setAudienceType('all');setCrewId('');setResponseMode('question');setDeliveryMode('both');setEvidenceMode('none');
     sentNotice.current=false;
+  }
+  function discardPending(){
+    if(pending)discarded.current=pending;
+    clearPending(scope);setPending(null);setError('');
+  }
+  function currentValue(id=requestId.current):PendingSend{
+    return {requestId:id,title:effectiveTitle,source:trimmedSource,audience:audienceChoice,responseMode,deliveryMode,evidenceMode,savedAt:Date.now()};
   }
 
   async function checkStatus(id=requestId.current){
@@ -181,24 +194,19 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       const value=await request<SendResult>(`/api/instructions/sends/${encodeURIComponent(id)}`);
       if(!current())return;
       setResult(value);
-      if(value.state==='published' || value.state==='failed'){
-        if(pending?.requestId===id || pending===null)clearPending(scope);
-        setPending(null);
-      }
+      if(!pending || pending.requestId===id){clearPending(scope);setPending(null);}
       if(value.state==='failed')setError(value.error || 'The instruction could not be sent.');
     }catch(reason){
       if(!current())return;
       if(reason instanceof StaffRequestError && reason.status===404){
+        if(pending?.requestId===id)discarded.current=pending;
         clearPending(scope);setPending(null);setResult(null);setError('');
         setError('No send was recorded. Review the instruction and send again.');
       }else setError(reason instanceof Error?reason.message:'Send status unavailable.');
     }finally{sending.current=false;setBusy(false);}
   }
 
-  async function submit(){
-    if(!canSubmit || sending.current || !current())return;
-    const value:PendingSend={requestId:requestId.current,title:effectiveTitle,source:trimmedSource,audience:audienceChoice,responseMode,deliveryMode,evidenceMode,savedAt:Date.now()};
-    try{savePending(scope,value);}catch(reason){setError((reason as Error).message);return;}
+  async function sendValue(value:PendingSend){
     sending.current=true;setBusy(true);setError('');setPending(value);
     try {
       const sent=await request<SendResult>('/api/instructions/send',{
@@ -207,7 +215,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       if(!current())return;
       setResult(sent);
       try{sessionStorage.removeItem(localKey);}catch{}
-      if(sent.state==='published' || sent.state==='failed'){clearPending(scope);setPending(null);}
+      clearPending(scope);setPending(null);
       if(sent.state==='failed')setError(sent.error || 'The instruction could not be sent.');
     }catch(reason){
       if(!current())return;
@@ -215,6 +223,25 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       if(!uncertain){clearPending(scope);setPending(null);}
       setError(reason instanceof Error?reason.message:'The send outcome is not confirmed.');
     }finally{sending.current=false;setBusy(false);}
+  }
+
+  async function retryPending(){
+    if(!pending || sending.current || !current())return;
+    discarded.current=null;
+    await sendValue(pending);
+  }
+
+  async function submit(){
+    if(!canSubmit || sending.current || !current())return;
+    let value=currentValue();
+    if(discarded.current && !sameSend(discarded.current,value)){
+      requestId.current=crypto.randomUUID();
+      history.replaceState(null,'',`${location.pathname}${location.search}#send/${requestId.current}`);
+      value=currentValue();
+    }
+    discarded.current=null;
+    try{savePending(scope,value);}catch(reason){setError((reason as Error).message);return;}
+    await sendValue(value);
   }
 
   async function retryUndelivered(){
@@ -262,8 +289,8 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
     <dialog ref={voiceDialog} className="worker-form-dialog" aria-label={tr("Record instruction")} onCancel={event=>{event.preventDefault();closeVoice();}}>{voiceOpen&&<VoiceTranscript authority={authority} title={title} onClose={closeVoice} replacing={!!source.trim()} onApproved={text=>{setSource(text);closeVoice();}}/>}</dialog>
 
     {recovery.error&&<div className="notice notice-amber" role="alert">{staffT.error(recovery.error)}</div>}
-    {pending && !error && <div className="notice notice-amber" role="status"><strong>{staffT("An earlier send was not confirmed.")}</strong> {staffT("Check its receipt before sending again.")} <button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button></div>}
-    {pending && error && <div className="notice notice-amber" role="status"><strong>{staffT("Send outcome not confirmed.")}</strong> {staffT("The original request is retained. Check its receipt rather than repeating it.")} <div className="actions"><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={reset}>{staffT("Discard request")}</button></div></div>}
+    {pending && !error && <div className="notice notice-amber" role="status"><strong>{staffT("An earlier send was not confirmed.")}</strong> {staffT("Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
+    {pending && error && <div className="notice notice-amber" role="status"><strong>{staffT("Send outcome not confirmed.")}</strong> {staffT("The original request is retained. Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
     {error && !pending && <div className="notice notice-amber" role="alert">{staffT.error(error)}</div>}
     <section className="panel send-composer" aria-labelledby="send-source-title">
       <label className="field" htmlFor="send-title"><span>{tr("Title")} <span aria-hidden="true">*</span></span>

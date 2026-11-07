@@ -44,17 +44,22 @@ export function createStaffRequest(session:PageSession,current:()=>boolean,fetch
     try {encoded=format==='csv'?body as Blob:mutation?JSON.stringify(body):undefined;}catch {throw new StaffRequestError('Invalid staff request');}
     assertCurrent();
     const timeout=AbortSignal.timeout(15000),requestSignal=signal?AbortSignal.any([signal,timeout]):timeout;
-    let response:Response,data;
+    let response:Response,data:any,decoded=true;
     try {
       sent=true;response=await fetcher(path,{method,credentials:'include',cache:'no-store',redirect:'error',signal:requestSignal,
         headers:{'x-client-session-context':expected.clientContext!,...(mutation?{'content-type':format==='csv'?'text/csv':'application/json'}:{})},body:encoded});
       assertCurrent();
       if(response.status===401){onSessionLost();throw new StaffRequestError('Session context changed. Saved request recovery is unchanged.',false,401,true);}
-      data=await response.json();assertCurrent();
+      try{data=await response.json();}catch{decoded=false;}
+      assertCurrent();
       if(requestSignal.aborted)throw new StaffRequestError('Connection interrupted. The saved outcome is not confirmed.',mutation);
     }catch(error) {
       if(error instanceof StaffRequestError)throw error;
       assertCurrent();throw new StaffRequestError('Connection interrupted. The saved outcome is not confirmed.',mutation);
+    }
+    if(!decoded) {
+      if(response.status===401){onSessionLost();throw new StaffRequestError('Session context changed. Saved request recovery is unchanged.',false,response.status,true);}
+      throw new StaffRequestError(`The service returned HTTP ${response.status}.`,mutation && (response.ok || response.status>=500),response.status);
     }
     if(!response.ok) {
       const lost=response.status===401 || response.status===409 && data?.error==='Session context changed';

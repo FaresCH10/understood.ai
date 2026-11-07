@@ -94,6 +94,18 @@ test('context denial invalidates only the current view and distinguishes known d
   await assert.rejects(createStaffRequest(session,()=>true,async()=>new Response('bad JSON'),now)('/api/settings/staff',{}),error=>error.uncertain);
 });
 
+test('non-JSON gateway responses keep their HTTP status and never trap a definitive send rejection',async()=>{
+  for(const [status,uncertain] of [[404,false],[409,false],[502,true],[503,true]]) {
+    await assert.rejects(createStaffRequest(session,()=>true,async()=>new Response('<html>gateway</html>',{status}),now)('/api/instructions/send',{}),
+      error=>error.status===status && error.uncertain===uncertain && !error.fenced && !error.message.includes('<html>'));
+  }
+  await assert.rejects(createStaffRequest(session,()=>true,async()=>new Response('not json',{status:404}),now)('/api/instructions/sends/request'),
+    error=>error.status===404 && !error.uncertain,'A receipt lookup must expose 404 even when the gateway body is not JSON');
+  let lost=0;
+  await assert.rejects(createStaffRequest(session,()=>true,async()=>new Response('gateway',{status:401}),now,()=>true,()=>lost++)('/api/instructions/send',{}),
+    error=>error.status===401 && error.fenced && !error.uncertain);assert.equal(lost,1);
+});
+
 test('aborted or expired completion is fenced and saved staff recovery remains untouched',async()=>{
   const values=new Map(),storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
   const scope='synthetic-private-scope',pending={requestId:randomUUID(),id:'member',action:'revoke',body:{revision:1,confirmed:true}};
