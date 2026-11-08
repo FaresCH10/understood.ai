@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import {instructionReadiness} from '../server/instruction-readiness.mjs';
 import {syntheticInstructionPrepare} from '../server/instruction-prep.mjs';
 test('readiness never advertises arbitrary synthetic translations or generated speech',()=>{
  assert.deepEqual(instructionReadiness({},'Put the blue folder on the desk.'),{mode:'synthetic',textLanguages:['en'],speechLanguages:[]});
- assert.deepEqual(instructionReadiness({},CANONICAL_SOURCE).textLanguages,['en','ar','ur']);
+ assert.deepEqual(instructionReadiness({},CANONICAL_SOURCE),{mode:'synthetic',textLanguages:WORKER_LANGUAGE_CODES,speechLanguages:WORKER_LANGUAGE_CODES});
  assert.deepEqual(instructionReadiness({integrationMode:'live',preparationAdapter:{capabilities:{textLanguages:['en','hi'],speechLanguages:['en']}}},'Instruction').textLanguages,['en','hi']);
  assert.deepEqual(instructionReadiness({},'ضع الملف على المكتب').textLanguages,[]);
  assert.throws(()=>instructionReadiness({},null),/Invalid instruction/);

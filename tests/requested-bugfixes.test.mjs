@@ -67,7 +67,7 @@ test('instruction-specific choices reject invented IDs, record correct choices a
     const sent=completeInstructionSend(db,owner,requestId),snapshot=JSON.parse(db.prepare('SELECT snapshot_json FROM publications WHERE id=?').get(sent.publicationId).snapshot_json);
     const choices=snapshot.languages.en.choices;
     assert.match(snapshot.question,/red ladder.*when/);assert.equal(choices.length,4);
-    assert.equal(choices.find(choice=>choice.id===snapshot.rubric.correctChoiceId).text,source);
+    assert.equal(choices.find(choice=>choice.id===snapshot.rubric.correctChoiceId).text,'to the north bay before the night shift');
     const assignment=db.prepare('SELECT * FROM assignments WHERE publication_id=? AND worker_id=?').get(sent.publicationId,'worker-1');
     const worker={principal_type:'worker',principal_id:'worker-1',org_id:'cedar',site_id:'beirut'};
     assert.throws(()=>submitAnswer(db,worker,assignment.id,randomUUID(),'invented-choice'),/published choices/);
