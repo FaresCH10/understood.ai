@@ -11,6 +11,7 @@ import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {listNotifications,readNotification,notificationReceipt} from '../server/postgres/notifications.mjs';
 import {submitAnswer} from '../server/postgres/domain.mjs';
 import {processOneAssessment} from '../server/postgres/assessment-worker.mjs';
+import {staffOverview} from '../server/postgres/read-models.mjs';
 import {resolveClarification,requestHelp} from '../server/postgres/clarifications.mjs';
 const scope={schema:'test_workspace',integrationMode:'synthetic'},staff={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'},worker={principal_type:'worker',principal_id:'w1',org_id:'a',site_id:'a'};
 test('PostgreSQL supports persisted drafts, selected members, attachments and explicit work completion',async()=>{
@@ -36,6 +37,9 @@ test('PostgreSQL supports persisted drafts, selected members, attachments and ex
   const assignment=(await db.query('SELECT id FROM assignments WHERE publication_id=$1',[sent.publicationId])).rows[0];
   await assert.rejects(postgresWorkspace(pool,worker,'work',{complete:assignment.id},scope),/Confirm understanding/);
   await acknowledgeAssignment(pool,worker,assignment.id,randomUUID(),scope);
+  const overview=await staffOverview(pool,staff,scope);
+  assert.equal(overview.publication.id,sent.publicationId);
+  assert.equal(overview.metrics.responses,1);assert.equal(overview.metrics.acknowledged,1);assert.equal(overview.metrics.completion,100);
   assert.equal((await postgresWorkspace(pool,worker,'work',{complete:assignment.id},scope)).status,'done');
   const completedAgain=await postgresWorkspace(pool,worker,'work',{complete:assignment.id},scope);assert.equal(completedAgain.status,'done');
   assert.equal(Number((await db.query("SELECT COUNT(*) AS n FROM audit WHERE action='instruction.completed'")).rows[0].n),1);

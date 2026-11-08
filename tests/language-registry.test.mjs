@@ -27,11 +27,11 @@ test('worker locale registry covers fourteen languages with explicit Punjabi scr
   assert.equal(languageDirection('hi'),'ltr');
   assert.equal(WORKER_LOCALES.every(locale=>locale.name.trim() && locale.englishName.trim()),true);
   assert.deepEqual(UI_LANGUAGE_CODES,expected);
-  assert.deepEqual(CONTENT_LANGUAGE_CODES,['en','ar','ur']);
+  assert.deepEqual(CONTENT_LANGUAGE_CODES,expected);
   assert.deepEqual(SPEECH_LANGUAGE_CODES,['en','ar']);
   assert.equal(LANGUAGE_CAPABILITIES.ur.speech,false);
   assert.equal(LANGUAGE_CAPABILITIES.hi.ui,true);
-  assert.equal(LANGUAGE_CAPABILITIES.hi.translation,false);
+  assert.equal(LANGUAGE_CAPABILITIES.hi.translation,true);
   assert.deepEqual(generationLanguages(['en','ar','ur']),['en','ar','ur']);
   assert.deepEqual(generationLanguages(['en','hi']),['en','hi']);
   assert.throws(()=>generationLanguages(['en','pa']),/Invalid generation languages/);

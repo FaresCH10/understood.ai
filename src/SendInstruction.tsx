@@ -6,7 +6,7 @@ import RecipientMembers from './RecipientMembers';
 import VoiceTranscript from './VoiceTranscript';
 import {AttachmentComposer} from './InstructionFiles';
 import {useEffect,useRef,useState,type RefObject} from 'react';
-import {AlertTriangle,ArrowLeft,CheckCircle2,ChevronRight,Circle,FileText,Mic,RefreshCw,Send,Users} from 'lucide-react';
+import {AlertTriangle,ArrowLeft,CheckCircle2,ChevronRight,Circle,Mic,RefreshCw,Send,Users} from 'lucide-react';
 import type {StaffRequestAuthority} from './useStaffRequest';
 import {useStaffRequest} from './useStaffRequest';
 import {StaffRequestError} from './staff-request';
@@ -17,6 +17,8 @@ type EvidenceMode='none'|'photo';
 type AudienceChoice={type:'all'}|{type:'crew';crewId:string}|{type:'members';workerIds:string[]};
 type AudienceOverview={members:{id:string;code:string;name:string|null;language:string;language_selection_required:boolean|number}[];workers:{total:number;byLanguage:Record<string,number>;notSelected?:number};crews:{id:string;name:string;members:number;byLanguage:Record<string,number>;notSelected:number}[]};
 type UndeliveredReason={reason:string;language?:string;count:number};
+type CoverageLanguage={language:string;workers:number;ready:boolean;reason:string|null};
+type InstructionCoverage={requestId:string;total:number;ready:number;preparation:'synthetic-fixture'|'synthetic-provider'|'provider';languages:CoverageLanguage[];missing:CoverageLanguage[]};
 type DeliveryStates={preparing:number;available:number;blocked:number;failed:number;withdrawn:number};
 type SendResult={requestId:string;briefingId:string;state:'preparing'|'published'|'failed';responseMode:Mode;deliveryMode:Delivery;evidenceMode?:EvidenceMode;
   audience:{type:string;count:number;crewId?:string};delivered:number;undelivered:number;undeliveredReasons:UndeliveredReason[];
@@ -69,13 +71,13 @@ export function derivedInstructionTitle(source:string){
   const sentence=clean.split(/(?<=[.!?])\s/)[0] || clean;
   return (sentence.length>120 ? `${sentence.slice(0,117).trimEnd()}…` : sentence).slice(0,titleMax);
 }
-function reasonText(reason:UndeliveredReason){
-  const language=reason.language?new Intl.DisplayNames(['en'],{type:'language'}).of(reason.language)||reason.language:'';
-  if(reason.reason==='language_unavailable')return `${language || 'Language'} version not ready`;
-  if(reason.reason==='content_unavailable')return `${language || 'Language'} text not ready`;
-  if(reason.reason==='question_unavailable')return `${language || 'Language'} question not ready`;
-  if(reason.reason==='speech_unavailable')return `${language || 'Language'} voice not ready`;
-  if(reason.reason==='worker_inactive')return `${language ? `${language} ` : ''}worker no longer active`;
+export function sourceAsksForReply(source:string){return /[?\u061F\u00BF]/.test(source);}
+function reasonText(reason:{reason:string|null;language?:string},languageName:(code:string)=>string,t:(text:string,values?:Record<string,string|number|boolean|null|undefined>)=>string){
+  const language=reason.language?languageName(reason.language):'';
+  if(!reason.reason)return language;
+  if(['language_unavailable','content_unavailable','question_unavailable','speech_unavailable'].includes(reason.reason))
+    return language?t("{p0} version not ready",{p0:language}):t("Language version not ready");
+  if(reason.reason==='worker_inactive')return t("Worker no longer active");
   return `${reason.reason.replaceAll('_',' ')}${language?` · ${language}`:''}`;
 }
 
@@ -87,6 +89,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const [recovery]=useState(()=>{try{return {pending:readPending(scope),error:''};}catch(error){return {pending:null,error:(error as Error).message};}});
   const restoredPending=recovery.pending;
   const [pending,setPending]=useState<PendingSend|null>(restoredPending);
+  const [pendingCheck,setPendingCheck]=useState(!!restoredPending);
   const [source,setSource]=useState(restoredPending?.source || '');
   const [title,setTitle]=useState(restoredPending?.title || '');
   const [audienceType,setAudienceType]=useState<'all'|'crew'|'members'>(restoredPending?.audience.type || (initialCrewId?'crew':'all'));
@@ -101,6 +104,8 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const [readinessError,setReadinessError]=useState('');
 
   const [audienceLoading,setAudienceLoading]=useState(false),[audienceRevision,setAudienceRevision]=useState(0);
+  const audienceErrorRef=useRef<HTMLParagraphElement|null>(null);
+  useEffect(()=>{if(!audienceError)return;setMobileStep(1);const frame=requestAnimationFrame(()=>audienceErrorRef.current?.focus());return()=>cancelAnimationFrame(frame);},[audienceError]);
   const leaveDialog=useRef<HTMLDialogElement>(null),leaveRequest=useRef<{next:string;resume?:()=>void}|null>(null);
   const [leaveOpen,setLeaveOpen]=useState(false);
   useEffect(()=>{if(leaveOpen)leaveDialog.current?.showModal();else leaveDialog.current?.close();},[leaveOpen]);
@@ -108,7 +113,13 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const [retryReceipt,setRetryReceipt]=useState<{requestId:string;retried:number;released:number}|null>(null);
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false),[attachmentBusy,setAttachmentBusy]=useState(false);
+  const [coverageWarning,setCoverageWarning]=useState<InstructionCoverage|null>(null);
+  const coverageDialog=useRef<HTMLDialogElement>(null),coverageValue=useRef<PendingSend|null>(null);
+  const [acknowledgeWarning,setAcknowledgeWarning]=useState(false);
+  const acknowledgeDialog=useRef<HTMLDialogElement>(null);
   const requestId=useRef(restoredPending?.requestId || draftId || crypto.randomUUID());
+  const errorRef=useRef<HTMLDivElement|null>(null);
+  useEffect(()=>{if(!error)return;errorRef.current?.focus();},[error]);
   const discarded=useRef<PendingSend|null>(null);
   const sending=useRef(false);
   const sentNotice=useRef(false);
@@ -159,10 +170,17 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   },[pending,result,current,request,attachmentBusy]);
   useEffect(()=>{if(voiceOpen)voiceDialog.current?.showModal();},[voiceOpen]);
   function closeVoice(){voiceDialog.current?.close();setVoiceOpen(false);}
+  useEffect(()=>{if(coverageWarning)coverageDialog.current?.showModal();},[coverageWarning]);
+  function closeCoverage(){coverageDialog.current?.close();setCoverageWarning(null);coverageValue.current=null;}
+  useEffect(()=>{if(acknowledgeWarning)acknowledgeDialog.current?.showModal();},[acknowledgeWarning]);
+  function closeAcknowledge(){acknowledgeDialog.current?.close();setAcknowledgeWarning(false);}
+  function useQuestionMode(){closeAcknowledge();setResponseMode('question');setEvidenceMode('none');requestAnimationFrame(()=>document.getElementById('send-question-mode')?.focus());}
+  function confirmAcknowledgeOnly(){closeAcknowledge();void submit(true);}
 
   useEffect(()=>{
     const controller=new AbortController(),live=()=>current() && !controller.signal.aborted;
     setAudienceLoading(true);
+    setAudienceError('');
     request<AudienceOverview>('/api/instructions/audience',undefined,controller.signal)
       .then(value=>{if(live()){setAudience(value);setAudienceError('');}})
       .catch(reason=>{if(live() && !(reason instanceof StaffRequestError && reason.fenced))setAudienceError(reason instanceof Error?reason.message:'Audience unavailable');}).finally(()=>{if(live())setAudienceLoading(false);});
@@ -185,12 +203,22 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   },[result?.requestId,result?.state,result?.deliveryStates?.preparing]);
 
   useEffect(()=>{
+    if(!restoredPending || !current())return;
+    let active=true;
+    request<SendResult>(`/api/instructions/sends/${encodeURIComponent(restoredPending.requestId)}`)
+      .then(value=>{if(!active||!current())return;setResult(value);clearPending(scope);setPending(null);if(value.state==='failed')setError(value.error||'The instruction could not be sent.');})
+      .catch(reason=>{if(active&&current()&&reason instanceof StaffRequestError && reason.status===404){clearPending(scope);setPending(null);}})
+      .finally(()=>{if(active)setPendingCheck(false);});
+    return()=>{active=false;};
+  },[]);
+
+  useEffect(()=>{
     if(result?.state==='published' && !sentNotice.current){sentNotice.current=true;onSent();}
   },[result?.state,onSent]);
 
   function reset(){
     requestId.current=crypto.randomUUID();discarded.current=null;hasSavedDraft.current=false;setDraftReady(false);setWorkerIds([]);setDraftNotice('');setDraftLoaded(true);history.replaceState(null,'',`${location.pathname}${location.search}#send/${requestId.current}`);
-    clearPending(scope);setPending(null);setResult(null);setRetryReceipt(null);setError('');
+    clearPending(scope);setPending(null);setResult(null);setRetryReceipt(null);setError('');setCoverageWarning(null);coverageValue.current=null;
     setSource('');setTitle('');setAudienceType('all');setCrewId('');setResponseMode('question');setDeliveryMode('both');setEvidenceMode('none');
     sentNotice.current=false;
   }
@@ -221,12 +249,15 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
     }finally{sending.current=false;setBusy(false);}
   }
 
+  function sendPayload(value:PendingSend){
+    return {requestId:value.requestId,title:value.title,source:value.source,audience:value.audience,
+      responseMode:value.responseMode,deliveryMode:value.deliveryMode,evidenceMode:value.evidenceMode};
+  }
+
   async function sendValue(value:PendingSend){
     sending.current=true;setBusy(true);setError('');setPending(value);
     try {
-      const sent=await request<SendResult>('/api/instructions/send',{
-        requestId:value.requestId,title:value.title,source:value.source,audience:value.audience,responseMode:value.responseMode,deliveryMode:value.deliveryMode,evidenceMode:value.evidenceMode,
-      });
+      const sent=await request<SendResult>('/api/instructions/send',sendPayload(value));
       if(!current())return;
       setResult(sent);
       try{sessionStorage.removeItem(localKey);}catch{}
@@ -246,14 +277,37 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
     await sendValue(pending);
   }
 
-  async function submit(){
+  async function submit(acknowledgeOnly=false){
     if(!canSubmit || sending.current || !current())return;
+    if(!acknowledgeOnly && responseMode==='acknowledge' && sourceAsksForReply(trimmedSource)){setAcknowledgeWarning(true);return;}
     let value=currentValue();
     if(discarded.current && !sameSend(discarded.current,value)){
       requestId.current=crypto.randomUUID();
       history.replaceState(null,'',`${location.pathname}${location.search}#send/${requestId.current}`);
       value=currentValue();
     }
+    sending.current=true;setBusy(true);setError('');
+    try {
+      const coverage=await request<InstructionCoverage>('/api/instructions/preflight',sendPayload(value));
+      if(!current())return;
+      if(coverage.missing.length){
+        // Nothing is recorded yet; the supervisor can fix recipients or send to the ready ones.
+        coverageValue.current=value;setCoverageWarning(coverage);
+        return;
+      }
+    }catch(reason){
+      if(current())setError(reason instanceof Error?reason.message:'Language coverage could not be checked. Nothing was sent.');
+      return;
+    }finally{sending.current=false;setBusy(false);}
+    discarded.current=null;
+    try{savePending(scope,value);}catch(reason){setError((reason as Error).message);return;}
+    await sendValue(value);
+  }
+
+  async function sendAnyway(){
+    const value=coverageValue.current;
+    closeCoverage();
+    if(!value || sending.current || !current())return;
     discarded.current=null;
     try{savePending(scope,value);}catch(reason){setError((reason as Error).message);return;}
     await sendValue(value);
@@ -276,7 +330,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   if(result) {
     const partial=result.state==='published' && result.undelivered>0;
     return <><div className="page-header"><div><h1>{result.state==='failed'?staffT("Instruction not sent"):partial?staffT("Instruction partly sent"):staffT("Instruction sent")}</h1><p>{result.state==='preparing'?staffT("Preparation is still running. This page checks again automatically."):partial?staffT("The ready language versions were delivered. Not every selected worker could receive this instruction."):staffT("The send is recorded. Recipient status is available in the instruction.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
-      {error && <div className="notice notice-amber" role="alert">{staffT.error(error)}</div>}
+      {error && <div className="notice notice-amber" role="alert" ref={errorRef} tabIndex={-1}>{staffT.error(error)}</div>}
       {result.state==='published' && <section className="panel send-result" aria-labelledby="send-result-title">
         <div className={`receipt-mark${partial?' receipt-mark-partial':''}`} aria-hidden="true">{partial?<AlertTriangle size={42}/>:<CheckCircle2 size={42}/>}</div>
         <h2 id="send-result-title">{partial?staffT("Partly sent"):result.duplicate?staffT("Send already recorded"):staffT("Send recorded")}</h2>
@@ -289,8 +343,11 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
           {!!result.deliveryStates?.preparing && <div><dt>{staffT("Still preparing")}</dt><dd>{result.deliveryStates.preparing}</dd></div>}
         </dl>
         {retryReceipt && <div className="notice" role="status"><strong>{staffT("Retry recorded.")}</strong> {retryReceipt.retried} {staffT("unfinished")} {retryReceipt.retried===1?staffT("delivery was"):staffT("deliveries were")} {staffT("rechecked")}{retryReceipt.released>0?staffT(" and {p0} {p1} this instruction",{p0:retryReceipt.released,p1:retryReceipt.released===1?'recipient now has':'recipients now have'}):''}.</div>}
-        {result.undelivered>0 && <div className="notice notice-amber" role="status"><strong>{staffT("Partly sent.")}</strong> {result.undelivered} {tr("of")} {result.audience.count} {staffT("selected workers did not receive this instruction.")}<ul className="send-reasons">{result.undeliveredReasons.map((reason,index)=><li key={`${reason.reason}:${reason.language}:${index}`}>{reasonText(reason)} · {reason.count}</li>)}</ul>
-          {result.retryable && <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryUndelivered()}><RefreshCw size={19}/>{busy?staffT("Retrying..."):staffT("Retry undelivered")}</button></div>}
+        {result.undelivered>0 && <div className="notice notice-amber" role="status"><strong>{staffT("Partly sent.")}</strong> {result.undelivered} {tr("of")} {result.audience.count} {staffT("selected workers did not receive this instruction.")}<ul className="send-reasons">{result.undeliveredReasons.map((reason,index)=><li key={`${reason.reason}:${reason.language}:${index}`}>{reasonText(reason,staffT.language,staffT)} · {reason.count}</li>)}</ul>
+          <div className="actions">
+            {result.retryable && <button className="button primary" disabled={busy} onClick={()=>void retryUndelivered()}><RefreshCw size={19}/>{busy?staffT("Retrying..."):staffT("Retry undelivered")}</button>}
+            {result.undeliveredReasons.some(reason=>['language_unavailable','content_unavailable','question_unavailable','speech_unavailable'].includes(reason.reason)) && <button className="button outline" onClick={()=>navigate('people')}>{staffT("Review worker languages")}</button>}
+          </div>
         </div>}
         <div className="actions"><button className="button primary" onClick={()=>navigate(`briefings/${result.briefingId}`)}>{staffT("Open instruction")}<ChevronRight size={19}/></button><button className="button outline" disabled={busy} onClick={reset}><Send size={19}/>{staffT("Send another")}</button></div>
       </section>}
@@ -303,11 +360,37 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
     <div className="page-header"><div><h1>{tr("Send an instruction")}</h1><p>{tr("Write or record your instruction, choose recipients, and send.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
     <dialog ref={leaveDialog} className="withdraw-dialog" aria-labelledby="composer-leave-title" onKeyDown={keepDialogFocus} onCancel={()=>setLeaveOpen(false)}><h2 id="composer-leave-title">{staffT.locale==='ar'?'تعذّر حفظ المسودة':'Draft could not be saved'}</h2><p>{staffT.locale==='ar'?'يمكنك البقاء وإعادة المحاولة، أو المغادرة دون حفظ التغييرات الأخيرة.':'Stay and retry saving, or leave without saving the latest changes. Previously saved drafts are retained.'}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>setLeaveOpen(false)}>{staffT.locale==='ar'?'البقاء':'Keep working'}</button><button className="button primary" onClick={()=>{const target=leaveRequest.current;if(!target)return;try{sessionStorage.removeItem(localKey);}catch{}approvedNext.current=target.next;setLeaveOpen(false);if(target.resume)target.resume();else navigate(target.next);}}>{staffT.locale==='ar'?'المغادرة دون حفظ':'Discard and leave'}</button></div></dialog>
     <dialog ref={voiceDialog} className="worker-form-dialog" aria-label={tr("Record instruction")} onCancel={event=>{event.preventDefault();closeVoice();}}>{voiceOpen&&<VoiceTranscript authority={authority} title={title} onClose={closeVoice} replacing={!!source.trim()} onApproved={text=>{setSource(text);closeVoice();}}/>}</dialog>
+    <dialog ref={coverageDialog} className="worker-form-dialog" aria-labelledby="coverage-warning-title" onCancel={event=>{event.preventDefault();closeCoverage();}}>
+      {coverageWarning&&(()=>{const blocked=coverageWarning.preparation==='provider'||coverageWarning.ready===0;return <div>
+        <h2 id="coverage-warning-title">{staffT("Some recipients cannot receive this instruction")}</h2>
+        <p>{coverageWarning.preparation==='provider'?staffT("The translation provider must prepare every selected worker language together, so this send would fail. Nothing has been sent."):coverageWarning.ready===0?staffT("No selected worker language can be prepared with the current translation setup. Nothing has been sent."):staffT("{p0} of {p1} recipients are ready. These worker languages are not available:",{p0:coverageWarning.ready,p1:coverageWarning.total})}</p>
+        <ul className="send-reasons">{coverageWarning.missing.map((item,index)=><li key={`${item.language}:${index}`}>{reasonText(item,staffT.language,staffT)} · {staffT.number(item.workers)}</li>)}</ul>
+        <p>{staffT("Change worker languages in Team, or review the translation setup in Language readiness. Nothing is sent until you choose.")}</p>
+        <div className="actions">
+          <button type="button" className="button outline" onClick={()=>{closeCoverage();navigate('people');}}>{staffT("Open Team")}</button>
+          <button type="button" className="button outline" onClick={()=>{closeCoverage();navigate('language-readiness');}}>{staffT("Language readiness")}</button>
+          {!blocked&&<button type="button" className="button primary" disabled={busy} onClick={()=>void sendAnyway()}>{staffT("Send to ready recipients")}</button>}
+          <button type="button" className="button outline" onClick={closeCoverage}>{staffT("Cancel")}</button>
+        </div>
+      </div>;})()}
+    </dialog>
+    <dialog ref={acknowledgeDialog} className="worker-form-dialog" aria-labelledby="acknowledge-warning-title" onCancel={event=>{event.preventDefault();closeAcknowledge();}}>
+      <div>
+        <h2 id="acknowledge-warning-title">{staffT("This instruction asks a question")}</h2>
+        <p>{staffT("Workers will only confirm receipt, so their answer will not be collected.")}</p>
+        <div className="actions">
+          <button type="button" className="button primary" onClick={useQuestionMode}>{staffT("Ask for an answer")}</button>
+          <button type="button" className="button outline" disabled={busy} onClick={confirmAcknowledgeOnly}>{staffT("Send acknowledgment only")}</button>
+          <button type="button" className="button outline" onClick={closeAcknowledge}>{staffT("Cancel")}</button>
+        </div>
+      </div>
+    </dialog>
 
     {recovery.error&&<div className="notice notice-amber" role="alert">{staffT.error(recovery.error)}</div>}
-    {pending && !busy && !error && <div className="notice notice-amber" role="status"><strong>{staffT("An earlier send was not confirmed.")}</strong> {staffT("Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
-    {pending && !busy && error && <div className="notice notice-amber" role="status"><strong>{staffT("Send outcome not confirmed.")}</strong> {staffT("The original request is retained. Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
-    {error && !pending && <div className="notice notice-amber" role="alert">{staffT.error(error)}</div>}
+    {pending && !error && !busy && !pendingCheck && <div className="notice notice-amber" role="status"><strong>{staffT("An earlier send was not confirmed.")}</strong> {staffT("Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
+    {pending && error && !busy && !pendingCheck && <div className="notice notice-amber" role="status"><strong>{staffT("Send outcome not confirmed.")}</strong> {staffT("The original request is retained. Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
+    {pendingCheck && <p className="muted" role="status">{staffT("Checking an earlier send...")}</p>}
+    {error && !pending && <div className="notice notice-amber" role="alert" ref={errorRef} tabIndex={-1}>{staffT.error(error)}</div>}
     <section className="panel send-composer" data-mobile-step={mobileStep} aria-labelledby="send-source-title"><nav className="send-mobile-steps" aria-label={tr("Send an instruction")}>{['Content','Recipients','Review'].map((label,index)=><button key={label} aria-current={mobileStep===index?'step':undefined} disabled={busy} onClick={()=>setMobileStep(index)}>{index+1}. {staffT.locale==='ar'?['المحتوى','المستلمون','المراجعة'][index]:label}</button>)}</nav><div className="send-step-content">
       <label className="field" htmlFor="send-title"><span>{tr("Title")} <span aria-hidden="true">*</span></span>
         <input id="send-title" name="title" type="text" required minLength={3} maxLength={titleMax}
@@ -334,7 +417,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       {readiness?.mode==='synthetic'&&<p className="notice notice-amber" role="status">{staffT.locale==='ar'?'وضع تجريبي: تدعم التعليمات العامة النص الإنجليزي فقط. الترجمة متعددة اللغات والصوت المُولّد يتطلبان تفعيل خدمات الذكاء الاصطناعي.':'Test mode: general instructions support English text only. Multilingual translation and generated audio require a configured live workspace.'}</p>}
       {!!readiness&&unavailableLanguages.length>0&&<p className="notice notice-amber" role="alert">{staffT.locale==='ar'?'اللغات غير الجاهزة للصيغة المحددة:':'Not ready for the selected delivery format:'} {unavailableLanguages.map(code=>staffT.language(code)).join(', ')}. {staffT.locale==='ar'?'اختر النص فقط والمستلمين الجاهزين، أو اطلب تفعيل الخدمات.':'Choose text-only ready recipients, or ask the workspace administrator to configure the required services.'}</p>}
       {readinessError&&<p role="alert">{readinessError}</p>}
-      {audienceError && <p className="notice notice-amber" role="alert">{audienceError}</p>}
+      {audienceError && <p className="notice notice-amber" role="alert" ref={audienceErrorRef} tabIndex={-1}>{staffT.error(audienceError)} <button type="button" className="text-link" onClick={()=>setAudienceRevision(value=>value+1)}>{staffT("Try again")}</button></p>}
       {selectedAudience && selectedAudience.total===0 && <p className="notice notice-amber" role="status">{staffT("There are no workers with a selected language in this audience.")}</p>}
 
       </div><div className="send-step-review"><MobileDisclosure title={staffT.locale==='ar'?'المرفقات (اختياري)':'Attachments (optional)'}><AttachmentComposer key={requestId.current} authority={authority} requestId={requestId.current} disabled={busy||!!pending||!draftLoaded} ready={draftReady} saveDraft={saveDraft} onBusy={setAttachmentBusy} languages={Object.keys(selectedAudience?.byLanguage||{}).sort()}/></MobileDisclosure>
@@ -343,9 +426,10 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       <div className="send-option-grid">
         <div className="send-mode-stack">
           <label className="send-toggle">
-            <input type="checkbox" checked={responseMode==='question'} disabled={busy || !!pending || !draftLoaded} onChange={event=>{const mode=event.target.checked?'question':'acknowledge';setResponseMode(mode);if(mode==='question')setEvidenceMode('none');}}/>
+            <input id="send-question-mode" type="checkbox" checked={responseMode==='question'} disabled={busy || !!pending || !draftLoaded} onChange={event=>{const mode=event.target.checked?'question':'acknowledge';setResponseMode(mode);if(mode==='question')setEvidenceMode('none');}}/>
             <span><strong>{tr("Include a question")}</strong><small>{responseMode==='question'?staffT("Workers select one instruction-specific answer. Correct answers and answers needing clarification appear in your response report."):staffT("Workers confirm receipt only. No answer or comprehension result is created.")}</small></span>
           </label>
+          {responseMode==='acknowledge'&&sourceAsksForReply(trimmedSource)&&<p className="notice notice-amber" role="status">{staffT("This instruction asks a question, but workers will only confirm receipt.")} <button type="button" className="text-link" disabled={busy||!!pending||!draftLoaded} onClick={()=>{setResponseMode('question');setEvidenceMode('none');document.getElementById('send-question-mode')?.focus();}}>{staffT("Ask for an answer instead")}</button></p>}
           <label className={`send-toggle${responseMode==='acknowledge'?'':' send-toggle-muted'}`}>
             <input type="checkbox" checked={evidenceMode==='photo'} disabled={busy || !!pending || !draftLoaded || responseMode!=='acknowledge'} onChange={event=>setEvidenceMode(event.target.checked?'photo':'none')}/>
             <span><strong>{tr("Require a photo")}</strong><small>{responseMode==='acknowledge'?staffT("Workers attach a photo when they confirm receipt. Authorized staff can view it privately in the response detail. Photos are excluded from reports and exports."):staffT("Available for acknowledgment-only instructions.")}</small></span>

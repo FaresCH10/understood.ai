@@ -5,9 +5,10 @@ import {createDraftInTransaction,queuePreparationInTransaction} from './preparat
 import {ensureInstructionSchema,INSTRUCTION_DELIVERY_MODES,INSTRUCTION_EVIDENCE_MODES,INSTRUCTION_RESPONSE_MODES} from './instruction-schema.mjs';
 import {validDeadline} from './briefing-input.mjs';
 import {generationLanguages} from './settings-input.mjs';
-import {CANONICAL_SOURCE,publishInTransaction} from './domain.mjs';
-import {CONTENT_LANGUAGE_CODES} from './languages.mjs';
+import {publishInTransaction} from './domain.mjs';
+import {WORKER_LANGUAGE_CODES} from './languages.mjs';
 import {groupedUndelivered,recipientDeliveryReadiness} from './delivery-readiness.mjs';
+import {instructionCoverage} from './instruction-coverage.mjs';
 import {deliveryContent,deliveryContentHash,deliveryStateCounts,instructionRetryInput,unresolvedDeliveries} from './instruction-deliveries.mjs';
 import {queuePublicationReminders} from './reminders.mjs';
 import {ensureReportAudienceSchema} from './report-scope.mjs';
@@ -152,9 +153,8 @@ export function startInstructionSend(db,session,input) {
     const workers=audienceWorkers(db,session,value.audience);
     if(!workers.length) throw new Error('Instruction audience is empty');
     if(workers.length>5000) throw new Error('Instruction audience exceeds limit');
-    const supported=[...new Set(['en',...workers.map((worker)=>worker.language)])]
-      .filter((language)=>CONTENT_LANGUAGE_CODES.includes(language));
-    const generation=value.request.source.trim()===CANONICAL_SOURCE ? generationLanguages(supported) : ['en'];
+    const supported=WORKER_LANGUAGE_CODES.filter((language)=>language==='en' || workers.some((worker)=>worker.language===language));
+    const generation=generationLanguages(supported);
     createDraftInTransaction(db,session,{requestId:value.requestId,title:value.request.title,source:value.request.source,generationLanguages:generation});
     queuePreparationInTransaction(db,session,value.requestId,1);
     const now=NOW(),audience={type:value.audience.type,workers,...(value.audience.crewId?{crewId:value.audience.crewId}:{})};
@@ -173,6 +173,16 @@ export function startInstructionSend(db,session,input) {
     const row=db.prepare('SELECT * FROM instruction_sends WHERE request_id=?').get(value.requestId);
     return sendView(db,row,false);
   });
+}
+
+// Read-only: tells the supervisor which recipient languages this environment can
+// prepare before anything is recorded. Missing languages are warned about, never hidden.
+export function instructionSendPreflight(db,session,input,{pipeline=null}={}) {
+  const value=instructionInput(input);
+  briefingAuthority(db,session);
+  const workers=audienceWorkers(db,session,value.audience);
+  return {requestId:value.requestId,...instructionCoverage({workers,source:value.request.source,
+    deliveryMode:value.deliveryMode,pipeline})};
 }
 
 export function instructionSendStatus(db,session,requestId) {

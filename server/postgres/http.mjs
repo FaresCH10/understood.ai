@@ -52,8 +52,9 @@ import {publicationHistoryQuery} from '../publication-history-input.mjs';
 import {searchSite} from './search.mjs';
 import {searchQuery} from '../search-input.mjs';
 import { createDraft,editDraft,queuePreparation,copyDraft,archiveBriefing,getPreparationRequestContext,getPreparationRequestReceipt,requestPreparation,processOnePreparation } from './preparation.mjs';
-import { instructionAudienceOverview,startInstructionSend,instructionSendStatus,completeInstructionSend,reconcileInstructionSend,retryInstructionSend } from './instructions.mjs';
+import { instructionAudienceOverview,startInstructionSend,instructionSendPreflight,instructionSendStatus,completeInstructionSend,reconcileInstructionSend,retryInstructionSend } from './instructions.mjs';
 import { acknowledgeAssignment } from './acknowledgments.mjs';
+import { processOneAssessment } from './assessment-worker.mjs';
 import {handleImprovementRoute} from '../self-healing-http.mjs';
 import {improvementHttpError} from '../self-healing-input.mjs';
 import {readInstructionImprovement,analyzeInstructionImprovement,createImprovementDraft} from './self-healing.mjs';
@@ -89,7 +90,7 @@ import {saveCaseReview,caseReviewReceipt,listCaseReviews} from './case-reviews.m
 import {caseRepeatPage,caseReviewPage} from './case-workflow-pages.mjs';
 import { readImportBytes } from '../worker-import.mjs';
 import { previewWorkerImport,getWorkerImport,confirmWorkerImport,workerImportErrorsCsv } from './worker-import.mjs';
-import { requestExport,listExports,retryExport,downloadExport,exportReceipt } from './exports.mjs';
+import { requestExport,listExports,retryExport,downloadExport,exportReceipt,processOneExport } from './exports.mjs';
 import {sendInvoiceDownload} from '../invoice-download.mjs';
 import {listInvoices,getInvoice,createInvoice,recordPayment,voidInvoice,billingReceipt} from './billing.mjs';
 import {getSettings,updateSettings,settingsReceipt,listSiteContacts} from './settings.mjs';
@@ -260,6 +261,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
   const mail=options.mail ?? {available:false};
   const registrationVerification=options.registrationVerification ?? mail;
   const destination=pilotDestination(options.pilotDestination);
+  const scheduleDrains=options.inlineJobs===true;
   const advanceInstructionPreparation=async(started,session)=>{
     const state=()=>domainTransaction(pool,repository.schema,async client=>(await client.query(
       'SELECT state FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3',[started.briefingId,session.org_id,session.site_id])).rows[0]?.state);
@@ -272,6 +274,20 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       current=await state();
     }
     return current;
+  };
+  // Serverless deployments have no background worker container, so bounded
+  // drains run on request instead. Production (live) keeps the worker authoritative.
+  const advanceExports=async()=>{
+    if(!scheduleDrains)return;
+    for(let i=0;i<3;i++) {
+      try {if(!await processOneExport(pool,{schema:repository.schema}))break;} catch {break;}
+    }
+  };
+  const advanceAssessments=async()=>{
+    if(!scheduleDrains||!options.inlineAssessment)return;
+    for(let i=0;i<5;i++) {
+      try {if(!await processOneAssessment(pool,options.inlineAssessment,{schema:repository.schema}))break;} catch {break;}
+    }
   };
   return async (req,res) => {
     let requestPath='';
@@ -414,6 +430,10 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(path==='/api/instructions/audience' && req.method==='GET') {
         if(url.search) throw new Error('Invalid instruction request');
         return send(res,200,await instructionAudienceOverview(pool,session,repository));
+      }
+      if(path==='/api/instructions/preflight' && req.method==='POST') {
+        if(url.search) throw new Error('Invalid instruction request');
+        return send(res,200,await instructionSendPreflight(pool,session,await readJson(req),repository));
       }
       if(path==='/api/instructions/send' && req.method==='POST') {
         if(url.search) throw new Error('Invalid instruction request');
@@ -652,6 +672,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         return send(res,200,await revokePushSubscription(pool,session,decodeURIComponent(pushSubscriptionMatch[1]),repository));
       }
       if(path==='/api/notifications/live'&&req.method==='GET'){
+        if(session.principal_type!=='staff')return send(res,404,{error:'Not configured'});
         await listNotifications(pool,session,{pageSize:'1'},repository);
         const live=await notificationLiveQuery(session,{schema});
         return send(res,live?200:404,live||{error:'Not configured'});
@@ -948,8 +969,8 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       }
       if (path==='/api/reports/exports') {
         if(url.search)throw Error('Invalid export request');
-        if (req.method==='GET') return send(res,200,await listExports(pool,session,repository));
-        if (req.method==='POST') return send(res,202,await requestExport(pool,session,await readJson(req),repository));
+        if (req.method==='GET') {await advanceExports();return send(res,200,await listExports(pool,session,repository));}
+        if (req.method==='POST') {const result=await requestExport(pool,session,await readJson(req),repository);await advanceExports();return send(res,202,result);}
       }
       const exportReceiptMatch=path.match(/^\/api\/reports\/exports\/receipts\/(create|retry)\/([^/]+)$/);
       if(exportReceiptMatch && req.method==='GET') {
@@ -958,8 +979,9 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       const reportExport=path.match(/^\/api\/reports\/exports\/([^/]+)\/(download|retry)$/);
       if (reportExport) {
         const [,id,action]=reportExport;
-        if (action==='retry' && req.method==='POST') {if(url.search)throw Error('Invalid export request');return send(res,202,await retryExport(pool,session,id,await readJson(req),repository));}
+        if (action==='retry' && req.method==='POST') {if(url.search)throw Error('Invalid export request');const result=await retryExport(pool,session,id,await readJson(req),repository);await advanceExports();return send(res,202,result);}
         if (action==='download' && req.method==='GET') {
+          await advanceExports();
           const file=await downloadExport(pool,session,id,repository);
           res.writeHead(200,{'content-type':'text/csv; charset=utf-8','content-disposition':`attachment; filename="${file.filename}"`,'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'});
           res.end(file.csv); return;
@@ -1003,7 +1025,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       const helpHistory=path.match(/^\/api\/worker\/briefings\/([^/]+)\/help-history$/);
       if(helpHistory&&req.method==='GET')return send(res,200,{...await workerHelpHistory(pool,session,helpHistory[1],Object.fromEntries(url.searchParams),repository),clientContext:clientSessionContext(session).clientContext});
       const exactSubmission=path.match(/^\/api\/worker\/briefings\/([^/]+)\/submissions\/([^/]+)$/);
-      if(exactSubmission&&req.method==='GET')return send(res,200,{...await workerSubmission(pool,session,exactSubmission[1],exactSubmission[2],Object.fromEntries(url.searchParams),repository),clientContext:clientSessionContext(session).clientContext});
+      if(exactSubmission&&req.method==='GET'){await advanceAssessments();return send(res,200,{...await workerSubmission(pool,session,exactSubmission[1],exactSubmission[2],Object.fromEntries(url.searchParams),repository),clientContext:clientSessionContext(session).clientContext});}
       const assignment=path.match(/^\/api\/worker\/briefings\/([^/]+)(?:\/(answers|audio|help|submissions|acknowledge|presentations|evidence))?$/);
       if (assignment) {
         const [,id,action]=assignment;
@@ -1017,7 +1039,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
           sendPrivateImage(res,evidence.mime,evidence.dataBase64);
           return;
         }
-        if(action==='submissions' && req.method==='GET') return send(res,200,{...await workerSubmissions(pool,session,id,Object.fromEntries(url.searchParams),repository),clientContext:clientSessionContext(session).clientContext});
+        if(action==='submissions' && req.method==='GET') {await advanceAssessments();return send(res,200,{...await workerSubmissions(pool,session,id,Object.fromEntries(url.searchParams),repository),clientContext:clientSessionContext(session).clientContext});}
         if(action==='presentations' && req.method==='GET'){
           if(url.search)throw Error('Invalid presentation request');
           return send(res,200,{...await listPresentations(pool,session,id,repository),clientContext:clientSessionContext(session).clientContext});
@@ -1028,7 +1050,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
           return send(res,200,{...await createPresentation(pool,session,id,body,
             {schema,queueGeneration:config.integrationMode==='live',translator:presentationTranslator,generationAllowed:presentationGenerationAllowed}),clientContext:clientSessionContext(session).clientContext});
         }
-        if (!action && req.method==='GET') return send(res,200,{...await workerBriefing(pool,session,id,repository),canVoiceHelp:voiceAvailable});
+        if (!action && req.method==='GET') {await advanceAssessments();return send(res,200,{...await workerBriefing(pool,session,id,repository),canVoiceHelp:voiceAvailable});}
         if (action==='help' && req.method==='GET') return send(res,200,await workerHelpCases(pool,session,id,repository));
         if (action==='help' && req.method==='POST') {
           const body=await readJson(req),result=await requestHelp(pool,session,id,body,repository);
@@ -1036,6 +1058,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         }
         if (action==='answers' && req.method==='POST') {
           const body=await readJson(req),result=await submitAnswer(pool,session,id,body.submissionId,body.text,{...repository,presentationId:body.presentationId ?? null});
+          await advanceAssessments();
           return send(res,result.duplicate ? 200 : 201,{...result,assignmentId:id,requestId:body.submissionId,clientContext:clientSessionContext(session).clientContext});
         }
         if (action==='audio' && req.method==='POST') {
@@ -1045,6 +1068,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
           const presentationId=typeof header==='string'&&header?header:null;
           const result=await receiveRecording(pool,session,id,req.headers['x-submission-id'],await readAudio(req),storage,
             {...repository,presentationId});
+          await advanceAssessments();
           return send(res,result.duplicate ? 200 : 201,{...result,assignmentId:id,requestId:req.headers['x-submission-id'],clientContext:clientSessionContext(session).clientContext});
         }
       }

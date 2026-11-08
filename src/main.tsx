@@ -34,7 +34,7 @@ import {
   ArrowLeft, ArrowRight, Bell, Check, CheckCircle2, ChevronDown, ChevronLeft,ChevronRight, Clock3,
   Eye, EyeOff,PanelLeft,Pencil,
   FileText, HelpCircle, Home, Languages, LogOut, MessageCircle, Plus,
-  Search, Send, Settings, Sparkles, TriangleAlert, Users, UsersRound, ContactRound, Volume2, X,
+  Search, Send, Settings, Sparkles, TriangleAlert, Users, UsersRound, ContactRound, Volume2, X, Square,
   BarChart3, CalendarDays, Download, Play, RefreshCw, ShieldCheck,KeyRound,Smartphone,QrCode,
 } from 'lucide-react';
 import './styles.css';
@@ -321,6 +321,7 @@ export default function App() {
   const [workerLinkSignal,setWorkerLinkSignal]=useState(0);
   const [workerBriefingSignal,setWorkerBriefingSignal]=useState(0);
   const [workerEntryLanguage,setWorkerEntryLanguage]=useState<WorkerUiLanguage>(()=>navigator.language.startsWith('ar')?'ar':navigator.language.startsWith('ur')?'ur':'en');
+  const [workerEntryLanguageChosen,setWorkerEntryLanguageChosen]=useState(false);
   const [recoveryToken,setRecoveryToken]=useState(()=>accountRecoveryToken(location.hash));
   const [invitationToken,setInvitationToken]=useState(()=>invitationLinkToken(location.hash));
   const [registrationToken,setRegistrationToken]=useState(()=>verificationToken(location.hash));
@@ -476,7 +477,7 @@ export default function App() {
       if(kind==='worker') {
         const recovered=await recoverWorkerEntry(entry!,api);if(!recovered)throw Error('Worker access could not be confirmed.');
         if(briefingTarget)saveWorkerBriefingTarget(sessionStorage,briefingTarget);
-        finishWorkerEntry(recovered,entry!);return;
+        finishWorkerEntry(recovered,entry!,workerEntryLanguageChosen?workerEntryLanguage:null);return;
       }
       const signedIn = checkedSiteSession(await api<Session>('/session')) as Session;
       try {if(rememberDevice && email.trim())localStorage.setItem('understood:sign-in-email',email.trim());else localStorage.removeItem('understood:sign-in-email');}catch {}
@@ -491,8 +492,9 @@ export default function App() {
     }
     finally {authInFlight.current=false;setAuthBusy(false);}
   };
-  function finishWorkerEntry(signedIn:PageSession,pending:PendingWorkerEntry){
-    saveWorkerUiLanguage(sessionStorage,signedIn,workerUiFallbackLanguage(signedIn));clearPendingWorkerEntry(sessionStorage,pending);
+  function finishWorkerEntry(signedIn:PageSession,pending:PendingWorkerEntry,preferred:WorkerUiLanguage|null){
+    try{saveWorkerUiLanguage(sessionStorage,signedIn,preferred ?? workerUiFallbackLanguage(signedIn));}catch{}
+    clearPendingWorkerEntry(sessionStorage,pending);
     setWorkerToken('');setWorkerEntryRecovery({pending:null,error:''});
     location.hash='inbox';location.reload();
   }
@@ -509,7 +511,7 @@ export default function App() {
       await api('/auth/worker/login',{method:'POST',body:JSON.stringify(input)});
       const signedIn=await api<Session>('/session',{cache:'no-store'});
       if(!validWorkerSession(signedIn))throw Error('Worker access could not be confirmed.');
-      try{saveWorkerUiLanguage(sessionStorage,signedIn,workerEntryLanguage);}catch{}
+      if(workerEntryLanguageChosen)try{saveWorkerUiLanguage(sessionStorage,signedIn,workerEntryLanguage);}catch{}
       if(briefingTarget)saveWorkerBriefingTarget(sessionStorage,briefingTarget);
       location.hash='inbox';location.reload();
     } catch(error){setMessage((error as Error).message);}
@@ -533,7 +535,7 @@ export default function App() {
   const logout = async () => {
     if(session?.role!=='worker' && navigationGuard.current && !navigationGuard.current('sign-out',()=>void logout()))return false;
     if(authInFlight.current)return false;
-    if(!await confirmSignOut(session?.role==='worker'?session.language:staffUiLanguage)||authInFlight.current||session?.clientContext!==activeSession.current?.clientContext)return false;
+    if(!await confirmSignOut(session?.role==='worker'?session.language:staffUiLanguage,session?.role==='worker')||authInFlight.current||session?.clientContext!==activeSession.current?.clientContext)return false;
     authInFlight.current=true;setAuthBusy(true);
     try {
       if (!await act('/logout')) return false;
@@ -545,7 +547,7 @@ export default function App() {
   };
 
   if(signInDestination)return <div className="loading-page" role="status">{signInCopy.signingIn}</div>;
-  if(workerEntryRecovery.pending || workerEntryRecovery.error)return <main className="entry-page"><Brand/><WorkerEntryRecovery pending={workerEntryRecovery.pending} storageError={workerEntryRecovery.error} paused={authBusy} request={api} onResolved={signedIn=>finishWorkerEntry(signedIn,workerEntryRecovery.pending!)} onAnother={anotherWorkerLink}/></main>;
+  if(workerEntryRecovery.pending || workerEntryRecovery.error)return <main className="entry-page"><Brand/><WorkerEntryRecovery pending={workerEntryRecovery.pending} storageError={workerEntryRecovery.error} paused={authBusy} request={api} onResolved={signedIn=>finishWorkerEntry(signedIn,workerEntryRecovery.pending!,workerEntryLanguageChosen?workerEntryLanguage:null)} onAnother={anotherWorkerLink}/></main>;
   if(view==='operations')return <BriefingView label="Platform operations"><Operations/></BriefingView>;
   if(registerView)return <AuthLayout variant="register"><RegistrationPage key={view} initialPlan={view.split('/')[1]} language={registrationLanguage} onLanguage={setRegistrationLanguage} authenticated={!!session?.authenticated} available={isCredentialMode(session?.mode)} onBack={()=>navigate('home')} onSignIn={()=>navigate('sign-in')} onOpenWorkspace={()=>navigate('overview')}/></AuthLayout>;
   if(view==='verify-registration')return <main className="entry-page"><Brand/><VerifyRegistration key={registrationToken} token={registrationToken} language={registrationLanguage} onLanguage={setRegistrationLanguage} onRegister={()=>navigate('register')} onSignIn={()=>navigate('sign-in')}/></main>;
@@ -569,7 +571,7 @@ export default function App() {
   }
   if(view==='accept-invitation') return <main className="entry-page"><Brand/><InvitationView key={invitationToken}><AcceptInvitation token={invitationToken} identity={session} onBack={()=>{setInvitationToken('');navigate('overview');}} onIdentityChanged={async()=>{setSession(checkedSiteSession(await api('/session')));}} onOpenSite={changeSite}/></InvitationView></main>;
   if(['account-recovery','reset-password'].includes(view)) return <main className="entry-page"><Brand/><AccountRecovery key={view} reset={view==='reset-password'} token={recoveryToken} onBack={()=>{setRecoveryToken('');navigate('overview');}} onReset={()=>{setPassword('');setSession({authenticated:false,mode:session.mode});}}/></main>;
-  if(view==='worker-access')return <WorkerAccessEntry language={workerEntryLanguage} onLanguage={setWorkerEntryLanguage} token={workerToken} linkSignal={workerLinkSignal} onToken={setWorkerToken} busy={authBusy} blocked={localCleanupFailed} authenticated={session.authenticated} session={session} supported failed={!!message} onSubmit={()=>void signInCredential('worker')} onPasswordLogin={(input)=>void signInWorkerPassword(input)} onClearFailure={()=>setMessage('')} onCancel={()=>{setWorkerToken('');setMessage('');navigate('overview');}}><Brand/>{localCleanupFailed && <section role="alert"><p>{localCleanupText[workerEntryLanguage].failed}</p><button className="button outline" disabled={authBusy} onClick={async()=>{if(authInFlight.current)return;authInFlight.current=true;setAuthBusy(true);try{setLocalCleanupFailed(!await clearWorkerLocalData());}finally{authInFlight.current=false;setAuthBusy(false);}}}>{localCleanupText[workerEntryLanguage].remove}</button></section>}</WorkerAccessEntry>;
+  if(view==='worker-access')return <WorkerAccessEntry language={workerEntryLanguage} onLanguage={value=>{setWorkerEntryLanguage(value);setWorkerEntryLanguageChosen(true);}} token={workerToken} linkSignal={workerLinkSignal} onToken={setWorkerToken} busy={authBusy} blocked={localCleanupFailed} authenticated={session.authenticated} session={session} supported failed={!!message} onSubmit={()=>void signInCredential('worker')} onPasswordLogin={(input)=>void signInWorkerPassword(input)} onClearFailure={()=>setMessage('')} onCancel={()=>{setWorkerToken('');setMessage('');navigate('overview');}}><Brand/>{localCleanupFailed && <section role="alert"><p>{localCleanupText[workerEntryLanguage].failed}</p><button className="button outline" disabled={authBusy} onClick={async()=>{if(authInFlight.current)return;authInFlight.current=true;setAuthBusy(true);try{setLocalCleanupFailed(!await clearWorkerLocalData());}finally{authInFlight.current=false;setAuthBusy(false);}}}>{localCleanupText[workerEntryLanguage].remove}</button></section>}</WorkerAccessEntry>;
   if (!session.authenticated || view==='worker-access') return (
     <AuthLayout note={isCredentialMode(session.mode)?signInCopy.reviewNote:signInCopy.previewNote}>
       <div className="auth-signin" lang={staffUiLanguage} dir={signInRtl?'rtl':'ltr'}>
@@ -648,7 +650,7 @@ return <StaffLanguageContext.Provider value={staffUiLanguage}><StaffTimezoneCont
 {view==='people/new-crew' && <CreateCrewPage authority={staffAuthority} canManage={canWrite} locale={directoryLanguage} navigate={navigate}/>}
 {view==='people/crews'  && (canWrite?<SiteCrews key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} locale={directoryLanguage} onLocaleChange={changeSiteLanguage} navigate={navigate} name={session.name} greeting={staffGreeting(session.timezone,clock)} canManageContacts={session.staffRole==='owner'}/>:<p lang="en" dir="ltr" role="status">{staffT("Your role cannot manage site crews.")}</p>)}
 {(['people','people/new'].includes(view) || view.startsWith('people/worker/') || (view.startsWith('people/crew/')&&view.endsWith('/workers'))) && <PeoplePage locale={directoryLanguage} onLocaleChange={changeSiteLanguage} authority={staffAuthority} key={`${session.clientContext}:${view}`} initialAdd={view==='people/new'} initialWorkerId={view.startsWith('people/worker/')?view.split('/')[2]:undefined} initialCrewId={view.startsWith('people/crew/')?view.split('/')[2]:undefined} refresh={refresh} onImport={() => navigate('people/import')} canManage={canWrite} canDelete={['owner','administrator'].includes(session.staffRole || '')} credentialAccess={isCredentialMode(session.mode)} navigate={navigate} />}{view.startsWith('people/import') && (canWrite ? <WorkerImportPage authority={staffAuthority} key={`${session.clientContext}:${view}`} id={view.split('/')[2]} navigate={navigate} /> : <Notice tone="blue">{staffT("Your role cannot import workers.")}</Notice>)}
-    {view === 'processing' && <Processing key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} />}{view.startsWith('processing/') && <ProcessingDetail key={`${view}:${staffRequestBinding(session)}`} authority={staffAuthority} id={view.split('/')[1]} refresh={refresh} navigate={navigate} canWrite={canWrite} onChanged={reload} />}{view === 'language-readiness' && <Suspense fallback={<p data-page-loading role="status">{staffT("Loading language readiness...")}</p>}><LanguageReadiness key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} /></Suspense>}{(view === 'reports'||view.startsWith('reports/crew/')) && <Reports initialCrewId={view.startsWith('reports/crew/')?view.split('/')[2]:undefined} key={`${view}:${staffRequestBinding(session)}`} authority={staffAuthority} refresh={refresh} navigate={navigate} language={reportUiLanguage}  />}
+    {view === 'processing' && <Processing key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} />}{view.startsWith('processing/') && <ProcessingDetail key={`${view}:${staffRequestBinding(session)}`} authority={staffAuthority} id={view.split('/')[1]} refresh={refresh} navigate={navigate} canWrite={canWrite} onChanged={reload} />}{view === 'language-readiness' && <Suspense fallback={<p data-page-loading role="status">{staffT("Loading language readiness...")}</p>}><LanguageReadiness key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} /></Suspense>}{(view === 'reports'||view.startsWith('reports/crew/')) && <Reports initialCrewId={view.startsWith('reports/crew/')?view.split('/')[2]:undefined} key={`${view}:${staffRequestBinding(session)}`} authority={staffAuthority} refresh={refresh} navigate={navigate} language={reportUiLanguage}  />}
     {view==='settings' && <WorkspaceSettings authority={staffAuthority} key={session.clientContext} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!,siteState:session.siteState}} onLifecycleChanged={()=>{
       if(!staffAuthority.isCurrent() || !staffAuthority.canMutate())return;
       void fetchBootstrapSession(fetch,AbortSignal.timeout(15000)).then(value=>{
@@ -689,9 +691,11 @@ function Overview({ refresh, navigate:onNavigate,canWrite,name,greeting,authorit
     if(reason.reason==='worker_inactive')return staffT("Worker no longer active");
     return '';
   };
-  const topDeliveryReason=(item:DeliveryProblem)=>[...item.reasons].sort((a,b)=>b.count-a.count).map(deliveryReason).find(Boolean) || '';
+  const deliveryReasons=(item:DeliveryProblem)=>[...item.reasons].sort((a,b)=>b.count-a.count)
+    .map(reason=>{const text=deliveryReason(reason);return text?`${text} (${staffT.number(reason.count)})`:'';})
+    .filter(Boolean).join(' · ');
   const waitingRow=(item:WaitingReply)=><button className="item-row overview-waiting" key={item.assignmentId} onClick={()=>navigate(`briefings/${item.briefingId}`)}><span className="small-avatar"><Clock3 size={18}/></span><span className="item-main"><strong>{item.worker} · {item.language.toUpperCase()}</strong><small>{item.title} · {item.dueAt?staffT("Due {p0}",{p0:staffT.date(item.dueAt)}):staffT("No deadline")}</small></span><ChevronRight size={16}/></button>;
-  const deliveryRow=(item:DeliveryProblem)=>{const reason=topDeliveryReason(item);return <button className="item-row overview-delivery" key={item.requestId} onClick={()=>navigate(`briefings/${item.briefingId}`)}><span className="small-avatar"><TriangleAlert size={18}/></span><span className="item-main"><strong>{item.title}</strong><small>{staffT("{p0} not delivered",{p0:staffT.number(item.undelivered)})}{reason?` · ${reason}`:''}</small></span><ChevronRight size={16}/></button>;};
+  const deliveryRow=(item:DeliveryProblem)=>{const reason=deliveryReasons(item);return <button className="item-row overview-delivery" key={item.requestId} onClick={()=>navigate(`briefings/${item.briefingId}`)}><span className="small-avatar"><TriangleAlert size={18}/></span><span className="item-main"><strong>{item.title}</strong><small>{staffT("{p0} not delivered",{p0:staffT.number(item.undelivered)})}{reason?` · ${reason}`:''}</small></span><ChevronRight size={16}/></button>;};
   const attentionPages=(total:number)=>Math.max(1,Math.ceil(total/20));
   const attentionPageCount=attentionPages(attentionDetail.data?.total||0);
   const showAttentionPager=attentionPageCount>1||attentionPage>attentionPageCount;
@@ -886,6 +890,7 @@ const workerText:Record<WorkerUiLanguage,WorkerText> = {
   'pa-Arab': { mine: 'میریاں ہدایتاں', todo: 'کرنا اے', completed: 'مکمل', listen: 'سنو تے جواب دیو', ack: 'پڑھو تے تصدیق کرو', open: 'ہدایت کھولو', help: 'مینوں مدد چاہیدی اے', back: 'واپس', question: 'تہاڈی واری', answer: 'اپنے لفظاں وچ جواب دیو', send: 'جواب بھیجو', received: 'تہاڈا جواب موصول ہو گیا', review: 'جے کوئی گل واضح نہ ہووے تے تہاڈا سپروائزر رابطہ کر سکدا اے۔', text: 'متن پڑھو', play: 'ہدایت سنو', playQuestion: 'سوال سنو', reply: 'اپنا جواب لکھو', helpTitle: 'سپروائزر توں مدد منگو', helpPrompt: 'تہانوں کیہڑی گل وچ مدد چاہیدی اے؟', saved: 'تہاڈی درخواست محفوظ ہو گئی۔', version: 'ہدایت', skip: 'مرکزی مواد تے جاؤ', more: 'ہور', due: 'آخری ویلہ', repeat: 'سپروائزر نے نواں جواب منگیا اے', repeatSaved: 'سپروائزر نے نواں جواب منگیا اے۔ تہاڈا پچھلا جواب محفوظ اے۔', reminder: 'یاد دہانی: تہاڈا جواب ہالے موصول نئیں ہویا۔', thisDevice: 'ایہ آلہ', receipt: 'وصولی', ackTitle: 'ایس ہدایت دی وصولی دی تصدیق کرو', ackBody: 'تہاڈے توں جواب نئیں منگیا جا ریا۔ صرف تصدیق کرو کہ تسیں ہدایت پڑھی یا سنی اے۔', saving: 'محفوظ ہو ریا اے...', ackAction: 'وصولی دی تصدیق کرو', reviewTitle: 'اپنا جواب ویکھو', reviewBody: 'ایہ متن تہاڈے سپروائزر نوں بھیجیا جائے گا۔', edit: 'ترمیم', reviewAnswer: 'جواب ویکھو', readInstruction: 'ہدایت پڑھو', expired: 'ہدایت دے مواد دی مدت ختم ہو گئی اے۔ تہاڈے جواباں دی تریخ تھلے اے۔', emptyFollowup: 'ہالے کوئی کھلی گل بات نئیں۔', followupShort: 'رابطہ', deadlinePassed: 'جواب دی آخری مدت لنگھ گئی اے۔ تسیں ہالے وی مدد منگ سکدے او۔' },
   id: { mine: 'Instruksi saya', todo: 'Perlu dikerjakan', completed: 'Selesai', listen: 'Dengarkan dan jawab', ack: 'Baca dan konfirmasi', open: 'Buka instruksi', help: 'Saya butuh bantuan', back: 'Kembali', question: 'Giliran Anda', answer: 'Jawab dengan kata-kata Anda sendiri', send: 'Kirim jawaban', received: 'Jawaban Anda diterima', review: 'Supervisor Anda dapat menghubungi jika ada yang kurang jelas.', text: 'Baca teks', play: 'Putar instruksi', playQuestion: 'Putar pertanyaan', reply: 'Ketik jawaban Anda', helpTitle: 'Minta bantuan supervisor', helpPrompt: 'Bantuan apa yang Anda butuhkan?', saved: 'Permintaan Anda tersimpan.', version: 'Instruksi', skip: 'Lompat ke konten utama', more: 'Lainnya', due: 'Tenggat', repeat: 'Supervisor meminta jawaban baru', repeatSaved: 'Supervisor meminta jawaban baru. Jawaban Anda sebelumnya tetap tersimpan.', reminder: 'Pengingat: jawaban Anda belum diterima.', thisDevice: 'Perangkat ini', receipt: 'Tanda terima', ackTitle: 'Konfirmasi penerimaan instruksi ini', ackBody: 'Anda tidak diminta menjawab. Konfirmasikan hanya bahwa Anda telah membaca atau mendengarkan instruksi.', saving: 'Menyimpan...', ackAction: 'Konfirmasi penerimaan', reviewTitle: 'Tinjau jawaban Anda', reviewBody: 'Teks ini akan dikirim ke supervisor Anda.', edit: 'Ubah', reviewAnswer: 'Tinjau jawaban', readInstruction: 'Baca instruksi', expired: 'Konten instruksi telah kedaluwarsa. Riwayat jawaban Anda tetap ada di bawah.', emptyFollowup: 'Belum ada percakapan tindak lanjut yang terbuka.', followupShort: 'Tindak lanjut', deadlinePassed: 'Tenggat jawaban telah lewat. Anda masih dapat meminta bantuan.' },
 };
+const workerStopText:Record<WorkerUiLanguage,string>={en:'Stop',ar:'إيقاف',ur:'رکیں',hi:'रोकें',bn:'থামুন',ml:'നിർത്തുക',ta:'நிறுத்து',te:'ఆపండి',ne:'रोक्नुहोस्',fil:'Itigil',si:'නවත්වන්න',ru:'Остановить','pa-Guru':'ਰੋਕੋ','pa-Arab':'روکو',id:'Hentikan'};
 
 type WorkerAux={emptyTodo:string;emptyDone:string;loading:string;unavailable:string;outcome:string;assessment:string;audioPending:string;audioFailed:string;typeInstead:string;recordInstead:string;matched:string;clarification:string;unassessable:string;saved:string};
 const workerAux:Record<WorkerUiLanguage,WorkerAux> = {
@@ -945,17 +950,22 @@ const workerLanguageText:Record<WorkerUiLanguage,WorkerLanguageText>={
 };
 type WorkerLanguageState={language:WorkerUiLanguage;selected:boolean;selectedAt:string|null;selectedBy:string|null;pendingRequest:{id:string;currentLanguage:WorkerUiLanguage;requestedLanguage:WorkerUiLanguage;reason:string;requestedAt:string}|null;items:unknown[]};
 
-function WorkerLanguageDialog({session,language,disabled,showLabel=false}:{session:Session;language:WorkerUiLanguage;disabled:boolean;showLabel?:boolean}) {
+function WorkerLanguageDialog({session,language,disabled,showLabel=false,onInterfaceLanguage}:{session:Session;language:WorkerUiLanguage;disabled:boolean;showLabel?:boolean;onInterfaceLanguage?:(language:WorkerUiLanguage)=>void}) {
   const dialog=useRef<HTMLDialogElement>(null),requestId=useRef('');
-  const [state,setState]=useState<WorkerLanguageState|null>(null),[choice,setChoice]=useState<WorkerUiLanguage>('en'),[reason,setReason]=useState('');
-  const [loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[sent,setSent]=useState(false);
+  const [state,setState]=useState<WorkerLanguageState|null>(null),[choice,setChoice]=useState<WorkerUiLanguage>(language),[reason,setReason]=useState('');
+  const [loading,setLoading]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[uiError,setUiError]=useState(''),[sent,setSent]=useState(false);
   const text=workerLanguageText[language];
+  function changeInterface(next:WorkerUiLanguage){
+    if(next===language||disabled)return;
+    try{saveWorkerUiLanguage(sessionStorage,session,next);}catch{setUiError(workerUiLanguageText[language].failed);return;}
+    setUiError('');onInterfaceLanguage?.(next);
+  }
   async function open() {
     if(disabled)return;
     requestId.current=crypto.randomUUID();setState(null);setError('');setSent(false);setReason('');setLoading(true);dialog.current?.showModal();
     try {
       const data=await api<WorkerLanguageState>('/worker/language',{cache:'no-store',headers:{'x-client-session-context':session.clientContext!}});
-      setState(data);setChoice(workerLanguageOptionList.find(option=>option.code!==data.language)?.code || data.language);
+      setState(data);setChoice(data.language);
     } catch(reason) {setError(messageOfLanguageError(language,reason));}
     finally {setLoading(false);}
   }
@@ -975,10 +985,12 @@ function WorkerLanguageDialog({session,language,disabled,showLabel=false}:{sessi
   return <><button type="button" className={`icon-button${showLabel?' worker-header-action':''}`} title={text.open} aria-label={text.open} disabled={disabled} onClick={()=>void open()}><Languages size={20}/>{showLabel&&<span className="worker-header-action-label" aria-hidden="true">{text.open}</span>}</button>
     <dialog ref={dialog} className="withdraw-dialog worker-language-dialog" aria-labelledby={titleId} onKeyDown={keepDialogFocus} onCancel={(event)=>{if(busy)event.preventDefault();}}>
       <div className="withdraw-heading"><h2 id={titleId}>{text.title}</h2><button autoFocus type="button" className="icon-button" title={text.close} aria-label={text.close} disabled={busy} onClick={()=>dialog.current?.close()}><X size={20}/></button></div>
+      <label className="field"><span>{workerUiLanguageText[language].label}</span><select value={language} disabled={busy||disabled} onChange={event=>changeInterface(event.target.value as WorkerUiLanguage)}>{workerLanguageOptionList.map(option=><option key={option.code} value={option.code} lang={option.code}>{option.label}</option>)}</select><small className="muted">{workerUiLanguageText[language].content}</small></label>
+      {uiError && <p role="alert" className="record-error">{uiError}</p>}
       {loading ? <p data-page-loading role="status">{text.loading}</p> : !state ? <>{error && <p role="alert" className="record-error">{error}</p>}</> : <>
         <p className="muted">{text.current}: <strong lang={state.language} dir={workerUiDirection(state.language)}>{workerUiNativeName(state.language)}</strong></p>
         {state.pendingRequest ? <div className="notice notice-amber"><p>{text.pending}: <bdi lang={state.pendingRequest.requestedLanguage} dir={workerUiDirection(state.pendingRequest.requestedLanguage)}>{workerUiNativeName(state.pendingRequest.requestedLanguage)}</bdi></p>{state.pendingRequest.reason && <p>{text.reason}: <bdi>{state.pendingRequest.reason}</bdi></p>}</div> : sent ? <p className="notice notice-green" role="status">{text.sent}</p> : <form className="worker-language-form" onSubmit={(event)=>void submit(event)}>
-          <div className="worker-language-fields"><fieldset className="worker-language-options"><legend>{text.choose}</legend>{workerLanguageOptionList.filter(option=>option.code!==state.language).map(option=><label key={option.code} className={choice===option.code?'selected':''}><input type="radio" name="new-language" value={option.code} checked={choice===option.code} disabled={busy} onChange={()=>setChoice(option.code)}/><span lang={option.code} dir={option.dir}>{option.label}</span></label>)}</fieldset>
+          <div className="worker-language-fields"><fieldset className="worker-language-options"><legend>{text.choose}</legend>{workerLanguageOptionList.map(option=><label key={option.code} className={choice===option.code?'selected':''}><input type="radio" name="new-language" value={option.code} checked={choice===option.code} disabled={busy} onChange={()=>setChoice(option.code)}/><span lang={option.code} dir={option.dir}>{option.label}</span></label>)}</fieldset>
           <label className="field">{text.reason}<textarea rows={2} maxLength={500} value={reason} disabled={busy} onChange={(event)=>setReason(event.target.value)}/></label>
           {error && <p role="alert" className="record-error">{error}</p>}
           </div><div className="actions worker-language-actions"><button type="button" className="button outline" disabled={busy} onClick={()=>dialog.current?.close()}>{text.cancel}</button><button type="submit" className="button primary" disabled={busy || choice===state.language}><Send size={18}/>{busy?text.sending:text.send}</button></div>
@@ -1014,6 +1026,7 @@ const noDeviceVoice:Record<WorkerUiLanguage,string>={
 };
 function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSessionLost,sessionInvalid,navigationGuard,onSessionRefresh,scanSignal }: { session: Session; view: string; navigate: (path: string) => void; refresh: number; act: (path: string, body?: unknown) => Promise<any>; logout: () => Promise<boolean>; message: string;onSessionLost:()=>void;sessionInvalid:()=>boolean;navigationGuard:React.RefObject<((next:string)=>boolean)|null>;onSessionRefresh:()=>Promise<boolean>;scanSignal:number }) {
   const [language,setUiLanguage]=useState<WorkerUiLanguage>(()=>{try{return readWorkerUiLanguage(sessionStorage,session);}catch{return workerUiFallbackLanguage(session);}});
+  useEffect(()=>{const root=document.documentElement,lang=root.lang,dir=root.dir;root.lang=language;root.dir=workerUiDirection(language);return ()=>{root.lang=lang;root.dir=dir;};},[language]);
   const [languageError,setLanguageError]=useState('');
   const [setupChoice,setSetupChoice]=useState<WorkerUiLanguage>(()=>language);
   const [setupBusy,setSetupBusy]=useState(false),[setupError,setSetupError]=useState(''),[setupSaved,setSetupSaved]=useState(false);
@@ -1045,6 +1058,8 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const evidenceText=workerEvidenceText[language];
   const [audioRefresh, setAudioRefresh] = useState(0);
   const [speakError,setSpeakError]=useState('');
+  const [speakingPart,setSpeakingPart]=useState<'body'|'question'|null>(null);
+  const speechUtterance=useRef<SpeechSynthesisUtterance|null>(null);
   const speechPlayers=useRef<{body:HTMLAudioElement|null;question:HTMLAudioElement|null}>({body:null,question:null});
   useEffect(()=>()=>{window.speechSynthesis?.cancel();speechPlayers.current.body?.pause();speechPlayers.current.question?.pause();},[]);
   const [helpText, setHelpText] = useState('');
@@ -1161,16 +1176,20 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const refreshText=workerRefreshText[language] || workerRefreshText.en;
   useEffect(()=>{if([inbox.error,detail.error].some(error=>['Session context changed','Sign in required'].includes(error)) || [inbox.errorStatus,detail.errorStatus].some(status=>status!==null && [401,403,409].includes(status)))onSessionLost();},[inbox.error,detail.error,inbox.errorStatus,detail.errorStatus]);
   const contentLanguage:RecordingLanguage=detail.data?.language ?? language;
-  const speak = (text: string) => {
+  const stopDeviceSpeech=()=>{speechUtterance.current=null;setSpeakingPart(null);window.speechSynthesis?.cancel();};
+  const speak = (text: string, part: 'body' | 'question') => {
+    if(speakingPart===part){stopDeviceSpeech();return;}
     const unavailable=noDeviceVoice[language] || noDeviceVoice.en;
     setSpeakError('');
     if(!('speechSynthesis' in window)){setSpeakError(unavailable);return;}
     const voices=speechSynthesis.getVoices();
     const prefix=contentLanguage.toLowerCase().split('-')[0];
     if(voices.length && !voices.some(voice=>voice.lang.toLowerCase().split(/[-_]/)[0]===prefix)){setSpeakError(unavailable);return;}
-    speechPlayers.current.body?.pause();speechPlayers.current.question?.pause();speechSynthesis.cancel();
+    speechPlayers.current.body?.pause();speechPlayers.current.question?.pause();speechUtterance.current=null;speechSynthesis.cancel();
     const utterance=new SpeechSynthesisUtterance(text);utterance.lang=contentLanguage;
-    utterance.onerror=()=>setSpeakError(unavailable);
+    utterance.onend=()=>{if(speechUtterance.current===utterance){speechUtterance.current=null;setSpeakingPart(null);}};
+    utterance.onerror=()=>{if(speechUtterance.current===utterance){speechUtterance.current=null;setSpeakingPart(null);setSpeakError(unavailable);}};
+    speechUtterance.current=utterance;setSpeakingPart(part);
     speechSynthesis.speak(utterance);
   };
   const workerOrigin=useRef('inbox'),workerScroll=useRef(0);
@@ -1178,8 +1197,8 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const [workStatus,setWorkStatus]=useState<{id:string;status:string}|null>(null);
   const workCleared=workStatus?.id===id&&['in-progress','done'].includes(workStatus?.status||'');
   useEffect(()=>setHelpSent(false),[id]);
-  const openWorker=(assignmentId:string)=>{workerOrigin.current=currentView.current;workerScroll.current=window.scrollY;navigate('worker/'+assignmentId);};
-  const goBack = () => askLeave('back',()=>{window.speechSynthesis?.cancel();setReceipt(null);approvedRoute.current=workerOrigin.current;navigate(workerOrigin.current);requestAnimationFrame(()=>window.scrollTo(0,workerScroll.current));});
+  const openWorker=(assignmentId:string,caseId?:string)=>{workerOrigin.current=currentView.current;workerScroll.current=window.scrollY;navigate('worker/'+assignmentId+(caseId?`/${caseId}`:''));};
+  const goBack = () => askLeave('back',()=>{stopDeviceSpeech();setReceipt(null);approvedRoute.current=workerOrigin.current;setAudioRefresh(value=>value+1);navigate(workerOrigin.current);requestAnimationFrame(()=>window.scrollTo(0,workerScroll.current));});
   const requestIdFor=(kind:'answer'|'help',assignmentId:string,text:string)=>workerRequestId(sessionStorage,session,assignmentId,kind,text,Date.now,kind==='answer'?detail.data?.repeatRequest?.id:undefined);
   const requestError=(error:unknown)=>setRequestFailure(workerRequestText[language][error instanceof WorkerRequestError?error.code:'storage']);
   const trackReceipt=(kind:PendingReceipt['kind'],assignmentId:string,requestId:string)=>setPendingReceipts(values=>[...values.filter(value=>value.kind!==kind),{kind,assignmentId,requestId,status:'unknown'}]);
@@ -1332,7 +1351,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
         <NotificationBell session={session} label={notices.title} locale={language} disabled={busy} onOpen={()=>navigate('notifications')} onSessionLost={onSessionLost}/>
         <WorkerAccountMenu label={t.more} view={view}>
           <button className="icon-button worker-header-action" title={t.thisDevice} aria-label={t.thisDevice} disabled={busy} onClick={()=>navigate('device')}><Smartphone size={20}/><span className="worker-header-action-label" aria-hidden="true">{t.thisDevice}</span></button>
-          <WorkerLanguageDialog session={session} language={language} disabled={busy} showLabel/>
+          <WorkerLanguageDialog session={session} language={language} disabled={busy} showLabel onInterfaceLanguage={setUiLanguage}/>
           <button className="icon-button worker-header-action" title={leaveText.end} aria-label={leaveText.end} disabled={busy} onClick={()=>askLeave('logout',()=>void endSession())}><LogOut size={20} /><span className="worker-header-action-label" aria-hidden="true">{leaveText.end}</span></button>
         </WorkerAccountMenu>
       </WorkerHeader>
@@ -1344,7 +1363,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
           <button className="button outline" disabled={busy} onClick={()=>void checkReceipt(value)}><RefreshCw size={18}/>{checkText.check}</button>
         </div>)}
         <div hidden={view!=='crew'}><WorkerCrew active={view==='crew'} language={language} clientContext={session.clientContext!} refresh={refresh+audioRefresh+(view==='crew'?1:0)} timezone={session.timezone} disabled={busy} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentView.current==='crew'} onSessionLost={onSessionLost} onOpen={openWorker} onHelp={()=>{setPage(1);navigate('help');}} refreshLabel={pagingText.refresh} previousLabel={pagingText.previous} nextLabel={pagingText.next}/></div><div hidden={view!=='inbox'}><WorkerInbox active={view==='inbox'} language={language} clientContext={session.clientContext!} timezone={session.timezone} refresh={refresh+audioRefresh+(view==='inbox'?1:0)} filter={workFilter} onFilter={setWorkFilter} onOpen={openWorker} onHelp={()=>{setPage(1);navigate('help');}} onSessionLost={onSessionLost} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentView.current==='inbox'} disabled={busy} title={t.mine} refreshLabel={pagingText.refresh} previousLabel={pagingText.previous} nextLabel={pagingText.next}/></div>
-        {view==='crew' ? null : view==='device' ? <WorkerDeviceView language={language} session={session} disabled={busy} current={()=>!sessionInvalid() && validWorkerSession(session) && currentView.current==='device'} onOperation={outboxOperation} onSessionLost={onSessionLost} onBack={()=>navigate('inbox')} languageError={languageError} onEndSession={()=>askLeave('logout',()=>void endSession())} onEndSessionAndClear={()=>void endSession()} languageControl={<WorkerLanguageDialog session={session} language={language} disabled={busy}/>}/> : view==='notifications' ? <WorkerNotifications session={session} language={language} navigate={navigate} refresh={refresh+audioRefresh} current={()=>!sessionInvalid() && validWorkerSession(session)} onSessionLost={onSessionLost} timezone={session.timezone}/> : !id ? (
+        {view==='crew' ? null : view==='device' ? <WorkerDeviceView language={language} session={session} disabled={busy} current={()=>!sessionInvalid() && validWorkerSession(session) && currentView.current==='device'} onOperation={outboxOperation} onSessionLost={onSessionLost} onBack={()=>navigate('inbox')} languageError={languageError} onEndSession={()=>askLeave('logout',()=>void endSession())} onEndSessionAndClear={()=>void endSession()} languageControl={<WorkerLanguageDialog session={session} language={language} disabled={busy} onInterfaceLanguage={setUiLanguage}/>}/> : view==='notifications' ? <WorkerNotifications session={session} language={language} navigate={navigate} refresh={refresh+audioRefresh} current={()=>!sessionInvalid() && validWorkerSession(session)} onSessionLost={onSessionLost} timezone={session.timezone}/> : !id ? (
           <>
             {view==='help'?<WorkerHelpHub language={language} items={visible} loading={inbox.loading} failed={!!inbox.error} disabled={busy} onOpen={(assignmentId,reason)=>{pendingHelpAssignment.current=assignmentId;pendingHelpReason.current=reason||null;openWorker(assignmentId);}} onFollowup={()=>{setWorkFilter('follow-up');setPage(1);navigate('inbox');}} onRefresh={()=>setAudioRefresh(value=>value+1)} refreshLabel={pagingText.refresh} dueLabel={t.due} timezone={session.timezone}/>:<>
             </>}
@@ -1374,8 +1393,8 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   <h2>{deliveryMode==='text'?t.readInstruction:t.listen}</h2>
                   {translatedContent?<p className="briefing-text" lang={session.language} dir="auto">{translatedContent.text}</p>:deliveryMode==='text' ? <p className="briefing-text" lang={detail.data.language} dir={workerUiDirection(detail.data.language)}>{detail.data.content.text}</p> : <>
                   {speakError && <p role="alert">{speakError}</p>}
-                  {detail.data.speechUrls?.body ? <WorkerAudioPlayer key={`${id}:body:${detail.data.publicationId}:${detail.data.version}`} src={detail.data.speechUrls.body} label={t.play} language={language} onPlayer={element=>{speechPlayers.current.body=element;}} onPlay={()=>{window.speechSynthesis?.cancel();speechPlayers.current.question?.pause();}}/> : <button className="audio-button" disabled={detail.data.content.speech!=='device-synthesis-demo'} onClick={() => speak(detail.data.content.text)}>
-                    <span className="play-round"><Volume2 size={25} /></span><span>{t.play}</span>
+                  {detail.data.speechUrls?.body ? <WorkerAudioPlayer key={`${id}:body:${detail.data.publicationId}:${detail.data.version}`} src={detail.data.speechUrls.body} label={t.play} language={language} onPlayer={element=>{speechPlayers.current.body=element;}} onPlay={()=>{stopDeviceSpeech();speechPlayers.current.question?.pause();}}/> : <button className="audio-button" aria-pressed={speakingPart==='body'} disabled={detail.data.content.speech!=='device-synthesis-demo'} onClick={() => speak(detail.data.content.text,'body')}>
+                    <span className="play-round">{speakingPart==='body'?<Square size={22}/>:<Volume2 size={25} />}</span><span>{speakingPart==='body'?workerStopText[language]:t.play}</span>
                     <span className="waveform" aria-hidden="true">▁▃▅▂▇▄▆▂▅▃▁</span>
                   </button>}
                   <details className="worker-text-disclosure" open={deliveryMode==='both'} key={`${id}:text:${detail.data.publicationId}:${detail.data.version}`}><summary><FileText size={18} aria-hidden="true"/> {t.text}<ChevronDown size={18} aria-hidden="true"/></summary>
@@ -1405,7 +1424,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   <div className="question-label"><HelpCircle size={24} />{t.question}</div>
                   <h2 lang={translatedQuestion?session.language:detail.data.language} dir="auto">{translatedQuestion||detail.data.content.question}</h2>
                   {detail.data.repeatRequest && <Notice tone="amber">{t.repeatSaved} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></Notice>}
-                  {!translatedQuestion && deliveryMode!=='text' && (detail.data.speechUrls?.question ? <WorkerAudioPlayer key={`${id}:question:${detail.data.publicationId}:${detail.data.version}`} src={detail.data.speechUrls.question} label={detail.data.speechUrls.includesChoices?workerWorkflowCopy[language][2]:t.playQuestion} language={language} onPlayer={element=>{speechPlayers.current.question=element;}} onPlay={()=>{window.speechSynthesis?.cancel();speechPlayers.current.body?.pause();}}/> : <button className="audio-button compact" disabled={detail.data.content.speech!=='device-synthesis-demo'} onClick={() => speak(detail.data.content.question)}><Play size={20} />{t.playQuestion}</button>)}
+                  {!translatedQuestion && deliveryMode!=='text' && (detail.data.speechUrls?.question ? <WorkerAudioPlayer key={`${id}:question:${detail.data.publicationId}:${detail.data.version}`} src={detail.data.speechUrls.question} label={detail.data.speechUrls.includesChoices?workerWorkflowCopy[language][2]:t.playQuestion} language={language} onPlayer={element=>{speechPlayers.current.question=element;}} onPlay={()=>{stopDeviceSpeech();speechPlayers.current.body?.pause();}}/> : <button className="audio-button compact" aria-pressed={speakingPart==='question'} disabled={detail.data.content.speech!=='device-synthesis-demo'} onClick={() => speak(detail.data.content.question,'question')}>{speakingPart==='question'?<Square size={18} />:<Play size={20} />}{speakingPart==='question'?workerStopText[language]:t.playQuestion}</button>)}
                   {responseState?.assessmentFailed&&<p className="notice notice-amber" role="alert">{statusText.failed} {t.help}</p>}
                   {!detail.data.repeatRequest && detail.data.audioStatus && !['failed','blocked'].includes(detail.data.audioStatus) ? (
                     <><Notice tone="blue">{audioMessage}</Notice><audio controls preload="none" src={'/api/recordings/' + detail.data.recordingId + '/audio'} /></>
@@ -1450,7 +1469,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   <button className="button outline full" onClick={revealHelp}><MessageCircle size={20} /> {t.help}</button>
                   </>}
                 </section>
-                {responseState?.canHelp&&<details className="worker-card worker-help-disclosure" id="worker-help" open={!!helpText||helpVoiceUnsent}>
+                {responseState?.canHelp&&<details className="worker-card worker-help-disclosure" id="worker-help" open={!!helpText||helpVoiceUnsent||helpSent}>
                   <summary>{t.helpTitle}<ChevronDown size={18} aria-hidden="true"/></summary><div>
                   {helpSent&&<div className="notice notice-green" role="status"><p>{t.saved}</p><button className="button outline" onClick={()=>{const section=document.getElementById('worker-followup-history');if(section instanceof HTMLDetailsElement)section.open=true;section?.scrollIntoView({block:'start'});}}>{statusText.history}</button></div>}
                   {responseState?.canHelp && <><label className="field">{t.helpPrompt}<textarea rows={3} value={helpText} disabled={busy || helpVoiceUnsent || inputAvailability.helpBlocked} onChange={(event) => setHelpText(event.target.value)} maxLength={500} /></label>

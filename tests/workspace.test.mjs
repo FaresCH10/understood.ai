@@ -8,10 +8,12 @@ import {ensureInstructionSchema} from '../server/instruction-schema.mjs';
 import {sqliteWorkspace} from '../server/workspace-sqlite.mjs';
 import {instructionInput,startInstructionSend,completeInstructionSend} from '../server/instructions.mjs';
 import {processOne} from '../server/worker.mjs';
+import {acknowledgeAssignment} from '../server/acknowledgments.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {sqliteApp,openPrincipalSession,principalLoginBody} from './helpers/sqlite-app.mjs';
 import {listNotifications,readNotification,notificationReceipt} from '../server/notifications.mjs';
 import {ensureClarificationSchema,resolveClarification,requestHelp} from '../server/clarifications.mjs';
+import {ensureCaseMessageSchema} from '../server/case-messages.mjs';
 const staff={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
 const worker={principal_type:'worker',principal_id:'worker-1',org_id:'cedar',site_id:'beirut'};
 const content={title:'Delivery check',source:'Please check the delivery count.',audience:{type:'all'},responseMode:'question',deliveryMode:'text'};
@@ -73,6 +75,21 @@ test('work completion requires understanding, is idempotent, and appears in work
  const history=(await sqliteWorkspace(db,staff,'work',{workerId:worker.principal_id})).items;assert.equal(history.find(row=>row.id===inProgress.id).status,'done');
  const library=await sqliteWorkspace(db,staff,'library',{});assert.ok(library.items.some(row=>row.workCounts.done===1));
  await assert.rejects(sqliteWorkspace(db,staff,'work',{workerId:worker.principal_id,complete:inProgress.id}),/Forbidden/);
+ }finally{db.close();}
+});
+test('acknowledging an instruction moves it from sent to in-progress in the worker inbox',async()=>{
+ const db=fixture();try{
+  const requestId=randomUUID(),input={requestId,title:'Acknowledge status',source:CANONICAL_SOURCE,audience:{type:'members',workerIds:['worker-1']},responseMode:'acknowledge',deliveryMode:'voice'};
+  instructionInput(input);startInstructionSend(db,staff,input);await processOne(db);const sent=completeInstructionSend(db,staff,requestId);
+  const assignmentId=db.prepare('SELECT id FROM assignments WHERE publication_id=?').get(sent.publicationId).id;
+  const before=(await sqliteWorkspace(db,worker,'work',{assignmentId})).item;
+  assert.equal(before.status,'sent');assert.equal(before.responseStatus,'waiting');assert.equal(before.canComplete,false);
+  acknowledgeAssignment(db,worker,assignmentId,randomUUID());
+  const after=(await sqliteWorkspace(db,worker,'work',{assignmentId})).item;
+  assert.equal(after.status,'in-progress');assert.equal(after.responseStatus,'received');assert.equal(after.canComplete,true);
+  const active=(await sqliteWorkspace(db,worker,'work',{status:'active',search:'Acknowledge status'}));
+  assert.equal(active.items.find(item=>item.id===assignmentId)?.status,'in-progress');
+  assert.equal(active.counts.done,0);
  }finally{db.close();}
 });
 test('work summaries paginate and filter on the server, preserve localized titles and exact worker scope',async()=>{
@@ -142,6 +159,19 @@ test('closing follow-up without explicit readiness cannot release failed underst
   const c=db.prepare("SELECT id FROM clarifications WHERE assignment_id='assignment-14' LIMIT 1").get();
   resolveClarification(db,staff,c.id,{notes:'Conversation closed without a readiness decision.'});
   assert.equal((await sqliteWorkspace(db,session,'work',{assignmentId:'assignment-14'})).item.canComplete,false);
+ }finally{db.close();}
+});
+
+test('work summaries expose the open supervisor reply case on SQLite',async()=>{
+ const db=fixture(),session={...worker,principal_id:'worker-14'};try{
+  ensureCaseMessageSchema(db);
+  const before=(await sqliteWorkspace(db,session,'work',{assignmentId:'assignment-14'})).item;
+  assert.equal(before.replyCaseId,null);assert.equal(before.hasSupervisorReply,false);
+  const c=db.prepare("SELECT id FROM clarifications WHERE assignment_id='assignment-14' AND status='open' LIMIT 1").get();
+  db.prepare('INSERT INTO case_messages(id,org_id,site_id,case_id,assignment_id,actor_type,actor_id,language,text,request_hash,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+    .run(randomUUID(),'cedar','beirut',c.id,'assignment-14','staff','maya','ar','Explain the shelf rule again.','a'.repeat(64),new Date().toISOString());
+  const after=(await sqliteWorkspace(db,session,'work',{assignmentId:'assignment-14'})).item;
+  assert.equal(after.replyCaseId,c.id);assert.equal(after.hasSupervisorReply,true);
  }finally{db.close();}
 });
 

@@ -59,6 +59,18 @@ test('instruction send publishes only prepared languages, freezes modes and supp
     assert.equal(report.delivery.captured,30);assert.equal(report.delivery.delivered,12);assert.equal(report.delivery.undelivered,18);
     assert.deepEqual(report.delivery.states,{preparing:0,available:12,blocked:0,failed:18,withdrawn:0});
     assert.deepEqual(report.delivery.undeliveredReasons,[{reason:'language_unavailable',language:'ar',count:10},{reason:'language_unavailable',language:'ur',count:8}]);
+    const allResponses=await (await call(`/publications/${result.publicationId}/responses?pageSize=50`,maya)).json();
+    assert.equal(allResponses.total,30);
+    assert.deepEqual(allResponses.delivery,{undelivered:18,reasons:[{reason:'language_unavailable',language:'ar',count:10},{reason:'language_unavailable',language:'ur',count:8}]});
+    const notDelivered=allResponses.items.filter(row=>row.status==='not_delivered');
+    assert.equal(notDelivered.length,18);
+    assert.ok(notDelivered.every(row=>row.assignmentId===null&&row.reason==='language_unavailable'&&row.deliveryState==='failed'));
+    assert.equal(new Set(notDelivered.map(row=>row.language)).size,2);
+    const filtered=await (await call(`/publications/${result.publicationId}/responses?status=not_delivered&pageSize=50`,maya)).json();
+    assert.equal(filtered.total,18);assert.equal(filtered.items.every(row=>row.status==='not_delivered'),true);
+    assert.equal((await (await call(`/publications/${result.publicationId}/responses?language=ar&pageSize=50`,maya)).json()).total,10);
+    assert.equal((await (await call(`/publications/${result.publicationId}/responses?status=not_delivered&search=${notDelivered[0].worker}`,maya)).json()).total>=1,true);
+    assert.equal((await call(`/publications/${result.publicationId}/responses?status=missing`,maya)).status,400);
     const replay=await call('/instructions/send',maya,input);
     assert.equal(replay.status,200);assert.equal((await replay.json()).duplicate,true);
     assert.equal(db.prepare('SELECT count(*) n FROM publications WHERE briefing_id=?').get(requestId).n,1);
@@ -86,6 +98,47 @@ test('instruction send publishes only prepared languages, freezes modes and supp
     assert.ok(!arInbox.items.some(value=>value.publicationId===result.publicationId));
     assert.equal((await call(`/instructions/sends/${requestId}`,maya)).status,200);
     assert.equal((await call(`/instructions/sends/${requestId}`,foreign)).status,404);
+  }finally{await new Promise(resolve=>server.close(resolve));db.close();}
+});
+
+test('send preflight reports recipient language coverage without recording a request',async()=>{
+  const db=openDatabase(':memory:'),server=sqliteApp(db);
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const base=`http://127.0.0.1:${server.address().port}/api`;
+  const contexts=new Map();
+  const call=(path,cookie,body,method=body?'POST':'GET')=>fetch(base+path,{method,headers:{...(cookie?{cookie}:{}),...(body?{'content-type':'application/json'}:{}),...(method!=='GET'?{origin}:{}),...(contexts.has(cookie)?{'x-client-session-context':contexts.get(cookie)}:{})},...(body?{body:JSON.stringify(body)}:{})});
+  const login=async principal=>{
+    const cookie=['worker-1','worker-13'].includes(principal)
+      ? `understood_session=${openPrincipalSession(db,db.prepare('SELECT * FROM workers WHERE id=?').get(principal)).token}`
+      : (await call(loginRoute(principal),null,principalLoginBody(principal))).headers.get('set-cookie').split(';')[0];
+    const context=(await (await call('/session',cookie)).json()).clientContext;
+    if(context)contexts.set(cookie,context);
+    return cookie;
+  };
+  try {
+    const maya=await login('maya'),worker=await login('worker-1');
+    const requestId=randomUUID(),input={requestId,title:'Ladder move',source:CANONICAL_SOURCE,audience:{type:'all'},responseMode:'question',deliveryMode:'both'};
+    const ready=await call('/instructions/preflight',maya,input);
+    assert.equal(ready.status,200);
+    const coverage=await ready.json();
+    assert.equal(coverage.requestId,requestId);
+    assert.equal(coverage.total,30);assert.equal(coverage.ready,30);assert.equal(coverage.preparation,'synthetic-fixture');
+    assert.deepEqual(coverage.missing,[]);
+    assert.deepEqual(coverage.languages,[
+      {language:'ar',workers:10,ready:true,reason:null},
+      {language:'en',workers:12,ready:true,reason:null},
+      {language:'ur',workers:8,ready:true,reason:null},
+    ]);
+    const limited=await (await call('/instructions/preflight',maya,{...input,requestId:randomUUID(),source:'Close the north gate before the night shift starts.'})).json();
+    assert.equal(limited.ready,12);
+    assert.deepEqual(limited.missing,[
+      {language:'ar',workers:10,ready:false,reason:'language_unavailable'},
+      {language:'ur',workers:8,ready:false,reason:'language_unavailable'},
+    ]);
+    assert.equal((await call('/instructions/preflight',null,input)).status,401);
+    assert.equal((await call('/instructions/preflight',worker,input)).status,403);
+    assert.equal(db.prepare('SELECT count(*) n FROM instruction_sends').get().n,0);
+    assert.equal((await call(`/instructions/sends/${requestId}`,maya)).status,404);
   }finally{await new Promise(resolve=>server.close(resolve));db.close();}
 });
 
@@ -310,7 +363,7 @@ test('delivery readiness isolates an incomplete target language from ready recip
   }finally{db.close();}
 });
 
-test('canonical sends count every selected locale and report unsupported content languages as undelivered',()=>{
+test('canonical sends deliver every selected locale',()=>{
   const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
   const db=openDatabase(':memory:');seed(db);ensurePeopleSchema(db);
   try {
@@ -322,9 +375,9 @@ test('canonical sends count every selected locale and report unsupported content
       responseMode:'acknowledge',deliveryMode:'text'});
     let guard=0;while(processOne(db) && guard++<20){}
     const result=completeInstructionSend(db,owner,requestId);
-    assert.equal(result.state,'published');assert.equal(result.delivered,30);assert.equal(result.undelivered,1);
-    assert.deepEqual(result.undeliveredReasons,[{reason:'language_unavailable',language:'hi',count:1}]);
-    assert.equal(db.prepare('SELECT COUNT(*) n FROM assignments WHERE publication_id=? AND worker_id=?').get(result.publicationId,hindi.id).n,0);
+    assert.equal(result.state,'published');assert.equal(result.delivered,31);assert.equal(result.undelivered,0);
+    assert.deepEqual(result.undeliveredReasons,[]);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM assignments WHERE publication_id=? AND worker_id=?').get(result.publicationId,hindi.id).n,1);
   }finally{db.close();}
 });
 

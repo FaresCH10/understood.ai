@@ -1,6 +1,6 @@
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {Search,FileText,UserRound,Users,ChevronLeft,ChevronRight,ArrowRight,RefreshCw} from 'lucide-react';
+import {Search,FileText,UserRound,Users,ChevronLeft,ChevronRight,ArrowLeft,ArrowRight,RefreshCw} from 'lucide-react';
 import {checkedSearchPage,searchDestination,searchRoute,searchRouteQuery,type SearchPage,type SearchKind} from './staff-search';
 
 export default function StaffSearch({route,context,canPeople,navigate}:{route:string;context:string;canPeople:boolean;navigate:(path:string)=>void}){
@@ -23,7 +23,7 @@ export default function StaffSearch({route,context,canPeople,navigate}:{route:st
   const pages=Math.max(1,Math.ceil((data?.total??0)/20)),labels={briefing:'Instructions',worker:'Workers',crew:'Crews'};
   const categories:('all'|SearchKind)[]=['all','briefing',...(canPeople?['worker','crew'] as SearchKind[]:[])];
   function submit(event:FormEvent){event.preventDefault();if(query.trim())navigate(searchRoute(query));}
-  return <section className="staff-search-view"><div className="page-header"><h1 ref={heading} tabIndex={-1}>{staffT("Search")}</h1></div>
+  return <section className="staff-search-view"><button className="back-link" onClick={()=>navigate('overview')}><ArrowLeft size={18}/>{staffT("Today")}</button><div className="page-header"><h1 ref={heading} tabIndex={-1}>{staffT("Search")}</h1></div>
     <form className="staff-search-form" role="search" onSubmit={submit}><label className="search-box"><Search size={20}/><input autoComplete="off" aria-label={staffT("Search this site")} type="search" value={query} onChange={event=>setQuery(event.target.value)} maxLength={80} required placeholder={canPeople?staffT("Search instructions, people..."):staffT("Search instructions...")}/></label><button className="icon-button" type="submit" title={staffT("Search")} aria-label={staffT("Submit search")}><ArrowRight size={21}/></button></form>
     {initial && <><nav className="briefing-detail-tabs" aria-label={staffT("Search categories")}>{categories.map(category=><button key={category} aria-pressed={kind===category} onClick={()=>{setData(null);setKind(category);setPage(1);}}>{category==='all'?staffT("All"):labels[category]}{data && ` (${category==='all'?Object.values(data.counts).reduce((n,value)=>n+value,0):data.counts[category]})`}</button>)}</nav>
     {busy?<p role="status">{staffT("Searching...")}</p>:error?<div role="alert"><p>{staffT.error(error)}</p><button className="button outline" onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={18}/>{staffT("Retry search")}</button></div>:data && <>

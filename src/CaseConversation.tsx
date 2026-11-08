@@ -148,8 +148,18 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
     inFlight.current=true;setBusy(true);setFailure(null);const controller=new AbortController();command.current=controller;
     try{await accept(await request({kind:pending.kind==='followup'?'followup':'message',requestId:pending.id},controller.signal) as ConversationReceipt,pending.id);}catch(reason){report(reason);}finally{inFlight.current=false;if(mounted.current)setBusy(false);}
   }
+  // A restored or queued receipt must settle on its own instead of reading as unknown until a manual check.
+  useEffect(()=>{
+    if(!pending)return;
+    const id=pending.id,kind=pending.kind==='followup'?'followup':'message',controller=new AbortController(),active=()=>isCurrent()&&!inFlight.current;
+    const verify=()=>{if(!active())return;request({kind,requestId:id},controller.signal)
+      .then(value=>{if(!active()||readPendingMessage(sessionStorage,session,caseId)?.id!==id)return;return accept(value as ConversationReceipt,id);})
+      .catch(reason=>{if(reason instanceof ConversationRequestError&&reason.code==='session')report(reason);});};
+    const waiting=generationStatus==='queued'||generationStatus==='processing',interval=waiting?window.setInterval(verify,5000):null,timer=waiting?null:window.setTimeout(verify,0);
+    return()=>{controller.abort();if(interval!==null)window.clearInterval(interval);if(timer!==null)window.clearTimeout(timer);};
+  },[pending?.id,generationStatus,tick]);
   const unavailable=!!data&&!worker&&data.language!=='en'&&!data.canGenerate;
-  const replyAvailable=!!data?.canReply&&!unavailable&&!loading&&canWrite&&canMutate();
+  const replyAvailable=!!data?.canReply&&!unavailable&&(!loading||!!data)&&canWrite&&canMutate();
   const error=failure==='closed'?t.closed:failure==='translation'?t.translation:failure==='blocked'?s.blocked:failure==='recovery'?s.recovery:failure==='conflict'?t.unknown:failure==='invalid'?s.invalid:failure?t.failed:null;
   function askClear(){if(busy||voiceDirty||!text||!isCurrent())return;clearIntent.current=text;clearTrigger.current=document.activeElement as HTMLElement;dialog.current?.showModal();}
   function confirmClear(){if(!busy&&!voiceDirty&&isCurrent()&&text===clearIntent.current){setText('');setFailure(null);}dialog.current?.close();}

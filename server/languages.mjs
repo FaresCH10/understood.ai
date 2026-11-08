@@ -39,11 +39,11 @@ export function languageTextMatches(code,text){
 }
 
 // Current runtime evidence, not a wish list. UI is available for every locale; the
-// synthetic bundle fixture stores text for en/ar/ur, speech and transcription exist
-// only for en/ar, and live provider language coverage is still unverified.
+// synthetic bundle fixture stores demo text for every locale, private speech and
+// transcription exist only for en/ar, and typed assessment fixtures cover en/ar/ur.
 export const LANGUAGE_CAPABILITIES = Object.freeze(Object.fromEntries(WORKER_LOCALES.map(locale=>[locale.code,Object.freeze({
   ui:true,
-  translation:['en','ar','ur'].includes(locale.code),
+  translation:true,
   transcription:['en','ar'].includes(locale.code),
   speech:['en','ar'].includes(locale.code),
   assessment:['en','ar','ur'].includes(locale.code),

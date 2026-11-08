@@ -11,17 +11,27 @@ export const workerUiFallbackLanguage=(session:PageSession):WorkerUiLanguage=>is
 export function readWorkerUiLanguage(storage:Pick<Storage,'getItem'>,session:PageSession,now=Date.now()):WorkerUiLanguage {
   const fallback=workerUiFallbackLanguage(session);
   if(!validWorkerSession(session,now))return fallback;
-  return fallback;
+  return savedWorkerUiLanguage(storage,session) ?? fallback;
+}
+type SavedWorkerUiLanguage={context:string;expiresAt:string;base:string|null;language:WorkerUiLanguage};
+function savedWorkerUiLanguage(storage:Pick<Storage,'getItem'>,session:PageSession):WorkerUiLanguage|null {
+  try {
+    const value=JSON.parse(storage.getItem(workerUiLanguageKey)||'null') as SavedWorkerUiLanguage|null;
+    if(!value || typeof value!=='object' || value.context!==session.clientContext || value.expiresAt!==session.expiresAt)return null;
+    // An override only applies to the instruction language it was chosen for.
+    if(value.base!==(session.language ?? null) || !isWorkerLanguage(value.language))return null;
+    return value.language;
+  } catch {return null;}
 }
 // Presentation only: this locale never authorizes expired-session reads or writes.
 export function readWorkerLockLanguage(storage:Pick<Storage,'getItem'>,session:PageSession):WorkerUiLanguage{
   const fallback=workerUiFallbackLanguage(session);
   if(!session.authenticated||session.role!=='worker'||typeof session.clientContext!=='string'||!/^[a-f0-9]{64}$/.test(session.clientContext)||typeof session.expiresAt!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(session.expiresAt)||!Number.isFinite(Date.parse(session.expiresAt)))return fallback;
-  return fallback;
+  return savedWorkerUiLanguage(storage,session) ?? fallback;
 }
 export function saveWorkerUiLanguage(storage:Pick<Storage,'getItem'|'setItem'>,session:PageSession,language:WorkerUiLanguage,now=Date.now()) {
-  if(!validWorkerSession(session,now) || !isWorkerLanguage(language) || language!==workerUiFallbackLanguage(session))throw Error('Language selection unavailable');
-  const raw=JSON.stringify({context:session.clientContext,expiresAt:session.expiresAt,language});
+  if(!validWorkerSession(session,now) || !isWorkerLanguage(language))throw Error('Language selection unavailable');
+  const raw=JSON.stringify({context:session.clientContext,expiresAt:session.expiresAt,base:session.language ?? null,language});
   storage.setItem(workerUiLanguageKey,raw);
   if(storage.getItem(workerUiLanguageKey)!==raw)throw Error('Language selection was not saved');
 }

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {createHash,randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {runMigrations} from '../server/postgres/migrate.mjs';
-import {startInstructionSend,instructionAudienceOverview,instructionSendStatus,completeInstructionSend,
+import {startInstructionSend,instructionAudienceOverview,instructionSendStatus,instructionSendPreflight,completeInstructionSend,
   retryInstructionSend,processOneInstructionSend,instructionDeliveryContentForAssignment} from '../server/postgres/instructions.mjs';
 import {processOnePreparation} from '../server/postgres/preparation.mjs';
 import {workerBriefings,workerBriefing} from '../server/postgres/read-models.mjs';
@@ -71,19 +71,19 @@ test('PostgreSQL instruction send prepares one logical publication, freezes mode
     assert.deepEqual(started.undeliveredReasons,[]);assert.equal(started.publicationId,null);
     await prepare(pool);
     const result=await completeInstructionSend(pool,owner,input.requestId,scope);
-    assert.equal(result.state,'published');assert.equal(result.delivered,2);assert.equal(result.undelivered,1);
-    assert.deepEqual(result.undeliveredReasons,[{reason:'language_unavailable',language:'hi',count:1}]);
+    assert.equal(result.state,'published');assert.equal(result.delivered,3);assert.equal(result.undelivered,0);
+    assert.deepEqual(result.undeliveredReasons,[]);
     const snapshot=(await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[result.publicationId])).rows[0].snapshot_json;
     assert.equal(snapshot.responseMode,'question');assert.equal(snapshot.deliveryMode,'both');
-    assert.deepEqual(Object.keys(snapshot.languages).sort(),['en','ur']);
+    assert.deepEqual(Object.keys(snapshot.languages).sort(),['en','hi','ur']);
     const report=await readPublicationReport(pool,owner,{schema:options.schema,publicationId:result.publicationId,filters:{}});
-    assert.equal(report.responseMode,'question');assert.equal(report.deliveryMode,'both');assert.equal(report.metrics.assigned,2);
-    assert.equal(report.delivery.captured,3);assert.equal(report.delivery.delivered,2);assert.equal(report.delivery.undelivered,1);
-    assert.deepEqual(report.delivery.states,{preparing:0,available:2,blocked:0,failed:1,withdrawn:0});
-    assert.deepEqual(report.delivery.undeliveredReasons,[{reason:'language_unavailable',language:'hi',count:1}]);
+    assert.equal(report.responseMode,'question');assert.equal(report.deliveryMode,'both');assert.equal(report.metrics.assigned,3);
+    assert.equal(report.delivery.captured,3);assert.equal(report.delivery.delivered,3);assert.equal(report.delivery.undelivered,0);
+    assert.deepEqual(report.delivery.states,{preparing:0,available:3,blocked:0,failed:0,withdrawn:0});
+    assert.deepEqual(report.delivery.undeliveredReasons,[]);
     const assignments=(await db.query('SELECT id,worker_id,language FROM assignments WHERE publication_id=$1 ORDER BY worker_id',[result.publicationId])).rows;
-    assert.deepEqual(assignments.map(row=>row.worker_id),['w1','w2']);
-    assert.equal((await db.query("SELECT COUNT(*)::int n FROM assignments WHERE publication_id=$1 AND worker_id='wh'",[result.publicationId])).rows[0].n,0);
+    assert.deepEqual(assignments.map(row=>row.worker_id),['w1','w2','wh']);
+    assert.equal((await db.query("SELECT COUNT(*)::int n FROM assignments WHERE publication_id=$1 AND worker_id='wh'",[result.publicationId])).rows[0].n,1);
 
     const replay=await startInstructionSend(pool,owner,input,scope);
     assert.equal(replay.duplicate,true);assert.equal(replay.publicationId,result.publicationId);assert.equal(replay.state,'published');
@@ -111,6 +111,8 @@ test('PostgreSQL acknowledgment-only sends hide the question, reject answers and
     const input={...instruction(),responseMode:'acknowledge',deliveryMode:'text'};
     await startInstructionSend(pool,owner,input,scope);
     await prepare(pool);
+    // Simulate a configured translator that could not produce Hindi for this send.
+    await db.query("UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages}',(prepared_json->'languages')-'hi') WHERE id=$1",[input.requestId]);
     const result=await completeInstructionSend(pool,owner,input.requestId,scope);
     assert.equal(result.state,'published');assert.equal(result.delivered,2);assert.equal(result.undelivered,1);
     const assignments=(await db.query('SELECT id,worker_id,language FROM assignments WHERE publication_id=$1 ORDER BY worker_id',[result.publicationId])).rows;
@@ -150,6 +152,17 @@ test('PostgreSQL acknowledgment-only sends hide the question, reject answers and
     assert.equal(detailDone.assessmentStatus,'complete');assert.ok(detailDone.acknowledgedAt);
     const responses=await listPublicationResponses(pool,owner,result.publicationId,{status:'acknowledged'},scope);
     assert.equal(responses.total,1);assert.equal(responses.items[0].status,'acknowledged');assert.equal(responses.items[0].language,'en');assert.ok(responses.items[0].receivedAt);
+    const all=await listPublicationResponses(pool,owner,result.publicationId,{pageSize:50},scope);
+    assert.equal(all.total,3);
+    const missing=all.items.find((row)=>row.status==='not_delivered');
+    assert.ok(missing);assert.equal(missing.assignmentId,null);assert.equal(missing.worker,'004');
+    assert.equal(missing.language,'hi');assert.equal(missing.reason,'language_unavailable');assert.equal(missing.deliveryState,'failed');
+    assert.deepEqual(all.delivery,{undelivered:1,reasons:[{reason:'language_unavailable',language:'hi',count:1}]});
+    const undeliveredPage=await listPublicationResponses(pool,owner,result.publicationId,{status:'not_delivered'},scope);
+    assert.equal(undeliveredPage.total,1);assert.deepEqual(undeliveredPage.items,all.items.filter((row)=>row.status==='not_delivered'));
+    assert.equal((await listPublicationResponses(pool,owner,result.publicationId,{language:'hi'},scope)).total,1);
+    assert.equal((await listPublicationResponses(pool,owner,result.publicationId,{search:'004'},scope)).total,1);
+    await assert.rejects(listPublicationResponses(pool,owner,result.publicationId,{status:'missing'},scope),/Invalid response filter/);
     const staffDetail=await getPublicationResponse(pool,owner,result.publicationId,first.id,{},scope);
     assert.equal(staffDetail.responseMode,'acknowledge');assert.equal(staffDetail.deliveryMode,'text');
     assert.equal(staffDetail.question,null);assert.equal(staffDetail.workerQuestion,null);assert.ok(staffDetail.acknowledgedAt);assert.deepEqual(staffDetail.receipts,[]);
@@ -197,7 +210,7 @@ test('PostgreSQL photo evidence is validated, double-scoped, immutable and repor
     const staffDetail=await getPublicationResponse(pool,owner,result.publicationId,assignment.id,{},scope);
     assert.equal(staffDetail.evidenceMode,'photo');assert.equal(staffDetail.evidence.sha256,sha);
     const report=await readPublicationReport(pool,owner,{schema:options.schema,publicationId:result.publicationId,filters:{}});
-    assert.equal(report.evidenceMode,'photo');assert.deepEqual(report.evidence,{required:2,received:1});
+    assert.equal(report.evidenceMode,'photo');assert.deepEqual(report.evidence,{required:3,received:1});
     const received=report.rows.find(row=>row[0]==='001');assert.equal(received[9],'received');assert.ok(received[10]);
     const missing=report.rows.find(row=>row[0]==='002');assert.equal(missing[9],'missing');assert.equal(missing[10],'');
     const exported=await requestExport(pool,owner,{requestId:randomUUID(),publicationId:result.publicationId},{schema:options.schema});
@@ -218,6 +231,7 @@ test('PostgreSQL late-prepared language rejoins the original publication and ser
     assert.equal(started.state,'preparing');assert.equal(started.audience.count,3);
     assert.deepEqual(started.deliveryStates,{preparing:3,available:0,blocked:0,failed:0,withdrawn:0});
     await prepare(pool);
+    await db.query("UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages}',(prepared_json->'languages')-'hi') WHERE id=$1",[input.requestId]);
     const first=await completeInstructionSend(pool,owner,input.requestId,scope);
     assert.equal(first.state,'published');assert.equal(first.delivered,2);assert.equal(first.undelivered,1);
     assert.deepEqual(first.deliveryStates,{preparing:0,available:2,blocked:0,failed:1,withdrawn:0});
@@ -305,6 +319,7 @@ test('PostgreSQL background completion releases late content after preparation',
     const requestId=randomUUID();
     await startInstructionSend(pool,owner,{...instruction(),requestId,responseMode:'question',deliveryMode:'both'},scope);
     await prepare(pool);
+    await db.query("UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages}',(prepared_json->'languages')-'hi') WHERE id=$1",[requestId]);
     const first=await completeInstructionSend(pool,owner,requestId,scope);
     assert.equal(first.delivered,2);
     const late=(await db.query("SELECT jsonb_set(prepared_json,'{languages,hi}',prepared_json->'languages'->'en') AS prepared FROM briefings WHERE id=$1",[requestId])).rows[0].prepared;
@@ -329,6 +344,7 @@ test('PostgreSQL a passed deadline blocks late release and leaves reminders for 
     try {
     await startInstructionSend(pool,owner,{...instruction(),requestId,dueAt,reminderMinutes:60,responseMode:'question',deliveryMode:'both'},scope);
     await prepare(pool);
+    await db.query("UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages}',(prepared_json->'languages')-'hi') WHERE id=$1",[requestId]);
     const first=await completeInstructionSend(pool,owner,requestId,scope);
     assert.equal(first.delivered,2);assert.equal(first.dueAt,dueAt);assert.equal(first.reminderMinutes,60);
     assert.equal((await db.query('SELECT COUNT(*)::int n FROM assignment_reminders WHERE publication_id=$1',[first.publicationId])).rows[0].n,2);
@@ -357,6 +373,33 @@ async function withHttp(f,run,serverOptions={}) {
 }
 const cookieOf=(response)=>response.headers.get('set-cookie').split(';')[0];
 const post=(body)=>({method:'POST',body:JSON.stringify(body)});
+
+test('PostgreSQL send preflight reports recipient language coverage without recording a request',async()=>{
+  const f=await fixture(),{db,pool}=f;
+  try {
+    const input={...instruction(),responseMode:'question',deliveryMode:'both'};
+    const coverage=await instructionSendPreflight(pool,owner,input,scope);
+    assert.equal(coverage.requestId,input.requestId);
+    assert.equal(coverage.total,3);assert.equal(coverage.ready,3);assert.equal(coverage.preparation,'synthetic-fixture');
+    assert.deepEqual(coverage.languages,[
+      {language:'en',workers:1,ready:true,reason:null},
+      {language:'hi',workers:1,ready:true,reason:null},
+      {language:'ur',workers:1,ready:true,reason:null},
+    ]);
+    assert.deepEqual(coverage.missing,[]);
+    const pipeline={dataClass:'synthetic',stages:[
+      {id:'translation',configuration:'configured',declaredLanguages:['en','hi']},
+      {id:'speech',configuration:'configured',declaredLanguages:['en']},
+    ]};
+    const voice=await instructionSendPreflight(pool,owner,{...input,deliveryMode:'voice'},{...scope,pipeline});
+    assert.deepEqual(voice.missing,[
+      {language:'hi',workers:1,ready:false,reason:'speech_unavailable'},
+      {language:'ur',workers:1,ready:false,reason:'language_unavailable'},
+    ]);
+    await assert.rejects(instructionSendPreflight(pool,worker,input,scope),/Forbidden/);
+    assert.equal((await db.query('SELECT COUNT(*)::int n FROM instruction_sends')).rows[0].n,0);
+  }finally{await db.close();}
+});
 
 test('configured provider sends stay queued during HTTP reads and publish generated speech through the worker',async()=>{
   const {db,pool}=await fixture(),objects=new Map();
@@ -405,12 +448,24 @@ test('PostgreSQL instruction and acknowledgment HTTP routes enforce session cont
       const audience=await request('/instructions/audience',staff,{headers:auth});assert.equal(audience.status,200);
       assert.deepEqual((await audience.json()).workers,{total:3,byLanguage:{en:1,ar:0,ur:1,hi:1},notSelected:0});
 
-      const payload={...instruction(),responseMode:'acknowledge',deliveryMode:'text'};httpRequestId=payload.requestId;
+      const previewPayload={...instruction(),responseMode:'acknowledge',deliveryMode:'text',requestId:randomUUID()};
+      assert.equal((await request('/instructions/preflight',staff,post(previewPayload))).status,409);
+      const preview=await request('/instructions/preflight',staff,{...post(previewPayload),headers:auth});
+      assert.equal(preview.status,200);
+      const coverage=await preview.json();
+      assert.equal(coverage.requestId,previewPayload.requestId);
+      assert.equal(coverage.total,3);assert.equal(coverage.ready,3);assert.equal(coverage.preparation,'synthetic-fixture');
+      assert.deepEqual(coverage.missing,[]);
+      assert.equal((await db.query('SELECT COUNT(*)::int n FROM instruction_sends')).rows[0].n,0);
+
+      // Arbitrary supervisor text has synthetic English only, so Urdu and Hindi
+      // exercise the retry path before their late content is supplied below.
+      const payload={...instruction(),source:'Close the loading bay gate before the night shift.',responseMode:'acknowledge',deliveryMode:'text'};httpRequestId=payload.requestId;
       assert.equal((await request('/instructions/send',staff,post(payload))).status,409);
       assert.equal((await request('/instructions/send',staff,{...post({...payload,requestId:randomUUID(),audience:{type:'crew',crewId:'empty'}}),headers:auth})).status,400);
       const sent=await request('/instructions/send',staff,{...post(payload),headers:auth});
       assert.equal(sent.status,201);
-      const result=await sent.json();assert.equal(result.state,'published');assert.equal(result.delivered,2);assert.equal(result.undelivered,1);
+      const result=await sent.json();assert.equal(result.state,'published');assert.equal(result.delivered,1);assert.equal(result.undelivered,2);
       const replay=await request('/instructions/send',staff,{...post(payload),headers:auth});assert.equal(replay.status,200);assert.equal((await replay.json()).duplicate,true);
       assert.equal((await request('/instructions/sends/'+payload.requestId,staff)).status,409);
       const status=await request('/instructions/sends/'+payload.requestId,staff,{headers:auth});assert.equal(status.status,200);assert.equal((await status.json()).publicationId,result.publicationId);
@@ -423,11 +478,11 @@ test('PostgreSQL instruction and acknowledgment HTTP routes enforce session cont
       assert.equal((await request('/instructions/sends/'+payload.requestId+'/retry?scope=x',staff,{...post({requestId:randomUUID()}),headers:auth})).status,400);
       assert.equal((await request('/instructions/sends/'+payload.requestId+'/retry',staff,{...post({requestId:'not-a-uuid'}),headers:auth})).status,400);
       assert.equal((await request('/instructions/sends/'+payload.requestId+'/retry',staff,{...post({}),headers:auth})).status,400);
-      await db.query(`UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages,hi}',prepared_json->'languages'->'en') WHERE id=$1`,[payload.requestId]);
+      await db.query(`UPDATE briefings SET prepared_json=jsonb_set(jsonb_set(prepared_json,'{languages,ur}',prepared_json->'languages'->'en'),'{languages,hi}',prepared_json->'languages'->'en') WHERE id=$1`,[payload.requestId]);
       const retryRequestId=randomUUID(),retried=await request('/instructions/sends/'+payload.requestId+'/retry',staff,{...post({requestId:retryRequestId}),headers:auth});
       assert.equal(retried.status,201);
       const retriedBody=await retried.json();
-      assert.equal(retriedBody.retried,1);assert.equal(retriedBody.released,1);assert.equal(retriedBody.delivered,3);
+      assert.equal(retriedBody.retried,2);assert.equal(retriedBody.released,2);assert.equal(retriedBody.delivered,3);
       assert.equal(retriedBody.undelivered,0);assert.deepEqual(retriedBody.deliveryStates,{preparing:0,available:3,blocked:0,failed:0,withdrawn:0});
       assert.equal(retriedBody.publicationId,result.publicationId);assert.equal(retriedBody.retryable,false);
       const retryReplay=await request('/instructions/sends/'+payload.requestId+'/retry',staff,{...post({requestId:retryRequestId}),headers:auth});

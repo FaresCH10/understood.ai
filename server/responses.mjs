@@ -5,6 +5,7 @@ import {ensureCaseMessageSchema} from './case-messages.mjs';
 import {workerCredentialSessionValid} from './auth.mjs';
 import {WORKER_LANGUAGE_CODES} from './languages.mjs';
 import {assignmentEvidence,assignmentEvidenceData,ensureEvidenceSchema} from './evidence.mjs';
+import {groupedUndelivered} from './delivery-readiness.mjs';
 
 const present=(db,name)=>!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name);
 
@@ -15,7 +16,7 @@ export function responseFilters(input={}) {
   if(!input || typeof input!=='object' || Array.isArray(input) || Object.keys(input).some((key) => !['search','language','status','page','pageSize'].includes(key))) throw new Error('Invalid response filter');
   const {search='',language='all',status='all'}=input,page=Number(input.page ?? 1),pageSize=Number(input.pageSize ?? 20);
   if(typeof search!=='string' || search.length>80 || !['all',...WORKER_LANGUAGE_CODES].includes(language)
-    || !['all','awaiting_response','assessment_pending','matched','clarification','unassessable','acknowledged','failed_audio'].includes(status)
+    || !['all','awaiting_response','assessment_pending','matched','clarification','unassessable','acknowledged','failed_audio','not_delivered'].includes(status)
     || !Number.isSafeInteger(page) || page<1 || page>5000 || !Number.isInteger(pageSize) || pageSize<1 || pageSize>50) throw new Error('Invalid response filter');
   return {search:search.trim(),language,status,page,pageSize};
 }
@@ -80,13 +81,25 @@ export function responseRow(row) {
     outcome:outcome || null,receivedAt:receivedAt instanceof Date ? receivedAt.toISOString() : receivedAt || null};
 }
 
-export function responsePage(rows,filters,publication) {
-  if(rows.length>5000) throw new Error('Response audience exceeds limit');
+export function undeliveredRow(row) {
+  return {assignmentId:null,worker:row.code,language:row.language,status:'not_delivered',outcome:null,receivedAt:null,
+    deliveryState:row.state,reason:row.reason || null};
+}
+
+export function responsePage(rows,filters,publication,undelivered=[]) {
+  if(rows.length>5000 || undelivered.length>5000) throw new Error('Response audience exceeds limit');
   // ponytail: publication caps audiences at 5000; filter this bounded metadata set, use SQL paging if that cap grows.
-  const {search,language,status,page,pageSize}=filters;
-  const filtered=rows.map(responseRow).filter((row) => row.worker.toLowerCase().includes(search.toLowerCase())
+  const {search,language,status,page,pageSize}=filters,needle=search.toLowerCase();
+  const filtered=rows.map(responseRow).filter((row) => row.worker.toLowerCase().includes(needle)
     && (language==='all' || language===row.language) && (status==='all' || status===row.status));
-  return {publication,items:filtered.slice((page-1)*pageSize,page*pageSize),total:filtered.length,page,pageSize};
+  // Undelivered recipients belong to the same send, so they share the audience filters and
+  // stay visible under "all" instead of disappearing from the supervisor's list.
+  const missing=undelivered.map(undeliveredRow).filter((row) => row.worker.toLowerCase().includes(needle)
+    && (language==='all' || language===row.language) && (status==='all' || status==='not_delivered'));
+  const items=[...filtered,...missing].sort((a,b)=>a.worker.localeCompare(b.worker) || String(a.status).localeCompare(String(b.status)));
+  return {publication,items:items.slice((page-1)*pageSize,page*pageSize),total:items.length,page,pageSize,
+    ...(undelivered.length?{delivery:{undelivered:undelivered.length,
+      reasons:groupedUndelivered(undelivered.map((row)=>({reason:row.reason || row.state,language:row.language})))}}:{})};
 }
 
 export function receiptRow(row,latest) {
@@ -252,7 +265,15 @@ export function listPublicationResponses(db,session,publicationId,input={}) {
     const rows=db.prepare(`SELECT a.id AS assignment_id,w.code,a.language,${responseColumns}
       FROM assignments a JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
       WHERE a.publication_id=? AND a.org_id=? AND a.site_id=? ORDER BY w.code,a.id LIMIT 5001`).all(publicationId,session.org_id,session.site_id);
-    return responsePage(rows,filters,publication);
+    const undelivered=present(db,'instruction_sends') && present(db,'instruction_deliveries')
+      ? db.prepare(`SELECT d.worker_id,d.language,d.state,d.reason,w.code
+        FROM instruction_deliveries d
+        JOIN instruction_sends s ON s.request_id=d.request_id AND s.org_id=d.org_id AND s.site_id=d.site_id
+        JOIN workers w ON w.id=d.worker_id AND w.org_id=d.org_id AND w.site_id=d.site_id
+        WHERE s.publication_id=? AND s.org_id=? AND s.site_id=? AND d.state<>'available'
+        ORDER BY w.code,d.worker_id LIMIT 5001`).all(publicationId,session.org_id,session.site_id)
+      : [];
+    return responsePage(rows,filters,publication,undelivered);
   });
 }
 
@@ -276,6 +297,8 @@ export function getPublicationResponse(db,session,publicationId,assignmentId,inp
     const cases=db.prepare('SELECT id,status,reason FROM clarifications WHERE assignment_id=? AND org_id=? ORDER BY created_at DESC,id DESC LIMIT 100').all(assignmentId,session.org_id);
     const acknowledgment=db.prepare('SELECT received_at FROM acknowledgments WHERE assignment_id=? AND org_id=? AND site_id=?')
       .get(assignmentId,session.org_id,session.site_id);
+    const completion=db.prepare('SELECT completed_at FROM assignment_completions WHERE assignment_id=? AND org_id=? AND site_id=?')
+      .get(assignmentId,session.org_id,session.site_id);
     const responseMode=snapshot.responseMode || 'question',deliveryMode=snapshot.deliveryMode || 'both';
     const evidenceMode=snapshot.evidenceMode==='photo' && responseMode==='acknowledge'?'photo':'none';
     const evidence=evidenceMode==='photo'?assignmentEvidence(db,session.org_id,session.site_id,assignmentId):null;
@@ -285,6 +308,7 @@ export function getPublicationResponse(db,session,publicationId,assignmentId,inp
       responseMode,deliveryMode,evidenceMode,evidence,
       ...(snapshot.rubric?.mode==='multiple-choice'?{questionType:'multiple-choice',choices:deliveredContent?.choices || snapshot.languages?.[assignment.language]?.choices || snapshot.languages?.en?.choices}:{}),
       acknowledgedAt:acknowledgment?.received_at || null,
+      completedAt:completion?.completed_at || null,
       ...submissionHistory(db,session,assignmentId,page,pageSize,true),cases};
   });
 }

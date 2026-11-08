@@ -18,7 +18,7 @@ type Props={pickerMode?:'all'|'draft'|'published';draft:{id:string;source:string
 export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric,scope,clientContext,onChanged,onEditingChange,authority,pickerMode='all'}:Props) {
   const staffT=useStaffStaticText();
   const selection=selected?.id || 'draft';
-  const [target,setTarget]=useState('ar'),[detailTick,setDetailTick]=useState(0);
+  const [target,setTarget]=useState('en'),[detailTick,setDetailTick]=useState(0);
   const published=usePublicationDetail(draft.id,selected?.id || null,clientContext,refresh+detailTick);
   const [tab,setTab]=useState<ArtifactReviewTab>('text'),tabId=useId(),tabRefs=useRef<Record<string,HTMLButtonElement|null>>({});
   const [reviewEditing,setReviewEditing]=useState(false),[regenerating,setRegenerating]=useState(false);
@@ -64,10 +64,9 @@ export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric
       <audio ref={kind==='body'?bodyPlayer:questionPlayer} controls preload="none" src={speech[kind]} aria-label={staffT("{language} {track} audio",{language:staffT.language(language.code),track:staffT(kind==='body'?'Instruction':'Question')})}
         onPlay={()=>{currentPreview.current=null;window.speechSynthesis?.cancel();setPlaying('');(kind==='body'?questionPlayer:bodyPlayer).current?.pause();}} onError={()=>setAudioError(kind)}/>
       {audioError===kind && <><p role="alert">{staffT("Private audio could not be loaded. No device speech has been substituted.")}</p><button className="button outline" title={staffT("Reload private audio")} onClick={()=>{setAudioError(null);(kind==='body'?bodyPlayer:questionPlayer).current?.load();}}><RotateCcw size={18}/>{staffT("Reload audio")}</button></>}
-    </div>):<p>{staffT("No verified private generated audio file is available for this language.")}</p>}
+    </div>):view.audio==='device-demo'?<p>{staffT("Voice delivery uses the worker's device voice. No private audio file is stored for this language.")}</p>:<p>{staffT("No verified private generated audio file is available for this language.")}</p>}
     {view.canPreview && <><p>{voice?staffT("Device voice: {name} ({language})",{name:voice.name,language:voice.lang}):staffT("No {language} device voice is available.",{language:staffT.language(language.code)})}</p><div className="actions">
-      {kinds.map(kind=><button key={kind} className="button outline" disabled={!voice || editing} onClick={()=>preview(kind==='body'?'briefing':'question')}><Play size={18}/>{kind==='body'?staffT("Preview text on device"):staffT("Preview question on device")}</button>)}
-      {playing && <button className="icon-button" title={staffT("Stop device preview")} aria-label={staffT("Stop device preview")} onClick={()=>{currentPreview.current=null;window.speechSynthesis.cancel();setPlaying('');}}><Square size={18}/></button>}
+      {kinds.map(kind=>{const previewing=playing===(kind==='body'?'briefing':'question');return <button key={kind} className="button outline" disabled={!voice || editing} onClick={()=>previewing?(currentPreview.current=null,window.speechSynthesis.cancel(),setPlaying('')):preview(kind==='body'?'briefing':'question')}>{previewing?<><Square size={18}/>{staffT("Stop device preview")}</>:<><Play size={18}/>{kind==='body'?staffT("Preview text on device"):staffT("Preview question on device")}</>}</button>;})}
     </div><span role="status">{playing?staffT("Playing {track} on this device",{track:staffT(playing==='briefing'?'Instruction':'Question')}):''}</span></>}{error && <p role="alert">{staffT.error(error)}</p>}
   </div>;
   const rubric=canViewRubric && <details className="artifact-rubric"><summary>{staffT("Private answer rubric")}</summary>{Array.isArray(prepared?.rubric?.askedFacts)?<ul>{prepared.rubric.askedFacts.map((value,index)=><li key={index}>{(artifactField(value,500).value||staffT("Invalid stored rubric fact"))}</li>)}</ul>:<p>{staffT("No stored answer rubric.")}</p>}</details>;

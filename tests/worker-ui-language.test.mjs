@@ -10,22 +10,23 @@ const now=Date.parse('2026-10-08T12:00:00.000Z');
 const session={authenticated:true,role:'worker',clientContext:'a'.repeat(64),workerId:'worker-14',language:'en',mode:'synthetic-credential',expiresAt:'2026-10-08T13:00:00.000Z'};
 function store(){const data={};return {data,getItem:key=>data[key]??null,setItem:(key,value)=>{data[key]=value;}};}
 
-test('only a supervisor-approved session language controls the worker interface, including locked views',()=>{
+test('a session-bound worker UI preference applies to its instruction language and expires with it',()=>{
   const storage=store();
   for(const language of WORKER_LANGUAGE_CODES){
-    const approved={...session,language};saveWorkerUiLanguage(storage,approved,language,now);
-    assert.equal(readWorkerUiLanguage(storage,approved,now),language);
-    assert.equal(readWorkerLockLanguage(storage,approved),language);
-    for(const changed of WORKER_LANGUAGE_CODES.filter(code=>code!==language))assert.throws(()=>saveWorkerUiLanguage(storage,approved,changed,now),/Language selection unavailable/);
+    saveWorkerUiLanguage(storage,session,language,now);
+    assert.equal(readWorkerUiLanguage(storage,session,now),language);
+    assert.equal(readWorkerLockLanguage(storage,session),language);
+    // Reassigning the instruction language retires the old interface preference.
+    assert.equal(readWorkerUiLanguage(storage,{...session,language:'hi'},now),'hi');
   }
-  storage.setItem(workerUiLanguageKey,JSON.stringify({context:session.clientContext,expiresAt:session.expiresAt,language:'ur'}));
-  assert.equal(readWorkerUiLanguage(storage,session,now),'en');assert.equal(readWorkerLockLanguage(storage,session),'en');
-  assert.equal(readWorkerUiLanguage(storage,{...session,language:'hi'},now),'hi');
-  assert.throws(()=>saveWorkerUiLanguage(storage,session,'en',now+3600000));
+  saveWorkerUiLanguage(storage,session,'ur',now);
+  assert.equal(readWorkerUiLanguage(storage,{...session,clientContext:'b'.repeat(64)},now),'en');
+  assert.equal(readWorkerUiLanguage(storage,{...session,expiresAt:'2026-10-08T14:00:00.000Z'},now),'en');
+  assert.throws(()=>saveWorkerUiLanguage(storage,session,'ur',now+3600000));
   assert.equal(readWorkerUiLanguage(storage,session,now+3600000),'en');
 });
 test('malformed/denied storage falls back; unsuccessful writes do not report persistence',()=>{
-  const storage=store();for(const raw of ['{','null','[]',JSON.stringify({context:session.clientContext,expiresAt:session.expiresAt,language:'xyz'}),'x'.repeat(301)]){storage.setItem(workerUiLanguageKey,raw);assert.equal(readWorkerUiLanguage(storage,session,now),'en');}
+  const storage=store();for(const raw of ['{','null','[]',JSON.stringify({context:session.clientContext,expiresAt:session.expiresAt,base:'en',language:'xyz'}),JSON.stringify({context:session.clientContext,expiresAt:session.expiresAt,language:'ur'}),'x'.repeat(301)]){storage.setItem(workerUiLanguageKey,raw);assert.equal(readWorkerUiLanguage(storage,session,now),'en');}
   assert.equal(readWorkerUiLanguage({getItem:()=>{throw Error();}},session,now),'en');
   assert.throws(()=>saveWorkerUiLanguage({setItem:()=>{},getItem:()=>null},session,'en',now));
   for(const language of WORKER_LANGUAGE_CODES)for(const text of Object.values(workerUiLanguageText[language]))assert.ok(text.trim());

@@ -76,8 +76,7 @@ test('SQLite language readiness is scoped and separates stored content from unte
     assert.equal(result.realDataAllowed,false);assert.deepEqual(result.languages.map(language=>language.code),WORKER_LANGUAGE_CODES);
     assert.ok(result.languages.every(language=>language.ui.state==='ready'));
     assert.ok(result.languages.some(language=>language.code==='ar' && language.content.state==='ready'));
-    assert.ok(result.languages.filter(language=>['en','ar','ur'].includes(language.code)).every(language=>language.translation.state==='not_tested'));
-    assert.ok(result.languages.filter(language=>!['en','ar','ur'].includes(language.code)).every(language=>language.translation.state==='unavailable'));
+    assert.ok(result.languages.every(language=>language.translation.state==='not_tested'));
     assert.equal((await request('/language-readiness/test',maya,{unexpected:true})).status,400);
     const tested=await (await request('/language-readiness/test',maya,{})).json();
     assert.equal(tested.tests.speech.state,'not_tested');assert.match(tested.provider.evidence,/Synthetic-only/);

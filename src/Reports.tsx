@@ -1,6 +1,6 @@
 import {MobileDisclosure} from './MobileDisclosure';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, History, Info, RefreshCw, Search, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Download, FileText, History, Info, RefreshCw, Search, TriangleAlert } from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {useArtifactMutation} from './useArtifactMutation';
 import {checkedArtifactScope} from './artifact-request';
@@ -145,6 +145,7 @@ export function ReportsPage({refresh,authority,navigate,language='en',onLanguage
   const dirty=Object.keys(filters).some(key=>filters[key as keyof ReportFilters]!==chosenFilters[key as keyof ReportFilters]);
   const crewLabel=filters.crewId==='@unassigned'?t('No crew'):report?.availableCrews?.find(crew=>crew.id===filters.crewId)?.name||(filters.crewId?t('Crew'):t('All assigned workers'));
   return <div className={`reports-workspace ${filtersOpen?'reports-filters-open':''}`} ref={workspace} dir={locale==='en'?'ltr':'rtl'}>
+    {initialCrewId&&<button className="back-link" onClick={()=>navigate('reports')}><ArrowLeft size={18}/>{t('Reports')}</button>}
     <div className="page-header report-header"><div><h1>{t('Reports')}</h1><p>{t('Review delivery, responses and follow-up for a published instruction.')}</p></div>
       <div className="actions">{onLanguageChange&&<CaseLocalePicker locale={locale} onChange={onLanguageChange}/>}<button className="button primary" onClick={() => void exportReport()} disabled={loading || busy || !m || !canExport || !!operation.pending.current || !!recovery.error}><Download size={17}/>{t(busy?'Working...':'Export CSV')}</button></div>
     </div>

@@ -12,6 +12,7 @@ import {verifyRuntimePermissions} from './postgres/runtime-permissions.mjs';
 import {readProductionReadiness} from './postgres/production-readiness.mjs';
 import {send as sendJson} from './http.mjs';
 import {resolvePilotGmail} from './pilot-gmail.mjs';
+import {syntheticAssessmentAdapter} from './postgres/synthetic-assessment.mjs';
 
 // Preserve the existing synthetic application mode, but persist accounts and
 // sessions in Neon. Serverless registration cannot depend on a separate worker.
@@ -52,6 +53,8 @@ export async function createVercelNeonHandler({env=process.env,pool,send,createP
     const customerHandler=postgresHandler(pool,{...(production?config:{}),config,schema,storage,requestAddress,secure:true,
       cookieName:'__Host-understood_session',backend:production?'postgres-vercel-live':'postgres-vercel-synthetic',
       mail:production?config.mail:{available:false},registrationVerification,
+      // Serverless synthetic runs have no background worker: drain its own queue.
+      ...(production?{}:{inlineJobs:true,inlineAssessment:syntheticAssessmentAdapter}),
       pilotDestination:pilotGmail?.destination ?? config.pilotDestination ?? null,sendPilot:pilotGmail?.send,
       dispatchRegistration:registrationId=>processOneRegistration(pool,registrationVerification,
         {schema,registrationId,throwOnFailure:true,...(send?{send}:{})}),

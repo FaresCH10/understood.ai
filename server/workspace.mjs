@@ -164,6 +164,7 @@ export async function workspaceOperation(q,session,operation,input={},options={}
    CASE WHEN EXISTS(SELECT 1 FROM briefing_content_purges bp WHERE bp.briefing_id=p.briefing_id) THEN 1 ELSE 0 END AS content_expired,
    COALESCE((SELECT d.content_json->>'title' FROM instruction_deliveries d WHERE d.assignment_id=a.id AND d.org_id=a.org_id AND d.site_id=a.site_id),p.snapshot_json->'languages'->a.language->>'title',p.snapshot_json->>'title','Instruction') AS title,
    (SELECT st.name FROM instruction_sends s JOIN staff st ON st.id=s.requested_by AND st.org_id=s.org_id AND st.site_id=s.site_id WHERE s.publication_id=p.id AND s.org_id=a.org_id AND s.site_id=a.site_id) AS supervisor_name,
+   (SELECT c.id FROM clarifications c JOIN case_messages m ON m.case_id=c.id AND m.org_id=c.org_id AND m.site_id=a.site_id WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='open' AND m.actor_type='staff' ORDER BY m.created_at DESC,m.id DESC LIMIT 1) AS reply_case_id,
    CASE WHEN EXISTS(SELECT 1 FROM clarifications c JOIN case_messages m ON m.case_id=c.id AND m.org_id=c.org_id AND m.site_id=a.site_id WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='open' AND m.actor_type='staff' AND NOT EXISTS(SELECT 1 FROM notification_events ne JOIN notification_event_reads nr ON nr.event_id=ne.id AND nr.org_id=ne.org_id AND nr.site_id=ne.site_id WHERE ne.org_id=a.org_id AND ne.site_id=a.site_id AND ne.recipient_id=a.worker_id AND ne.object_type='case_message' AND ne.object_id=m.id AND nr.principal_type='worker' AND nr.principal_id=a.worker_id)) THEN 1 ELSE 0 END AS supervisor_reply,
    ${workColumns} FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
    LEFT JOIN assignment_completions ac ON ac.assignment_id=a.id AND ac.org_id=a.org_id AND ac.site_id=a.site_id
@@ -171,7 +172,7 @@ export async function workspaceOperation(q,session,operation,input={},options={}
    work AS (SELECT assessed.*,${workStatusSql} AS status,${workResponseSql} AS response_status FROM assessed)`;
   const base=[...scope,workerId,...(filter.assignmentId?[filter.assignmentId]:[]),...(options.workerCrewId?[options.workerCrewId]:[])],now=new Date().toISOString();
   const map=row=>({id:row.id,publicationId:row.publication_id,briefingId:row.briefing_id,title:Number(row.content_expired)?'Instruction unavailable':row.title,version:row.version,publicationState:row.state,
-   status:row.status,language:row.language,dueAt:iso(row.due_at)||null,supervisorName:row.supervisor_name||null,hasSupervisorReply:!!Number(row.supervisor_reply),responseStatus:row.response_status,
+   status:row.status,language:row.language,dueAt:iso(row.due_at)||null,supervisorName:row.supervisor_name||null,hasSupervisorReply:!!Number(row.supervisor_reply),replyCaseId:row.reply_case_id||null,responseStatus:row.response_status,
    contentExpired:!!Number(row.content_expired),canComplete:row.status==='in-progress'&&row.state==='published'&&!Number(row.content_expired),completedAt:iso(row.completed_at)||null,sentAt:iso(row.published_at)});
   const exact=filter.assignmentId?(await q(`${cte} SELECT * FROM work`,base))[0]:null;
   if(filter.assignmentId&&!exact)throw Error('Assignment unavailable');

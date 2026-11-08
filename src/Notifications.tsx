@@ -2,7 +2,7 @@ import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useRef,useState} from 'react';
 import {gsap,useGSAP} from './gsap';
 import './notifications-workspace.css';
-import {Bell,BellRing,Check,CheckCheck,ChevronDown,ChevronLeft,ChevronRight,ArrowUpRight,FileText,MessageCircle,Languages,Download,RefreshCw,Trash2} from 'lucide-react';
+import {ArrowLeft,Bell,BellRing,Check,CheckCheck,ChevronDown,ChevronLeft,ChevronRight,ArrowUpRight,FileText,MessageCircle,Languages,Download,RefreshCw,Trash2} from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {usePushNotifications} from './usePushNotifications';
 import {useArtifactMutation} from './useArtifactMutation';
@@ -71,6 +71,7 @@ export function Notifications({refresh,navigate,timezone,authority}:{refresh:num
   const pages=Math.max(1,Math.ceil((data?.total || 0)/20));
   const date=staffT.date;
   return <div className="notifications-workspace" ref={root}>
+    <button className="back-link" onClick={()=>navigate('overview')}><ArrowLeft size={18}/>{staffT("Today")}</button>
     <header className="notifications-header">
       <div><div className="notifications-title"><h1>{staffT("Notifications")}</h1>{data && <span className={`notifications-unread-count${data.unread?' has-unread':''}`} aria-label={staffT("{p0} unread",{p0:data.unread})}>{staffT.number(data.unread)}</span>}</div><p>{staffT("Updates from your team, all in one place.")}</p></div>
       <div className="notifications-header-actions"><button className="button primary notifications-mark-all" disabled={loading || blocked || !data?.unread} onClick={()=>void markAllRead()}>{bulkBusy?<RefreshCw className="notifications-spinning" size={17}/>:<CheckCheck size={18}/>}<span>{staffT(bulkBusy?"Marking as read...":"Mark all as read")}</span></button><button className="icon-button" aria-label={staffT("Refresh notifications")} title={staffT("Refresh notifications")} disabled={loading || blocked} onClick={()=>setTick(value=>value+1)}><RefreshCw size={19} className={loading?'notifications-spinning':''}/></button></div>

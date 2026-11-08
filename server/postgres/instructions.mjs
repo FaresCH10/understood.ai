@@ -4,6 +4,7 @@ import {createDraftInTransaction,queuePreparationInTransaction} from './preparat
 import {instructionInput} from '../instructions.mjs';
 import {generationLanguages} from '../settings-input.mjs';
 import {WORKER_LANGUAGE_CODES} from '../languages.mjs';
+import {instructionCoverage} from '../instruction-coverage.mjs';
 import {generatedBundleEvidence,verifyGeneratedAudio} from './generated-audio.mjs';
 import {bundleHash} from '../ai/prepared-bundle.mjs';
 import {groupedUndelivered,recipientDeliveryReadiness} from '../delivery-readiness.mjs';
@@ -376,6 +377,18 @@ export async function startInstructionSend(pool,session,input,{schema='public'}=
     await domainAudit(client,session,'instruction.send_requested',value.requestId);
     const row=(await client.query('SELECT * FROM instruction_sends WHERE request_id=$1',[value.requestId])).rows[0];
     return sendView(client,row,false);
+  });
+}
+
+// Read-only: warns about recipient languages the configured preparation cannot
+// produce before anything is recorded.
+export async function instructionSendPreflight(pool,session,input,{schema='public',pipeline=null}={}) {
+  const value=instructionInput(input);
+  return domainTransaction(pool,schema,async client=>{
+    await requirePrincipal(client,session,'staff');
+    const workers=await audienceWorkers(client,session,value.audience);
+    return {requestId:value.requestId,...instructionCoverage({workers,source:value.request.source,
+      deliveryMode:value.deliveryMode,pipeline})};
   });
 }
 

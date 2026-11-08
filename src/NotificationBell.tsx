@@ -57,7 +57,8 @@ export function NotificationBell({session,label,locale='en',disabled=false,onOpe
       finally{pending=false;}
     };
     const changed=()=>{void read();};
-    const stopLive=watchNeonNotifications(binding,controller.signal,changed);
+    // Live notifications are a staff feature; workers keep the polling fallback.
+    const stopLive=session.role==='worker'?()=>{}:watchNeonNotifications(binding,controller.signal,changed);
     void read();const timer=window.setInterval(changed,30000);
     window.addEventListener(notificationChanged,changed);window.addEventListener('focus',changed);
     window.addEventListener('hashchange',changed);document.addEventListener('visibilitychange',changed);

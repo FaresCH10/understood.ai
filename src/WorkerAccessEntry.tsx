@@ -15,6 +15,7 @@ function rememberedCompany(){try{const value=localStorage.getItem(COMPANY_KEY);r
 function keepCompany(remember:boolean,company:string){try{if(remember)localStorage.setItem(COMPANY_KEY,company);else localStorage.removeItem(COMPANY_KEY);}catch{}}
 export function WorkerAccessEntry({language,onLanguage,token,linkSignal,onToken,busy,blocked,authenticated,session,supported,failed,onSubmit,onPasswordLogin,onClearFailure,onCancel,children}:{language:WorkerUiLanguage;onLanguage:(value:WorkerUiLanguage)=>void;token:string;linkSignal:number;onToken:(value:string)=>void;busy:boolean;blocked:boolean;authenticated:boolean;session?:PageSession;supported:boolean;failed:boolean;onSubmit:()=>void;onPasswordLogin:(input:WorkerCredentialInput)=>void;onClearFailure:()=>void;onCancel:()=>void;children:React.ReactNode}) {
   const t=workerEntryText[language],c=workerCredentialEntryText[language],m=workerCompanyMemoryText[language],rtl=workerUiDirection(language)==='rtl',Forward=rtl?ArrowLeft:ArrowRight,Back=rtl?ArrowRight:ArrowLeft,Chevron=rtl?ChevronLeft:ChevronRight;
+  useEffect(()=>{const root=document.documentElement,lang=root.lang,dir=root.dir;root.lang=language;root.dir=rtl?'rtl':'ltr';return ()=>{root.lang=lang;root.dir=dir;};},[language,rtl]);
   const identity=workerEntryIdentity(session,language),tokenInput=useRef<HTMLInputElement>(null);
   const [mode,setMode]=useState<'login'|'link'>(token?'link':'login');
   const [company,setCompany]=useState(rememberedCompany),[workerId,setWorkerId]=useState(''),[password,setPassword]=useState('');

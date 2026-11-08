@@ -10,13 +10,27 @@ import type {StaffUiKey} from './staff-ui-locale';
 import {caseReason} from './clarification-locale';
 
 type Publication={id:string;version:number;state:string};
-type Row={assignmentId:string;worker:string;language:string;status:string;receivedAt:string|null};
-type Page={publication:Publication;items:Row[];total:number;page:number;pageSize:number};
+type Row={assignmentId:string|null;worker:string;language:string;status:string;receivedAt:string|null;deliveryState?:string;reason?:string|null};
+type DeliveryReason={reason:string;language:string|null;count:number};
+type Page={publication:Publication;items:Row[];total:number;page:number;pageSize:number;delivery?:{undelivered:number;reasons:DeliveryReason[]}};
 type Receipt={sequence:string;kind:string;receivedAt:string;isLatest:boolean;answerText:string|null;outcome:string|null;reasons:string[];recordingId:string|null;audioStatus:string|null;evidence:{factIndex:number;quote:string}[]};
-type Detail={questionType?:string;choices?:{id:string;text:string}[];publication:Publication;assignment:{id:string;worker:string;language:string;dueAt:string|null};question:string|null;workerQuestion:string|null;facts:string[];receipts:Receipt[];total:number;page:number;pageSize:number;cases:{id:string;status:string;reason:string}[];responseMode?:string;deliveryMode?:string;acknowledgedAt?:string|null;evidenceMode?:string;evidence?:{requestId:string;mime:string;bytes:number;sha256:string;receivedAt:string}|null};
-type WorkerAssignment=Row & {publicationId:string;title:string;version:number;state:string;dueAt:string|null};
+type Detail={questionType?:string;choices?:{id:string;text:string}[];publication:Publication;assignment:{id:string;worker:string;language:string;dueAt:string|null};question:string|null;workerQuestion:string|null;facts:string[];receipts:Receipt[];total:number;page:number;pageSize:number;cases:{id:string;status:string;reason:string}[];responseMode?:string;deliveryMode?:string;acknowledgedAt?:string|null;completedAt?:string|null;evidenceMode?:string;evidence?:{requestId:string;mime:string;bytes:number;sha256:string;receivedAt:string}|null};
+type WorkerAssignment={assignmentId:string;worker:string;language:string;status:string;receivedAt:string|null;publicationId:string;title:string;version:number;state:string;dueAt:string|null};
 type WorkerAssignmentPage={worker:{id:string;code:string;active:boolean};items:WorkerAssignment[];total:number;page:number;pageSize:number};
-const labels:Record<string,StaffUiKey>={correct_answer:'Correct answer',incorrect_answer:'Incorrect answer — needs clarification',awaiting_response:'Awaiting response',acknowledged:'Acknowledged',assessment_pending:'Assessment pending',matched:'Matches key facts',clarification:'Needs clarification',unassessable:'Could not assess',failed_audio:'Audio check failed'};
+const labels:Record<string,StaffUiKey>={correct_answer:'Correct answer',incorrect_answer:'Incorrect answer — needs clarification',awaiting_response:'Awaiting response',acknowledged:'Acknowledged',assessment_pending:'Assessment pending',matched:'Matches key facts',clarification:'Needs clarification',unassessable:'Could not assess',failed_audio:'Audio check failed',not_delivered:'Not delivered'};
+const filterStatuses=['awaiting_response','assessment_pending','matched','clarification','unassessable','acknowledged','failed_audio','not_delivered'] as const;
+function deliveryReasonText(ui:ReturnType<typeof useStaffUi>,reason:string|null|undefined){
+  if(reason==='language_unavailable')return ui.t('Version not ready');
+  if(reason==='content_unavailable')return ui.t('Text not ready');
+  if(reason==='question_unavailable')return ui.t('Question not ready');
+  if(reason==='speech_unavailable')return ui.t('Voice not ready');
+  if(reason==='worker_inactive')return ui.t('Worker no longer active');
+  if(reason==='workspace_read_only')return ui.t('Workspace is read-only');
+  if(reason==='deadline_passed')return ui.t('Delivery deadline passed');
+  if(reason==='preparing')return ui.t('Delivery pending');
+  if(reason==='withdrawn')return ui.t('Delivery withdrawn');
+  return ui.t('Delivery did not complete.');
+}
 
 function useResponse<T>(path:string|null,refresh:number,authority:StaffRequestAuthority) {
   const {request,current}=useStaffRequest(authority),key=JSON.stringify([path,refresh,authority.session.clientContext]);
@@ -31,7 +45,7 @@ function useResponse<T>(path:string|null,refresh:number,authority:StaffRequestAu
   return path&&result.key===key&&current()?result:{data:null,error:'',loading:!!path};
 }
 function Assessment({value}:{value:string}) {
-  const ui=useStaffUi(),tone=value==='matched'?'green':value==='failed_audio'?'red':/clarification|pending|unassessable/.test(value)?'amber':'blue';
+  const ui=useStaffUi(),tone=value==='matched'?'green':value==='failed_audio'||value==='not_delivered'?'red':/clarification|pending|unassessable/.test(value)?'amber':'blue';
   return <span className={`status status-${tone}`}>{ui.t(Object.hasOwn(labels,value)?labels[value]:'Status unavailable')}</span>;
 }
 function Paging({page,total,size,onChange,label}:{page:number;total:number;size:number;onChange:(page:number)=>void;label:'recipients'|'assigned instructions'|'submissions'}) {
@@ -54,12 +68,13 @@ export function PublicationResponses({briefingId,publication,onSelect,context,re
     {publication&&<SelfHealingLoop key={`improvement:${publication.id}`} publicationId={publication.id} authority={authority} navigate={navigate}/>}
     <div className="filters response-filters"><label className="search-box"><Search size={18}/><span className="sr-only">{ui.t('Search recipients')}</span><input dir="auto" value={search} maxLength={80} onChange={event=>{setSearch(event.target.value);setPage(1);}} placeholder={ui.t('Worker ID')}/></label>
       <label className="select-label">{ui.t('Assigned language')}<select value={language} onChange={event=>{setLanguage(event.target.value);setPage(1);}}><option value="all">{ui.t('All languages')}</option>{WORKER_LOCALES.map(locale=><option key={locale.code} value={locale.code}>{ui.language(locale.code)}</option>)}</select></label>
-      <label className="select-label">{ui.t('Latest response')}<select value={status} onChange={event=>{setStatus(event.target.value);setPage(1);}}><option value="all">{ui.t('All states')}</option>{Object.entries(labels).map(([key,name])=><option key={key} value={key}>{ui.t(name)}</option>)}</select></label>
+      <label className="select-label">{ui.t('Latest response')}<select value={status} onChange={event=>{setStatus(event.target.value);setPage(1);}}><option value="all">{ui.t('All states')}</option>{filterStatuses.map(key=><option key={key} value={key}>{ui.t(labels[key])}</option>)}</select></label>
       <button className="icon-button" aria-label={ui.t('Refresh responses')} title={ui.t('Refresh responses')} disabled={loading} onClick={()=>setTick(value=>value+1)}><RefreshCw size={18}/></button>
     </div>
     <div className={`responses-layout ${assignmentId?'has-selection':''}`}><section className="panel" aria-label={ui.t('Publication recipients')}><h2>{ui.t('Responses')} {publication&&`· ${ui.t('Version {version}',{version:ui.number(publication.version)})}`}</h2>
       {loading?<p data-page-loading role="status">{ui.t('Loading responses...')}</p>:error?<p role="alert">{ui.error(error,'Response unavailable')}</p>:data&&<>
-        {data.items.length?<div className="table-wrap" tabIndex={0} aria-label={ui.t('Recipient response table')}><table><thead><tr>{(['Worker','Assigned language','Latest response','Received'] as const).map(key=><th key={key}>{ui.t(key)}</th>)}</tr></thead><tbody>{data.items.map(row=><tr key={row.assignmentId} className={assignmentId===row.assignmentId?'selected-response':''}><td><button ref={node=>{recipientButtons.current[row.assignmentId]=node;}} className="text-link" aria-pressed={assignmentId===row.assignmentId} onClick={()=>setAssignmentId(row.assignmentId)}><bdi>{row.worker}</bdi><ChevronRight className="directional-icon" size={16}/></button></td><td data-label={ui.t("Assigned language")}>{ui.language(row.language)}</td><td data-label={ui.t("Latest response")}><Assessment value={row.status}/></td><td data-label={ui.t("Received")}>{ui.date(row.receivedAt)}</td></tr>)}</tbody></table></div>:<p>{ui.t('No recipients match these filters.')}</p>}
+        {data.delivery&&data.delivery.undelivered>0&&<p className="notice notice-amber" role="status"><strong>{ui.t('{count} recipients did not receive this instruction.',{count:ui.number(data.delivery.undelivered)})}</strong>{' '}{data.delivery.reasons.map(reason=>`${reason.language?`${ui.language(reason.language)}: `:''}${deliveryReasonText(ui,reason.reason)} (${ui.number(reason.count)})`).join(' · ')}</p>}
+        {data.items.length?<div className="table-wrap" tabIndex={0} aria-label={ui.t('Recipient response table')}><table><thead><tr>{(['Worker','Assigned language','Latest response','Received'] as const).map(key=><th key={key}>{ui.t(key)}</th>)}</tr></thead><tbody>{data.items.map(row=>{const id=row.assignmentId;return <tr key={id||`missing:${row.worker}:${row.language}:${row.deliveryState||''}:${row.reason||''}`} className={id&&assignmentId===id?'selected-response':''}><td>{id?<button ref={node=>{recipientButtons.current[id]=node;}} className="text-link" aria-pressed={assignmentId===id} onClick={()=>setAssignmentId(id)}><bdi>{row.worker}</bdi><ChevronRight className="directional-icon" size={16}/></button>:<strong><bdi>{row.worker}</bdi></strong>}</td><td data-label={ui.t("Assigned language")}>{ui.language(row.language)}</td><td data-label={ui.t("Latest response")}><Assessment value={row.status}/>{row.status==='not_delivered'&&<div><small>{deliveryReasonText(ui,row.reason||row.deliveryState)}</small></div>}</td><td data-label={ui.t("Received")}>{ui.date(row.receivedAt)}</td></tr>;})}</tbody></table></div>:<p>{ui.t('No recipients match these filters.')}</p>}
         <Paging page={page} total={data.total} size={pageSize} onChange={setPage} label="recipients"/>
       </>}
     </section>{assignmentId&&<ResponseDetail authority={authority} key={`${publicationId}:${assignmentId}`} publicationId={publicationId} assignmentId={assignmentId} refresh={refresh+tick} onClose={()=>{recipientButtons.current[assignmentId]?.focus();setAssignmentId(null);}} navigate={navigate} canPlayAudio={canPlayAudio}/>}</div>
@@ -84,6 +99,7 @@ export function ResponseDetail({publicationId,assignmentId,refresh,onClose,navig
     {loading?<p data-page-loading role="status">{ui.t('Loading submission history...')}</p>:error?<p role="alert">{ui.error(error,'Response unavailable')}</p>:data&&<>
       <p>{ui.t('Version {version}',{version:ui.number(data.publication.version)})} · {ui.state(data.publication.state)} · {ui.language(data.assignment.language)}</p>
       {data.assignment.dueAt&&<p>{ui.t('Due {date}',{date:ui.date(data.assignment.dueAt)})}</p>}
+      {data.completedAt&&<p className="notice notice-green" role="status"><strong>{ui.t('Work completed')}</strong> · {ui.date(data.completedAt)}</p>}
       {data.responseMode==='acknowledge'?<><h3>{ui.t('Receipt')}</h3>{data.acknowledgedAt?<><Assessment value="acknowledged"/><p>{ui.date(data.acknowledgedAt)}</p></>:<p>{ui.t('Awaiting acknowledgment.')}</p>}
         {data.evidenceMode==='photo'&&(data.evidence?<figure className="response-evidence"><img src={`/api/publications/${encodeURIComponent(publicationId)}/responses/${encodeURIComponent(assignmentId)}/evidence`} alt={ui.t('Photo evidence submitted by {worker}',{worker:data.assignment.worker})}/><figcaption>{ui.t('Photo evidence')} · <bdi dir="ltr">{data.evidence.mime.replace('image/','').toUpperCase()}</bdi> · {ui.number(Math.max(1,Math.ceil(data.evidence.bytes/1024)))} {ui.t('KB')} · {ui.date(data.evidence.receivedAt)}</figcaption></figure>:<p className="notice notice-amber">{ui.t('Photo evidence was requested but has not been received.')}</p>)}</>:<><h3>{ui.t('Question')}</h3><p dir="auto">{data.question}</p>{data.workerQuestion&&data.workerQuestion!==data.question&&<p lang={data.assignment.language} dir={languageDirection(data.assignment.language) || 'ltr'}>{data.workerQuestion}</p>}</>}
       <h3>{ui.t('Published key facts')}</h3><ul>{data.facts.map((fact,index)=><li dir="auto" key={index}>{fact}</li>)}</ul>

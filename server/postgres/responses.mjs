@@ -86,7 +86,13 @@ export async function listPublicationResponses(pool,session,publicationId,input=
   return responseRead(pool,schema,async (client) => {
     await requirePrincipal(client,session,'staff',['owner','supervisor','auditor']);
     const {publication}=await scopedPublication(client,session,publicationId);
-    return responsePage(await publicationResponses(client,session,publicationId),filters,publication);
+    const undelivered=(await client.query(`SELECT d.worker_id,d.language,d.state,d.reason,w.code
+      FROM instruction_deliveries d
+      JOIN instruction_sends s ON s.request_id=d.request_id AND s.org_id=d.org_id AND s.site_id=d.site_id
+      JOIN workers w ON w.id=d.worker_id AND w.org_id=d.org_id AND w.site_id=d.site_id
+      WHERE s.publication_id=$1 AND s.org_id=$2 AND s.site_id=$3 AND d.state<>'available'
+      ORDER BY w.code,d.worker_id LIMIT 5001`,[publicationId,session.org_id,session.site_id])).rows;
+    return responsePage(await publicationResponses(client,session,publicationId),filters,publication,undelivered);
   });
 }
 
@@ -117,6 +123,7 @@ export async function getPublicationResponse(pool,session,publicationId,assignme
       [assignmentId,publicationId,session.org_id,session.site_id])).rows[0];
     if(!row) throw new Error('Response unavailable');
     const acknowledgment=(await client.query('SELECT received_at FROM acknowledgments WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3',[assignmentId,session.org_id,session.site_id])).rows[0];
+    const completion=(await client.query('SELECT completed_at FROM assignment_completions WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3',[assignmentId,session.org_id,session.site_id])).rows[0];
     const cases=(await client.query('SELECT id,status,reason FROM clarifications WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 ORDER BY created_at DESC,id DESC LIMIT 100',[assignmentId,session.org_id,session.site_id])).rows;
     const responseMode=snapshot.responseMode || 'question',deliveryMode=snapshot.deliveryMode || 'both';
     const evidenceMode=responseMode==='acknowledge' && snapshot.evidenceMode==='photo'?'photo':'none';
@@ -127,6 +134,7 @@ export async function getPublicationResponse(pool,session,publicationId,assignme
       responseMode,deliveryMode,evidenceMode,evidence,
       ...(snapshot.rubric?.mode==='multiple-choice'?{questionType:'multiple-choice',choices:snapshot.languages?.[row.language]?.choices || snapshot.languages?.en?.choices}:{}),
       acknowledgedAt:acknowledgment?.received_at?.toISOString() || null,
+      completedAt:completion?.completed_at?.toISOString() || null,
       ...await submissionHistory(client,session,assignmentId,page,pageSize,true),cases};
   });
 }

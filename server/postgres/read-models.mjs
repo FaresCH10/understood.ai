@@ -130,8 +130,13 @@ export async function staffOverview(pool,session,{schema='public'}={}) {
     await requirePrincipal(client,session,'staff',readRoles);
     const context=(await client.query(`SELECT o.name AS organization,s.name AS site,s.timezone FROM organizations o
       JOIN sites s ON s.org_id=o.id WHERE o.id=$1 AND s.id=$2`,[session.org_id,session.site_id])).rows[0];
-    const publication=(await client.query(`SELECT id,briefing_id AS "briefingId",version,snapshot_json->>'title' AS title FROM publications
-      WHERE org_id=$1 AND site_id=$2 AND state='published' ORDER BY published_at DESC,id LIMIT 1`,[session.org_id,session.site_id])).rows[0] || null;
+    const publication=(await client.query(`SELECT p.id,p.briefing_id AS "briefingId",p.version,p.snapshot_json->>'title' AS title,
+      COALESCE(p.snapshot_json->>'responseMode','question') AS "responseMode"
+      FROM publications p
+      WHERE p.org_id=$1 AND p.site_id=$2 AND p.state='published'
+        AND NOT EXISTS(SELECT 1 FROM briefing_archives ba
+          WHERE ba.briefing_id=p.briefing_id AND ba.org_id=p.org_id AND ba.site_id=p.site_id)
+      ORDER BY p.published_at DESC,p.version DESC,p.id DESC LIMIT 1`,[session.org_id,session.site_id])).rows[0] || null;
     const metrics=metricsFromResponses(publication ? await publicationResponses(client,session,publication.id) : []);
     const cases=(await client.query(`SELECT c.id,c.reason,c.status,c.created_at,w.code AS worker,a.language,p.snapshot_json->>'title' AS title
       FROM clarifications c JOIN assignments a ON a.id=c.assignment_id AND a.org_id=c.org_id AND a.site_id=c.site_id

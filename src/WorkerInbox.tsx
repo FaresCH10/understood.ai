@@ -11,7 +11,7 @@ import {useWorkerSwipeTabs} from './useWorkerSwipeTabs';
 
 const inboxTabs = ['active', 'done', 'all'] as const;
 
-export function WorkerInbox({active=true,language,clientContext,refresh,filter,onFilter,onOpen,onHelp,onSessionLost,current,disabled,timezone,title,refreshLabel,previousLabel,nextLabel}:{active?:boolean;language:WorkerUiLanguage;clientContext:string;refresh:number;filter:WorkFilter;onFilter:(value:WorkFilter)=>void;onOpen:(id:string)=>void;onHelp:()=>void;onSessionLost:()=>void;current:()=>boolean;disabled:boolean;timezone?:string;title:string;refreshLabel:string;previousLabel:string;nextLabel:string}){
+export function WorkerInbox({active=true,language,clientContext,refresh,filter,onFilter,onOpen,onHelp,onSessionLost,current,disabled,timezone,title,refreshLabel,previousLabel,nextLabel}:{active?:boolean;language:WorkerUiLanguage;clientContext:string;refresh:number;filter:WorkFilter;onFilter:(value:WorkFilter)=>void;onOpen:(id:string,caseId?:string)=>void;onHelp:()=>void;onSessionLost:()=>void;current:()=>boolean;disabled:boolean;timezone?:string;title:string;refreshLabel:string;previousLabel:string;nextLabel:string}){
  const t=workerJourneyText(language),rtl=workerUiDirection(language)==='rtl',Forward=rtl?ArrowLeft:ArrowRight;
  const [page,setPage]=useState(1),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[tick,setTick]=useState(0);
  const [data,setData]=useState<WorkerWorkPage|null>(null),[loading,setLoading]=useState(true),[failed,setFailed]=useState(false);
@@ -49,7 +49,7 @@ export function WorkerInbox({active=true,language,clientContext,refresh,filter,o
    const action=item.status==='done'?t.viewDone:item.hasSupervisorReply?t.reply:item.status==='in-progress'?t.continue:t.open;
    const published=item.publicationState==='published';
    const StatusIcon=!published?FileText:item.status==='done'?Check:item.status==='follow-up'?MessageCircle:FileText;
-   return <a className={`worker-task-card is-${item.status}`} key={item.id} href={`#worker/${item.id}`} onClick={event=>{if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();if(!disabled)onOpen(item.id);}}>
+   return <a className={`worker-task-card is-${item.status}`} key={item.id} href={`#worker/${item.id}${item.hasSupervisorReply&&item.replyCaseId?`/${item.replyCaseId}`:''}`} onClick={event=>{if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();if(!disabled)onOpen(item.id,item.hasSupervisorReply?item.replyCaseId||undefined:undefined);}}>
     <div className="worker-task-card-body">
      <div className="worker-task-card-top"><span className={`worker-task-state${published?` is-${item.status}`:''}`}><StatusIcon size={15} aria-hidden="true"/>{published?label:workerWorkflowCopy[language][item.publicationState==='withdrawn'?0:1]}</span>{late&&<span className="worker-overdue">{t.overdue}</span>}</div>
      <h2><bdi lang={item.language} dir={languageDirection(item.language)??'ltr'}>{item.title}</bdi></h2>

@@ -50,7 +50,7 @@ import {queueCaseFollowup,followupReceipt,followupGenerationAvailable,getFollowu
 import {resolveCaseFollowup} from './ai/case-followup-config.mjs';
 import { ensureBriefingSchema,createDraft,editDraft,queuePreparation,copyDraft,archiveBriefing,getPreparationRequestContext,getPreparationRequestReceipt,requestPreparation } from './preparation.mjs';
 import {ensureInstructionSchema} from './instruction-schema.mjs';
-import {startInstructionSend,completeInstructionSend,instructionSendStatus,instructionAudienceOverview,retryInstructionSend,instructionDeliveryContentForAssignment} from './instructions.mjs';
+import {startInstructionSend,completeInstructionSend,instructionSendStatus,instructionSendPreflight,instructionAudienceOverview,retryInstructionSend,instructionDeliveryContentForAssignment} from './instructions.mjs';
 import {acknowledgeAssignment} from './acknowledgments.mjs';
 import {handleImprovementRoute} from './self-healing-http.mjs';
 import {improvementHttpError} from './self-healing-input.mjs';
@@ -599,6 +599,10 @@ export function createAppHandler(db, options = {}) {
       if(path==='/api/instructions/audience' && req.method==='GET') {
         if(url.search) throw new Error('Invalid instruction request');
         return send(res,200,instructionAudienceOverview(db,session));
+      }
+      if(path==='/api/instructions/preflight' && req.method==='POST') {
+        if(url.search) throw new Error('Invalid instruction request');
+        return send(res,200,instructionSendPreflight(db,session,await readJson(req)));
       }
       if(path==='/api/instructions/send' && req.method==='POST') {
         if(url.search) throw new Error('Invalid instruction request');
