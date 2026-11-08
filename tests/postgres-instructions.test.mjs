@@ -1,3 +1,4 @@
+import {requestCaseRepeat} from '../server/postgres/case-repeats.mjs';
 import {processOneAssessment} from '../server/postgres/assessment-worker.mjs';
 import {assignWorkerPassword} from '../server/postgres/worker-credentials.mjs';
 import test from 'node:test';
@@ -398,6 +399,9 @@ test('PostgreSQL instruction and acknowledgment HTTP routes enforce session cont
       const staffContext=(await (await request('/session',staff)).json()).clientContext;
       const auth={'x-client-session-context':staffContext};
       assert.equal((await request('/instructions/audience',staff)).status,409);
+      assert.equal((await request('/instructions/readiness',staff,post({source:'Put the blue folder on the desk.'}))).status,409);
+      const readiness=await request('/instructions/readiness',staff,{...post({source:'Put the blue folder on the desk.'}),headers:auth});
+      assert.equal(readiness.status,200);assert.deepEqual((await readiness.json()).textLanguages,['en']);
       const audience=await request('/instructions/audience',staff,{headers:auth});assert.equal(audience.status,200);
       assert.deepEqual((await audience.json()).workers,{total:3,byLanguage:{en:1,ar:0,ur:1,hi:1},notSelected:0});
 
@@ -480,8 +484,9 @@ test('PostgreSQL multiple-choice assessment uses the frozen key and routes incor
     assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[first.id])).rows[0].outcome,'clarification');
     assert.equal((await db.query('SELECT count(*)::int n FROM clarifications WHERE assignment_id=$1',[assignment])).rows[0].n,1);
     await assert.rejects(submitAnswer(pool,worker,assignment,randomUUID(),snapshot.rubric.correctChoiceId,scope),/approved repeat/);
-    const secondAssignment=(await db.query("SELECT id FROM assignments WHERE publication_id=$1 AND worker_id='w2'",[sent.publicationId])).rows[0].id;
-    const second=await submitAnswer(pool,{...worker,principal_id:'w2'},secondAssignment,randomUUID(),snapshot.rubric.correctChoiceId,scope);
+    const caseId=(await db.query('SELECT id FROM clarifications WHERE assignment_id=$1',[assignment])).rows[0].id;
+    await requestCaseRepeat(pool,owner,caseId,{requestId:randomUUID(),dueAt:new Date(Date.now()+3600000).toISOString()},scope);
+    const second=await submitAnswer(pool,worker,assignment,randomUUID(),snapshot.rubric.correctChoiceId,scope);
     assert.equal(await processOneAssessment(pool,adapter,scope),true);
     assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[second.id])).rows[0].outcome,'matched');
     assert.equal(providerCalls,0);
@@ -500,4 +505,27 @@ test('PostgreSQL sends expose every crew and reject selected workers whose langu
     await f.db.query("UPDATE workers SET language_selection_required=false WHERE id='new-worker'");
     assert.equal((await startInstructionSend(f.pool,owner,input,scope)).audience.count,4);
   }finally{await f.db.close();}
+});
+
+test('synthetic serverless reads drain scoped assessment and CSV jobs without a durable worker',async()=>{
+ const f=await fixture(),{db,pool}=f;try{
+  const payload={...instruction(),responseMode:'question',deliveryMode:'text'};
+  await startInstructionSend(pool,owner,payload,scope);await prepare(pool);
+  const sent=await completeInstructionSend(pool,owner,payload.requestId,scope);
+  const assignment=(await db.query("SELECT id FROM assignments WHERE publication_id=$1 AND worker_id='w1'",[sent.publicationId])).rows[0].id;
+  const snapshot=(await db.query('SELECT snapshot_json FROM publications WHERE id=$1',[sent.publicationId])).rows[0].snapshot_json;
+  const attempt=await submitAnswer(pool,worker,assignment,randomUUID(),snapshot.rubric.correctChoiceId,scope);
+  const exported=await requestExport(pool,owner,{requestId:randomUUID(),publicationId:sent.publicationId},scope);
+  assert.equal(await processOneAssessment(pool,{async assess(){assert.fail('foreign scope must not assess');}},{...scope,orgId:'b',siteId:'b'}),false);
+  assert.equal(await processOneExport(pool,{...scope,orgId:'b',siteId:'b'}),false);
+  await provisionStaffCredential(pool,{staffId:'owner',orgId:'a',siteId:'a',email:'owner@example.test',password:'long-enough-password'},scope);
+  await withHttp(f,async({request})=>{
+   const staff=cookieOf(await request('/auth/staff/login',null,post({email:'owner@example.test',password:'long-enough-password'})));
+   const context=(await (await request('/session',staff)).json()).clientContext;
+   const response=await request('/reports/exports',staff,{headers:{'x-client-session-context':context}});
+   assert.equal(response.status,200);
+   assert.equal((await response.json()).find(row=>row.id===exported.id).status,'ready');
+   assert.equal((await db.query('SELECT outcome FROM attempts WHERE id=$1',[attempt.id])).rows[0].outcome,'matched');
+  },{inlineSyntheticJobs:true});
+ }finally{await db.close();}
 });

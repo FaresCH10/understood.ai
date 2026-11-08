@@ -31,7 +31,7 @@ export async function createVercelNeonHandler({env=process.env,pool,send,createP
   // A misspelled or partially live setting must never fall back to demo dispatch.
   if(!production&&(env.UNDERSTOOD_AI_MODE==='live'||env.UNDERSTOOD_DATA_CLASS==='real'))throw Error('Select the approved production runtime');
   const config=production?productionServiceConfig(env,{service:'api',transport:'vercel',approvalManifest:approvalManifest??readProductionApproval(env)}):
-    {tier:'local',aiMode:'synthetic',accessMode:'credential',integrationMode:'synthetic',dataClass:'synthetic',
+    {tier:'local',aiMode:'synthetic',accessMode:'credential',integrationMode:'synthetic',inlineSyntheticJobs:true,dataClass:'synthetic',
       publicOrigin,remoteDemo:true,localDemo:false,demoHosts:hosts};
   const ownsPool=!pool;
   pool ??= await createPostgresPool({connectionString:production?env.UNDERSTOOD_POSTGRES_URL:env.DATABASE_URL,tls:true,caFile:production?env.UNDERSTOOD_POSTGRES_CA_FILE:undefined});

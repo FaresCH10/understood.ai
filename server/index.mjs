@@ -1,3 +1,4 @@
+import {instructionReadiness} from './instruction-readiness.mjs';
 import {isPendingWorkspacePlan} from './pilot-policy.mjs';
 import {EVIDENCE_MAX_JSON_BYTES} from './evidence-policy.mjs';
 import {requiredWorkerCreation} from './people.mjs';
@@ -590,6 +591,11 @@ export function createAppHandler(db, options = {}) {
         return send(res, 200, staffAttentionPage(db, session, Object.fromEntries(url.searchParams)));
       }
       if(await handleWorkspaceRoute(req,res,session,url,(s,op,input)=>sqliteWorkspace(db,s,op,input)))return;
+      if(path==='/api/instructions/readiness' && req.method==='POST') {
+        if(session.principal_type!=='staff'||!['owner','supervisor','auditor'].includes(session.role))throw Error('Forbidden');
+        const input=await readJson(req);
+        return send(res,200,instructionReadiness({...config,preparationAdapter:options.preparationAdapter??config.preparationAdapter},input.source));
+      }
       if(path==='/api/instructions/audience' && req.method==='GET') {
         if(url.search) throw new Error('Invalid instruction request');
         return send(res,200,instructionAudienceOverview(db,session));

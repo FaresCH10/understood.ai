@@ -1,3 +1,7 @@
+import {instructionReadiness} from '../instruction-readiness.mjs';
+import {processOneAssessment} from './assessment-worker.mjs';
+import {syntheticAssessmentAdapter} from './synthetic-assessment.mjs';
+import {processOneExport} from './exports.mjs';
 import {isPendingWorkspacePlan} from '../pilot-policy.mjs';
 import {EVIDENCE_MAX_JSON_BYTES} from '../evidence-policy.mjs';
 import {requiredWorkerCreation} from '../people.mjs';
@@ -236,7 +240,7 @@ export function createPostgresRehearsalServer(pool,{storage,dataClass,schema,...
   const config=resolveAuthConfig(options);
   if (config.accessMode!=='credential' || dataClass!=='synthetic' || !/^understood_test_[a-z0-9_]+$/.test(schema || '')
     || typeof pool?.connect!=='function') throw new Error('Use an explicitly isolated synthetic PostgreSQL rehearsal');
-  return createServer(postgresHandler(pool,{...options,storage,schema,config:{...config,dataClass,caseFollowupAdapter:options.caseFollowupAdapter},cookieName:'understood_pg_rehearsal',backend:'postgres-rehearsal',requestAddress:req=>{requireLocalRequest(req);return req.socket.remoteAddress;}}));
+  return createServer(postgresHandler(pool,{...options,storage,schema,config:{...config,dataClass,integrationMode:'synthetic',inlineSyntheticJobs:options.inlineSyntheticJobs===true,caseFollowupAdapter:options.caseFollowupAdapter},cookieName:'understood_pg_rehearsal',backend:'postgres-rehearsal',requestAddress:req=>{requireLocalRequest(req);return req.socket.remoteAddress;}}));
 }
 export function createPostgresHostedServer(pool,{config,storage,publicBuild}={}) {
   if(config?.tier==='production')assertProductionAdmission(config);
@@ -374,6 +378,14 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(session.principal_type==='staff' && path!=='/api/session' && isPendingWorkspacePlan(session.workspace_plan))
         return send(res,403,{error:'Workspace access is pending'});
       if(!archivedWriteAllowed(path,req.method))await domainTransaction(pool,repository.schema,client=>requireSiteOperational(client,session.org_id,session.site_id));
+      // Vercel's synthetic sandbox has no durable worker. Drain bounded local
+      // jobs on authenticated status reads; never run demo processing in live mode.
+      if(config.inlineSyntheticJobs && config.integrationMode==='synthetic' && !options.preparationAdapter && !config.preparationAdapter && req.method==='GET'
+        && /^\/api\/(?:worker\/briefings|workspace\/work|reports)(?:\/|$)/.test(path)) {
+        const jobScope={schema:repository.schema,orgId:session.org_id,siteId:session.site_id};
+        try{await processOneAssessment(pool,syntheticAssessmentAdapter,jobScope);await processOneExport(pool,jobScope);}
+        catch(error){console.error('Synthetic background processing unavailable',error.code||'job_error');}
+      }
       if(await handleSourceAudioRoute(req,res,session,url,{
         list:(s,filters)=>listSourceAudio(pool,s,filters,repository),
         retry:(s,id,input)=>retrySourceAudio(pool,s,id,input,repository),
@@ -394,6 +406,11 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if (path==='/api/overview' && req.method==='GET') return send(res,200,await staffOverview(pool,session,repository));
       if(path==='/api/overview/attention' && req.method==='GET') return send(res,200,await attentionPage(pool,session,Object.fromEntries(url.searchParams),repository));
       if(await handleWorkspaceRoute(req,res,session,url,(s,op,input)=>postgresWorkspace(pool,s,op,input,repository)))return;
+      if(path==='/api/instructions/readiness' && req.method==='POST') {
+        if(session.principal_type!=='staff'||!['owner','supervisor','auditor'].includes(session.role))throw Error('Forbidden');
+        const input=await readJson(req);
+        return send(res,200,instructionReadiness({...config,preparationAdapter:options.preparationAdapter??config.preparationAdapter},input.source));
+      }
       if(path==='/api/instructions/audience' && req.method==='GET') {
         if(url.search) throw new Error('Invalid instruction request');
         return send(res,200,await instructionAudienceOverview(pool,session,repository));

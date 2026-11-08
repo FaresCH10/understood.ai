@@ -1,3 +1,4 @@
+function staffWorkspaceLanguage(value:'en'|'ar'|'ur'):'en'|'ar'|'ur'{return value==='ur'?'en':value;}
 import {workerWorkflowCopy} from './worker-workflow-copy';
 import {SessionRecoveryScreen} from './SessionRecoveryScreen';
 import {useSignOutConfirmation} from './SignOutConfirmation';
@@ -304,7 +305,7 @@ export default function App() {
   const [siteInterfaceLanguage,setSiteInterfaceLanguage]=useState<CaseLocale>(()=>{try{const value=localStorage.getItem('understood:interface-language');return value==='ar'||value==='ur'?value:'en';}catch{return 'en';}});
   const directoryLanguage:PeopleLocale=siteInterfaceLanguage==='ar'?'ar':'en';
   const caseUiLanguage=siteInterfaceLanguage,reportUiLanguage=siteInterfaceLanguage;
-  const staffUiLanguage=siteInterfaceLanguage,staffUi=peopleShellText[staffUiLanguage];
+  const staffUiLanguage=['sign-in','account-recovery','reset-password','accept-invitation'].includes(view)?siteInterfaceLanguage:staffWorkspaceLanguage(siteInterfaceLanguage),staffUi=peopleShellText[staffUiLanguage];
   const staffT=createStaffText(staffUiLanguage,session?.timezone || 'UTC');
   const signInCopy=staffSignInText[staffUiLanguage],signInRtl=staffUiLanguage==='ar'||staffUiLanguage==='ur';
   function changeSiteLanguage(language:CaseLocale){setSiteInterfaceLanguage(language);try{localStorage.setItem('understood:interface-language',language);}catch{}}
@@ -334,7 +335,7 @@ export default function App() {
   const sessionGuard=useWorkerSessionGuard(session,authBusy || siteTransition || Boolean(workerEntryRecovery.pending || workerEntryRecovery.error));
   const activeSession=useRef(session);activeSession.current=session;
   const [clock]=useState(() => new Date());
-  useEffect(() => { if (!message) return; const timeout = window.setTimeout(() => setMessage(''), 3500); return () => clearTimeout(timeout); }, [message]);
+  useEffect(() => { if (!message || view==='worker-access' || view==='sign-in') return; const timeout = window.setTimeout(() => setMessage(''), 3500); return () => clearTimeout(timeout); }, [message,view]);
   useEffect(() => {
     const onHash = () => {
       if(navigationGuard.current && !navigationGuard.current(location.hash.slice(1) || 'overview'))return;
@@ -626,7 +627,8 @@ return <StaffLanguageContext.Provider value={staffUiLanguage}><StaffTimezoneCont
     <div className="dashboard-header-utilities"><InterfaceLanguagePicker value={staffUiLanguage} onChange={changeSiteLanguage} disabled={siteTransition}/>
     {['owner','supervisor','auditor'].includes(session.staffRole || '') && <NotificationBell session={session} locale={staffUiLanguage} label={staffUi.notifications} onSessionLost={sessionGuard.invalidate} disabled={siteTransition} onOpen={()=>navigate('notifications')}/>}
     </div></div>
-  </header><nav className="supervisor-bottom-nav" aria-label={staffUiLanguage==='ar'?'التنقل الرئيسي':'Main navigation'}>{[['overview','Today',Home],['briefings','Instructions',FileText],['clarifications','Clarifications',MessageCircle]].map(([path,label,Icon])=>{const key=path as string;const NavIcon=Icon as typeof Home;return <button key={key} aria-current={view===key||view.startsWith(key+'/')?'page':undefined} disabled={siteTransition} onClick={()=>navigate(key)}><NavIcon size={21}/><span>{staffT(label as string)}</span></button>;})}<button aria-expanded={sidebarOpen} disabled={siteTransition} onClick={()=>setSidebarOpen(value=>!value)}><PanelLeft size={21}/><span>{staffUiLanguage==='ar'?'المزيد':'More'}</span></button></nav>{siteTransition ? <main className="staff-content" id="staff-main" tabIndex={-1}><h1>{staffUi.siteSession}</h1>{siteTransitionError ? <><p role="alert">{staffUi.siteError}</p><button className="button outline" onClick={()=>void recheckSite()}><RefreshCw size={18}/>{staffUi.recheck}</button></> : <p role="status">{staffUi.checkingSite}</p>}</main> : <main className="staff-content" id="staff-main" tabIndex={-1} key={`${session.staffScope}:${session.staffRole}`}>
+  </header><nav className="supervisor-bottom-nav" aria-label={staffUiLanguage==='ar'?'التنقل الرئيسي':'Main navigation'}>{[['overview','Today',Home],['briefings','Instructions',FileText],['clarifications','Clarifications',MessageCircle]].map(([path,label,Icon])=>{const key=path as string;const NavIcon=Icon as typeof Home;return <button key={key} aria-current={view===key||view.startsWith(key+'/')?'page':undefined} disabled={siteTransition} onClick={()=>navigate(key)}><NavIcon size={21}/><span>{key==='overview'?staffUiLanguage==='ar'?'اليوم':'Today':staffT(label as string)}</span></button>;})}<button aria-expanded={sidebarOpen} disabled={siteTransition} onClick={()=>setSidebarOpen(value=>!value)}><PanelLeft size={21}/><span>{staffUiLanguage==='ar'?'المزيد':'More'}</span></button></nav>{siteTransition ? <main className="staff-content" id="staff-main" tabIndex={-1}><h1>{staffUi.siteSession}</h1>{siteTransitionError ? <><p role="alert">{staffUi.siteError}</p><button className="button outline" onClick={()=>void recheckSite()}><RefreshCw size={18}/>{staffUi.recheck}</button></> : <p role="status">{staffUi.checkingSite}</p>}</main> : <main className="staff-content" id="staff-main" tabIndex={-1} key={`${session.staffScope}:${session.staffRole}`}>
+    {siteInterfaceLanguage==='ur'&&<Notice>Supervisor workspace is currently available in English and Arabic. English is shown.</Notice>}
     <SettingsLayout active={view==='settings'||view.startsWith('settings/')} view={view} role={session.staffRole||''} credential={isCredentialMode(session.mode)&&!!session.staffScope} organization={session.organization} site={session.site} navigate={navigate}>
 {session.siteState==='archived' && <Notice tone="blue">{staffUi.archived}</Notice>}
 {view === 'overview' && <Overview key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} name={session.name} greeting={staffGreeting(session.timezone,clock)} />}
@@ -1337,7 +1339,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
       <WorkerSurface view={`${view}:${tab}`} >
         {briefingTargetFailure && !id && <p className="notice notice-amber" role="alert">{navText.detailFailed}</p>}
         {requestFailure && <p ref={requestFailureRef} tabIndex={-1} className="notice notice-amber" role="alert">{requestFailure}</p>}
-        {pendingReceipts.filter(value=>value.assignmentId===id).map(value=><div className="notice notice-amber worker-receipt-check" key={value.kind}>
+        {!busy&&pendingReceipts.filter(value=>value.assignmentId===id).map(value=><div className="notice notice-amber worker-receipt-check" key={value.kind}>
           <strong>{checkText[value.kind]}</strong><p role="status">{checkText[value.status]}</p>
           <button className="button outline" disabled={busy} onClick={()=>void checkReceipt(value)}><RefreshCw size={18}/>{checkText.check}</button>
         </div>)}

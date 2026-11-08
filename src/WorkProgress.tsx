@@ -1,3 +1,4 @@
+import {workerReceiptText} from './worker-submission-receipt';
 import {useEffect,useRef,useState} from 'react';
 import {Check,CheckCircle2,RefreshCw} from 'lucide-react';
 import {useStaffText} from './staff-language';
@@ -39,7 +40,7 @@ export function WorkerWorkProgress({assignmentId,clientContext,current,onSession
   catch{try{const item=await read();if(item.status==='done')accepted(item);else if(mounted.current&&callbacks.current.current()){setRow(item);setError(t.unavailable);}}catch{if(mounted.current&&callbacks.current.current()){setRow(null);setError(t.unavailable);}}}
   finally{running.current=false;if(mounted.current){setBusy(false);dialog.current?.close();}}
  }
- const step=row?workJourneyStep(row):0,status=row?.status==='done'?t.done:row?.status==='in-progress'?t.progress:row?.status==='follow-up'?t.follow:t.sent;
+ const step=row?workJourneyStep(row):0,status=row?.status==='done'?t.done:row?.status==='in-progress'?t.progress:row?.status==='follow-up'?t.follow:row?.responseStatus==='pending'?workerReceiptText[locale].pending:row?.responseStatus==='received'?workerReceiptText[locale].received:t.sent;
  const stages=[j.assigned,confirmationLabel||j.check,j.working,j.done];
  return <section className="worker-journey" aria-label={j.steps} aria-busy={busy||loading}>
   <div className="worker-journey-heading"><h2>{j.steps}</h2>{row&&<span className={`worker-task-state is-${row.status}`} role="status">{status}</span>}</div>

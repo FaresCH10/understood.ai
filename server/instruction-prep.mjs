@@ -34,6 +34,23 @@ function instructionFacts(text) {
   return sentences.length ? sentences : [text.slice(0,500)];
 }
 
+// Only construct a fact-specific demo question when all four answers vary
+// that exact fact. Otherwise use the clearly synthetic whole-instruction check.
+function actionChoices(facts){
+ for(const fact of facts){
+  const action=/^(?:please\s+)?(move|put|place|store|take)\s+(.+?)\s+((?:to|on|at|in)\s+.+?)[.!?]?$/i.exec(fact);
+  if(!action)continue;
+  const answer=action[3].replace(/[.!?]$/,'').trim();
+  for(const variants of [['blue','yellow','red','green'],['north','south','east','west'],['before','after','during','until']]){
+   const match=new RegExp(`\\b(${variants.join('|')})\\b`,'i').exec(answer);
+   if(!match)continue;
+   return {fact,question:`Where must you ${action[1].toLowerCase()} ${action[2]}${/\b(before|after|until|during)\b/i.test(answer)?', and when':''}?`,
+    choices:[answer,...variants.filter(value=>value!==match[0].toLowerCase()).map(value=>answer.slice(0,match.index)+value+answer.slice(match.index+match[0].length))]};
+  }
+ }
+ return null;
+}
+
 export function syntheticInstructionPrepare(briefing,send) {
   const text=briefing.source.trim();
   if(/\p{Script=Arabic}/u.test(text))throw Error('Arabic source requires a configured translation provider.');
@@ -51,16 +68,17 @@ export function syntheticInstructionPrepare(briefing,send) {
   const action=/^(?:please\s+)?(move|put|place|store|take)\s+(.+?)\s+(?:to|on|at|in|before|after)\b/i.exec(text);
   const timing=/\b(before|after|until|during)\b/i.test(text);
   const facts=instructionFacts(text);
-  const question=action?`Where must you ${action[1].toLowerCase()} ${action[2]}${timing?', and when':''}?`
+  const concrete=questionMode?actionChoices(facts):null;
+  const question=concrete?.question || (action?`Where must you ${action[1].toLowerCase()} ${action[2]}${timing?', and when':''}?`
     :/\bkeep\b.*\bclear\b/i.test(text)?'What must you keep clear?'
-    :facts.length>1?'Which actions does this instruction require?':'What action does this instruction require?';
+    :facts.length>1?'Which actions does this instruction require?':'What action does this instruction require?');
   return withMultipleChoice({
     responseMode:send.response_mode,
     title:briefing.title,
     source:text,
     facts:instructionFacts(text),
-    ...(questionMode ? {question,rubric:{mode:'keywords',askedFacts:groups.map((group)=>`Mention ${group[0]}`),keywordGroups:groups}} : {}),
-    languages:{en:{title:briefing.title,text,...(questionMode ? {question} : {}),speech:'device-synthesis-demo'}},
+    ...(questionMode ? {question,rubric:{mode:'keywords',askedFacts:concrete?[concrete.fact]:groups.map((group)=>`Mention ${group[0]}`),keywordGroups:groups}} : {}),
+    languages:{en:{title:briefing.title,text,...(questionMode ? {question,...(concrete?{answerChoices:concrete.choices}:{})} : {}),speech:'device-synthesis-demo'}},
     provenance:{adapter:'synthetic-instruction-v1',live:false},
-  });
+  },{preserveQuestions:!!concrete});
 }

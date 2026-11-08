@@ -149,3 +149,5 @@
  .staff-shell .send-composer .send-mobile-review{margin-top:0}
  .staff-shell .reports-workspace>.reports-scope{order:-2}
 }
+
+.send-refresh-recipients{display:flex;align-items:center;gap:7px;min-height:44px;margin-bottom:8px}

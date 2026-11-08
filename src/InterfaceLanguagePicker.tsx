@@ -5,7 +5,7 @@ import {ChevronDown,Check} from 'lucide-react';
 import {gsap,useGSAP} from './gsap';
 
 type Language='en'|'ar'|'ur';
-const languages=[{code:'en',name:'English',description:'English'},{code:'ar',name:'العربية',description:'Arabic'},{code:'ur',name:'اردو',description:'Urdu'}] as const;
+const languages=[{code:'en',name:'English',description:'English'},{code:'ar',name:'العربية',description:'Arabic'}] as const;
 export function InterfaceLanguagePicker({value,onChange,disabled=false}:{value:Language;onChange:(language:Language)=>void;disabled?:boolean}){
  const root=useRef<HTMLDetailsElement>(null),panel=useRef<HTMLDivElement>(null);
  const {contextSafe}=useGSAP(()=>{}, {scope:root});

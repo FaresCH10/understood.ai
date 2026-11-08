@@ -1,0 +1,13 @@
+{
+  "observation": "Response captured from the browser while retrying the unavailable audit crew view",
+  "status": 200,
+  "url": "https://understood-ai.vercel.app/api/people/crews/9eeedd63-23db-46ce-a10b-7dfa87358fb4",
+  "body": {
+    "id": "9eeedd63-23db-46ce-a10b-7dfa87358fb4",
+    "org_id": "e8ae0da5-8d63-4f2f-bcdf-5556b471709c",
+    "site_id": "4e2f6d2b-6a4f-4d61-a1b4-a0f679b0b6f8",
+    "name": "QA1107 Audit Crew",
+    "active": true,
+    "member_count": 0
+  }
+}

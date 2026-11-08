@@ -1,3 +1,4 @@
+import {keepDialogFocus} from './dialog-focus';
 import {MobileDisclosure} from './MobileDisclosure';
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useStaffText} from './staff-language';
@@ -69,7 +70,7 @@ export function derivedInstructionTitle(source:string){
   return (sentence.length>120 ? `${sentence.slice(0,117).trimEnd()}…` : sentence).slice(0,titleMax);
 }
 function reasonText(reason:UndeliveredReason){
-  const language=reason.language==='ar'?'Arabic':reason.language==='ur'?'Urdu':reason.language?reason.language.toUpperCase():'';
+  const language=reason.language?new Intl.DisplayNames(['en'],{type:'language'}).of(reason.language)||reason.language:'';
   if(reason.reason==='language_unavailable')return `${language || 'Language'} version not ready`;
   if(reason.reason==='content_unavailable')return `${language || 'Language'} text not ready`;
   if(reason.reason==='question_unavailable')return `${language || 'Language'} question not ready`;
@@ -96,6 +97,13 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const [evidenceMode,setEvidenceMode]=useState<EvidenceMode>(restoredPending?.evidenceMode || 'none');
   const [audience,setAudience]=useState<AudienceOverview|null>(null);
   const [audienceError,setAudienceError]=useState('');
+  const [readiness,setReadiness]=useState<{mode:string;textLanguages:string[];speechLanguages:string[]}|null>(null);
+  const [readinessError,setReadinessError]=useState('');
+
+  const [audienceLoading,setAudienceLoading]=useState(false),[audienceRevision,setAudienceRevision]=useState(0);
+  const leaveDialog=useRef<HTMLDialogElement>(null),leaveRequest=useRef<{next:string;resume?:()=>void}|null>(null);
+  const [leaveOpen,setLeaveOpen]=useState(false);
+  useEffect(()=>{if(leaveOpen)leaveDialog.current?.showModal();else leaveDialog.current?.close();},[leaveOpen]);
   const [result,setResult]=useState<SendResult|null>(null);
   const [retryReceipt,setRetryReceipt]=useState<{requestId:string;retried:number;released:number}|null>(null);
   const [error,setError]=useState('');
@@ -104,15 +112,17 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const discarded=useRef<PendingSend|null>(null);
   const sending=useRef(false);
   const sentNotice=useRef(false);
+  useEffect(()=>{const controller=new AbortController();setReadiness(null);setReadinessError('');const timer=setTimeout(()=>{request<{mode:string;textLanguages:string[];speechLanguages:string[]}>('/api/instructions/readiness',{source},controller.signal).then(value=>{if(!controller.signal.aborted&&current())setReadiness(value);}).catch(()=>{if(!controller.signal.aborted&&current())setReadinessError('Preparation readiness could not be checked. Refresh recipients to retry.');});},400);return()=>{clearTimeout(timer);controller.abort();};},[source,audienceRevision,request,current]);
   const trimmedSource=source.trim();
   const effectiveTitle=title.trim().slice(0,titleMax);
   const audienceChoice:AudienceChoice=audienceType==='crew'?{type:'crew',crewId}:audienceType==='members'?{type:'members',workerIds:[...workerIds].sort()}:{type:'all'};
   const selectedCrew=audienceType==='crew'?audience?.crews.find(crew=>crew.id===crewId):null;
   const selectedMembers=audience?.members?.filter(member=>workerIds.includes(member.id))||[];
   const selectedAudience=audienceType==='members'?{total:selectedMembers.filter(member=>!member.language_selection_required).length,notSelected:selectedMembers.filter(member=>member.language_selection_required).length,byLanguage:selectedMembers.reduce<Record<string,number>>((counts,member)=>{counts[member.language]=(counts[member.language]||0)+1;return counts;},{})}:audienceType==='all'?audience?.workers:selectedCrew?{total:selectedCrew.members,byLanguage:selectedCrew.byLanguage,notSelected:selectedCrew.notSelected}:null;
+  const unavailableLanguages=selectedAudience?Object.keys(selectedAudience.byLanguage||{}).filter(code=>(selectedAudience.byLanguage[code]||0)>0&&(!readiness?.textLanguages.includes(code)||(deliveryMode!=='text'&&!readiness?.speechLanguages.includes(code)))):[];
   const titleValid=effectiveTitle.length>=3;
   const canSubmit=trimmedSource.length>=sourceMin && trimmedSource.length<=sourceMax && titleValid
-    && !!selectedAudience && selectedAudience.total>0 && !selectedAudience.notSelected && !busy && !attachmentBusy && !pending && !recovery.error;
+    && !!selectedAudience && selectedAudience.total>0 && !selectedAudience.notSelected && !!readiness && !readinessError && !unavailableLanguages.length && !audienceLoading && !audienceError && !busy && !attachmentBusy && !pending && !recovery.error;
   const sourceIssue=trimmedSource.length<sourceMin?'short':trimmedSource.length>sourceMax?'long':'';
   const audienceReady=!!selectedAudience && selectedAudience.total>0 && !selectedAudience.notSelected;
   const audienceHint=audienceType==='crew'&&!selectedCrew?staffT("Select a crew to continue."):selectedAudience?.notSelected?staffT("Select a language for every worker in this audience."):selectedAudience?staffT("Choose at least one worker with a selected language."):staffT("Loading recipients...");
@@ -144,7 +154,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
     return()=>clearTimeout(timer);
   },[title,source,audienceType,crewId,workerIds,responseMode,deliveryMode,evidenceMode,draftLoaded,pending,result]);
   useEffect(()=>{
-    const guard=(next:string,resume?:()=>void)=>{if(attachmentBusy){setError('Wait for the attachment to finish uploading.');return false;}if(approvedNext.current===next){approvedNext.current=null;return true;}if(pending||result||!contentRef.current.source&&!contentRef.current.title)return true;void saveDraft().then(()=>{approvedNext.current=next;if(resume)resume();else navigate(next);}).catch(reason=>{if(current())setError(`Save draft before leaving: ${reason.message}`);});return false;};
+    const guard=(next:string,resume?:()=>void)=>{if(attachmentBusy){setError('Wait for the attachment to finish uploading.');return false;}if(approvedNext.current===next){approvedNext.current=null;return true;}if(pending||result||!contentRef.current.source&&!contentRef.current.title)return true;void saveDraft().then(()=>{approvedNext.current=next;if(resume)resume();else navigate(next);}).catch(reason=>{if(current()){setError(`Save draft before leaving: ${reason.message}`);leaveRequest.current={next,resume};setLeaveOpen(true);}});return false;};
     navigationGuard.current=guard;return()=>{if(navigationGuard.current===guard)navigationGuard.current=null;};
   },[pending,result,current,request,attachmentBusy]);
   useEffect(()=>{if(voiceOpen)voiceDialog.current?.showModal();},[voiceOpen]);
@@ -152,11 +162,14 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
 
   useEffect(()=>{
     const controller=new AbortController(),live=()=>current() && !controller.signal.aborted;
+    setAudienceLoading(true);
     request<AudienceOverview>('/api/instructions/audience',undefined,controller.signal)
       .then(value=>{if(live()){setAudience(value);setAudienceError('');}})
-      .catch(reason=>{if(live() && !(reason instanceof StaffRequestError && reason.fenced))setAudienceError(reason instanceof Error?reason.message:'Audience unavailable');});
+      .catch(reason=>{if(live() && !(reason instanceof StaffRequestError && reason.fenced))setAudienceError(reason instanceof Error?reason.message:'Audience unavailable');}).finally(()=>{if(live())setAudienceLoading(false);});
     return()=>controller.abort();
-  },[request,current]);
+  },[request,current,audienceRevision]);
+
+  useEffect(()=>{const update=()=>{if(document.visibilityState==='visible')setAudienceRevision(value=>value+1);};window.addEventListener('focus',update);document.addEventListener('visibilitychange',update);return()=>{window.removeEventListener('focus',update);document.removeEventListener('visibilitychange',update);};},[]);
 
   useEffect(()=>{
     const waiting=result && (result.state==='preparing' || (result.deliveryStates?.preparing ?? 0)>0);
@@ -288,11 +301,12 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
 
   return <>
     <div className="page-header"><div><h1>{tr("Send an instruction")}</h1><p>{tr("Write or record your instruction, choose recipients, and send.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
+    <dialog ref={leaveDialog} className="withdraw-dialog" aria-labelledby="composer-leave-title" onKeyDown={keepDialogFocus} onCancel={()=>setLeaveOpen(false)}><h2 id="composer-leave-title">{staffT.locale==='ar'?'تعذّر حفظ المسودة':'Draft could not be saved'}</h2><p>{staffT.locale==='ar'?'يمكنك البقاء وإعادة المحاولة، أو المغادرة دون حفظ التغييرات الأخيرة.':'Stay and retry saving, or leave without saving the latest changes. Previously saved drafts are retained.'}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>setLeaveOpen(false)}>{staffT.locale==='ar'?'البقاء':'Keep working'}</button><button className="button primary" onClick={()=>{const target=leaveRequest.current;if(!target)return;try{sessionStorage.removeItem(localKey);}catch{}approvedNext.current=target.next;setLeaveOpen(false);if(target.resume)target.resume();else navigate(target.next);}}>{staffT.locale==='ar'?'المغادرة دون حفظ':'Discard and leave'}</button></div></dialog>
     <dialog ref={voiceDialog} className="worker-form-dialog" aria-label={tr("Record instruction")} onCancel={event=>{event.preventDefault();closeVoice();}}>{voiceOpen&&<VoiceTranscript authority={authority} title={title} onClose={closeVoice} replacing={!!source.trim()} onApproved={text=>{setSource(text);closeVoice();}}/>}</dialog>
 
     {recovery.error&&<div className="notice notice-amber" role="alert">{staffT.error(recovery.error)}</div>}
-    {pending && !error && <div className="notice notice-amber" role="status"><strong>{staffT("An earlier send was not confirmed.")}</strong> {staffT("Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
-    {pending && error && <div className="notice notice-amber" role="status"><strong>{staffT("Send outcome not confirmed.")}</strong> {staffT("The original request is retained. Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
+    {pending && !busy && !error && <div className="notice notice-amber" role="status"><strong>{staffT("An earlier send was not confirmed.")}</strong> {staffT("Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
+    {pending && !busy && error && <div className="notice notice-amber" role="status"><strong>{staffT("Send outcome not confirmed.")}</strong> {staffT("The original request is retained. Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
     {error && !pending && <div className="notice notice-amber" role="alert">{staffT.error(error)}</div>}
     <section className="panel send-composer" data-mobile-step={mobileStep} aria-labelledby="send-source-title"><nav className="send-mobile-steps" aria-label={tr("Send an instruction")}>{['Content','Recipients','Review'].map((label,index)=><button key={label} aria-current={mobileStep===index?'step':undefined} disabled={busy} onClick={()=>setMobileStep(index)}>{index+1}. {staffT.locale==='ar'?['المحتوى','المستلمون','المراجعة'][index]:label}</button>)}</nav><div className="send-step-content">
       <label className="field" htmlFor="send-title"><span>{tr("Title")} <span aria-hidden="true">*</span></span>
@@ -314,8 +328,12 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       {audienceType==='crew'&&<label className="field">{tr("Choose crew")}<select aria-label={tr("Choose crew")} value={crewId} disabled={busy||!!pending} onChange={event=>setCrewId(event.target.value)}><option value="">{tr("Select crew")}</option>{audience?.crews.map(crew=><option key={crew.id} value={crew.id}>{crew.name} ({crew.members})</option>)}</select></label>}
       {audienceType==='members'&&<RecipientMembers members={audience?.members||[]} selected={workerIds} onChange={setWorkerIds} disabled={busy||!!pending}/>}
 
+      <button type="button" className="text-link send-refresh-recipients" disabled={busy||audienceLoading} onClick={()=>setAudienceRevision(value=>value+1)}><RefreshCw size={16}/>{staffT.locale==='ar'?'تحديث المستلمين':'Refresh recipients'}</button>
       {selectedAudience && <div className="language-chips send-audience-languages" aria-label={staffT("Worker languages")}>{Object.entries(selectedAudience.byLanguage || {}).filter(([,count])=>count>0).map(([code,count])=><i key={code}>{code.toUpperCase()} {count}</i>)}</div>}
       {!!selectedAudience?.notSelected && <p className="notice notice-amber" role="status">{selectedAudience.notSelected} {staffT("active workers in this audience still need a language selected in Team before sending.")}</p>}
+      {readiness?.mode==='synthetic'&&<p className="notice notice-amber" role="status">{staffT.locale==='ar'?'وضع تجريبي: تدعم التعليمات العامة النص الإنجليزي فقط. الترجمة متعددة اللغات والصوت المُولّد يتطلبان تفعيل خدمات الذكاء الاصطناعي.':'Test mode: general instructions support English text only. Multilingual translation and generated audio require a configured live workspace.'}</p>}
+      {!!readiness&&unavailableLanguages.length>0&&<p className="notice notice-amber" role="alert">{staffT.locale==='ar'?'اللغات غير الجاهزة للصيغة المحددة:':'Not ready for the selected delivery format:'} {unavailableLanguages.map(code=>staffT.language(code)).join(', ')}. {staffT.locale==='ar'?'اختر النص فقط والمستلمين الجاهزين، أو اطلب تفعيل الخدمات.':'Choose text-only ready recipients, or ask the workspace administrator to configure the required services.'}</p>}
+      {readinessError&&<p role="alert">{readinessError}</p>}
       {audienceError && <p className="notice notice-amber" role="alert">{audienceError}</p>}
       {selectedAudience && selectedAudience.total===0 && <p className="notice notice-amber" role="status">{staffT("There are no workers with a selected language in this audience.")}</p>}
 

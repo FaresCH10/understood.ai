@@ -35,12 +35,13 @@ async function routeFailedAssessment(pool,job,schema){
  });
 }
 
-export async function processOneAssessment(pool,adapter,{schema='public'}={}) {
+export async function processOneAssessment(pool,adapter,{schema='public',orgId=null,siteId=null}={}) {
   if (typeof adapter?.assess!=='function') throw new Error('Assessment adapter unavailable');
   const job = await domainTransaction(pool,schema,async (client) => {
     const row = (await client.query(`SELECT * FROM assessment_jobs WHERE ((status='queued' AND due_at<=clock_timestamp())
       OR (status='processing' AND lease_until<=clock_timestamp())) AND ${dispatchPredicate('assessment_jobs',{provider:true})}
-      ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1`)).rows[0];
+      AND ($1::text IS NULL OR org_id=$1) AND ($2::text IS NULL OR site_id=$2)
+      ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1`,[orgId,siteId])).rows[0];
     if (!row || !await dispatchAllowed(client,row.org_id,{provider:true})) return null;
     if (row.attempts>=3) {
       await client.query(`UPDATE assessment_jobs SET status='failed',lease_token=NULL,lease_until=NULL,error='Assessment interrupted too many times' WHERE id=$1`,[row.id]);

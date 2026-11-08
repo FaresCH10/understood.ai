@@ -21,9 +21,9 @@ function workerDto(row) {
   const {pending_request_id,pending_requested_language,pending_current_language,pending_reason,pending_requested_at,...rest}=row;
   return {...rest,name:row.name ?? null,active:!!row.active,
     language_selection_required:!!row.language_selection_required,language_selected:!row.language_selection_required,
-    language_selected_at:row.language_selected_at ?? null,language_selected_by:row.language_selected_by ?? null,
+    language_selected_at:row.language_selected_at ? new Date(row.language_selected_at).toISOString() : null,language_selected_by:row.language_selected_by ?? null,
     pending_language_request:pending_request_id ? {id:pending_request_id,currentLanguage:pending_current_language,
-      requestedLanguage:pending_requested_language,reason:pending_reason,requestedAt:pending_requested_at} : null};
+      requestedLanguage:pending_requested_language,reason:pending_reason,requestedAt:new Date(pending_requested_at).toISOString()} : null};
 }
 
 const workerColumns=`w.id,w.org_id,w.site_id,w.code,w.name,w.language,w.language_selection_required,

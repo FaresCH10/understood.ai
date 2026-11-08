@@ -1,3 +1,4 @@
+import {readCrewMembers} from '../src/crew-overview.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
@@ -43,4 +44,15 @@ test('PostgreSQL numbers worker IDs per company and restricts prefix edits to ow
     assert.ok(codes.includes('HT-001'));
     assert.equal((await db.query("SELECT COUNT(*)::int AS n FROM audit WHERE action='organization.worker_prefix_updated'")).rows[0].n,1);
   } finally {await db.close();}
+});
+
+test('worker list normalizes jsonb timestamps so disabled crew members remain readable',async()=>{
+ const {db,pool}=await fixture();try{
+  await db.query("INSERT INTO crews(id,org_id,site_id,name) VALUES ('crew','a','a','Crew')");
+  await db.query("INSERT INTO crew_memberships(worker_id,org_id,site_id,crew_id) VALUES ('demo','a','a','crew')");
+  await db.query("UPDATE workers SET active=false,language_selected_at='2026-11-07T12:34:56.123Z',language_selected_by='staff' WHERE id='demo'");
+  const result=await listWorkers(pool,owner,{crewId:'crew',status:'all',pageSize:10},options);
+  assert.equal(result.items[0].language_selected_at,'2026-11-07T12:34:56.123Z');
+  assert.deepEqual(readCrewMembers(result,{scope:'["a","a","owner"]',crewId:'crew',status:'all',page:1,pageSize:10}),result);
+ }finally{await db.close();}
 });

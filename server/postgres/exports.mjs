@@ -131,14 +131,15 @@ export async function downloadExport(pool,session,id,{schema='public'}={}) {
   return result;
 }
 
-export async function processOneExport(pool,{schema='public',render=exportCsv}={}) {
+export async function processOneExport(pool,{schema='public',render=exportCsv,orgId=null,siteId=null}={}) {
   const token=randomUUID();
   const row=await domainTransaction(pool,schema,async (client) => {
     await expireBatch(client);
     const job=(await client.query(`SELECT * FROM report_exports WHERE expires_at>clock_timestamp() AND
       (status='queued' OR (status='processing' AND lease_until<=clock_timestamp()))
       AND ${dispatchPredicate('report_exports')}
-      ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`)).rows[0];
+      AND ($1::text IS NULL OR org_id=$1) AND ($2::text IS NULL OR site_id=$2)
+      ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED`,[orgId,siteId])).rows[0];
     if (!job || !await dispatchAllowed(client,job.org_id)) return null;
     if (job.attempts>=3) {
       await client.query("UPDATE report_exports SET status='failed',error='Export retry limit reached',lease_token=NULL,lease_until=NULL WHERE id=$1",[job.id]);

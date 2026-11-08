@@ -93,7 +93,7 @@ export function staffApplicationContextRequired(path,method) {
     || /^\/api\/processing\/[^/]+\/provenance$/.test(path)
     || /^\/api\/audit(?:\/[^/]+)?$/.test(path) || path==='/api/language-readiness'
     || path==='/api/calendar' || path==='/api/instructions/audience' || /^\/api\/instructions\/sends\/[^/]+$/.test(path))
-    || method==='POST' && (path==='/api/language-readiness/test' || /^\/api\/processing\/[^/]+\/retries$/.test(path) || path==='/api/instructions/send'
+    || method==='POST' && (path==='/api/language-readiness/test' || /^\/api\/processing\/[^/]+\/retries$/.test(path) || path==='/api/instructions/send' || path==='/api/instructions/readiness'
       || /^\/api\/instructions\/sends\/[^/]+\/retry$/.test(path));
 }
 

@@ -1,10 +1,10 @@
+import {syntheticAssessmentAdapter} from './synthetic-assessment.mjs';
 import {resolveRegistrationVerification} from '../registration-verification.mjs';
 import {processOnePresentation} from './presentation-jobs.mjs';
 import {assertProductionAdmission} from './production-admission.mjs';
 import { isAbsolute,resolve,relative } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { resolveAuthConfig } from '../auth.mjs';
-import { assessAnswer } from '../domain.mjs';
 import { createPostgresRehearsalServer } from './http.mjs';
 import { verifyMigrations } from './migrate.mjs';
 import {verifyRuntimePermissions} from './runtime-permissions.mjs';
@@ -74,16 +74,7 @@ export function rehearsalConfig(env=process.env) {
   return {...config,registrationVerification,schema,port,audioRoot,dataClass:'synthetic',integrationMode:'synthetic',mail,storageChecks:env.UNDERSTOOD_STORAGE_CHECKS==='true',operatorAccess:env.UNDERSTOOD_OPERATOR_ACCESS==='true',sourceAdapter:resolveSourceTranscription(env),caseFollowupAdapter:resolveCaseFollowup(env),recordingAdapter:resolveRecordingAdapter(env),preparationAdapter:resolvePreparationAdapter(env),assessmentAdapter:resolveAssessmentAdapter(env),providerVerification:resolveProviderVerification(env)};
 }
 
-export const syntheticAssessmentAdapter={
-  async assess(answer,question,facts) {
-    if (facts?.join('|')!=='finished -> blue shelf|unfinished -> yellow shelf' || typeof question!=='string')
-      return {outcome:'unassessable',reasons:['unsupported_synthetic_rubric'],evidence:[]};
-    const result=assessAnswer(answer);
-    if (result.outcome==='matched' && answer.length>300)
-      return {outcome:'unassessable',reasons:['synthetic_evidence_limit'],evidence:[]};
-    return {...result,evidence:result.outcome==='matched' ? facts.map((_,factIndex) => ({factIndex,quote:answer})) : []};
-  },
-};
+export {syntheticAssessmentAdapter} from './synthetic-assessment.mjs';
 
 export function rehearsalTasks(pool,storage,config,{verificationSignal}={}) {
   const options={schema:config.schema,integrationMode:config.integrationMode??'synthetic'};
