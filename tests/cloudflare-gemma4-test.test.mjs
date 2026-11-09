@@ -4,7 +4,7 @@ import {cloudflareGemma4Test} from '../server/ai/cloudflare-gemma4-test.mjs';
 import {staffApplicationContextRequired} from '../server/session-context.mjs';
 
 const env={
-  VERCEL_ENV:'preview',UNDERSTOOD_CLOUDFLARE_GEMMA4_TEST:'true',
+  VERCEL_ENV:'production',UNDERSTOOD_CLOUDFLARE_GEMMA4_TEST:'true',
   CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32),CLOUDFLARE_API_TOKEN:'test-token',
 };
 const output={
@@ -14,9 +14,10 @@ const output={
 };
 const providerResult=value=>Response.json({success:true,result:{choices:[{message:{content:JSON.stringify(value)}}]}});
 
-test('Gemma testing requires preview, explicit opt-in and server credentials',()=>{
+test('Gemma testing requires a synthetic Vercel production deployment, explicit opt-in and server credentials',()=>{
+  assert.ok(cloudflareGemma4Test(env));
   for(const override of [
-    {VERCEL_ENV:'production'},{VERCEL_ENV:undefined},{UNDERSTOOD_TIER:'production'},
+    {VERCEL_ENV:'preview'},{VERCEL_ENV:undefined},{UNDERSTOOD_TIER:'production'},
     {UNDERSTOOD_CLOUDFLARE_GEMMA4_TEST:undefined},{CLOUDFLARE_API_TOKEN:''},{CLOUDFLARE_ACCOUNT_ID:'invalid'},
   ])assert.equal(cloudflareGemma4Test({...env,...override}),null);
   assert.equal(staffApplicationContextRequired('/api/instructions/gemma4-test','POST'),true);

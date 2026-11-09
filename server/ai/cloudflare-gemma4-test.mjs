@@ -4,7 +4,7 @@ const model='@cf/google/gemma-4-26b-a4b-it';
 const source='Place 2 sealed cartons on the blue shelf before 4 pm. Do not move unsealed cartons. Keep the walkway clear.';
 
 export function cloudflareGemma4Test(env,fetcher=fetch) {
-  if(env.VERCEL_ENV!=='preview' || env.UNDERSTOOD_TIER==='production' || env.UNDERSTOOD_CLOUDFLARE_GEMMA4_TEST!=='true')return null;
+  if(env.VERCEL_ENV!=='production' || env.UNDERSTOOD_TIER==='production' || env.UNDERSTOOD_CLOUDFLARE_GEMMA4_TEST!=='true')return null;
   const account=env.CLOUDFLARE_ACCOUNT_ID?.trim(),token=env.CLOUDFLARE_API_TOKEN?.trim();
   if(!/^[a-f0-9]{32}$/i.test(account ?? '') || !token)return null;
 
