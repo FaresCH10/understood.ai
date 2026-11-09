@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState,type FormEvent} from 'react';
-import {ArrowLeft,ArrowRight,Check,CheckCircle2,Clock3,LogIn,Mail,RefreshCw,ShieldCheck} from 'lucide-react';
+import {ArrowLeft,ArrowRight,Check,CheckCircle2,Clock3,LoaderCircle,LogIn,Mail,RefreshCw,ShieldCheck} from 'lucide-react';
 import {isPaidPlan,PAID_PLANS,PLAN_NAMES,PILOT_DAYS} from '../server/pilot-policy.mjs';
 import {countryOptions} from './country-options';
 import {AuthLanguagePicker} from './AuthLanguagePicker';
@@ -11,7 +11,8 @@ type AccountBody=Parameters<typeof requestAccount>[0];
 type RegistrationPlan=keyof typeof PLAN_NAMES;
 
 const en={
-  verifyEyebrow:'Email verification',verifyIntro:'Enter the six-digit code for',verifyHint:'Paste the code from your most recent email.',verifyTrialNote:'Sign in after verification to check your workspace access.',verifyDifferent:'Use a different email',verifyMissing:'Didn’t receive an email?',verifyPrivacy:'Already registered? Sign in instead.',
+  verifyIntro:'Enter the six-digit verification code for',verifyHint:'Use the code from the most recent email.',verifyDifferent:'Use a different email',verifyMissing:'Didn’t receive an email?',
+  preparingEmail:'Preparing email verification',preparingEmailBody:'This may take a few seconds. Keep this tab open.',
   codeExpired:'This code has expired. Request a new code below.',codeLimited:'Too many attempts. Wait a few minutes before trying again.',codeService:'The verification service is temporarily unavailable. Please try again shortly.',
   codeLabel:'Verification code',codeHint:'Enter the six-digit code from your email. Codes expire; use the latest code or request another.',codeSent:'If this registration is eligible, a verification code has been requested for',codeResend:'Request another code',codeResent:'If this registration is still pending, a new code has been requested.',codeError:'The code could not be verified. Check the latest code and try again.',codeUnavailable:'Email verification is not configured or could not be checked. Please try again later.',codeNote:'Verify your email to finish setting up your account.',checkingVerification:'Checking email verification…',retryVerification:'Check again',
   kicker:'Company account',title:'Set up your company workspace',
@@ -31,13 +32,14 @@ const en={
   unconfirmed:'The result could not be confirmed. Retry the same registration before starting over.',retry:'Retry the same registration',
   startOver:'Start a different registration',dismiss:'Dismiss',passwordMismatch:'The passwords do not match.',storage:'This browser could not keep a registration receipt. Keep this tab open until the result is confirmed.',
   verifyTitle:'Verify your work email',verifyLead:'Confirm your email to prepare your workspace. Pilot access remains read-only until approval.',verify:'Verify work email',verifying:'Verifying...',
-  verifiedDuplicatePolicy:'Sign in to check your current access. Existing workspace terms remain unchanged.',verifiedTitle:'Email verified',verifiedLead:'Your email is verified. Sign in to check your workspace access.',verifiedDuplicate:'This link was already used. Sign in to open your workspace.',
+  verifiedTitle:'Email verified',verifiedLead:'Sign in with your password to check your workspace access.',verifiedDuplicate:'This link was already used. Sign in to open your workspace.',
   verifiedTrial:'Workspace access opens once your pilot is approved or your paid plan is activated.',openSignIn:'Sign in to continue',
   unavailableTitle:'This link is unavailable',unavailableBody:'It may have expired, been replaced, or already been used. Sign in if your account is active, or request a new link from the registration page.',newLink:'Request a new link',
   uncertainTitle:'Verification not confirmed',uncertainBody:'The result could not be confirmed. Retry this same link before signing in.',retryVerify:'Retry verification',signInShort:'Sign in',
 };
 const ar={
-  verifyEyebrow:'تأكيد البريد الإلكتروني',verifyIntro:'أدخل الرمز المكوّن من ستة أرقام للبريد',verifyHint:'الصق الرمز من أحدث رسالة وصلتك.',verifyTrialNote:'سجّل الدخول بعد التحقق لمراجعة الوصول إلى مساحة العمل.',verifyDifferent:'استخدام بريد مختلف',verifyMissing:'لم تصلك رسالة؟',verifyPrivacy:'لديك حساب؟ سجّل الدخول بدلاً من ذلك.',
+  verifyIntro:'أدخل رمز التحقق المكوّن من ستة أرقام للبريد',verifyHint:'استخدم الرمز من أحدث رسالة وصلتك.',verifyDifferent:'استخدام بريد مختلف',verifyMissing:'لم تصلك رسالة؟',
+  preparingEmail:'جارٍ تجهيز التحقق من البريد',preparingEmailBody:'قد يستغرق ذلك بضع ثوانٍ. أبقِ هذه النافذة مفتوحة.',
   codeExpired:'انتهت صلاحية هذا الرمز. اطلب رمزاً جديداً أدناه.',codeLimited:'محاولات كثيرة. انتظر بضع دقائق قبل المحاولة مجدداً.',codeService:'خدمة التحقق غير متاحة مؤقتاً. حاول مجدداً بعد قليل.',
   codeLabel:'رمز التحقق',codeHint:'أدخل الرمز المكوّن من ستة أرقام من بريدك. تنتهي صلاحية الرموز؛ استخدم أحدث رمز أو اطلب رمزاً آخر.',codeSent:'إذا كان التسجيل مؤهلاً، فقد طُلب إرسال رمز تحقق إلى',codeResend:'طلب رمز آخر',codeResent:'إذا كان التسجيل ما زال معلقاً، فقد طُلب رمز جديد.',codeError:'تعذّر التحقق من الرمز. راجع أحدث رمز وحاول مجدداً.',codeUnavailable:'التحقق من البريد غير مضبوط أو تعذّر فحصه. حاول لاحقاً.',codeNote:'تحقق من بريدك لإكمال إعداد حسابك.',checkingVerification:'جارٍ فحص التحقق من البريد…',retryVerification:'إعادة الفحص',
   kicker:'حساب الشركة',title:'جهّز مساحة عمل شركتك',
@@ -57,7 +59,7 @@ const ar={
   unconfirmed:'تعذّر تأكيد النتيجة. أعد محاولة التسجيل نفسه قبل البدء من جديد.',retry:'إعادة محاولة التسجيل نفسه',
   startOver:'بدء تسجيل مختلف',dismiss:'إغلاق',passwordMismatch:'كلمتا المرور غير متطابقتين.',storage:'تعذّر على هذا المتصفح حفظ إيصال التسجيل. أبقِ هذه النافذة مفتوحة حتى تأكيد النتيجة.',
   verifyTitle:'تحقق من بريد العمل',verifyLead:'تحقق من البريد لتجهيز مساحة العمل. تبقى صلاحيات البرنامج للقراءة فقط حتى الموافقة.',verify:'تحقق من بريد العمل',verifying:'جارٍ التحقق...',
-  verifiedDuplicatePolicy:'سجّل الدخول للاطلاع على صلاحياتك الحالية. تبقى شروط مساحة العمل القائمة دون تغيير.',verifiedTitle:'تم التحقق من البريد',verifiedLead:'تم التحقق من بريدك. سجّل الدخول لمراجعة الوصول إلى مساحة العمل.',verifiedDuplicate:'استُخدم هذا الرابط سابقاً. سجّل الدخول لفتح مساحة عملك.',
+  verifiedTitle:'تم التحقق من البريد',verifiedLead:'سجّل الدخول بكلمة المرور لمراجعة الوصول إلى مساحة العمل.',verifiedDuplicate:'استُخدم هذا الرابط سابقاً. سجّل الدخول لفتح مساحة عملك.',
   verifiedTrial:'يتاح الوصول عند الموافقة على البرنامج التجريبي أو تفعيل خطتك المدفوعة.',openSignIn:'سجّل الدخول للمتابعة',
   unavailableTitle:'هذا الرابط غير متاح',unavailableBody:'قد يكون منتهي الصلاحية أو مستبدلاً أو مستخدماً سابقاً. سجّل الدخول إذا كان حسابك نشطاً، أو اطلب رابطاً جديداً من صفحة التسجيل.',newLink:'طلب رابط جديد',
   uncertainTitle:'لم يتم تأكيد التحقق',uncertainBody:'تعذّر تأكيد النتيجة. أعد محاولة الرابط نفسه قبل تسجيل الدخول.',retryVerify:'إعادة محاولة التحقق',signInShort:'تسجيل الدخول',
@@ -84,7 +86,7 @@ function AccessChoice({language,onChoose,onClose}:{language:RegistrationLanguage
   </dialog>;
 }
 
-export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWorkspace,authenticated,available,initialPlan}:{initialPlan?:string;language:RegistrationLanguage;onLanguage:(value:RegistrationLanguage)=>void;onBack:()=>void;onSignIn:()=>void;onOpenWorkspace:()=>void;authenticated:boolean;available:boolean}) {
+export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWorkspace,authenticated,available,initialPlan}:{initialPlan?:string;language:RegistrationLanguage;onLanguage:(value:RegistrationLanguage)=>void;onBack:()=>void;onSignIn:()=>void;onOpenWorkspace:()=>void;authenticated:boolean;available:boolean|null}) {
   const t=copy[language],heading=useRef<HTMLHeadingElement>(null),sending=useRef(false);
   const Back=language==='ar'?ArrowRight:ArrowLeft,Forward=language==='ar'?ArrowLeft:ArrowRight;
   const countries=useMemo(()=>{
@@ -96,14 +98,17 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   const [receipt,setReceipt]=useState<RegistrationReceipt|null>(null),[pending,setPending]=useState<{receipt:RegistrationReceipt;body:AccountBody}|null>(null);
   const [ownerName,setOwnerName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');
   const [company,setCompany]=useState(''),[country,setCountry]=useState(''),[phone,setPhone]=useState(''),[terms,setTerms]=useState(false);
-  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[storageError,setStorageError]=useState(false);
+  const [operation,setOperation]=useState<'register'|'resend'|'verify'|null>(null);
+  const busy=operation!==null;
+  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[storageError,setStorageError]=useState(false);
   const [verificationCheck,setVerificationCheck]=useState(0);
   const [method,setMethod]=useState<'link'|'neon-code'>('link'),[verificationReady,setVerificationReady]=useState<boolean|null>(null),[code,setCode]=useState(''),[codeComplete,setCodeComplete]=useState(false);
   useEffect(()=>{setVerificationReady(null);const controller=new AbortController();void registrationOptions(controller.signal).then(value=>{setMethod(value.verification);setVerificationReady(value.available);}).catch(()=>{if(!controller.signal.aborted)setVerificationReady(false);});return()=>controller.abort();},[verificationCheck]);
   useEffect(()=>{try{const saved=readRegistrationReceipt(sessionStorage);if(saved)setReceipt(saved);else if(!isPaidPlan(initialPlan))setChoosingPlan(true);}catch{setStorageError(true);}},[initialPlan]);
-  useEffect(()=>{if(receipt||codeComplete)heading.current?.focus();},[receipt,codeComplete]);
+  const preparing=available===null || operation==='register';
+  useEffect(()=>{if(preparing||receipt||codeComplete)heading.current?.focus();},[receipt,codeComplete,preparing]);
   async function send(body:AccountBody,value:RegistrationReceipt) {
-    sending.current=true;setBusy(true);setError('');setNotice('');
+    sending.current=true;setOperation('register');setError('');setNotice('');
     try {
       try {saveRegistrationReceipt(sessionStorage,{...value,state:'pending'});} catch {setStorageError(true);}
       const result=await requestAccount(body);
@@ -111,7 +116,6 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
       const accepted=acceptedRegistrationReceipt(value,result);
       try {saveRegistrationReceipt(sessionStorage,accepted);} catch {setStorageError(true);}
       setReceipt(accepted);setPending(null);setPassword('');setConfirmPassword('');
-      heading.current?.focus();
     } catch(caught) {
       const failure=caught as Error;
       const status=caught instanceof RegistrationError?caught.status:null;
@@ -121,7 +125,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
       }
       setError(failure.message);
     } finally {
-      sending.current=false;setBusy(false);
+      sending.current=false;setOperation(null);
     }
   }
   function submit(event:FormEvent) {
@@ -139,17 +143,17 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   }
   async function resend() {
     if(!receipt || sending.current) return;
-    sending.current=true;setBusy(true);setError('');setNotice('');
+    sending.current=true;setOperation('resend');setError('');setNotice('');
     try {const result=await resendAccount({requestId:receipt.requestId,email:receipt.email});const updated:RegistrationReceipt={...receipt,verification:result.verification==='neon-code'?'neon-code':'link'};setReceipt(updated);try{saveRegistrationReceipt(sessionStorage,updated);}catch{setStorageError(true);}setCode('');setNotice(updated.verification==='neon-code'?t.codeResent:t.resent);}
     catch(caught) {setError((caught as Error).message);}
-    finally {sending.current=false;setBusy(false);}
+    finally {sending.current=false;setOperation(null);}
   }
   async function verifyCode(event:FormEvent){
     event.preventDefault();if(!receipt||sending.current||code.length!==6)return;
-    sending.current=true;setBusy(true);setError('');setNotice('');
+    sending.current=true;setOperation('verify');setError('');setNotice('');
     try{checkedVerification(await verifyAccountCode(receipt,code));try{clearRegistrationReceipt(sessionStorage);}catch{setStorageError(true);}setCode('');setCodeComplete(true);}
     catch(caught){const code=caught instanceof RegistrationError?caught.code:null;setError(code==='REGISTRATION_CODE_EXPIRED'?t.codeExpired:code==='REGISTRATION_CODE_RATE_LIMITED'?t.codeLimited:code==='REGISTRATION_PROVIDER_UNAVAILABLE'?t.codeService:t.codeError);}
-    finally{sending.current=false;setBusy(false);}
+    finally{sending.current=false;setOperation(null);}
   }
   function startOver() {
     try {clearRegistrationReceipt(sessionStorage);} catch {setStorageError(true);}
@@ -157,7 +161,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   }
   const header=<>
     <div className="registration-top">
-      <button type="button" className="button subtle" onClick={onBack}><Back size={17} aria-hidden="true"/>{t.back}</button>
+      <button type="button" className="button subtle" disabled={busy} onClick={onBack}><Back size={17} aria-hidden="true"/>{t.back}</button>
     </div>
     <AuthLanguagePicker label={staffSignInText[language].language} note={t.languageNote} name="registration-language" value={language} options={registrationLanguages} disabled={busy} onChange={onLanguage}/>
   </>;
@@ -166,28 +170,34 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
     <div className="registration-intro"><span className="public-kicker">{t.kicker}</span><h1>{t.signedInTitle}</h1><p>{t.signedInBody}</p></div>
     <div className="actions"><button type="button" className="button primary" onClick={onOpenWorkspace}><ArrowRight size={18}/>{t.continue}</button></div>
   </section>;
-  if(!available && !authenticated) return <section className="registration-page" lang={language} dir={language==='ar'?'rtl':'ltr'}>
+  if(available===false) return <section className="registration-page" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     {header}
     <div className="registration-sent"><div className="registration-icon"><ShieldCheck size={30}/></div><h1>{t.unavailableEnvironment}</h1><p>{t.unavailableEnvironmentBody}</p><div className="actions"><button type="button" className="button outline" onClick={onSignIn}><LogIn size={18}/>{t.signInShort}</button><a className="button subtle" href="#pilot">{t.back}</a></div></div>
   </section>;
-  return <section className={`registration-page${!receipt&&!codeComplete?' registration-start':''}`} lang={language} dir={language==='ar'?'rtl':'ltr'}>
+  return <section className={`registration-page ${preparing||receipt||codeComplete?'registration-email-step':'registration-start'}`} lang={language} dir={language==='ar'?'rtl':'ltr'}>
     {header}
-    {codeComplete?<div className="registration-sent"><div className="registration-icon"><CheckCircle2 size={30}/></div><h1 ref={heading} tabIndex={-1}>{t.verifiedTitle}</h1><p role="status">{t.verifiedLead}</p><p>{t.verifiedDuplicatePolicy}</p><button type="button" className="button primary" onClick={onSignIn}>{t.openSignIn}</button></div>:receipt?.state==='accepted'&&receipt.verification==='neon-code'?<div className="registration-sent registration-verification">
-      <div className="verification-heading"><Mail size={22} aria-hidden="true"/><span>{t.verifyEyebrow}</span></div>
+    {preparing?<div className="registration-sent registration-verification registration-email-loading">
+      <LoaderCircle className="verification-spinner" size={28} aria-hidden="true"/>
+      <div role="status"><h1 ref={heading} tabIndex={-1}>{t.preparingEmail}</h1><p>{t.preparingEmailBody}</p></div>
+    </div>:codeComplete?<div className="registration-sent registration-verification registration-email-success">
+      <CheckCircle2 className="verification-status-icon" size={28} aria-hidden="true"/>
+      <h1 ref={heading} tabIndex={-1}>{t.verifiedTitle}</h1><p>{t.verifiedLead}</p>
+      <button type="button" className="button primary full" onClick={onSignIn}>{t.openSignIn}<Forward size={16} aria-hidden="true"/></button>
+    </div>:receipt?.state==='accepted'&&receipt.verification==='neon-code'?<div className="registration-sent registration-verification">
+      <Mail className="verification-status-icon" size={26} aria-hidden="true"/>
       <h1 ref={heading} tabIndex={-1}>{t.sentTitle}</h1>
       <p className="verification-recipient">{t.verifyIntro}<bdi dir="ltr">{receipt.email}</bdi></p>
       <form className="registration-code-form" onSubmit={verifyCode}>
         <label className="field" htmlFor="registration-code">{t.codeLabel}</label>
-        <input id="registration-code" className="verification-code-input" aria-describedby={`verification-code-hint${error?' verification-code-error':''}`} aria-invalid={!!error} required inputMode="numeric" autoComplete="one-time-code" dir="ltr" minLength={6} maxLength={6} pattern="[0-9]{6}" placeholder="000000" value={code} disabled={busy} onChange={event=>{setCode(normalizeVerificationCode(event.target.value));setError('');}}/>
+        <input id="registration-code" className="verification-code-input" aria-describedby={`verification-code-hint${error?' verification-code-error':''}`} aria-invalid={!!error} required inputMode="numeric" autoComplete="one-time-code" dir="ltr" minLength={6} maxLength={6} pattern="[0-9]{6}" placeholder="······" value={code} disabled={busy} onChange={event=>{setCode(normalizeVerificationCode(event.target.value));setError('');}}/>
         <p id="verification-code-hint" className="verification-hint">{t.verifyHint}</p>
         {error&&<p id="verification-code-error" role="alert" className="verification-error">{error}</p>}
-        <button type="submit" className="button primary full" disabled={busy||code.length!==6}>{busy?t.verifying:t.verify}<ArrowRight size={16}/></button>
+        <button type="submit" className="button primary full" disabled={busy||code.length!==6}>{operation==='verify'?t.verifying:t.verify}<Forward size={16} aria-hidden="true"/></button>
       </form>
-      <div className="verification-resend"><span>{t.verifyMissing}</span><button type="button" className="text-link" disabled={busy} onClick={()=>void resend()}>{busy?t.resending:t.codeResend}</button></div>
+      <div className="verification-resend"><span>{t.verifyMissing}</span><button type="button" className="text-link" disabled={busy} onClick={()=>void resend()}>{operation==='resend'?t.resending:t.codeResend}</button></div>
       {notice&&<p role="status" className="verification-status"><Check size={15}/>{t.codeResent}</p>}
-      <div className="verification-footer"><p><ShieldCheck size={16}/>{t.verifyTrialNote}</p><button type="button" className="text-link" disabled={busy} onClick={startOver}>{t.verifyDifferent}</button></div>
+      <div className="verification-footer"><button type="button" className="text-link" disabled={busy} onClick={startOver}>{t.verifyDifferent}</button><button type="button" className="text-link" disabled={busy} onClick={onSignIn}>{t.signIn}<Forward size={16} aria-hidden="true"/></button></div>
       {storageError&&<p className="verification-hint">{t.storage}</p>}
-      <button type="button" className="text-link verification-signin" disabled={busy} onClick={onSignIn}>{t.signIn}<ArrowRight size={16}/></button>
     </div>:receipt ? <div className="registration-sent">
       <div className="registration-icon">{receipt.state==='accepted'?<Mail size={30}/>:<RefreshCw size={30}/>}</div>
       <h1 ref={heading} tabIndex={-1}>{receipt.state==='accepted'?t.sentTitle:language==='ar'?'لم يتم تأكيد التسجيل':'Registration not confirmed'}</h1>

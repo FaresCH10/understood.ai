@@ -15,12 +15,12 @@ export function useStaffRequest(authority:StaffRequestAuthority) {
   return useMemo(()=>{
     const expected=Object.freeze({...authority.session});
     const current=()=>lifetime.current.live && active.current===binding && validStaffSession(expected) && latest.current.isCurrent();
-    return {current,request:<T,>(path:string,body?:unknown,signal?:AbortSignal,method?:StaffRequestMethod,format?:StaffRequestFormat)=>{
+    return {current,request:<T,>(path:string,body?:unknown,signal?:AbortSignal,method?:StaffRequestMethod,format?:StaffRequestFormat,waitForVerification?:()=>Promise<void>)=>{
       // Every call retains its own mount generation, including across Strict Mode cleanup.
       const generation=lifetime.current;
       return createStaffRequest(expected,()=>current() && generation.live && lifetime.current===generation,
         (url,options)=>fetch(url,{...options,signal:AbortSignal.any([options!.signal!,generation.controller.signal])}),Date.now,
-        ()=>latest.current.canMutate(),()=>latest.current.onSessionLost())<T>(path,body,signal,method,format);
+        ()=>latest.current.canMutate(),()=>latest.current.onSessionLost())<T>(path,body,signal,method,format,waitForVerification);
     }};
   },[binding]);
 }

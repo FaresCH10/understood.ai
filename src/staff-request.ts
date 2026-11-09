@@ -21,7 +21,7 @@ export function staffRequestBinding(session:PageSession) {
 
 export function createStaffRequest(session:PageSession,current:()=>boolean,fetcher:typeof fetch=fetch,now=Date.now,canMutate:()=>boolean=current,onSessionLost:()=>void=()=>{}) {
   const expected=Object.freeze({...session});
-  return async function request<T>(path:string,body?:unknown,signal?:AbortSignal,method:StaffRequestMethod=body===undefined?'GET':'POST',format:StaffRequestFormat='json'):Promise<T> {
+  return async function request<T>(path:string,body?:unknown,signal?:AbortSignal,method:StaffRequestMethod=body===undefined?'GET':'POST',format:StaffRequestFormat='json',waitForVerification?:()=>Promise<void>):Promise<T> {
     let url:URL;
     try {url=new URL(path,'http://staff.invalid');}catch {throw new StaffRequestError('Invalid staff request');}
     if(!path.startsWith('/api/') || path.length>8192 || /[\\#\u0000-\u001f\u007f]/.test(path)
@@ -35,8 +35,8 @@ export function createStaffRequest(session:PageSession,current:()=>boolean,fetch
       || !/^[^/\\\u0000-\u001f]{1,116}\.csv$/i.test(url.searchParams.get('filename') || '')))throw new StaffRequestError('Invalid staff request');
     const mutation=method!=='GET';
     let sent=false;
-    const assertCurrent=()=>{
-      if(!current() || !validStaffSession(expected,now()) || signal?.aborted || mutation && sent && !canMutate())throw new StaffRequestError('Session context changed or verification is pending. Saved request recovery is unchanged.',mutation && sent,null,true);
+    const assertCurrent=(checkMutation=true)=>{
+      if(!current() || !validStaffSession(expected,now()) || signal?.aborted || checkMutation && mutation && sent && !canMutate())throw new StaffRequestError('Session context changed or verification is pending. Saved request recovery is unchanged.',mutation && sent,null,true);
     };
     assertCurrent();
     if(mutation && !canMutate())throw new StaffRequestError('Session check in progress. No request was sent.',false,null,true);
@@ -48,9 +48,13 @@ export function createStaffRequest(session:PageSession,current:()=>boolean,fetch
     try {
       sent=true;response=await fetcher(path,{method,credentials:'include',cache:'no-store',redirect:'error',signal:requestSignal,
         headers:{'x-client-session-context':expected.clientContext!,...(mutation?{'content-type':format==='csv'?'text/csv':'application/json'}:{})},body:encoded});
-      assertCurrent();
+      const confirmedCreation=mutation && response.status===201 && waitForVerification;
+      assertCurrent(!confirmedCreation);
       if(response.status===401){onSessionLost();throw new StaffRequestError('Session context changed. Saved request recovery is unchanged.',false,401,true);}
       try{data=await response.json();}catch{decoded=false;}
+      // The write already succeeded. Keep its response while a foreground check
+      // settles, then apply the same identity and mutation fences as usual.
+      if(confirmedCreation && !canMutate())await confirmedCreation();
       assertCurrent();
       if(requestSignal.aborted)throw new StaffRequestError('Connection interrupted. The saved outcome is not confirmed.',mutation);
     }catch(error) {

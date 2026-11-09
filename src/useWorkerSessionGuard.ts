@@ -9,6 +9,7 @@ export function useWorkerSessionGuard(session:PageSession|null,paused:boolean) {
   const [locked,setLocked]=useState<string|null>(null),[checking,setChecking]=useState<string|null>(null);
   const binding=session?.authenticated?JSON.stringify([session.clientContext,session.role,session.staffRole,session.staffScope,session.siteState,session.expiresAt]):null;
   const lockedRef=useRef<string|null>(null),checkingRef=useRef<string|null>(null),active=useRef(binding);active.current=binding;
+  const verification=useRef<ReturnType<typeof fetchBootstrapSession>|null>(null);
   const channel=useRef<BroadcastChannel|null>(null),previous=useRef<string|null>(null);
   const invalidate=()=>{if(binding && active.current===binding){lockedRef.current=binding;setLocked(binding);}};
   const resume=()=>{if(active.current!==binding)return;setSuspended(null);lockedRef.current=null;checkingRef.current=null;setLocked(null);setChecking(null);};
@@ -36,8 +37,10 @@ export function useWorkerSessionGuard(session:PageSession|null,paused:boolean) {
       if(!validPageSession(session)){lock(true);return;}
       inFlight=true;setRetrying(binding);
       if(session.role==='staff' && !background){checkingRef.current=binding;setChecking(binding);}
+      const response=fetchBootstrapSession(fetch,controller.signal);
+      verification.current=response;
       try {
-        const value=await fetchBootstrapSession(fetch,controller.signal);
+        const value=await response;
         if(!samePageSession(session,value))lock(true);
         else{unverified=false;setSuspended(null);}
       }catch(error) {
@@ -49,7 +52,7 @@ export function useWorkerSessionGuard(session:PageSession|null,paused:boolean) {
             clearTimeout(retryTimer);retryTimer=setTimeout(()=>void check(true),5000);
           }
         }
-      }finally {inFlight=false;if(live && active.current===binding)setRetrying(null);if(live && active.current===binding && !unverified){checkingRef.current=null;setChecking(null);}}
+      }finally {if(verification.current===response)verification.current=null;inFlight=false;if(live && active.current===binding)setRetrying(null);if(live && active.current===binding && !unverified){checkingRef.current=null;setChecking(null);}}
 
     };
     retry.current=()=>{clearTimeout(retryTimer);void check(true);};
@@ -74,6 +77,7 @@ export function useWorkerSessionGuard(session:PageSession|null,paused:boolean) {
     };
   },[binding,session?.language,session?.workerId,paused,locked]);
   return {retrying:!!binding&&retrying===binding,suspended:!!binding && suspended===binding,retry:()=>retry.current?.(),locked:!!binding && locked===binding,checking:!!binding && !paused && checking===binding,invalidate,resume,
+    waitForVerification:async()=>{await verification.current?.catch(()=>{});},
     isInvalidated:()=>!!active.current && lockedRef.current===active.current,
     isLocked:()=>!!active.current && (lockedRef.current===active.current || checkingRef.current===active.current)};
 }

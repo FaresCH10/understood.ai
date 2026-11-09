@@ -94,6 +94,26 @@ test('context denial invalidates only the current view and distinguishes known d
   await assert.rejects(createStaffRequest(session,()=>true,async()=>new Response('bad JSON'),now)('/api/settings/staff',{}),error=>error.uncertain);
 });
 
+test('worker creation retains its successful response during verification and still fences a changed session',async()=>{
+  for(const sameSession of [true,false]) {
+    let current=true,allowed=true,posts=0;
+    let finishCheck,beginWait;
+    const check=new Promise(resolve=>{finishCheck=resolve;});
+    const waiting=new Promise(resolve=>{beginWait=resolve;});
+    const created={id:'worker-id',code:'AC-001'};
+    const request=createStaffRequest(session,()=>current,async()=>{
+      posts++;allowed=false;
+      return new Response(JSON.stringify(created),{status:201});
+    },now,()=>allowed);
+    const result=request('/api/people/workers',{name:'Fixture worker'},undefined,'POST','json',()=>{beginWait();return check;});
+    await waiting;
+    current=sameSession;allowed=true;finishCheck();
+    if(sameSession)assert.deepEqual(await result,created);
+    else await assert.rejects(result,error=>error.fenced && error.uncertain);
+    assert.equal(posts,1);
+  }
+});
+
 test('non-JSON gateway responses keep their HTTP status and never trap a definitive send rejection',async()=>{
   for(const [status,uncertain] of [[404,false],[409,false],[502,true],[503,true]]) {
     await assert.rejects(createStaffRequest(session,()=>true,async()=>new Response('<html>gateway</html>',{status}),now)('/api/instructions/send',{}),
