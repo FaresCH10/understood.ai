@@ -131,14 +131,21 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const selectedCrew=audienceType==='crew'?audience?.crews.find(crew=>crew.id===crewId):null;
   const selectedMembers=audience?.members?.filter(member=>workerIds.includes(member.id))||[];
   const selectedAudience=audienceType==='members'?{total:selectedMembers.filter(member=>!member.language_selection_required).length,notSelected:selectedMembers.filter(member=>member.language_selection_required).length,byLanguage:selectedMembers.reduce<Record<string,number>>((counts,member)=>{counts[member.language]=(counts[member.language]||0)+1;return counts;},{})}:audienceType==='all'?audience?.workers:selectedCrew?{total:selectedCrew.members,byLanguage:selectedCrew.byLanguage,notSelected:selectedCrew.notSelected}:null;
-  const unavailableLanguages=selectedAudience?Object.keys(selectedAudience.byLanguage||{}).filter(code=>(selectedAudience.byLanguage[code]||0)>0&&(!readiness?.textLanguages.includes(code)||(deliveryMode!=='text'&&!readiness?.speechLanguages.includes(code)))):[];
-  const unavailableWorkers=selectedAudience?unavailableLanguages.reduce((sum,code)=>sum+(selectedAudience.byLanguage?.[code]||0),0):0;
-  const readyWorkers=selectedAudience?selectedAudience.total-unavailableWorkers:0;
+  const audienceLanguages=Object.entries(selectedAudience?.byLanguage??{}).filter(([,count])=>count>0);
+  const unavailableLanguages=audienceLanguages.filter(([code])=>!readiness?.textLanguages.includes(code)
+    || (deliveryMode!=='text'&&!readiness.speechLanguages.includes(code))).map(([code])=>code);
+  const unavailableWorkers=unavailableLanguages.reduce((total,code)=>total+(selectedAudience?.byLanguage[code]??0),0);
+  const readyWorkers=(selectedAudience?.total??0)-unavailableWorkers;
   const titleValid=effectiveTitle.length>=3;
   const canSubmit=trimmedSource.length>=sourceMin && trimmedSource.length<=sourceMax && titleValid
     && !!selectedAudience && selectedAudience.total>0 && !selectedAudience.notSelected && !!readiness && !readinessError && readyWorkers>0 && !audienceLoading && !audienceError && !busy && !attachmentBusy && !pending && !recovery.error;
   const sourceIssue=trimmedSource.length<sourceMin?'short':trimmedSource.length>sourceMax?'long':'';
   const audienceReady=!!selectedAudience && selectedAudience.total>0 && !selectedAudience.notSelected;
+  const deliveryBlocked=audienceReady && !!readiness && readyWorkers===0;
+  const canSwitchToText=deliveryBlocked && deliveryMode!=='text' && audienceLanguages.some(([code])=>readiness.textLanguages.includes(code));
+  const deliveryHint=canSwitchToText
+    ? staffT.locale==='ar'?'الصوت غير متاح للمستلمين المحددين. اختر النص فقط للإرسال إلى المستلمين الجاهزين.':'Voice is unavailable for the selected recipients. Choose Text only to send to recipients who can receive it.'
+    : staffT.locale==='ar'?'لا تتوفر ترجمة لهذه التعليمات بلغات المستلمين المحددين.':'Translation is unavailable for this instruction in the selected recipients’ languages.';
   const audienceHint=audienceType==='crew'&&!selectedCrew?staffT("Select a crew to continue."):selectedAudience?.notSelected?staffT("Select a language for every worker in this audience."):selectedAudience?staffT("Choose at least one worker with a selected language."):staffT("Loading recipients...");
 
   const voiceDialog=useRef<HTMLDialogElement>(null),[voiceOpen,setVoiceOpen]=useState(false);
@@ -419,7 +426,9 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       {selectedAudience && <div className="language-chips send-audience-languages" aria-label={staffT("Worker languages")}>{Object.entries(selectedAudience.byLanguage || {}).filter(([,count])=>count>0).map(([code,count])=><i key={code}>{code.toUpperCase()} {count}</i>)}</div>}
       {!!selectedAudience?.notSelected && <p className="notice notice-amber" role="status">{selectedAudience.notSelected} {staffT("active workers in this audience still need a language selected in Team before sending.")}</p>}
       {readiness?.mode==='synthetic'&&<p className="notice notice-amber" role="status">{(readiness.textLanguages.length>1?staffT.locale==='ar'?'وضع تجريبي: المثال المحفوظ مترجم إلى كل لغة عامل ويستخدم صوت الجهاز. التعليمات الأخرى تدعم النص الإنجليزي فقط حتى يتم تفعيل مساحة عمل حية.':'Demo mode: the seeded shelf example is translated into every worker language and uses device speech. Other instructions support English text only until a live workspace is configured.':staffT.locale==='ar'?'وضع تجريبي: تدعم التعليمات العامة النص الإنجليزي فقط. الترجمة متعددة اللغات والصوت المُولّد يتطلبان تفعيل خدمات الذكاء الاصطناعي.':'Test mode: general instructions support English text only. Multilingual translation and generated audio require a configured live workspace.')}</p>}
-      {!!readiness&&unavailableLanguages.length>0&&<p className="notice notice-amber" role="alert">{staffT.locale==='ar'?'اللغات غير الجاهزة للصيغة المحددة:':'Not ready for the selected delivery format:'} {unavailableLanguages.map(code=>staffT.language(code)).join(', ')}. {staffT.locale==='ar'?'يمكنك الإرسال إلى العاملين الجاهزين ومراجعة المستبعدين قبل الإرسال، أو تعديل المستلمين أولاً.':'You can send to the ready workers and review exclusions before sending, or adjust recipients first.'}</p>}
+      {!!readiness&&unavailableLanguages.length>0&&<p className="notice notice-amber" role="alert">
+        {staffT.locale==='ar'?'اللغات غير الجاهزة للصيغة المحددة:':'Not ready for the selected delivery format:'} {unavailableLanguages.map(code=>staffT.language(code)).join(', ')}. {deliveryBlocked?deliveryHint:readyWorkers>0&&(staffT.locale==='ar'?'يمكنك الإرسال إلى العاملين الجاهزين ومراجعة المستبعدين قبل الإرسال، أو تعديل المستلمين أولاً.':'You can send to the ready workers and review exclusions before sending, or adjust recipients first.')}
+      </p>}
       {readinessError&&<p role="alert">{readinessError}</p>}
       {audienceError && <p className="notice notice-amber" role="alert" ref={audienceErrorRef} tabIndex={-1}>{staffT.error(audienceError)} <button type="button" className="text-link" onClick={()=>setAudienceRevision(value=>value+1)}>{staffT("Try again")}</button></p>}
       {selectedAudience && selectedAudience.total===0 && <p className="notice notice-amber" role="status">{staffT("There are no workers with a selected language in this audience.")}</p>}
@@ -457,8 +466,15 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
         <strong>{staffT("Before you can send")}</strong>
         <ul>
           <li className={titleValid?'met':undefined}>{titleValid?<CheckCircle2 size={16} aria-hidden="true"/>:<Circle size={16} aria-hidden="true"/>}<span>{staffT("Title (at least 3 characters)")}</span></li>
-          <li className={sourceIssue?'met':undefined}>{sourceIssue?<Circle size={16} aria-hidden="true"/>:<CheckCircle2 size={16} aria-hidden="true"/>}<span>{staffT("Instruction length (10–{p0} characters)",{p0:sourceMax})}</span></li>
+          <li className={!sourceIssue?'met':undefined}>{sourceIssue?<Circle size={16} aria-hidden="true"/>:<CheckCircle2 size={16} aria-hidden="true"/>}<span>{staffT("Instruction length (10–{p0} characters)",{p0:sourceMax})}</span></li>
           <li className={audienceReady?'met':undefined}>{audienceReady?<CheckCircle2 size={16} aria-hidden="true"/>:<Circle size={16} aria-hidden="true"/>}<span>{staffT("Audience (workers with a selected language)")}{!audienceReady&&<small>{audienceHint}</small>}</span></li>
+          {audienceReady&&<li className={readiness&&readyWorkers>0?'met':undefined}>
+            {readiness&&readyWorkers>0?<CheckCircle2 size={16} aria-hidden="true"/>:<Circle size={16} aria-hidden="true"/>}
+            <span>{staffT.locale==='ar'?'صيغة الإرسال':'Delivery format'}
+              {deliveryBlocked&&<small>{deliveryHint} {canSwitchToText&&<button type="button" className="text-link" onClick={()=>setDeliveryMode('text')}>{tr("Text only")}</button>}</small>}
+              {!readiness&&<small>{readinessError|| (staffT.locale==='ar'?'جارٍ التحقق من توفر الإرسال…':'Checking delivery availability…')}</small>}
+            </span>
+          </li>}
           {attachmentBusy&&<li><Circle size={16} aria-hidden="true"/><span>{staffT("Wait for the attachment to finish uploading.")}</span></li>}
         </ul>
       </div>}
