@@ -110,7 +110,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const [evidenceMode,setEvidenceMode]=useState<EvidenceMode>(restoredPending?.evidenceMode || 'none');
   const [audience,setAudience]=useState<AudienceOverview|null>(null);
   const [audienceError,setAudienceError]=useState('');
-  const [readiness,setReadiness]=useState<{mode:string;textLanguages:string[];speechLanguages:string[];providerLabel?:string|null}|null>(null);
+  const [readiness,setReadiness]=useState<{mode:string;textLanguages:string[];speechLanguages:string[];providerLabel?:string|null;translationProviderLabel?:string|null}|null>(null);
   const [readinessError,setReadinessError]=useState('');
 
   const [audienceLoading,setAudienceLoading]=useState(false),[audienceRevision,setAudienceRevision]=useState(0);
@@ -440,7 +440,9 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       {selectedAudience && <div className="language-chips send-audience-languages" aria-label={staffT("Worker languages")}>{Object.entries(selectedAudience.byLanguage || {}).filter(([,count])=>count>0).map(([code,count])=><i key={code}>{code.toUpperCase()} {count}</i>)}</div>}
       {!!selectedAudience?.notSelected && <p className="notice notice-amber" role="status">{selectedAudience.notSelected} {staffT("active workers in this audience still need a language selected in Team before sending.")}</p>}
       {readiness?.mode==='synthetic'&&<p className="notice notice-amber" role="status">{(readiness.textLanguages.length>1?staffT.locale==='ar'?'وضع تجريبي: المثال المحفوظ مترجم إلى كل لغة عامل ويستخدم صوت الجهاز. التعليمات الأخرى تدعم النص الإنجليزي فقط حتى يتم تفعيل مساحة عمل حية.':'Demo mode: the seeded shelf example is translated into every worker language and uses device speech. Other instructions support English text only until a live workspace is configured.':staffT.locale==='ar'?'وضع تجريبي: تدعم التعليمات العامة النص الإنجليزي فقط. الترجمة متعددة اللغات والصوت المُولّد يتطلبان تفعيل خدمات الذكاء الاصطناعي.':'Test mode: general instructions support English text only. Multilingual translation and generated audio require a configured live workspace.')}</p>}
-      {readiness?.providerLabel&&readiness.mode.endsWith('-text')&&<p className="muted" role="status">{staffT.locale==='ar'?`${readiness.providerLabel} يمكنه ترجمة التعليمات الإنجليزية للتسليم النصي. يعتمد توفر الصوت على لغة العامل.`:`${readiness.providerLabel} can translate English instructions for text delivery. Voice availability depends on the worker’s language.`}</p>}
+      {readiness?.providerLabel&&readiness.mode.endsWith('-text')&&<p className="muted" role="status">{staffT.locale==='ar'
+        ?readiness.translationProviderLabel?`${readiness.providerLabel} يكتب سؤال التحقق. ${readiness.translationProviderLabel} يترجم نص التعليمات. يعتمد توفر الصوت على لغة العامل.`:`${readiness.providerLabel} يمكنه ترجمة التعليمات الإنجليزية للتسليم النصي. يعتمد توفر الصوت على لغة العامل.`
+        :readiness.translationProviderLabel?`${readiness.providerLabel} writes the check question. ${readiness.translationProviderLabel} translates the instruction text. Voice availability depends on the worker’s language.`:`${readiness.providerLabel} can translate English instructions for text delivery. Voice availability depends on the worker’s language.`}</p>}
       {audienceError && <p className="notice notice-amber" role="alert" ref={audienceErrorRef} tabIndex={-1}>{staffT.error(audienceError)} <button type="button" className="text-link" onClick={()=>setAudienceRevision(value=>value+1)}>{staffT("Try again")}</button></p>}
       {selectedAudience && selectedAudience.total===0 && <p className="notice notice-amber" role="status">{staffT("There are no workers with a selected language in this audience.")}</p>}
 

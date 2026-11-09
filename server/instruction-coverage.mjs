@@ -9,8 +9,10 @@ export function syntheticInstructionLanguages(source) {
 
 export function hostedInstructionLanguages(source,instructionTextAdapter) {
   const speechLanguages=/\p{Script=Arabic}/u.test(source)?[]:syntheticInstructionLanguages(source);
+  const declared=Array.isArray(instructionTextAdapter?.textLanguages)
+    ? WORKER_LANGUAGE_CODES.filter(code=>instructionTextAdapter.textLanguages.includes(code)) : null;
   return {
-    textLanguages:instructionTextAdapter && speechLanguages.length?[...WORKER_LANGUAGE_CODES]:speechLanguages,
+    textLanguages:instructionTextAdapter && speechLanguages.length?declared??[...WORKER_LANGUAGE_CODES]:speechLanguages,
     speechLanguages,
   };
 }

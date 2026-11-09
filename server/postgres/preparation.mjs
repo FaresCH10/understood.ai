@@ -279,10 +279,17 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
         }
         return [language,content];
       }));
-      if(translations.some(result=>result.status==='rejected'))throw Error('At least one instruction translation failed');
+      const failure=translations.find(result=>result.status==='rejected');
+      if(failure) {
+        const error=Error('At least one instruction translation failed');
+        error.translationCause=typeof failure.reason?.message==='string'?failure.reason.message.slice(0,160):'';
+        throw error;
+      }
       await checkPreparationClaim(pool,job,claim,{schema});
       prepared={...prepared,languages:{...prepared.languages,...Object.fromEntries(translations.map(result=>result.value))},
-        provenance:{...prepared.provenance,adapter:instructionTextAdapter.provenanceAdapter ?? GEMMA4_DELIVERY_ADAPTER,model:instructionTextAdapter.model}};
+        provenance:{...prepared.provenance,adapter:instructionTextAdapter.provenanceAdapter ?? GEMMA4_DELIVERY_ADAPTER,model:instructionTextAdapter.model,
+          questionAdapter:providerPrepared?instructionTextAdapter.provenanceAdapter ?? GEMMA4_DELIVERY_ADAPTER:'synthetic-instruction-v1',
+          ...(instructionTextAdapter.translationAdapter?{translationAdapter:instructionTextAdapter.translationAdapter}:{})}};
     } else if(providerPrepared) {
       prepared={...prepared,provenance:{...prepared.provenance,
         adapter:instructionTextAdapter.provenanceAdapter ?? GEMMA4_DELIVERY_ADAPTER,model:instructionTextAdapter.model}};
@@ -317,8 +324,10 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       const current=(await client.query(`SELECT id FROM jobs WHERE id=$1 AND status='processing' AND lease_token=$2 AND lease_until>clock_timestamp() FOR UPDATE`,[job.id,job.token])).rows[0];
       if (!current) return;
       await appendPreparationStage(client,job,systemStage('worker','failed',preparationErrorCode(error)));
+      const translationLabel=instructionTextAdapter?.translationLabel ?? instructionTextAdapter?.label ?? 'The text provider';
+      const detail=translating && error?.translationCause?` (${error.translationCause})`:'';
       await client.query(`UPDATE jobs SET status='failed',lease_token=NULL,lease_until=NULL,error=$2 WHERE id=$1`,
-        [job.id,translating?`${instructionTextAdapter?.label ?? 'The text provider'} could not prepare the translations. Retry delivery.`:'Synthetic preparation failed']);
+        [job.id,translating?`${translationLabel} could not prepare the translations${detail}. Retry delivery.`:'Synthetic preparation failed']);
       await client.query(`UPDATE briefings SET state='failed',updated_at=clock_timestamp() WHERE id=$1 AND org_id=$2 AND site_id=$3 AND revision=$4 AND state='processing'`,[job.briefing_id,job.org_id,job.site_id,job.revision]);
     });
   }

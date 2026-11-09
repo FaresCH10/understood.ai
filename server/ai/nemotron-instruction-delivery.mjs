@@ -2,12 +2,12 @@ import {languageTextMatches} from '../languages.mjs';
 import {withMultipleChoice} from '../multiple-choice.mjs';
 import {createNemotronAdapter,NEMOTRON_ULTRA_MODEL} from './nemotron.mjs';
 import {NEMOTRON_DELIVERY_ADAPTER} from './instruction-text-providers.mjs';
+import {createGoogleTranslateAdapter,GOOGLE_TRANSLATE_ADAPTER,GOOGLE_TRANSLATE_LANGUAGES} from './google-translate.mjs';
 
-const PREPARE_TIMEOUT_MS=9000;
-const CALL_TIMEOUT_MS=14000;
+const PREPARE_TIMEOUT_MS=16000;
+const TRANSLATE_TIMEOUT_MS=6000;
 const BUDGET_MS=25000;
 const MAX_CONCURRENCY=8;
-const numbers=value=>(value.match(/[0-9]+(?:[.,][0-9]+)*/g)??[]).sort().join(' ');
 const words=value=>new Set(value.normalize('NFKC').toLocaleLowerCase().replace(/[\p{P}\p{Z}\s]+/gu,' ').trim().split(' ').filter(word=>word.length>2));
 const grounded=(source,value)=>{
   const sourceWords=words(source),target=[...words(value)];
@@ -23,9 +23,12 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
   if(env.VERCEL_ENV!=='production' || env.UNDERSTOOD_TIER==='production')return null;
   const apiKey=env.NVIDIA_API_KEY?.trim();
   if(!apiKey)return null;
+  const googleKey=(env.GOOGLE_TRANSLATE_API_KEY ?? '').trim();
+  if(!googleKey)return null;
   const textModel=(env.NVIDIA_TEXT_MODEL || '').trim() || NEMOTRON_ULTRA_MODEL;
   const options={apiKey,dataClass:'synthetic',textModel,fetchImpl:fetcher};
   const adapterFor=timeoutMs=>createNemotronAdapter({...options,timeoutMs,requestJournal:inlineJournal});
+  const translatorFor=timeoutMs=>createGoogleTranslateAdapter({apiKey:googleKey,fetchImpl:fetcher,timeoutMs});
   // The handler instance is cached across Vercel requests, so the time budget
   // must start on each preparation, not when the adapter is constructed.
   let deadline=0;
@@ -37,6 +40,9 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
   return {
     mode:'nemotron-text',
     label:'Nemotron 3 Ultra 550B',
+    translationLabel:'Google Translate',
+    translationAdapter:GOOGLE_TRANSLATE_ADAPTER,
+    textLanguages:GOOGLE_TRANSLATE_LANGUAGES,
     provenanceAdapter:NEMOTRON_DELIVERY_ADAPTER,
     model:textModel,
     async prepare(briefing,instruction) {
@@ -60,20 +66,12 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
       await acquire();
       try {
         const left=remaining();
-        if(left<2500)throw Error('Nemotron translation budget exhausted');
-        const adapter=adapterFor(Math.min(CALL_TIMEOUT_MS,left-500));
+        if(left<2000)throw Error('Google Translate budget exhausted');
+        const translator=translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,left-500));
         const choices=Array.isArray(content?.choices);
-        const input={title:content.title,text:content.text,
+        const translated=await translator.translate({title:content.title,text:content.text,
           ...(typeof content.question==='string'?{question:content.question}:{}),
-          ...(choices?{answerChoices:content.choices.map(choice=>choice.text)}:{})};
-        const translated=await adapter.translate(input,language);
-        for(const [field,original] of [['title',content.title],['text',content.text],
-          ...(typeof content.question==='string'?[['question',content.question]]:[])]) {
-          if(numbers(translated[field])!==numbers(original))throw Error('Nemotron translation changed numbers');
-        }
-        if(choices && (!Array.isArray(translated.answerChoices) || translated.answerChoices.length!==content.choices.length
-          || content.choices.some((choice,index)=>numbers(translated.answerChoices[index])!==numbers(choice.text))))
-          throw Error('Nemotron translation changed the answer choices');
+          ...(choices?{answerChoices:content.choices.map(choice=>choice.text)}:{})},language);
         return {title:translated.title,text:translated.text,
           ...(typeof content.question==='string'?{question:translated.question}:{}),
           ...(choices?{questionType:'multiple-choice',choices:content.choices.map((choice,index)=>({id:choice.id,text:translated.answerChoices[index]}))}:{})};
