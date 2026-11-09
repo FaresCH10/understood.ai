@@ -2,7 +2,7 @@ import {languageTextMatches} from '../languages.mjs';
 import {withMultipleChoice} from '../multiple-choice.mjs';
 import {createNemotronAdapter,NEMOTRON_ULTRA_MODEL} from './nemotron.mjs';
 import {NEMOTRON_DELIVERY_ADAPTER} from './instruction-text-providers.mjs';
-import {createGoogleTranslateAdapter,GOOGLE_TRANSLATE_ADAPTER,GOOGLE_TRANSLATE_LANGUAGES} from './google-translate.mjs';
+import {createDeepLTranslateAdapter,DEEPL_TRANSLATE_ADAPTER,DEEPL_TRANSLATE_LANGUAGES} from './deepl-translate.mjs';
 
 const PREPARE_TIMEOUT_MS=16000;
 const TRANSLATE_TIMEOUT_MS=6000;
@@ -23,12 +23,12 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
   if(env.VERCEL_ENV!=='production' || env.UNDERSTOOD_TIER==='production')return null;
   const apiKey=env.NVIDIA_API_KEY?.trim();
   if(!apiKey)return null;
-  const googleKey=(env.GOOGLE_TRANSLATE_API_KEY ?? '').trim();
-  if(!googleKey)return null;
+  const deeplKey=(env.DEEPL_API_KEY ?? '').trim();
+  if(!deeplKey)return null;
   const textModel=(env.NVIDIA_TEXT_MODEL || '').trim() || NEMOTRON_ULTRA_MODEL;
   const options={apiKey,dataClass:'synthetic',textModel,fetchImpl:fetcher};
   const adapterFor=timeoutMs=>createNemotronAdapter({...options,timeoutMs,requestJournal:inlineJournal});
-  const translatorFor=timeoutMs=>createGoogleTranslateAdapter({apiKey:googleKey,fetchImpl:fetcher,timeoutMs});
+  const translatorFor=timeoutMs=>createDeepLTranslateAdapter({apiKey:deeplKey,fetchImpl:fetcher,timeoutMs});
   // The handler instance is cached across Vercel requests, so the time budget
   // must start on each preparation, not when the adapter is constructed.
   let deadline=0;
@@ -40,9 +40,9 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
   return {
     mode:'nemotron-text',
     label:'Nemotron 3 Ultra 550B',
-    translationLabel:'Google Translate',
-    translationAdapter:GOOGLE_TRANSLATE_ADAPTER,
-    textLanguages:GOOGLE_TRANSLATE_LANGUAGES,
+    translationLabel:'DeepL',
+    translationAdapter:DEEPL_TRANSLATE_ADAPTER,
+    textLanguages:DEEPL_TRANSLATE_LANGUAGES,
     provenanceAdapter:NEMOTRON_DELIVERY_ADAPTER,
     model:textModel,
     async prepare(briefing,instruction) {
@@ -66,7 +66,7 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
       await acquire();
       try {
         const left=remaining();
-        if(left<2000)throw Error('Google Translate budget exhausted');
+        if(left<2000)throw Error('DeepL translation budget exhausted');
         const translator=translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,left-500));
         const choices=Array.isArray(content?.choices);
         const translated=await translator.translate({title:content.title,text:content.text,

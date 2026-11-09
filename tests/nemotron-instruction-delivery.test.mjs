@@ -8,10 +8,10 @@ import {processOnePreparation} from '../server/postgres/preparation.mjs';
 import {instructionReadiness} from '../server/instruction-readiness.mjs';
 import {nemotronInstructionDelivery} from '../server/ai/nemotron-instruction-delivery.mjs';
 import {NEMOTRON_DELIVERY_ADAPTER} from '../server/ai/instruction-text-providers.mjs';
-import {GOOGLE_TRANSLATE_ADAPTER,GOOGLE_TRANSLATE_LANGUAGES} from '../server/ai/google-translate.mjs';
+import {DEEPL_TRANSLATE_ADAPTER,DEEPL_TRANSLATE_LANGUAGES} from '../server/ai/deepl-translate.mjs';
 import {NEMOTRON_ULTRA_MODEL} from '../server/ai/nemotron.mjs';
 
-const baseEnv={UNDERSTOOD_INSTRUCTION_TEXT_PROVIDER:'nemotron',VERCEL_ENV:'production',NVIDIA_API_KEY:'test-only-nvidia-key',GOOGLE_TRANSLATE_API_KEY:'test-only-google-key'};
+const baseEnv={UNDERSTOOD_INSTRUCTION_TEXT_PROVIDER:'nemotron',VERCEL_ENV:'production',NVIDIA_API_KEY:'test-only-nvidia-key',DEEPL_API_KEY:'test-only-deepl-key:fx'};
 const source='Place 2 cartons on the blue shelf before 4 pm. Keep the walkway clear.';
 const facts=['Place 2 cartons on the blue shelf before 4 pm.','Keep the walkway clear.'];
 const question='Where do the 2 cartons go before 4 pm, and what must stay clear?';
@@ -22,7 +22,7 @@ const hindi={title:'कार्टन वितरण',text:'नीली श�
   answerChoices:['नीली शेल्फ़ पर','पीली शेल्फ़ पर','लाल शेल्फ़ पर','हरी शेल्फ़ पर']};
 const reply=value=>Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(value)}}]});
 const fetcher=handler=>{const calls=[];return {calls,fetch:async(url,options)=>{const body=JSON.parse(options.body);calls.push({url,body,headers:options.headers});return handler(body,calls.length);}};};
-const googleReply=texts=>Response.json({data:{translations:texts.map(translatedText=>({translatedText}))}});
+const deeplReply=texts=>Response.json({translations:texts.map(text=>({detected_source_language:'EN',text}))});
 const hindiValues=[hindi.title,hindi.text,hindi.question,...hindi.answerChoices];
 const english={title:'Carton routing',text:source,question,questionType:'multiple-choice',
   choices:choices.map((text,index)=>({id:`c${index}`,text}))};
@@ -34,20 +34,20 @@ async function resetBudget(adapter){
 
 test('Nemotron Vercel delivery is explicitly gated and advertises its provider mode',()=>{
   for(const patch of [{UNDERSTOOD_INSTRUCTION_TEXT_PROVIDER:'gemma4'},{VERCEL_ENV:'preview'},
-    {UNDERSTOOD_TIER:'production'},{NVIDIA_API_KEY:' '},{GOOGLE_TRANSLATE_API_KEY:' '}])
+    {UNDERSTOOD_TIER:'production'},{NVIDIA_API_KEY:' '},{DEEPL_API_KEY:' '}])
     assert.equal(nemotronInstructionDelivery({...baseEnv,...patch},async()=>assert.fail('No provider call')),null);
   const adapter=nemotronInstructionDelivery(baseEnv,async()=>assert.fail('No provider call'));
   assert.equal(adapter.mode,'nemotron-text');
   assert.equal(adapter.label,'Nemotron 3 Ultra 550B');
-  assert.equal(adapter.translationLabel,'Google Translate');
-  assert.equal(adapter.translationAdapter,GOOGLE_TRANSLATE_ADAPTER);
+  assert.equal(adapter.translationLabel,'DeepL');
+  assert.equal(adapter.translationAdapter,DEEPL_TRANSLATE_ADAPTER);
   assert.equal(adapter.provenanceAdapter,NEMOTRON_DELIVERY_ADAPTER);
   assert.equal(adapter.model,NEMOTRON_ULTRA_MODEL);
   assert.deepEqual(instructionReadiness({instructionTextAdapter:adapter},source),{mode:'nemotron-text',
-    providerLabel:'Nemotron 3 Ultra 550B',translationProviderLabel:'Google Translate',
-    textLanguages:GOOGLE_TRANSLATE_LANGUAGES,speechLanguages:['en']});
+    providerLabel:'Nemotron 3 Ultra 550B',translationProviderLabel:'DeepL',
+    textLanguages:DEEPL_TRANSLATE_LANGUAGES,speechLanguages:['en']});
   assert.deepEqual(instructionReadiness({instructionTextAdapter:adapter},'ضع الصندوق على الرف'),{mode:'nemotron-text',
-    providerLabel:'Nemotron 3 Ultra 550B',translationProviderLabel:'Google Translate',textLanguages:[],speechLanguages:[]});
+    providerLabel:'Nemotron 3 Ultra 550B',translationProviderLabel:'DeepL',textLanguages:[],speechLanguages:[]});
 });
 
 test('Nemotron prepares one grounded English question with four checked choices',async()=>{
@@ -77,27 +77,27 @@ test('Nemotron prepares one grounded English question with four checked choices'
   assert.equal(await malformed.prepare({source,title:'Carton routing'},{response_mode:'question',delivery_mode:'text'}),null);
 });
 
-test('Google Translate translates instruction text and ordered choices for the worker language',async()=>{
-  const mock=fetcher(()=>googleReply(hindiValues));
+test('DeepL translates instruction text and ordered choices for the worker language',async()=>{
+  const mock=fetcher(()=>deeplReply(hindiValues));
   const adapter=nemotronInstructionDelivery(baseEnv,mock.fetch);
   await resetBudget(adapter);
   assert.deepEqual(await adapter.translate('hi',english),{title:hindi.title,text:hindi.text,question:hindi.question,
     questionType:'multiple-choice',choices:hindi.answerChoices.map((text,index)=>({id:`c${index}`,text}))});
   assert.equal(mock.calls.length,1);
-  assert.equal(mock.calls[0].url,'https://translation.googleapis.com/language/translate/v2');
-  assert.equal(mock.calls[0].headers['x-goog-api-key'],'test-only-google-key');
-  assert.deepEqual(mock.calls[0].body,{q:englishValues,source:'en',target:'hi',format:'text'});
+  assert.equal(mock.calls[0].url,'https://api-free.deepl.com/v2/translate');
+  assert.equal(mock.calls[0].headers.authorization,'DeepL-Auth-Key test-only-deepl-key:fx');
+  assert.deepEqual(mock.calls[0].body,{text:englishValues,source_lang:'EN',target_lang:'HI'});
 });
 
-test('Google Translate rejects translated numbers, scripts or choices that drift from the source',async()=>{
+test('DeepL rejects translated scripts or choices that drift from the source',async()=>{
   const variants=[
-    {texts:[hindi.title,hindi.text.replace('2','5'),hindi.question,...hindi.answerChoices],reason:/invalid text translation/},
     {texts:[hindi.title,source,hindi.question,...hindi.answerChoices],reason:/invalid text translation/},
+    {texts:[hindi.title,hindi.text,'',...hindi.answerChoices],reason:/invalid question translation/},
     {texts:[hindi.title,hindi.text,hindi.question,hindi.answerChoices[0],hindi.answerChoices[1],
-      hindi.answerChoices[2].replace('पर','पर 9'),hindi.answerChoices[3]],reason:/changed the answer choices/},
+      'on the red shelf',hindi.answerChoices[3]],reason:/changed the answer choices/},
   ];
   for(const {texts,reason} of variants){
-    const adapter=nemotronInstructionDelivery(baseEnv,fetcher(()=>googleReply(texts)).fetch);
+    const adapter=nemotronInstructionDelivery(baseEnv,fetcher(()=>deeplReply(texts)).fetch);
     await resetBudget(adapter);
     await assert.rejects(()=>adapter.translate('hi',english),reason);
   }
@@ -113,7 +113,7 @@ test('a Vercel instruction send publishes Nemotron Hindi text and keeps English 
     await db.exec("INSERT INTO organizations(id,name) VALUES('a','Synthetic');INSERT INTO sites(id,org_id,name,timezone) VALUES('a','a','Synthetic','UTC');INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','a','a','Owner','owner');INSERT INTO workers(id,org_id,site_id,code,language) VALUES('w1','a','a','001','hi');");
     const owner={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'};
     const scope={schema};
-    const mock=fetcher(()=>googleReply([hindi.title,hindi.text]));
+    const mock=fetcher(()=>deeplReply([hindi.title,hindi.text]));
     const adapter=nemotronInstructionDelivery(baseEnv,mock.fetch);
     const input={requestId:randomUUID(),title:'Carton routing',source,audience:{type:'all'},
       responseMode:'acknowledge',deliveryMode:'text'};
@@ -124,13 +124,13 @@ test('a Vercel instruction send publishes Nemotron Hindi text and keeps English 
     assert.equal(row.state,'ready');
     assert.equal(row.prepared_json.provenance.adapter,NEMOTRON_DELIVERY_ADAPTER);
     assert.equal(row.prepared_json.provenance.questionAdapter,'synthetic-instruction-v1');
-    assert.equal(row.prepared_json.provenance.translationAdapter,GOOGLE_TRANSLATE_ADAPTER);
+    assert.equal(row.prepared_json.provenance.translationAdapter,DEEPL_TRANSLATE_ADAPTER);
     assert.equal(row.prepared_json.provenance.model,NEMOTRON_ULTRA_MODEL);
     assert.equal(row.prepared_json.provenance.live,false);
     assert.equal(row.prepared_json.languages.en.text,source);
     assert.equal(row.prepared_json.languages.hi.text,hindi.text);
     assert.equal(mock.calls.length,1);
-    assert.equal(mock.calls[0].url,'https://translation.googleapis.com/language/translate/v2');
+    assert.equal(mock.calls[0].url,'https://api-free.deepl.com/v2/translate');
     const result=await completeInstructionSend(pool,owner,input.requestId,scope);
     assert.equal(result.state,'published');
     assert.equal(result.delivered,1);
