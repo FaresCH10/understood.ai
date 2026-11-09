@@ -13,6 +13,7 @@ import {readProductionReadiness} from './postgres/production-readiness.mjs';
 import {send as sendJson} from './http.mjs';
 import {resolvePilotGmail} from './pilot-gmail.mjs';
 import {syntheticAssessmentAdapter} from './postgres/synthetic-assessment.mjs';
+import {vercelDatabaseOptions,vercelRequestsLiveMode} from './vercel-database.mjs';
 
 // Preserve the existing synthetic application mode, but persist accounts and
 // sessions in Neon. Serverless registration cannot depend on a separate worker.
@@ -30,12 +31,12 @@ export async function createVercelNeonHandler({env=process.env,pool,send,createP
   if(registrationVerification.provider!=='neon' || !registrationVerification.available)throw Error('Neon verification configuration required');
   const production=env.UNDERSTOOD_TIER==='production';
   // A misspelled or partially live setting must never fall back to demo dispatch.
-  if(!production&&(env.UNDERSTOOD_AI_MODE==='live'||env.UNDERSTOOD_DATA_CLASS==='real'))throw Error('Select the approved production runtime');
+  if(!production&&vercelRequestsLiveMode(env))throw Error('Select the approved production runtime');
   const config=production?productionServiceConfig(env,{service:'api',transport:'vercel',approvalManifest:approvalManifest??readProductionApproval(env)}):
     {tier:'local',aiMode:'synthetic',accessMode:'credential',integrationMode:'synthetic',inlineSyntheticJobs:true,dataClass:'synthetic',
       publicOrigin,remoteDemo:true,localDemo:false,demoHosts:hosts};
   const ownsPool=!pool;
-  pool ??= await createPostgresPool({connectionString:production?env.UNDERSTOOD_POSTGRES_URL:env.DATABASE_URL,tls:true,caFile:production?env.UNDERSTOOD_POSTGRES_CA_FILE:undefined});
+  pool ??= await createPostgresPool(vercelDatabaseOptions(env));
   try {
     await verify(pool,{schema});
     if(production)await verifyPermissions(pool,{schema,profile:'application'});

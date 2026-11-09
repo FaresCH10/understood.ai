@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {rootCertificates} from 'node:tls';
+import {spawnSync} from 'node:child_process';
 import {productionFixture} from './helpers/production-runtime.mjs';
 import {productionServiceConfig,productionAdmissionBlockers} from '../server/postgres/production-admission.mjs';
 import {readProductionApproval} from '../server/postgres/production-approval.mjs';
@@ -15,12 +17,39 @@ test('Vercel live runtime is explicitly admitted and rejects forged transport',(
  assert.throws(()=>config.requestAddress({headers:{host:'app.understood.co','x-forwarded-proto':'https','x-vercel-forwarded-for':'203.0.113.10, 203.0.113.11'}}),/Forbidden/);
  assert.ok(productionAdmissionBlockers({...vercel,VERCEL:'0'},{service:'api',transport:'vercel',approvalManifest}).includes('invalid_vercel_transport'));
  assert.throws(()=>productionServiceConfig(vercel,{service:'api',transport:'vercel'}),/admission blocked/);
+ const {UNDERSTOOD_POSTGRES_CA_FILE,...withoutFile}=vercel;
+ const portable={...withoutFile,UNDERSTOOD_POSTGRES_CA_PEM:rootCertificates[0]};
+ assert.equal(productionServiceConfig(portable,{service:'api',transport:'vercel',approvalManifest}).integrationMode,'live');
+ assert.ok(productionAdmissionBlockers({...portable,UNDERSTOOD_POSTGRES_CA_FILE},{service:'api',transport:'vercel',approvalManifest}).includes('postgres_ca_invalid'));
+});
+
+test('gateway refuses an unconfigured production request even without DATABASE_URL',()=>{
+ const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!/^UNDERSTOOD_|^DATABASE_URL$/.test(key)));
+ const result=spawnSync(process.execPath,['--input-type=module','-e',`
+  import gateway from './api/gateway.mjs';
+  const response={setHeader(){},writeHead(status){this.statusCode=status;},end(){console.log(this.statusCode);}};
+  await gateway({url:'/api/gateway?understood_path=health',method:'GET',headers:{host:'app.understood.co','x-forwarded-proto':'https'}},response);
+ `],{env:{...env,VERCEL:'1',VERCEL_PROJECT_PRODUCTION_URL:'app.understood.co',UNDERSTOOD_TIER:'production'},encoding:'utf8'});
+ assert.equal(result.status,0,result.stderr);
+ assert.equal(result.stdout.trim(),'503');
 });
 
 test('approval JSON uses the same bounded manifest and cannot silently shadow a file',()=>{
  const {approvalManifest}=productionFixture('api');
  assert.deepEqual(readProductionApproval({UNDERSTOOD_RELEASE_APPROVAL_JSON:JSON.stringify(approvalManifest)}),approvalManifest);
  for(const env of [{},{UNDERSTOOD_RELEASE_APPROVAL_JSON:'{'},{UNDERSTOOD_RELEASE_APPROVAL_JSON:' '.repeat(65537)},{UNDERSTOOD_RELEASE_APPROVAL_JSON:'{}',UNDERSTOOD_RELEASE_APPROVAL_FILE:'ignored'}])assert.throws(()=>readProductionApproval(env));
+});
+
+test('the offline admission command accepts the Vercel API configuration and approval JSON',()=>{
+ const {env,approvalManifest}=productionFixture('api');
+ delete env.UNDERSTOOD_TRUSTED_PROXY_NETWORKS;
+ const result=spawnSync(process.execPath,['scripts/production-admission-check.mjs'],{
+   env:{...env,VERCEL:'1',VERCEL_PROJECT_PRODUCTION_URL:'app.understood.co',UNDERSTOOD_RELEASE_APPROVAL_JSON:JSON.stringify(approvalManifest)},encoding:'utf8',
+ });
+ assert.equal(result.status,0,result.stderr||result.stdout);
+ const report=JSON.parse(result.stdout);
+ assert.equal(report.admitted,true);
+ assert.equal(report.deploymentAuthorized,false);
 });
 
 test('partial real-data configuration never enters the synthetic Vercel handler',async()=>{

@@ -8,6 +8,7 @@ import {resolvePushAdapter} from '../push-adapter.mjs';
 import {WORKER_LANGUAGE_CODES} from '../languages.mjs';
 import {resolveAttachmentScanner} from '../attachment-policy.mjs';
 import {vercelTransport} from '../vercel-transport.mjs';
+import {vercelPostgresCaPem} from '../vercel-database.mjs';
 import {resolveRegistrationVerification} from '../registration-verification.mjs';
 
 // Production adapters have a separate implementation. Runtime admission still requires the release and provider approvals.
@@ -118,9 +119,11 @@ function reviewApprovalManifest(env,manifest,blockers) {
   if(!['none','approved'].includes(scope.freeTierDispatch)) blocker(blockers,'release_scope_free_tier_invalid');
   return scope;
 }
-function reviewDatabase(env,service,blockers) {
+function reviewDatabase(env,service,transport,blockers) {
   if(env.UNDERSTOOD_POSTGRES_TLS!=='true') blocker(blockers,'postgres_tls_required');
-  if(typeof env.UNDERSTOOD_POSTGRES_CA_FILE!=='string' || !env.UNDERSTOOD_POSTGRES_CA_FILE.trim()
+  if(transport==='vercel' && env.UNDERSTOOD_POSTGRES_CA_PEM) {
+    try{vercelPostgresCaPem(env);}catch{blocker(blockers,'postgres_ca_invalid');}
+  } else if(typeof env.UNDERSTOOD_POSTGRES_CA_FILE!=='string' || !env.UNDERSTOOD_POSTGRES_CA_FILE.trim()
     || !isAbsolute(env.UNDERSTOOD_POSTGRES_CA_FILE)) blocker(blockers,'postgres_ca_required');
   let url=null;
   try { url=new URL(env.UNDERSTOOD_POSTGRES_URL ?? ''); } catch { url=null; }
@@ -260,7 +263,7 @@ function review(env,{service='api',approvalManifest=null,transport='proxy'}={}) 
   let platformTransport=null;
   if(transport==='vercel')try{platformTransport=vercelTransport(env,origin?.origin);}catch{blocker(blockers,'invalid_vercel_transport');}
   const trusted=transport==='proxy'?trustedProxyPolicy(env,blockers):null;
-  reviewDatabase(env,service,blockers);
+  reviewDatabase(env,service,transport,blockers);
   const storage=reviewStorage(env,service,blockers);
   const mail=reviewMail(env,origin?.origin,service,blockers);
   const push=reviewPush(env,service,blockers);

@@ -2,8 +2,12 @@ import { createVercelDemoHandler } from '../server/vercel-demo.mjs';
 import {createVercelNeonHandler} from '../server/vercel-neon.mjs';
 
 import {runtimeCache} from '../server/vercel-runtime-cache.mjs';
+import {vercelRequestsLiveMode} from '../server/vercel-database.mjs';
 const getRuntime=runtimeCache(async()=>{
-  try{return await (process.env.DATABASE_URL?createVercelNeonHandler():createVercelDemoHandler());}
+  try{
+    const usePostgres=process.env.DATABASE_URL || vercelRequestsLiveMode(process.env);
+    return await (usePostgres?createVercelNeonHandler():createVercelDemoHandler());
+  }
   catch(error){
     const code=typeof error?.code==='string'&&/^[A-Z0-9_]{1,40}$/.test(error.code)?error.code:'INITIALIZATION_FAILED';
     console.error('Understood API initialization:',code);throw error;

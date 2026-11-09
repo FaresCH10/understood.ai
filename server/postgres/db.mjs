@@ -71,8 +71,9 @@ export async function withPostgresClient(pool, fn) {
 }
 
 export async function createPostgresPool({ connectionString = process.env.UNDERSTOOD_POSTGRES_URL || process.env.DATABASE_URL,
-  tls = process.env.UNDERSTOOD_POSTGRES_TLS === 'true' || (!process.env.UNDERSTOOD_POSTGRES_URL && !!process.env.DATABASE_URL), caFile = process.env.UNDERSTOOD_POSTGRES_CA_FILE } = {}) {
+  tls = process.env.UNDERSTOOD_POSTGRES_TLS === 'true' || (!process.env.UNDERSTOOD_POSTGRES_URL && !!process.env.DATABASE_URL), caFile = process.env.UNDERSTOOD_POSTGRES_CA_FILE, caPem } = {}) {
   if (!connectionString) throw new Error('UNDERSTOOD_POSTGRES_URL is required');
+  if (caPem && caFile) throw new Error('Configure one PostgreSQL CA source');
   let url;
   try { url = new URL(connectionString); } catch { throw new Error('Invalid PostgreSQL connection URL'); }
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname) throw new Error('Invalid PostgreSQL connection URL');
@@ -88,7 +89,7 @@ export async function createPostgresPool({ connectionString = process.env.UNDERS
   const Pool = module.Pool ?? module.default.Pool;
   return guardPostgresPool(new Pool({
     connectionString,
-    ssl: tls ? { rejectUnauthorized: true, ...(caFile ? { ca: readFileSync(caFile, 'utf8') } : {}) } : false,
+    ssl: tls ? { rejectUnauthorized: true, ...(caFile || caPem ? { ca: caPem ?? readFileSync(caFile, 'utf8') } : {}) } : false,
     max: 8,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 10000,

@@ -6,7 +6,11 @@ The local `npm run dev` command remains a synthetic development runtime. Product
 
 Set `UNDERSTOOD_TIER=production`, `UNDERSTOOD_AI_MODE=live`, `UNDERSTOOD_ACCESS_MODE=credential`, and `UNDERSTOOD_DATA_CLASS=real`, together with the existing `.env.production.example` contract. Use the restricted **application** database login in `UNDERSTOOD_POSTGRES_URL`, a verified CA file, an `understood_prod_*` schema, private storage, production model/language settings and provider release scope. The API must not receive the Gemini key; the background worker does.
 
+The Vercel build checks the same `UNDERSTOOD_POSTGRES_URL` and schema that the live gateway uses. `DATABASE_URL` is the separate demo connection. For Vercel, supply the reviewed PostgreSQL CA chain as `UNDERSTOOD_POSTGRES_CA_PEM` and omit `UNDERSTOOD_POSTGRES_CA_FILE`. Use PEM certificate text with real newlines. The worker keeps its mounted CA file. Both services verify TLS certificates.
+
 Supply the actual reviewed release manifest either as `UNDERSTOOD_RELEASE_APPROVAL_FILE` or as the bounded `UNDERSTOOD_RELEASE_APPROVAL_JSON` environment variable. Never both. Existing candidate fingerprint, gate evidence, named review, validity and approved language checks still apply. No manifest was fabricated or enabled by this change.
+
+Run `npm run production:admission` with the candidate environment loaded to list configuration blockers. With `VERCEL=1` and the API service selected, the command checks the Vercel transport and accepts the same approval JSON as the gateway. Run it again with the worker environment. These checks make no provider or database requests.
 
 `server/vercel-neon.mjs` now selects the existing production service configuration when production is explicitly requested, verifies the database application permissions and passes the live pipeline configuration into the handler. It retains Neon registration verification. The Vercel transport uses the platform's overwritten forwarding headers and requires `VERCEL=1`, an exact approved HTTPS origin and a known deployment host; the self-hosted transport retains exact trusted proxy IP checks. Partially real/live settings cannot silently select synthetic mode.
 
