@@ -16,6 +16,7 @@ import {syntheticAssessmentAdapter} from './postgres/synthetic-assessment.mjs';
 import {vercelDatabaseOptions,vercelRequestsLiveMode} from './vercel-database.mjs';
 import {cloudflareGemma4Test} from './ai/cloudflare-gemma4-test.mjs';
 import {cloudflareGemma4Delivery} from './ai/cloudflare-gemma4-delivery.mjs';
+import {nemotronInstructionDelivery} from './ai/nemotron-instruction-delivery.mjs';
 
 // Preserve the existing synthetic application mode, but persist accounts and
 // sessions in Neon. Serverless registration cannot depend on a separate worker.
@@ -34,6 +35,12 @@ export async function createVercelNeonHandler({env=process.env,pool,send,createP
   const production=env.UNDERSTOOD_TIER==='production';
   // A misspelled or partially live setting must never fall back to demo dispatch.
   if(!production&&vercelRequestsLiveMode(env))throw Error('Select the approved production runtime');
+  const textProvider=(env.UNDERSTOOD_INSTRUCTION_TEXT_PROVIDER ?? '').trim() || undefined;
+  if(textProvider!==undefined&&!['nemotron','gemma4','disabled'].includes(textProvider))throw Error('Invalid instruction text provider');
+  const instructionTextAdapter=textProvider==='nemotron'?nemotronInstructionDelivery(env)
+    :textProvider==='gemma4'?cloudflareGemma4Delivery(env)
+    :textProvider==='disabled'?null
+    :(nemotronInstructionDelivery(env) ?? cloudflareGemma4Delivery(env));
   const config=production?productionServiceConfig(env,{service:'api',transport:'vercel',approvalManifest:approvalManifest??readProductionApproval(env)}):
     {tier:'local',aiMode:'synthetic',accessMode:'credential',integrationMode:'synthetic',inlineSyntheticJobs:true,dataClass:'synthetic',
       publicOrigin,remoteDemo:true,localDemo:false,demoHosts:hosts};
@@ -58,7 +65,7 @@ export async function createVercelNeonHandler({env=process.env,pool,send,createP
       mail:production?config.mail:{available:false},registrationVerification,
       // Serverless synthetic runs have no background worker: drain its own queue.
       ...(production?{}:{inlineJobs:true,inlineAssessment:syntheticAssessmentAdapter,gemma4Test:cloudflareGemma4Test(env),
-        instructionTextAdapter:cloudflareGemma4Delivery(env)}),
+        instructionTextAdapter}),
       pilotDestination:pilotGmail?.destination ?? config.pilotDestination ?? null,sendPilot:pilotGmail?.send,
       dispatchRegistration:registrationId=>processOneRegistration(pool,registrationVerification,
         {schema,registrationId,throwOnFailure:true,...(send?{send}:{})}),

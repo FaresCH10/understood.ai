@@ -8,5 +8,7 @@ export function instructionReadiness(config,source){
   const speech=adapter.capabilities?.speechLanguages?.filter(isWorkerLanguage)||[];
   return {mode:config.integrationMode==='live'?'live':'verification',textLanguages:languages,speechLanguages:speech};
  }
- return {mode:config.instructionTextAdapter?'gemma4-text':'synthetic',...hostedInstructionLanguages(source,config.instructionTextAdapter)};
+ if(!config.instructionTextAdapter)return {mode:'synthetic',...hostedInstructionLanguages(source)};
+ return {mode:config.instructionTextAdapter.mode ?? 'gemma4-text',providerLabel:config.instructionTextAdapter.label ?? null,
+  ...hostedInstructionLanguages(source,config.instructionTextAdapter)};
 }

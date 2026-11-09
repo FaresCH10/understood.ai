@@ -1,19 +1,19 @@
 import {WORKER_LANGUAGE_CODES} from '../languages.mjs';
 import {createGeminiAdapter,GEMINI_MODELS} from './gemini.mjs';
 import {createOpenRouterAdapter,OPENROUTER_FREE_MODEL} from './openrouter.mjs';
+import {createNemotronAdapter,NEMOTRON_ULTRA_MODEL} from './nemotron.mjs';
 import {bundleHash} from './prepared-bundle.mjs';
 import {createProviderPacer} from './provider-pacing.mjs';
 
 export const preparationInputHash=({source,title,revision,languages,review=null,glossary})=>bundleHash({source,...(typeof title==='string'?{title}:{}),revision,languages,review,glossary});
 
-const hybridProvenance=Object.freeze({adapter:'openrouter-gemini-bundle-v1',dataClass:'synthetic',
-  textModel:OPENROUTER_FREE_MODEL,speechModel:GEMINI_MODELS.speech,voice:'Kore',
-  promptVersion:'openrouter-gemini-bundle-v1',schemaVersion:'openrouter-gemini-v1'});
+const bundleProvenance=(adapter,textModel)=>({adapter,dataClass:'synthetic',
+  textModel,speechModel:GEMINI_MODELS.speech,voice:'Kore',promptVersion:adapter,schemaVersion:adapter.replace('-bundle-','-')});
 
 export function resolvePreparationAdapter(env=process.env,{fetchImpl=fetch}={}) {
   const mode=env.UNDERSTOOD_PREPARATION_ADAPTER ?? 'disabled';
   if(mode==='disabled')return undefined;
-  if(!['gemini-free','openrouter-gemini'].includes(mode) || env.UNDERSTOOD_TIER!=='local' || env.UNDERSTOOD_AI_MODE!=='synthetic'
+  if(!['gemini-free','openrouter-gemini','nemotron-gemini'].includes(mode) || env.UNDERSTOOD_TIER!=='local' || env.UNDERSTOOD_AI_MODE!=='synthetic'
     || env.UNDERSTOOD_DATA_CLASS!=='synthetic' || env.UNDERSTOOD_ACCESS_MODE!=='credential')throw Error('Preparation provider requires an isolated synthetic credential runtime');
   let hashes;
   try {
@@ -29,14 +29,21 @@ export function resolvePreparationAdapter(env=process.env,{fetchImpl=fetch}={}) 
     return Object.freeze({...select(createGeminiAdapter(options)),permitsPreparation:input=>permitted.has(preparationInputHash(input)),
       withJournal:requestJournal=>select(createGeminiAdapter({...options,requestJournal}))});
   }
-  const textModel=env.OPENROUTER_MODEL || OPENROUTER_FREE_MODEL;
-  const textOptions={apiKey:env.OPENROUTER_API_KEY,dataClass:'synthetic',textModel,fetchImpl};
   const audioOptions={apiKey:env.GEMINI_API_KEY,dataClass:'synthetic',fetchImpl,paceRequest:createProviderPacer({intervalMs:fetchImpl===fetch?6000:0,intervals:{[GEMINI_MODELS.speech]:fetchImpl===fetch?20000:0}})};
-  const provenance=Object.freeze({...hybridProvenance,textModel});
-  const select=(text,audio)=>Object.freeze({provenance,capabilities:Object.freeze({textLanguages:WORKER_LANGUAGE_CODES,
-    speechLanguages:WORKER_LANGUAGE_CODES}),supportsMultipleChoice:text.supportsMultipleChoice,prepare:text.prepare,checkPreparation:text.checkPreparation,translate:text.translate,
-    checkTranslation:text.checkTranslation,speech:audio.speech});
-  return Object.freeze({...select(createOpenRouterAdapter(textOptions),createGeminiAdapter(audioOptions)),
-    permitsPreparation:input=>permitted.has(preparationInputHash(input)),
-    withJournal:requestJournal=>select(createOpenRouterAdapter({...textOptions,requestJournal}),createGeminiAdapter({...audioOptions,requestJournal}))});
+  const hybrid=(provenance,textOptions,createText)=>{
+    const select=(text,audio)=>Object.freeze({provenance,capabilities:Object.freeze({textLanguages:WORKER_LANGUAGE_CODES,
+      speechLanguages:WORKER_LANGUAGE_CODES}),supportsMultipleChoice:text.supportsMultipleChoice,prepare:text.prepare,checkPreparation:text.checkPreparation,translate:text.translate,
+      checkTranslation:text.checkTranslation,speech:audio.speech});
+    return Object.freeze({...select(createText(textOptions),createGeminiAdapter(audioOptions)),
+      permitsPreparation:input=>permitted.has(preparationInputHash(input)),
+      withJournal:requestJournal=>select(createText({...textOptions,requestJournal}),createGeminiAdapter({...audioOptions,requestJournal}))});
+  };
+  if(mode==='nemotron-gemini') {
+    const textModel=env.NVIDIA_TEXT_MODEL || NEMOTRON_ULTRA_MODEL;
+    return hybrid(Object.freeze(bundleProvenance('nemotron-gemini-bundle-v1',textModel)),
+      {apiKey:env.NVIDIA_API_KEY,dataClass:'synthetic',textModel,fetchImpl},createNemotronAdapter);
+  }
+  const textModel=env.OPENROUTER_MODEL || OPENROUTER_FREE_MODEL;
+  return hybrid(Object.freeze(bundleProvenance('openrouter-gemini-bundle-v1',textModel)),
+    {apiKey:env.OPENROUTER_API_KEY,dataClass:'synthetic',textModel,fetchImpl},createOpenRouterAdapter);
 }

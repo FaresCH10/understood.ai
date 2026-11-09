@@ -28,7 +28,7 @@ export function verificationPlan(mode) {
 }
 
 function loadKey() {
-  for(const file of ['.env','.env.production.local']) {
+  for(const file of ['.env','.env.production.worker','.env.production.local']) {
     const path=resolve(file);
     if(!existsSync(path))continue;
     const value=parseEnv(readFileSync(path,'utf8')).GEMINI_API_KEY;

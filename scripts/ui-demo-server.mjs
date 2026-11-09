@@ -21,6 +21,7 @@ import {resolveSourceTranscription} from '../server/ai/source-transcription-conf
 import {resolvePreparationAdapter,preparationInputHash} from '../server/ai/preparation-config.mjs';
 import {resolveRecordingAdapter} from '../server/ai/recording-config.mjs';
 import {createGeminiAdapter} from '../server/ai/gemini.mjs';
+import {NEMOTRON_ULTRA_MODEL} from '../server/ai/nemotron.mjs';
 import {localAudioStore} from '../server/private-storage.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 
@@ -48,18 +49,22 @@ function required(value,name) {
 mkdirSync(runDir,{recursive:true,mode:0o700});
 const repoEnv=envFile(join(ROOT,'.env')),localEnv=envFile(join(ROOT,'.env.production.local'));
 const geminiKey=required(repoEnv.GEMINI_API_KEY || process.env.GEMINI_API_KEY,'GEMINI_API_KEY');
-const openrouterKey=required(localEnv.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY,'OPENROUTER_API_KEY');
+const nvidiaKey=repoEnv.NVIDIA_API_KEY || localEnv.NVIDIA_API_KEY || process.env.NVIDIA_API_KEY || '';
+const openrouterKey=localEnv.OPENROUTER_API_KEY || repoEnv.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY || '';
+if(!nvidiaKey && !openrouterKey)throw Error('NVIDIA_API_KEY or OPENROUTER_API_KEY is required for synthetic preparation');
+const nvidiaModel=repoEnv.NVIDIA_TEXT_MODEL || localEnv.NVIDIA_TEXT_MODEL || process.env.NVIDIA_TEXT_MODEL || NEMOTRON_ULTRA_MODEL;
 const openrouterModel=localEnv.OPENROUTER_MODEL || process.env.OPENROUTER_MODEL || 'minimax/minimax-m3.1-flash:free';
 
 const env={...process.env,
   UNDERSTOOD_TIER:'local',UNDERSTOOD_AI_MODE:'synthetic',UNDERSTOOD_ACCESS_MODE:'credential',UNDERSTOOD_DATA_CLASS:'synthetic',
   UNDERSTOOD_PUBLIC_ORIGIN:`http://127.0.0.1:${webPort}`,UNDERSTOOD_REHEARSAL_PORT:String(apiPort),
   UNDERSTOOD_POSTGRES_SCHEMA:schema,UNDERSTOOD_REHEARSAL_AUDIO_ROOT:join(runDir,'audio'),
-  UNDERSTOOD_SOURCE_TRANSCRIPTION:'gemini-free',UNDERSTOOD_PREPARATION_ADAPTER:'openrouter-gemini',
-  UNDERSTOOD_RECORDING_ADAPTER:'openrouter-gemini',
+  UNDERSTOOD_SOURCE_TRANSCRIPTION:'gemini-free',UNDERSTOOD_PREPARATION_ADAPTER:nvidiaKey?'nemotron-gemini':'openrouter-gemini',
+  UNDERSTOOD_RECORDING_ADAPTER:openrouterKey?'openrouter-gemini':'gemini-free',
   UNDERSTOOD_SYNTHETIC_AUDIO_HASHES:JSON.stringify(['0'.repeat(64)]),
   UNDERSTOOD_SYNTHETIC_PREPARATION_HASHES:JSON.stringify(['0'.repeat(64)]),
-  GEMINI_API_KEY:geminiKey,OPENROUTER_API_KEY:openrouterKey,OPENROUTER_MODEL:openrouterModel};
+  GEMINI_API_KEY:geminiKey,NVIDIA_API_KEY:nvidiaKey,NVIDIA_TEXT_MODEL:nvidiaModel,
+  OPENROUTER_API_KEY:openrouterKey,OPENROUTER_MODEL:openrouterModel};
 
 // PGlite exposes one session. Serializing whole leases keeps nested API transactions from interleaving.
 function serialPool(db) {

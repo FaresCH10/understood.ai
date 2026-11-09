@@ -2,7 +2,7 @@ import {GEMINI_MODELS} from './gemini.mjs';
 
 const methods=(handle,names)=>names.every(name=>typeof handle?.[name]==='function');
 const synthetic=handle=>handle?.provenance?.dataClass==='synthetic';
-const bundle=handle=>synthetic(handle) && ['gemini-bundle-v1','openrouter-gemini-bundle-v1'].includes(handle.provenance.adapter);
+const bundle=handle=>synthetic(handle) && ['gemini-bundle-v1','openrouter-gemini-bundle-v1','nemotron-gemini-bundle-v1'].includes(handle.provenance.adapter);
 const languages=handle=>Array.isArray(handle?.capabilities?.textLanguages)?handle.capabilities.textLanguages:null;
 const speechLanguages=handle=>Array.isArray(handle?.capabilities?.speechLanguages)?handle.capabilities.speechLanguages:null;
 
@@ -26,8 +26,8 @@ export function pipelineStatus(config={}) {
       'Exact synthetic WAV allowlist, current source authority and request quotas required. Transcription language coverage is unverified.'],
     ['preparation','Content preparation',prepared,
       prepared?[preparation.provenance.textModel]:[],languages(preparation) ?? [],
-      prepared&&preparation.provenance.adapter==='openrouter-gemini-bundle-v1'
-        ? 'OpenRouter text preparation with exact complete-input allowlist, requester authority and quotas; generated speech uses the configured audio model.'
+      prepared&&['openrouter-gemini-bundle-v1','nemotron-gemini-bundle-v1'].includes(preparation.provenance.adapter)
+        ? `${preparation.provenance.textModel} text preparation with exact complete-input allowlist, requester authority and quotas; generated speech uses the configured audio model.`
         : 'Exact complete-input allowlist, current requester authority and request quotas required.'],
     ['translation','Translation',prepared,
       prepared?[preparation.provenance.textModel]:[],languages(preparation) ?? [],
