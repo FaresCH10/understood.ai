@@ -1,4 +1,5 @@
 import {validateMultipleChoice} from './multiple-choice-input.mjs';
+import {GEMMA4_DELIVERY_ADAPTER} from './ai/cloudflare-gemma4-delivery.mjs';
 import {translationEdits} from './translation-input.mjs';
 import {generationLanguages} from './settings-input.mjs';
 const uuid=(value) => typeof value==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -79,7 +80,9 @@ export function readySnapshot(briefing,workers,integrationMode,modes={}) {
       || !value.rubric.askedFacts.length || value.rubric.askedFacts.length>6 || !value.rubric.askedFacts.every((fact) => nonempty(fact,500)))))
     throw new Error('Briefing is not technically ready');
   // A device-speech demo marker is not a verified live private audio artifact.
-  if (integrationMode!=='synthetic' || !['synthetic-local-v1','synthetic-instruction-v1'].includes(value.provenance?.adapter) || value.provenance.live!==false)
+  const translatedText=value.provenance?.adapter===GEMMA4_DELIVERY_ADAPTER && deliveryMode==='text'
+    && (!questionMode || value.rubric?.mode==='multiple-choice');
+  if (integrationMode!=='synthetic' || (!translatedText && !['synthetic-local-v1','synthetic-instruction-v1'].includes(value.provenance?.adapter)) || value.provenance.live!==false)
     throw new Error('Live publication artifact verification is unavailable');
   if(value.provenance.adapter==='synthetic-instruction-v1' && questionMode && value.rubric?.mode!=='multiple-choice') {
     const groups=value.rubric?.keywordGroups;

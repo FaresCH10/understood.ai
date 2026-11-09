@@ -20,6 +20,7 @@ import {bindPreparationAuthority,checkPreparationAuthority} from './preparation-
 import {reserveProviderOperation,providerRequestJournal} from './provider-budget.mjs';
 import {preparationOperationEvidence} from '../ai/preparation-provenance.mjs';
 import {expiredBriefingContentMatches} from './briefing-retention.mjs';
+import {GEMMA4_DELIVERY_ADAPTER} from '../ai/cloudflare-gemma4-delivery.mjs';
 
 export async function archiveBriefing(pool,session,id,input,{schema='public'}={}) {
   const change=archiveBriefingInput(input),requestJson=JSON.stringify(change);
@@ -178,13 +179,15 @@ export function requestPreparation(pool,session,id,value,{schema='public'}={}) {
   });
 }
 
-export async function processOnePreparation(pool,{schema='public',integrationMode,prepare=syntheticPrepare,adapter,storage,languages}={}) {
+export async function processOnePreparation(pool,{schema='public',integrationMode,prepare=syntheticPrepare,adapter,storage,languages,
+  briefingId=null,instructionTextAdapter}={}) {
   const dataClass=integrationDataClass(integrationMode);
   if(integrationMode==='live')assertProviderMode(adapter,integrationMode);
   const job=await domainTransaction(pool,schema,async (client) => {
     const row=(await client.query(`SELECT * FROM jobs WHERE kind='prepare' AND ((status='queued' AND due_at<=clock_timestamp())
       OR (status='processing' AND lease_until<=clock_timestamp())) AND ${dispatchPredicate('jobs',{provider:true})}
-      ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1`)).rows[0];
+      AND ($1::text IS NULL OR briefing_id=$1)
+      ORDER BY due_at,id FOR UPDATE SKIP LOCKED LIMIT 1`,[briefingId])).rows[0];
     if (!row || !await dispatchAllowed(client,row.org_id,{provider:true})) return null;
     const token=randomUUID();
     await client.query(`UPDATE jobs SET status='processing',attempts=attempts+1,lease_token=$2,lease_until=clock_timestamp()+interval '180 seconds',error=NULL WHERE id=$1`,[row.id,token]);
@@ -192,6 +195,7 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     return {...row,attempts:row.attempts+1,token};
   });
   if (!job) return false;
+  let translating=false;
   try {
     if (job.attempts>3) throw new Error('Preparation interrupted too many times');
     const briefing=await domainTransaction(pool,schema,async (client) => (await client.query(`SELECT b.source,b.title,b.state,b.revision,
@@ -255,6 +259,25 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       : checkedSyntheticReview(await prepare(briefing.source),review);
     if(base.languages?.en)base={...base,title:briefing.title,languages:{...base.languages,en:{...base.languages.en,title:briefing.title}}};
     let prepared=checkedSyntheticGlossary(base,glossary);
+    const missing=targets.filter(language=>!prepared.languages[language]);
+    if(integrationMode==='synthetic' && instructionTextAdapter && briefing.instruction_request_id && instruction.delivery_mode==='text' && missing.length){
+      translating=true;
+      const claim={source:briefing.source,review:review ?? null,glossary};
+      await checkPreparationClaim(pool,job,claim,{schema});
+      const translations=await Promise.allSettled(missing.map(async language=>{
+        const content=await instructionTextAdapter.translate(language,prepared.languages.en);
+        for(const term of glossary.terms){
+          if(term.sourceLanguage==='en' && term.targetLanguage===language && briefing.source.toLowerCase().includes(term.term.toLowerCase())
+            && !content.text.toLowerCase().includes((term.override || term.suggestion || '').toLowerCase()))
+            throw Error('Instruction translation changed an approved glossary term');
+        }
+        return [language,content];
+      }));
+      if(translations.some(result=>result.status==='rejected'))throw Error('At least one instruction translation failed');
+      await checkPreparationClaim(pool,job,claim,{schema});
+      prepared={...prepared,languages:{...prepared.languages,...Object.fromEntries(translations.map(result=>result.value))},
+        provenance:{...prepared.provenance,adapter:GEMMA4_DELIVERY_ADAPTER,model:instructionTextAdapter.model}};
+    }
     if(!instruction)prepared=withMultipleChoice(prepared,{preserveQuestions:true,preserveAskedFacts:true});
     if(recordedSource)prepared=withMultipleChoice(prepared);
     const available=targets.filter(language=>prepared.languages[language]);
@@ -285,7 +308,8 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       const current=(await client.query(`SELECT id FROM jobs WHERE id=$1 AND status='processing' AND lease_token=$2 AND lease_until>clock_timestamp() FOR UPDATE`,[job.id,job.token])).rows[0];
       if (!current) return;
       await appendPreparationStage(client,job,systemStage('worker','failed',preparationErrorCode(error)));
-      await client.query(`UPDATE jobs SET status='failed',lease_token=NULL,lease_until=NULL,error='Synthetic preparation failed' WHERE id=$1`,[job.id]);
+      await client.query(`UPDATE jobs SET status='failed',lease_token=NULL,lease_until=NULL,error=$2 WHERE id=$1`,
+        [job.id,translating?'Gemma 4 could not prepare the translations. Retry delivery.':'Synthetic preparation failed']);
       await client.query(`UPDATE briefings SET state='failed',updated_at=clock_timestamp() WHERE id=$1 AND org_id=$2 AND site_id=$3 AND revision=$4 AND state='processing'`,[job.briefing_id,job.org_id,job.site_id,job.revision]);
     });
   }

@@ -382,13 +382,13 @@ export async function startInstructionSend(pool,session,input,{schema='public'}=
 
 // Read-only: warns about recipient languages the configured preparation cannot
 // produce before anything is recorded.
-export async function instructionSendPreflight(pool,session,input,{schema='public',pipeline=null}={}) {
+export async function instructionSendPreflight(pool,session,input,{schema='public',pipeline=null,instructionTextAdapter=null}={}) {
   const value=instructionInput(input);
   return domainTransaction(pool,schema,async client=>{
     await requirePrincipal(client,session,'staff');
     const workers=await audienceWorkers(client,session,value.audience);
     return {requestId:value.requestId,...instructionCoverage({workers,source:value.request.source,
-      deliveryMode:value.deliveryMode,pipeline})};
+      deliveryMode:value.deliveryMode,pipeline,instructionTextAdapter})};
   });
 }
 

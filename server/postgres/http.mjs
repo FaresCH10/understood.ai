@@ -256,7 +256,8 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
   const pushAdapter=options.pushAdapter ?? resolvePushAdapter(options.pushEnv);
   const cookieOptions={name:cookieName,secure};
   const pipeline=pipelineStatus(options);
-  const repository={schema,integrationMode:config.integrationMode??'synthetic',cookieName,pipeline,providerVerification:options.providerVerification,storage,attachmentScanner:options.attachmentScanner};
+  const instructionTextAdapter=options.instructionTextAdapter;
+  const repository={schema,integrationMode:config.integrationMode??'synthetic',cookieName,pipeline,providerVerification:options.providerVerification,storage,attachmentScanner:options.attachmentScanner,instructionTextAdapter};
   const mail=options.mail ?? {available:false};
   const registrationVerification=options.registrationVerification ?? mail;
   const destination=pilotDestination(options.pilotDestination);
@@ -267,12 +268,10 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
     // Provider preparation belongs to the background worker. An HTTP status poll
     // must never claim that job with the local demo processor.
     if(options.preparationAdapter||repository.integrationMode==='live')return state();
-    let current=await state();
-    for(let i=0;i<10 && current==='processing';i++) {
-      if(!await processOnePreparation(pool,{schema:repository.schema,integrationMode:'synthetic'})) break;
-      current=await state();
-    }
-    return current;
+    if(await state()==='processing')await processOnePreparation(pool,{
+      schema:repository.schema,integrationMode:'synthetic',briefingId:started.briefingId,instructionTextAdapter,
+    });
+    return state();
   };
   // Serverless deployments have no background worker container, so bounded
   // drains run on request instead. Production (live) keeps the worker authoritative.
@@ -424,7 +423,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(path==='/api/instructions/readiness' && req.method==='POST') {
         if(session.principal_type!=='staff'||!['owner','supervisor','auditor'].includes(session.role))throw Error('Forbidden');
         const input=await readJson(req);
-        return send(res,200,instructionReadiness({...config,preparationAdapter:options.preparationAdapter??config.preparationAdapter},input.source));
+        return send(res,200,instructionReadiness({...config,instructionTextAdapter,preparationAdapter:options.preparationAdapter??config.preparationAdapter},input.source));
       }
       if(path==='/api/instructions/gemma4-test' && req.method==='POST') {
         if(!options.gemma4Test || url.search)return send(res,404,{error:'Not found'});

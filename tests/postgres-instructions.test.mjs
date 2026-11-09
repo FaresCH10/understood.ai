@@ -19,6 +19,7 @@ import {receiveRecording} from '../server/postgres/recordings.mjs';
 import {CANONICAL_SOURCE} from '../server/domain.mjs';
 import {createPostgresRehearsalServer} from '../server/postgres/http.mjs';
 import {provisionStaffCredential,issueWorkerGrant} from '../server/postgres/auth.mjs';
+import {cloudflareGemma4Delivery} from '../server/ai/cloudflare-gemma4-delivery.mjs';
 
 const options={schema:'understood_test_instructions',integrationMode:'synthetic'};
 const owner={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'};
@@ -55,6 +56,63 @@ function wav() {
   return bytes;
 }
 const storage={async save(){},async read(){throw new Error('unused');},async remove(){}};
+
+test('Gemma 4 text reaches the Sinhala worker and retains the normal acknowledgment receipt',async()=>{
+  const {db,pool}=await fixture();
+  try {
+    await db.query("UPDATE workers SET language='si' WHERE id='w1'");
+    const input={...instruction(),title:'Carton handover',source:'Place 2 cartons on the blue shelf before 4 pm.',
+      audience:{type:'members',workerIds:['w1']},responseMode:'acknowledge',deliveryMode:'text'};
+    const older=await startInstructionSend(pool,owner,{...input,requestId:randomUUID()},scope);
+    let requests=0,rejectMeaning=true;
+    const translation={title:'කාටුන් භාරදීම',text:'පස්වරු 4 ට පෙර නිල් රාක්කය මත කාටුන් 2 ක් තබන්න.'};
+    const instructionTextAdapter=cloudflareGemma4Delivery({
+      VERCEL_ENV:'production',UNDERSTOOD_CLOUDFLARE_GEMMA4_DELIVERY:'true',CLOUDFLARE_ACCOUNT_ID:'a'.repeat(32),CLOUDFLARE_API_TOKEN:'fixture',
+    },async (url,options)=>{
+      requests++;
+      const data=JSON.parse(options.body);
+      assert.equal(data.store,false);
+      const payload=JSON.parse(data.messages[1].content);
+      if(payload.original)assert.deepEqual(payload.translated,translation);
+      else assert.deepEqual(payload,{title:input.title,text:input.source});
+      return Response.json({result:{response:payload.original?{preserved:!rejectMeaning}:translation}});
+    });
+    const enabled={...scope,instructionTextAdapter};
+    assert.equal((await instructionSendPreflight(pool,owner,input,enabled)).ready,1);
+    assert.equal((await instructionSendPreflight(pool,owner,{...input,deliveryMode:'both'},enabled)).ready,0);
+    const started=await startInstructionSend(pool,owner,input,enabled);
+    const preparation={...options,briefingId:started.briefingId,instructionTextAdapter};
+    await processOnePreparation(pool,preparation);
+    const failed=await completeInstructionSend(pool,owner,input.requestId,scope);
+    assert.equal(failed.state,'failed');
+    assert.equal(failed.delivered,0);
+    assert.equal(failed.publicationId,null);
+    assert.match(failed.error,/Gemma 4/);
+
+    rejectMeaning=false;
+    const retry=await retryInstructionSend(pool,owner,input.requestId,{requestId:randomUUID()},scope);
+    assert.equal(retry.state,'preparing');
+    await processOnePreparation(pool,preparation);
+    const sent=await completeInstructionSend(pool,owner,input.requestId,scope);
+    assert.equal(sent.state,'published');
+    assert.equal(sent.delivered,1);
+    assert.equal((await instructionSendStatus(pool,owner,older.requestId,scope)).state,'preparing');
+    const {items}=await workerBriefings(pool,worker,scope);
+    const item=items.find(item=>item.publicationId===sent.publicationId);
+    assert.ok(item);
+    const detail=await workerBriefing(pool,worker,item.id,scope);
+    assert.equal(detail.language,'si');
+    assert.equal(detail.content.text,translation.text);
+    assert.equal(detail.content.speech,null);
+    const ackId=randomUUID(),acknowledgment=await acknowledgeAssignment(pool,worker,item.id,ackId,scope);
+    assert.equal(acknowledgment.id,ackId);
+    assert.ok(Date.parse(acknowledgment.receivedAt));
+    assert.equal((await workerRequestReceipt(pool,worker,item.id,'acknowledge',ackId,scope)).status,'acknowledged');
+    await startInstructionSend(pool,owner,input,enabled);
+    assert.equal(await processOnePreparation(pool,preparation),false);
+    assert.equal(requests,4);
+  }finally{await db.close();}
+});
 
 test('PostgreSQL instruction send prepares one logical publication, freezes modes, delivers ready languages and replays safely',async()=>{
   const f=await fixture(),{db,pool}=f;
