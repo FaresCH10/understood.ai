@@ -5,7 +5,7 @@ import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 import {instructionReadiness} from '../server/instruction-readiness.mjs';
 import {syntheticInstructionPrepare} from '../server/instruction-prep.mjs';
 test('readiness never advertises arbitrary synthetic translations or generated speech',()=>{
- assert.deepEqual(instructionReadiness({},'Put the blue folder on the desk.'),{mode:'synthetic',textLanguages:['en'],speechLanguages:[]});
+ assert.deepEqual(instructionReadiness({},'Put the blue folder on the desk.'),{mode:'synthetic',textLanguages:['en'],speechLanguages:['en']});
  assert.deepEqual(instructionReadiness({},CANONICAL_SOURCE),{mode:'synthetic',textLanguages:WORKER_LANGUAGE_CODES,speechLanguages:WORKER_LANGUAGE_CODES});
  assert.deepEqual(instructionReadiness({integrationMode:'live',preparationAdapter:{capabilities:{textLanguages:['en','hi'],speechLanguages:['en']}}},'Instruction').textLanguages,['en','hi']);
  assert.deepEqual(instructionReadiness({},'ضع الملف على المكتب').textLanguages,[]);

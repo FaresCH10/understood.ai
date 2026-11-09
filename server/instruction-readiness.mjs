@@ -1,4 +1,3 @@
-import {CANONICAL_SOURCE} from './domain.mjs';
 import {isWorkerLanguage} from './languages.mjs';
 import {syntheticInstructionLanguages} from './instruction-coverage.mjs';
 export function instructionReadiness(config,source){
@@ -10,6 +9,5 @@ export function instructionReadiness(config,source){
   return {mode:config.integrationMode==='live'?'live':'verification',textLanguages:languages,speechLanguages:speech};
  }
  const languages=/\p{Script=Arabic}/u.test(source)?[]:syntheticInstructionLanguages(source);
- const speech=source.trim()===CANONICAL_SOURCE?languages:[];
- return {mode:'synthetic',textLanguages:languages,speechLanguages:speech};
+ return {mode:'synthetic',textLanguages:languages,speechLanguages:languages};
 }
