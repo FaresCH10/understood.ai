@@ -1,0 +1,94 @@
+{
+  "version": 2,
+  "name": "drive-the-button-send-instruction-is-enabled",
+  "projectId": "understood-48b1943f",
+  "createdAt": 1794223929414,
+  "steps": [
+    {
+      "tool": "reticle_act_sequence",
+      "anchor": {
+        "kind": "role",
+        "role": "textbox",
+        "name": "Title"
+      },
+      "steps": [
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Title"
+          },
+          "args": {
+            "value": "Delivery availability check"
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 406
+          }
+        },
+        {
+          "tool": "reticle_act",
+          "anchor": {
+            "kind": "role",
+            "role": "textbox",
+            "name": "Instruction"
+          },
+          "args": {
+            "value": "Place sealed cartons on the blue shelf before the shift."
+          },
+          "action": "fill",
+          "source": {
+            "file": "src/SendInstruction.tsx",
+            "line": 410
+          }
+        }
+      ],
+      "page": "/artifacts/send-availability-check.html"
+    },
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "role",
+        "role": "button",
+        "name": "Text only",
+        "nth": 1,
+        "of": 2
+      },
+      "args": {},
+      "action": "click",
+      "source": {
+        "file": "src/SendInstruction.tsx",
+        "line": 474
+      },
+      "expect": {
+        "kind": "element",
+        "query": {
+          "role": "button",
+          "name": "Send instruction"
+        },
+        "state": "enabled"
+      },
+      "timeoutMs": 3500,
+      "page": "/artifacts/send-availability-check.html"
+    }
+  ],
+  "intent": "The button \"Send instruction\" is enabled",
+  "intentDerived": true,
+  "requires": [
+    {
+      "kind": "route",
+      "pathname": "/artifacts/send-availability-check.html"
+    }
+  ],
+  "ensures": [
+    {
+      "kind": "route",
+      "pathname": "/artifacts/send-availability-check.html"
+    }
+  ],
+  "author": {
+    "agent": "codex-mcp-client"
+  }
+}
