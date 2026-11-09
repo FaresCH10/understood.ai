@@ -266,11 +266,15 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     if(providerPrepared)base={...base,languages:{en:base.languages.en}};
     let prepared=checkedSyntheticGlossary(base,glossary);
     const missing=targets.filter(language=>!prepared.languages[language]);
-    if(integrationMode==='synthetic' && instructionTextAdapter && briefing.instruction_request_id && instruction.delivery_mode==='text' && missing.length){
+    // A provider that declares its languages cannot translate the rest; those
+    // recipients are left undelivered instead of failing the whole send.
+    const translatable=Array.isArray(instructionTextAdapter?.textLanguages)
+      ? missing.filter(language=>instructionTextAdapter.textLanguages.includes(language)) : missing;
+    if(integrationMode==='synthetic' && instructionTextAdapter && briefing.instruction_request_id && instruction.delivery_mode==='text' && translatable.length){
       translating=true;
       const claim={source:briefing.source,review:review ?? null,glossary};
       await checkPreparationClaim(pool,job,claim,{schema});
-      const translations=await Promise.allSettled(missing.map(async language=>{
+      const translations=await Promise.allSettled(translatable.map(async language=>{
         const content=await instructionTextAdapter.translate(language,prepared.languages.en);
         for(const term of glossary.terms){
           if(term.sourceLanguage==='en' && term.targetLanguage===language && briefing.source.toLowerCase().includes(term.term.toLowerCase())

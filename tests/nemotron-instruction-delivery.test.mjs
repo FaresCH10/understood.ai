@@ -103,14 +103,14 @@ test('DeepL rejects translated scripts or choices that drift from the source',as
   }
 });
 
-test('a Vercel instruction send publishes Nemotron Hindi text and keeps English for the supervisor',async()=>{
+test('a Vercel instruction send publishes supported languages and leaves Sinhala undelivered',async()=>{
   const db=new PGlite();
   const pool={async connect(){return {query:async(sql,args)=>args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)||{rows:[]},release(){}};}};
   const schema='understood_test_nemotron';
   try {
     await db.exec(`CREATE SCHEMA ${schema}; SET search_path TO ${schema},pg_catalog`);
     await runMigrations(pool,{schema});
-    await db.exec("INSERT INTO organizations(id,name) VALUES('a','Synthetic');INSERT INTO sites(id,org_id,name,timezone) VALUES('a','a','Synthetic','UTC');INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','a','a','Owner','owner');INSERT INTO workers(id,org_id,site_id,code,language) VALUES('w1','a','a','001','hi');");
+    await db.exec("INSERT INTO organizations(id,name) VALUES('a','Synthetic');INSERT INTO sites(id,org_id,name,timezone) VALUES('a','a','Synthetic','UTC');INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','a','a','Owner','owner');INSERT INTO workers(id,org_id,site_id,code,language) VALUES('w1','a','a','001','hi'),('w2','a','a','002','si');");
     const owner={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'};
     const scope={schema};
     const mock=fetcher(()=>deeplReply([hindi.title,hindi.text]));
@@ -129,11 +129,13 @@ test('a Vercel instruction send publishes Nemotron Hindi text and keeps English 
     assert.equal(row.prepared_json.provenance.live,false);
     assert.equal(row.prepared_json.languages.en.text,source);
     assert.equal(row.prepared_json.languages.hi.text,hindi.text);
+    assert.equal(row.prepared_json.languages.si,undefined);
     assert.equal(mock.calls.length,1);
     assert.equal(mock.calls[0].url,'https://api-free.deepl.com/v2/translate');
     const result=await completeInstructionSend(pool,owner,input.requestId,scope);
     assert.equal(result.state,'published');
     assert.equal(result.delivered,1);
+    assert.equal(result.undelivered,1);
   } finally {
     await db.close();
   }
