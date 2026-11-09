@@ -10,12 +10,13 @@ import {AlertTriangle,ArrowLeft,CheckCircle2,ChevronRight,Circle,Mic,RefreshCw,S
 import type {StaffRequestAuthority} from './useStaffRequest';
 import {useStaffRequest} from './useStaffRequest';
 import {StaffRequestError} from './staff-request';
+import Gemma4TestPanel from './Gemma4TestPanel';
 
 type Mode='question'|'acknowledge';
 type Delivery='text'|'voice'|'both';
 type EvidenceMode='none'|'photo';
 type AudienceChoice={type:'all'}|{type:'crew';crewId:string}|{type:'members';workerIds:string[]};
-type AudienceOverview={members:{id:string;code:string;name:string|null;language:string;language_selection_required:boolean|number}[];workers:{total:number;byLanguage:Record<string,number>;notSelected?:number};crews:{id:string;name:string;members:number;byLanguage:Record<string,number>;notSelected:number}[]};
+type AudienceOverview={members:{id:string;code:string;name:string|null;language:string;language_selection_required:boolean|number}[];workers:{total:number;byLanguage:Record<string,number>;notSelected?:number};crews:{id:string;name:string;members:number;byLanguage:Record<string,number>;notSelected:number}[];gemma4TestSource?:string};
 type UndeliveredReason={reason:string;language?:string;count:number};
 type CoverageLanguage={language:string;workers:number;ready:boolean;reason:string|null};
 type InstructionCoverage={requestId:string;total:number;ready:number;preparation:'synthetic-fixture'|'synthetic-provider'|'provider';languages:CoverageLanguage[];missing:CoverageLanguage[]};
@@ -405,6 +406,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
         <div className="send-record-actions"><button type="button" className="button outline" disabled={busy||!!pending||!draftLoaded} onClick={()=>setVoiceOpen(true)}><Mic size={18}/>{tr("Record")}</button>{draftNotice&&<span className="muted send-draft-status" role="status">{draftNotice}</span>}</div>
         <p id="send-source-count" className="muted send-counter">{trimmedSource.length < sourceMin ? tr('At least 10 characters.') : <><bdi>{trimmedSource.length} / {sourceMax}</bdi> {tr('characters')}</>}</p>
       </div>
+      {audience?.gemma4TestSource&&<Gemma4TestPanel authority={authority} source={audience.gemma4TestSource}/>}
       </div><div className="send-step-recipients"><label className="field">{tr("Who should receive it?")}
         <select value={audienceType} disabled={busy || !!pending || !draftLoaded} onChange={event=>setAudienceType(event.target.value as 'all'|'crew'|'members')}>
           <option value="all">{tr("All active workers")}</option><option value="crew">{tr("Crews")}</option><option value="members">{tr("Members")}</option>

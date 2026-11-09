@@ -94,7 +94,7 @@ export function staffApplicationContextRequired(path,method) {
     || /^\/api\/audit(?:\/[^/]+)?$/.test(path) || path==='/api/language-readiness'
     || path==='/api/calendar' || path==='/api/instructions/audience' || /^\/api\/instructions\/sends\/[^/]+$/.test(path))
     || method==='POST' && (path==='/api/language-readiness/test' || /^\/api\/processing\/[^/]+\/retries$/.test(path) || path==='/api/instructions/preflight' || path==='/api/instructions/send' || path==='/api/instructions/readiness'
-      || /^\/api\/instructions\/sends\/[^/]+\/retry$/.test(path));
+      || path==='/api/instructions/gemma4-test' || /^\/api\/instructions\/sends\/[^/]+\/retry$/.test(path));
 }
 
 export function staffClarificationContextRequired(path,method) {

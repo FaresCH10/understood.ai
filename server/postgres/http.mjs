@@ -426,9 +426,17 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         const input=await readJson(req);
         return send(res,200,instructionReadiness({...config,preparationAdapter:options.preparationAdapter??config.preparationAdapter},input.source));
       }
+      if(path==='/api/instructions/gemma4-test' && req.method==='POST') {
+        if(!options.gemma4Test || url.search)return send(res,404,{error:'Not found'});
+        if(session.principal_type!=='staff'||!['owner','supervisor'].includes(session.role))throw Error('Forbidden');
+        const {status,data}=await options.gemma4Test.run(await readJson(req,256));
+        return send(res,status,data);
+      }
       if(path==='/api/instructions/audience' && req.method==='GET') {
         if(url.search) throw new Error('Invalid instruction request');
-        return send(res,200,await instructionAudienceOverview(pool,session,repository));
+        const audience=await instructionAudienceOverview(pool,session,repository);
+        const test=options.gemma4Test;
+        return send(res,200,test && ['owner','supervisor'].includes(session.role)?{...audience,gemma4TestSource:test.source}:audience);
       }
       if(path==='/api/instructions/preflight' && req.method==='POST') {
         if(url.search) throw new Error('Invalid instruction request');
