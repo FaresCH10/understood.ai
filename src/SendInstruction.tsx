@@ -29,6 +29,7 @@ type PendingSend={requestId:string;title:string;source:string;audience:AudienceC
 const evidenceFor=(mode:Mode,evidence:unknown):EvidenceMode=>mode==='acknowledge'&&evidence==='photo'?'photo':'none';
 
 const sourceMin=10,sourceMax=4000,titleMax=120;
+const mobileSteps=['Content','Recipients','Review'];
 const pendingKey=(scope:string)=>`understood:send-instruction:${scope}`;
 const validAudience=(value:unknown):value is AudienceChoice=>{
   if(!value || typeof value!=='object')return false;
@@ -87,6 +88,14 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
  const tr=useStaffText();
   const {request,current}=useStaffRequest(authority);
   const [mobileStep,setMobileStep]=useState(0);
+  const mobileHeading=useRef<HTMLHeadingElement>(null);
+  function goToMobileStep(step:number){
+    setMobileStep(step);
+    requestAnimationFrame(()=>mobileHeading.current?.focus());
+  }
+  function stepHeading(index:number){
+    return <h2 className="send-mobile-heading" tabIndex={-1} ref={mobileStep===index?mobileHeading:undefined}>{staffT(mobileSteps[index])}</h2>;
+  }
   const [recovery]=useState(()=>{try{return {pending:readPending(scope),error:''};}catch(error){return {pending:null,error:(error as Error).message};}});
   const restoredPending=recovery.pending;
   const [pending,setPending]=useState<PendingSend|null>(restoredPending);
@@ -124,12 +133,13 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const discarded=useRef<PendingSend|null>(null);
   const sending=useRef(false);
   const sentNotice=useRef(false);
-  useEffect(()=>{const controller=new AbortController();setReadiness(null);setReadinessError('');const timer=setTimeout(()=>{request<{mode:string;textLanguages:string[];speechLanguages:string[]}>('/api/instructions/readiness',{source},controller.signal).then(value=>{if(!controller.signal.aborted&&current())setReadiness(value);}).catch(()=>{if(!controller.signal.aborted&&current())setReadinessError('Preparation readiness could not be checked. Refresh recipients to retry.');});},400);return()=>{clearTimeout(timer);controller.abort();};},[source,audienceRevision,request,current]);
+  useEffect(()=>{const controller=new AbortController();setReadiness(null);setReadinessError('');const timer=setTimeout(()=>{request<{mode:string;textLanguages:string[];speechLanguages:string[]}>('/api/instructions/readiness',{source},controller.signal).then(value=>{if(!controller.signal.aborted&&current())setReadiness(value);}).catch(()=>{if(!controller.signal.aborted&&current())setReadinessError('Delivery availability could not be checked.');});},400);return()=>{clearTimeout(timer);controller.abort();};},[source,audienceRevision,request,current]);
   const trimmedSource=source.trim();
   const effectiveTitle=title.trim().slice(0,titleMax);
   const audienceChoice:AudienceChoice=audienceType==='crew'?{type:'crew',crewId}:audienceType==='members'?{type:'members',workerIds:[...workerIds].sort()}:{type:'all'};
   const selectedCrew=audienceType==='crew'?audience?.crews.find(crew=>crew.id===crewId):null;
   const selectedMembers=audience?.members?.filter(member=>workerIds.includes(member.id))||[];
+  const singleMember=audienceType==='members'&&selectedMembers.length===1?selectedMembers[0]:null;
   const selectedAudience=audienceType==='members'?{total:selectedMembers.filter(member=>!member.language_selection_required).length,notSelected:selectedMembers.filter(member=>member.language_selection_required).length,byLanguage:selectedMembers.reduce<Record<string,number>>((counts,member)=>{counts[member.language]=(counts[member.language]||0)+1;return counts;},{})}:audienceType==='all'?audience?.workers:selectedCrew?{total:selectedCrew.members,byLanguage:selectedCrew.byLanguage,notSelected:selectedCrew.notSelected}:null;
   const audienceLanguages=Object.entries(selectedAudience?.byLanguage??{}).filter(([,count])=>count>0);
   const unavailableLanguages=audienceLanguages.filter(([code])=>!readiness?.textLanguages.includes(code)
@@ -339,7 +349,8 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
 
   if(result) {
     const partial=result.state==='published' && result.undelivered>0;
-    return <><div className="page-header"><div><h1>{result.state==='failed'?staffT("Instruction not sent"):partial?staffT("Instruction partly sent"):staffT("Instruction sent")}</h1><p>{result.state==='preparing'?staffT("Preparation is still running. This page checks again automatically."):partial?staffT("The ready language versions were delivered. Not every selected worker could receive this instruction."):staffT("The send is recorded. Recipient status is available in the instruction.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
+    const heading=result.state==='preparing'?'Preparing instruction':result.state==='failed'?'Instruction not sent':partial?'Instruction partly sent':'Instruction sent';
+    return <><div className="page-header"><div aria-live="polite"><h1>{staffT(heading)}</h1><p>{result.state==='preparing'?staffT("Preparation is still running. This page checks again automatically."):result.state==='failed'?staffT("No instruction was delivered."):partial?staffT("The ready language versions were delivered. Not every selected worker could receive this instruction."):staffT("The send is recorded. Recipient status is available in the instruction.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
       {error && <div className="notice notice-amber" role="alert" ref={errorRef} tabIndex={-1}>{staffT.error(error)}</div>}
       {result.state==='published' && <section className="panel send-result" aria-labelledby="send-result-title">
         <div className={`receipt-mark${partial?' receipt-mark-partial':''}`} aria-hidden="true">{partial?<AlertTriangle size={42}/>:<CheckCircle2 size={42}/>}</div>
@@ -361,13 +372,13 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
         </div>}
         <div className="actions"><button className="button primary" onClick={()=>navigate(`briefings/${result.briefingId}`)}>{staffT("Open instruction")}<ChevronRight size={19}/></button><button className="button outline" disabled={busy} onClick={reset}><Send size={19}/>{staffT("Send another")}</button></div>
       </section>}
-      {result.state==='preparing' && <section className="panel send-result" aria-live="polite"><h2>{staffT("Preparing instruction")}</h2><p>{staffT("Content and language versions are being prepared. This does not block the screen; the status will refresh automatically.")}</p><div className="actions"><button className="button primary" disabled={busy} onClick={()=>void checkStatus(result.requestId)}><RefreshCw size={19}/>{busy?staffT("Checking..."):staffT("Check status")}</button><button className="button outline" disabled={busy} onClick={()=>navigate('briefings')}>{staffT("View instructions")}</button></div></section>}
-      {result.state==='failed' && <section className="panel send-result"><p>{staffT("No instruction was delivered.")} {((result.error?staffT.error(result.error):staffT("Review the source and try again.")))}</p><div className="actions"><button className="button primary" disabled={busy} onClick={reset}><Send size={19}/>{staffT("Start again")}</button><button className="button outline" onClick={()=>navigate('briefings')}>{tr("Instructions")}</button></div></section>}
+      {result.state==='preparing' && <section className="panel send-result"><div className="actions"><button className="button primary" disabled={busy} onClick={()=>void checkStatus(result.requestId)}><RefreshCw size={19}/>{busy?staffT("Checking..."):staffT("Check status")}</button><button className="button outline" disabled={busy} onClick={()=>navigate('briefings')}>{staffT("View instructions")}</button></div></section>}
+      {result.state==='failed' && <section className="panel send-result"><p>{result.error?staffT.error(result.error):staffT("Review the source and try again.")}</p><div className="actions"><button className="button primary" disabled={busy} onClick={reset}><Send size={19}/>{staffT("Start again")}</button><button className="button outline" onClick={()=>navigate('briefings')}>{tr("Instructions")}</button></div></section>}
     </>;
   }
 
   return <>
-    <div className="page-header"><div><h1>{tr("Send an instruction")}</h1><p>{tr("Write or record your instruction, choose recipients, and send.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
+    <div className="page-header"><div><h1 id="send-composer-title">{tr("Send an instruction")}</h1><p>{tr("Write or record your instruction, choose recipients, and send.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
     <dialog ref={leaveDialog} className="withdraw-dialog" aria-labelledby="composer-leave-title" onKeyDown={keepDialogFocus} onCancel={()=>setLeaveOpen(false)}><h2 id="composer-leave-title">{staffT.locale==='ar'?'تعذّر حفظ المسودة':'Draft could not be saved'}</h2><p>{staffT.locale==='ar'?'يمكنك البقاء وإعادة المحاولة، أو المغادرة دون حفظ التغييرات الأخيرة.':'Stay and retry saving, or leave without saving the latest changes. Previously saved drafts are retained.'}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>setLeaveOpen(false)}>{staffT.locale==='ar'?'البقاء':'Keep working'}</button><button className="button primary" onClick={()=>{const target=leaveRequest.current;if(!target)return;try{sessionStorage.removeItem(localKey);}catch{}approvedNext.current=target.next;setLeaveOpen(false);if(target.resume)target.resume();else navigate(target.next);}}>{staffT.locale==='ar'?'المغادرة دون حفظ':'Discard and leave'}</button></div></dialog>
     <dialog ref={voiceDialog} className="worker-form-dialog" aria-label={tr("Record instruction")} onCancel={event=>{event.preventDefault();closeVoice();}}>{voiceOpen&&<VoiceTranscript authority={authority} title={title} onClose={closeVoice} replacing={!!source.trim()} onApproved={text=>{setSource(text);closeVoice();}}/>}</dialog>
     <dialog ref={coverageDialog} className="worker-form-dialog" aria-labelledby="coverage-warning-title" onCancel={event=>{event.preventDefault();closeCoverage();}}>
@@ -401,7 +412,8 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
     {pending && error && !busy && !pendingCheck && <div className="notice notice-amber" role="status"><strong>{staffT("Send outcome not confirmed.")}</strong> {staffT("The original request is retained. Check its receipt or try the same request again. A recorded request is not sent twice.")} <div className="actions"><button className="button primary" disabled={busy} onClick={()=>void retryPending()}><Send size={18}/>{staffT("Try sending again.")}</button><button className="button outline" disabled={busy} onClick={()=>void checkStatus(pending.requestId)}><RefreshCw size={18}/>{staffT("Check receipt")}</button><button className="button outline" disabled={busy} onClick={discardPending}>{staffT("Discard request")}</button></div></div>}
     {pendingCheck && <p className="muted" role="status">{staffT("Checking an earlier send...")}</p>}
     {error && !pending && <div className="notice notice-amber" role="alert" ref={errorRef} tabIndex={-1}>{staffT.error(error)}</div>}
-    <section className="panel send-composer" data-mobile-step={mobileStep} aria-labelledby="send-source-title"><nav className="send-mobile-steps" aria-label={tr("Send an instruction")}>{['Content','Recipients','Review'].map((label,index)=><button key={label} aria-current={mobileStep===index?'step':undefined} disabled={busy} onClick={()=>setMobileStep(index)}>{index+1}. {staffT.locale==='ar'?['المحتوى','المستلمون','المراجعة'][index]:label}</button>)}</nav><div className="send-step-content">
+    <section className="panel send-composer" data-mobile-step={mobileStep} aria-labelledby="send-composer-title"><nav className="send-mobile-steps" aria-label={tr("Send an instruction")}>{mobileSteps.map((label,index)=><button key={label} aria-current={mobileStep===index?'step':undefined} disabled={busy} onClick={()=>goToMobileStep(index)}>{staffT.number(index+1)}. {staffT(label)}</button>)}</nav><div className="send-step-content">
+      {stepHeading(0)}
       <label className="field" htmlFor="send-title"><span>{tr("Title")} <span aria-hidden="true">*</span></span>
         <input id="send-title" name="title" type="text" required minLength={3} maxLength={titleMax}
           value={title} disabled={busy || !!pending || !draftLoaded} onChange={event=>setTitle(event.target.value)} placeholder={staffT("Give this instruction a clear title")} />
@@ -414,7 +426,9 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
         <p id="send-source-count" className="muted send-counter">{trimmedSource.length < sourceMin ? tr('At least 10 characters.') : <><bdi>{trimmedSource.length} / {sourceMax}</bdi> {tr('characters')}</>}</p>
       </div>
       {audience?.gemma4TestSource&&<Gemma4TestPanel authority={authority} source={audience.gemma4TestSource}/>}
-      </div><div className="send-step-recipients"><label className="field">{tr("Who should receive it?")}
+      </div><div className="send-step-recipients">
+      {stepHeading(1)}
+      <label className="field">{tr("Who should receive it?")}
         <select value={audienceType} disabled={busy || !!pending || !draftLoaded} onChange={event=>setAudienceType(event.target.value as 'all'|'crew'|'members')}>
           <option value="all">{tr("All active workers")}</option><option value="crew">{tr("Crews")}</option><option value="members">{tr("Members")}</option>
         </select>
@@ -427,16 +441,26 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       {!!selectedAudience?.notSelected && <p className="notice notice-amber" role="status">{selectedAudience.notSelected} {staffT("active workers in this audience still need a language selected in Team before sending.")}</p>}
       {readiness?.mode==='synthetic'&&<p className="notice notice-amber" role="status">{(readiness.textLanguages.length>1?staffT.locale==='ar'?'وضع تجريبي: المثال المحفوظ مترجم إلى كل لغة عامل ويستخدم صوت الجهاز. التعليمات الأخرى تدعم النص الإنجليزي فقط حتى يتم تفعيل مساحة عمل حية.':'Demo mode: the seeded shelf example is translated into every worker language and uses device speech. Other instructions support English text only until a live workspace is configured.':staffT.locale==='ar'?'وضع تجريبي: تدعم التعليمات العامة النص الإنجليزي فقط. الترجمة متعددة اللغات والصوت المُولّد يتطلبان تفعيل خدمات الذكاء الاصطناعي.':'Test mode: general instructions support English text only. Multilingual translation and generated audio require a configured live workspace.')}</p>}
       {readiness?.mode==='gemma4-text'&&<p className="muted" role="status">{staffT.locale==='ar'?'يمكن لـ Gemma 4 ترجمة التعليمات الإنجليزية للتسليم النصي. يعتمد توفر الصوت على لغة العامل.':'Gemma 4 can translate English instructions for text delivery. Voice availability depends on the worker’s language.'}</p>}
-      {!!readiness&&unavailableLanguages.length>0&&<p className="notice notice-amber" role="alert">
-        {staffT.locale==='ar'?'اللغات غير الجاهزة للصيغة المحددة:':'Not ready for the selected delivery format:'} {unavailableLanguages.map(code=>staffT.language(code)).join(', ')}. {deliveryBlocked?deliveryHint:readyWorkers>0&&(staffT.locale==='ar'?'يمكنك الإرسال إلى العاملين الجاهزين ومراجعة المستبعدين قبل الإرسال، أو تعديل المستلمين أولاً.':'You can send to the ready workers and review exclusions before sending, or adjust recipients first.')}
-      </p>}
-      {readinessError&&<p role="alert">{readinessError}</p>}
       {audienceError && <p className="notice notice-amber" role="alert" ref={audienceErrorRef} tabIndex={-1}>{staffT.error(audienceError)} <button type="button" className="text-link" onClick={()=>setAudienceRevision(value=>value+1)}>{staffT("Try again")}</button></p>}
       {selectedAudience && selectedAudience.total===0 && <p className="notice notice-amber" role="status">{staffT("There are no workers with a selected language in this audience.")}</p>}
 
-      </div><div className="send-step-review"><MobileDisclosure title={staffT.locale==='ar'?'المرفقات (اختياري)':'Attachments (optional)'}><AttachmentComposer key={requestId.current} authority={authority} requestId={requestId.current} disabled={busy||!!pending||!draftLoaded} ready={draftReady} saveDraft={saveDraft} onBusy={setAttachmentBusy} languages={Object.keys(selectedAudience?.byLanguage||{}).sort()}/></MobileDisclosure>
-
-      <div className="send-mobile-review"><strong>{effectiveTitle}</strong><p dir="auto">{source}</p><span>{selectedAudience?.total ?? 0} {staffT.locale==='ar'?'مستلم':'recipients'}</span></div>
+      </div><div className="send-step-review">
+      {stepHeading(2)}
+      {effectiveTitle&&<div className="send-mobile-review"><strong dir="auto">{effectiveTitle}</strong>
+        {source.length>300?<details><summary>{staffT("Read instruction preview")}</summary><p dir="auto">{source}</p></details>:<p dir="auto">{source}</p>}
+      </div>}
+      {selectedAudience&&<div className="send-review-audience">
+        <div><strong>{staffT("Recipients")}</strong><p>
+          {singleMember?<>{singleMember.name&&<><bdi>{singleMember.name}</bdi>{' '}</>}<bdi dir="ltr">{singleMember.name?`(${singleMember.code})`:singleMember.code}</bdi></>:selectedCrew?<bdi>{selectedCrew.name}</bdi>:audienceType==='all'?tr("All active workers"):staffT("Selected members")}
+        </p></div>
+        <button type="button" className="text-link send-edit-recipients" disabled={busy} onClick={()=>goToMobileStep(1)}>{staffT("Edit recipients")}</button>
+        {audienceLanguages.length>0&&<ul className="send-review-languages" aria-label={staffT("Worker languages")}>{audienceLanguages.map(([code,count])=><li key={code}>{staffT.language(code)} <bdi>{staffT.number(count)}</bdi></li>)}</ul>}
+        {audienceReady&&<p className="send-review-readiness" role="status">
+          {readiness?<>{staffT("Workers ready for this format")} <bdi>{staffT.number(readyWorkers)} / {staffT.number(selectedAudience.total)}</bdi></>:readinessError?staffT(readinessError):staffT("Checking delivery availability…")}
+        </p>}
+        {readinessError&&<button type="button" className="text-link" disabled={busy||audienceLoading} onClick={()=>setAudienceRevision(value=>value+1)}>{staffT("Try again")}</button>}
+      </div>}
+      <MobileDisclosure title={staffT.locale==='ar'?'المرفقات (اختياري)':'Attachments (optional)'}><AttachmentComposer key={requestId.current} authority={authority} requestId={requestId.current} disabled={busy||!!pending||!draftLoaded} ready={draftReady} saveDraft={saveDraft} onBusy={setAttachmentBusy} languages={Object.keys(selectedAudience?.byLanguage||{}).sort()}/></MobileDisclosure>
       <div className="send-option-grid">
         <div className="send-mode-stack">
           <label className="send-toggle">
@@ -459,6 +483,9 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
 
 
 
+      {!!readiness&&unavailableLanguages.length>0&&<p className="notice notice-amber" role="status">
+        {staffT.locale==='ar'?'اللغات غير الجاهزة للصيغة المحددة:':'Not ready for the selected delivery format:'} {unavailableLanguages.map(code=>staffT.language(code)).join(staffT.locale==='ar'?'، ':', ')}. {deliveryBlocked?deliveryHint:readyWorkers>0&&(staffT.locale==='ar'?'يمكنك الإرسال إلى العاملين الجاهزين ومراجعة المستبعدين قبل الإرسال، أو تعديل المستلمين أولاً.':'You can send to the ready workers and review exclusions before sending, or adjust recipients first.')}
+      </p>}
       <div className="send-submit">
         <span className="muted"><Users size={17}/> {audience?staffT("Recipients are resolved when you send; later joiners are not added automatically."):staffT("Loading recipients...")}</span>
         <button className="button primary" disabled={!canSubmit||!draftLoaded} onClick={()=>void submit()}>{busy?staffT("Sending..."):<><Send size={20}/>{tr("Send instruction")}</>}</button>
@@ -473,12 +500,11 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
             {readiness&&readyWorkers>0?<CheckCircle2 size={16} aria-hidden="true"/>:<Circle size={16} aria-hidden="true"/>}
             <span>{staffT.locale==='ar'?'صيغة الإرسال':'Delivery format'}
               {deliveryBlocked&&<small>{deliveryHint} {canSwitchToText&&<button type="button" className="text-link" onClick={()=>setDeliveryMode('text')}>{tr("Text only")}</button>}</small>}
-              {!readiness&&<small>{readinessError|| (staffT.locale==='ar'?'جارٍ التحقق من توفر الإرسال…':'Checking delivery availability…')}</small>}
             </span>
           </li>}
           {attachmentBusy&&<li><Circle size={16} aria-hidden="true"/><span>{staffT("Wait for the attachment to finish uploading.")}</span></li>}
         </ul>
       </div>}
-      </div><div className="send-mobile-footer"><button className="button outline" disabled={mobileStep===0||busy} onClick={()=>setMobileStep(value=>value-1)}>{staffT.locale==='ar'?'السابق':'Back'}</button>{mobileStep<2&&<button className="button primary" disabled={mobileStep===0?(!titleValid||!!sourceIssue):!audienceReady} onClick={()=>{setMobileStep(value=>value+1);document.querySelector('.send-composer')?.scrollIntoView({block:'start'});}}>{staffT.locale==='ar'?'متابعة':'Continue'}</button>}</div></section>
+      </div><div className="send-mobile-footer"><button className="button outline" disabled={mobileStep===0||busy} onClick={()=>goToMobileStep(mobileStep-1)}>{staffT("Back")}</button>{mobileStep<2&&<button className="button primary" disabled={busy||(mobileStep===0?(!titleValid||!!sourceIssue):!audienceReady)} onClick={()=>goToMobileStep(mobileStep+1)}>{staffT("Continue")}</button>}</div></section>
   </>;
 }

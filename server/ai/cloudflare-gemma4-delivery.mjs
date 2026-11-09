@@ -1,8 +1,9 @@
 import {languageTextMatches,workerLocale} from '../languages.mjs';
 import {choiceTextKey} from '../multiple-choice.mjs';
 import {cloudflareGemma4,CLOUDFLARE_GEMMA4_MODEL} from './cloudflare-gemma4.mjs';
+import {GEMMA4_DELIVERY_ADAPTER} from './delivery-adapters.mjs';
 
-export const GEMMA4_DELIVERY_ADAPTER='cloudflare-gemma4-instruction-v1';
+export {GEMMA4_DELIVERY_ADAPTER};
 const numbers=value=>(value.match(/[0-9]+(?:[.,][0-9]+)*/g)??[]).sort().join(' ');
 
 export function cloudflareGemma4Delivery(env,fetcher=fetch) {

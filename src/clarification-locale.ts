@@ -106,6 +106,7 @@ export const caseTranslations={
   'Last loaded details are shown below.':['تظهر أدناه آخر تفاصيل حُمّلت.','آخری لوڈ شدہ تفصیلات نیچے ہیں۔'],
   'Case unavailable.':['الحالة غير متاحة.','معاملہ دستیاب نہیں۔'],
   'Original response':['الإجابة الأصلية','اصل جواب'],
+  'View follow-up conversation':['عرض محادثة المتابعة','رابطے کی گفتگو دیکھیں'],
   'Original response audio':['صوت الإجابة الأصلية','اصل جواب کی آڈیو'],
   'No submitted answer retained for this case.':['لا توجد إجابة مقدّمة محفوظة لهذه الحالة.','اس معاملے کے لیے جمع شدہ جواب محفوظ نہیں۔'],
   'Assessment':['التقييم','جانچ'],

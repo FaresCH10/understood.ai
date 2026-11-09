@@ -57,7 +57,9 @@
 .cd-workspace .worker-card-head>h2 { margin-bottom: 0; }
 .cd-workspace .worker-card-head>.actions { margin: 0; }
 .cd-workspace .worker-card-head>.icon-button { flex: none; width: 36px; height: 36px; }
-.cd-conversation { min-width: 0; }
+.cd-conversation { min-width: 0; scroll-margin-block-start: 82px; }
+.cd-conversation:focus-visible { outline: 2px solid var(--ui-focus,#327abd); outline-offset: 3px; }
+.cd-workspace .cd-conversation-jump { margin-block-start: 12px; min-height: 44px; height: auto; white-space: normal; text-align: start; }
 .cd-conversation>.panel>p { font-size: 13px; line-height: 1.75; color: var(--cd-muted); }
 .cd-conversation .worker-help-entry { margin: 12px 0; padding: 14px; border: 1px solid var(--cd-line); background: #f7f9f8; border-radius: 8px; }
 .cd-conversation .worker-help-entry .worker-card-head { margin-bottom: 8px; }

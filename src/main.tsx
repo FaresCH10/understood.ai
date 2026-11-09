@@ -1336,8 +1336,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   function revealHelp(){
     const section=document.getElementById('worker-help');
     if(section instanceof HTMLDetailsElement)section.open=true;
-    section?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
-    (section?.querySelector<HTMLElement>('textarea')||section?.querySelector<HTMLElement>('summary'))?.focus({preventScroll:true});
+    (section?.querySelector<HTMLElement>('textarea:not(:disabled)')||section?.querySelector<HTMLElement>('summary'))?.focus();
   }
   // Do not unmount an unsent recording as the wall clock crosses a deadline. The server rechecks acceptance on upload.
   const responseState = useMemo(() => detail.data ? workerResponseState(detail.data) : null, [detail.data]);
@@ -1373,7 +1372,15 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
               {!inbox.error && page>pages && <button className="button outline" onClick={() => setPage(1)}>{pagingText.first}</button>}
             </div></div>}
           </>
-        ) : detail.loading && !(detail.data?.id===id && (hasUnsent || receipt?.assignmentId===id)) ? <p role="status">{a.loading}</p> : (detail.error && !retainedDetail) || !detail.data || detail.data.id!==id ? <><p className="notice notice-amber" role="alert">{navText.detailFailed}</p><button className="icon-button" aria-label={refreshText.refresh} title={refreshText.refresh} disabled={busy || detail.loading} onClick={()=>setAudioRefresh(value=>value+1)}><RefreshCw size={20}/></button></> : (
+        ) : detail.loading && !(detail.data?.id===id && (hasUnsent || receipt?.assignmentId===id)) ? <p role="status">{a.loading}</p> : (detail.error && !retainedDetail) || !detail.data || detail.data.id!==id ? (
+          <section className="worker-card">
+            <p className="notice notice-amber" role="alert">{navText.detailFailed}</p>
+            <div className="worker-assignment-actions">
+              <button className="button primary" disabled={busy} onClick={()=>setAudioRefresh(value=>value+1)}><RefreshCw size={18} aria-hidden="true"/>{refreshText.refresh}</button>
+              <button className="button outline" disabled={busy} onClick={goBack}>{t.back}</button>
+            </div>
+          </section>
+        ) : (
           <>
             <button className="back-link" disabled={busy} onClick={goBack}>{workerUiDirection(language)==='rtl'?<ArrowRight size={19} aria-hidden="true"/>:<ArrowLeft size={19} aria-hidden="true"/>}{t.back}</button>
             <button className="icon-button" aria-label={refreshText.refresh} title={refreshText.refresh} disabled={busy || detail.loading} onClick={()=>setAudioRefresh(value=>value+1)}><RefreshCw size={20}/></button>
@@ -1381,7 +1388,6 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
             {detail.error && <p role="alert">{refreshText.failed}</p>}
             {<><h1 lang={detail.data.language} dir={workerUiDirection(detail.data.language)}>{detail.data.contentExpired?detail.data.title:detail.data.content.title}</h1>
             <p className="worker-subtitle">{t.version} v{detail.data.version}</p></>}
-            {!detail.data.contentExpired&&<WorkerWorkProgress key={`work:${id}`} disabled={busy||detailUnavailable} confirmationLabel={responseMode==='acknowledge'?t.ackAction:undefined} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} refresh={refresh+audioRefresh} language={language} timezone={session.timezone} onWorkChange={setWorkStatus} onCompleted={()=>setAudioRefresh(value=>value+1)}/>}
             {receipt?.assignmentId === id ? (
               <><section className="worker-card"><h2>{t.readInstruction}</h2><p className="briefing-text" lang={detail.data.language} dir={workerUiDirection(detail.data.language)}>{receipt.presentation?.text||detail.data.content?.text}</p></section><WorkerSubmissionReceipt resolvedLabel={workCleared?statusText.resolved:undefined} choices={receipt.presentation?.choices||detail.data.content?.choices} key={receipt.requestId} session={session} selection={{assignmentId:id,version:receipt.publicationVersion,language:receipt.contentLanguage,requestId:receipt.requestId,kind:receipt.requestKind}} acknowledgedContext={receipt.clientContext} language={language} timezone={session.timezone} disabled={busy||detailUnavailable} canHelp={!!responseState?.canHelp} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost} onBack={goBack} onHelp={()=>{pendingHelpAssignment.current=id;setReceipt(null);}} onChecked={()=>{const requestId=receipt.requestId;if(!requestId||checkedReceipts.current.has(requestId))return;checkedReceipts.current.add(requestId);setAudioRefresh(value=>value+1);}}/></>
             ) : detail.data.contentExpired ? (
@@ -1402,6 +1408,10 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   </details>
                   </>}
                   <WorkerPresentationView key={`presentation:${id}:${detail.data.publicationId}:${detail.data.version}`} assignmentId={id} version={detail.data.version} sourceKind="instruction" originalLanguage={detail.data.language} approvedLanguage={session.language || ''} uiLanguage={language} session={session} disabled={busy||detailUnavailable} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} onActive={setAnswerPresentationId} onChoices={setTranslatedChoices} onQuestion={setTranslatedQuestion} onContent={setTranslatedContent} requiresChoices={detail.data.content.questionType==='multiple-choice'}/>
+                  {(responseState?.canRespond||responseState?.canHelp)&&<div className="worker-assignment-actions">
+                    {responseState.canRespond&&<button type="button" className="button outline" onClick={()=>document.getElementById('worker-question')?.focus()}>{responseMode==='acknowledge'?<CheckCircle2 size={18} aria-hidden="true"/>:<HelpCircle size={18} aria-hidden="true"/>}{responseMode==='acknowledge'?t.ackTitle:t.question}</button>}
+                    {responseState.canHelp&&<button type="button" className="button outline" onClick={revealHelp}><MessageCircle size={18} aria-hidden="true"/>{t.help}</button>}
+                  </div>}
                 </section>
                   <InstructionFiles language={language} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost}/>
                 <section className="worker-card question-card" id="worker-question" tabIndex={-1}>
@@ -1419,7 +1429,6 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                       </> : null}
                     </section>}
                     {detail.data.acknowledgedAt ? <><Status value={statusText.acknowledged}/><p className="muted"><time dateTime={detail.data.acknowledgedAt}>{new Date(detail.data.acknowledgedAt).toLocaleString(language,{timeZone:session.timezone,dateStyle:'medium',timeStyle:'short'})}</time></p></> : !responseState?.closed && responseState?.canRespond ? <button className="button primary full" disabled={busy || acknowledging || detailUnavailable || (evidenceMode==='photo' && !evidencePhoto)} onClick={()=>void acknowledge()}>{acknowledging?t.saving:<><CheckCircle2 size={20}/>{t.ackAction}</>}</button> : null}
-                    <button className="button outline full" onClick={revealHelp}><MessageCircle size={20} /> {t.help}</button>
                   </> : <>
                   <div className="question-label"><HelpCircle size={24} />{t.question}</div>
                   <h2 lang={translatedQuestion?session.language:detail.data.language} dir="auto">{translatedQuestion||detail.data.content.question}</h2>
@@ -1466,7 +1475,6 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                     </>
                   )}
                   {responseState?.pending && <button className="icon-button" aria-label={statusText.check} title={statusText.check} disabled={busy} onClick={() => setAudioRefresh((value) => value + 1)}><RefreshCw size={20} /></button>}
-                  <button className="button outline full" onClick={revealHelp}><MessageCircle size={20} /> {t.help}</button>
                   </>}
                 </section>
                 {responseState?.canHelp&&<details className="worker-card worker-help-disclosure" id="worker-help" open={!!helpText||helpVoiceUnsent||helpSent}>
@@ -1479,6 +1487,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
               </>
             )}
 
+            {!detail.data.contentExpired&&<WorkerWorkProgress key={`work:${id}`} disabled={busy||detailUnavailable} confirmationLabel={responseMode==='acknowledge'?t.ackAction:undefined} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} refresh={refresh+audioRefresh} language={language} timezone={session.timezone} onWorkChange={setWorkStatus} onCompleted={()=>setAudioRefresh(value=>value+1)}/>}
             <details className="worker-detail-disclosure" open={hasUnsent||pendingReceipts.length>0}><summary>{journeyText.resources}<ChevronDown size={18} aria-hidden="true"/></summary><div>
             <WorkerOfflineSaveView key={`offline:${id}:${detail.data.publicationId}:${detail.data.version}`} session={session} language={language} scope={{assignmentId:id,publicationId:detail.data.publicationId,version:detail.data.version,language:detail.data.language}} disabled={busy || detailUnavailable} current={()=>!sessionInvalid() && validWorkerSession(session) && currentAssignment.current===id && !detailUnavailable} onOperation={outboxOperation}/>
             {detail.data.content?.questionType!=='multiple-choice' && <WorkerAudioDraftView key={`audio:${id}:${detail.data.publicationId}:${detail.data.version}`} session={session} interfaceLanguage={language} scope={{assignmentId:id,publicationId:detail.data.publicationId,version:detail.data.version,language:detail.data.language}}

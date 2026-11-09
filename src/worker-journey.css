@@ -103,6 +103,10 @@
 .worker-detail-disclosure[open]>summary svg { transform:rotate(180deg); }
 .worker-detail-disclosure>div { padding-block:8px; }
 .worker-detail-disclosure .worker-card { margin-bottom:12px; }
+.worker-assignment-actions { display:flex;flex-wrap:wrap;gap:8px;margin-block-start:12px; }
+.worker-assignment-actions>.button { flex:1 1 9rem;min-width:0;overflow-wrap:anywhere; }
+#worker-question,#worker-help textarea { scroll-margin-block:82px; }
+#worker-question:focus-visible { outline:2px solid #277c61;outline-offset:3px; }
 .worker-help-disclosure>summary { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; min-height:44px; font-size:18px; font-weight:650; list-style:none; }
 .worker-help-disclosure>summary::-webkit-details-marker { display:none; }
 .worker-help-disclosure>summary svg { flex-shrink:0; }
