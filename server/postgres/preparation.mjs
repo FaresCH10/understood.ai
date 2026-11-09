@@ -20,7 +20,7 @@ import {bindPreparationAuthority,checkPreparationAuthority} from './preparation-
 import {reserveProviderOperation,providerRequestJournal} from './provider-budget.mjs';
 import {preparationOperationEvidence} from '../ai/preparation-provenance.mjs';
 import {expiredBriefingContentMatches} from './briefing-retention.mjs';
-import {GEMMA4_DELIVERY_ADAPTER} from '../ai/cloudflare-gemma4-delivery.mjs';
+import {GEMMA4_DELIVERY_ADAPTER} from '../ai/instruction-text-providers.mjs';
 
 export async function archiveBriefing(pool,session,id,input,{schema='public'}={}) {
   const change=archiveBriefingInput(input),requestJson=JSON.stringify(change);
@@ -254,10 +254,16 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       return true;
     }
     if(intent) throw Error('Generated target regeneration requires its configured adapter');
-    let base=instruction
+    let providerPrepared=false,base=null;
+    if(instruction?.delivery_mode==='text' && typeof instructionTextAdapter?.prepare==='function') {
+      base=await instructionTextAdapter.prepare({source:briefing.source,title:briefing.title},instruction).catch(()=>null);
+      providerPrepared=!!base;
+    }
+    base ??= instruction
       ? syntheticInstructionPrepare({source:briefing.source,title:briefing.title},instruction)
       : checkedSyntheticReview(await prepare(briefing.source),review);
     if(base.languages?.en)base={...base,title:briefing.title,languages:{...base.languages,en:{...base.languages.en,title:briefing.title}}};
+    if(providerPrepared)base={...base,languages:{en:base.languages.en}};
     let prepared=checkedSyntheticGlossary(base,glossary);
     const missing=targets.filter(language=>!prepared.languages[language]);
     if(integrationMode==='synthetic' && instructionTextAdapter && briefing.instruction_request_id && instruction.delivery_mode==='text' && missing.length){
@@ -276,7 +282,10 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       if(translations.some(result=>result.status==='rejected'))throw Error('At least one instruction translation failed');
       await checkPreparationClaim(pool,job,claim,{schema});
       prepared={...prepared,languages:{...prepared.languages,...Object.fromEntries(translations.map(result=>result.value))},
-        provenance:{...prepared.provenance,adapter:GEMMA4_DELIVERY_ADAPTER,model:instructionTextAdapter.model}};
+        provenance:{...prepared.provenance,adapter:instructionTextAdapter.provenanceAdapter ?? GEMMA4_DELIVERY_ADAPTER,model:instructionTextAdapter.model}};
+    } else if(providerPrepared) {
+      prepared={...prepared,provenance:{...prepared.provenance,
+        adapter:instructionTextAdapter.provenanceAdapter ?? GEMMA4_DELIVERY_ADAPTER,model:instructionTextAdapter.model}};
     }
     if(!instruction)prepared=withMultipleChoice(prepared,{preserveQuestions:true,preserveAskedFacts:true});
     if(recordedSource)prepared=withMultipleChoice(prepared);
@@ -309,7 +318,7 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       if (!current) return;
       await appendPreparationStage(client,job,systemStage('worker','failed',preparationErrorCode(error)));
       await client.query(`UPDATE jobs SET status='failed',lease_token=NULL,lease_until=NULL,error=$2 WHERE id=$1`,
-        [job.id,translating?'Gemma 4 could not prepare the translations. Retry delivery.':'Synthetic preparation failed']);
+        [job.id,translating?`${instructionTextAdapter?.label ?? 'The text provider'} could not prepare the translations. Retry delivery.`:'Synthetic preparation failed']);
       await client.query(`UPDATE briefings SET state='failed',updated_at=clock_timestamp() WHERE id=$1 AND org_id=$2 AND site_id=$3 AND revision=$4 AND state='processing'`,[job.briefing_id,job.org_id,job.site_id,job.revision]);
     });
   }

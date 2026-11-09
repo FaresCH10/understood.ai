@@ -1,7 +1,7 @@
 import {languageTextMatches,workerLocale} from '../languages.mjs';
 import {choiceTextKey} from '../multiple-choice.mjs';
 import {cloudflareGemma4,CLOUDFLARE_GEMMA4_MODEL} from './cloudflare-gemma4.mjs';
-import {GEMMA4_DELIVERY_ADAPTER} from './delivery-adapters.mjs';
+import {GEMMA4_DELIVERY_ADAPTER} from './instruction-text-providers.mjs';
 
 export {GEMMA4_DELIVERY_ADAPTER};
 const numbers=value=>(value.match(/[0-9]+(?:[.,][0-9]+)*/g)??[]).sort().join(' ');
@@ -11,6 +11,8 @@ export function cloudflareGemma4Delivery(env,fetcher=fetch) {
   const run=cloudflareGemma4(env,fetcher);
   if(!run)return null;
   return {
+    mode:'gemma4-text',
+    label:'Gemma 4',
     model:CLOUDFLARE_GEMMA4_MODEL,
     async translate(language,content) {
       const locale=workerLocale(language);

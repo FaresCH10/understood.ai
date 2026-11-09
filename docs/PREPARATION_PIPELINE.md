@@ -9,9 +9,10 @@ tenant, pause controls and lease. Legacy unattributed jobs cannot dispatch
 Gemini; an explicitly authorized retry records new authority, not invented history.
 
 Enable only an isolated LOCAL synthetic credential rehearsal with
-`UNDERSTOOD_PREPARATION_ADAPTER=gemini-free` and
-`UNDERSTOOD_SYNTHETIC_PREPARATION_HASHES` containing independently reviewed
-synthetic input fingerprints. An input includes source, revision, target
+`UNDERSTOOD_PREPARATION_ADAPTER` set to `gemini-free`, `openrouter-gemini`
+(OpenRouter text with Gemini speech) or `nemotron-gemini` (NVIDIA Nemotron text
+with Gemini speech), and `UNDERSTOOD_SYNTHETIC_PREPARATION_HASHES` containing
+independently reviewed synthetic input fingerprints. An input includes source, revision, target
 languages, optional edits and glossary snapshot. Changing any dependency
 requires a new fingerprint. Global and tenant request quotas must also be
 explicitly enabled. A key alone does not enable dispatch; hosted activation
