@@ -15,6 +15,9 @@ export const caseTranslations={
   'How to follow up':['كيفية المتابعة','رابطہ کیسے کریں'],
   'Assessment details':['تفاصيل التقييم','جانچ کی تفصیلات'],
   'Case type':['نوع الحالة','معاملے کی قسم'],
+  'Case':['الحالة','معاملہ'],
+  'Record the outcome and close this follow-up.':['سجّل النتيجة وأغلق هذه المتابعة.','نتیجہ درج کریں اور یہ رابطہ بند کریں۔'],
+  'Review the recorded outcome and notes.':['راجع النتيجة والملاحظات المسجلة.','درج شدہ نتیجہ اور نوٹس دیکھیں۔'],
   'Answer check':['مراجعة الإجابة','جواب کی جانچ'],
   'Supervisor follow-up':['متابعة المشرف','سپروائزر کا رابطہ'],
   'Give the worker another opportunity to respond.':['امنح العامل فرصة أخرى للإجابة.','کارکن کو جواب دینے کا ایک اور موقع دیں۔'],
@@ -26,6 +29,49 @@ export const caseTranslations={
   'Change follow-up deadline':['تغيير موعد المتابعة','رابطے کا آخری وقت تبدیل کریں'],
   'Update when this follow-up is due.':['حدّث موعد استحقاق هذه المتابعة.','اس رابطے کا آخری وقت تبدیل کریں۔'],
   'Assessment review':['مراجعة التقييم','جانچ کا جائزہ'],
+  'Change history':['سجل التغييرات','تبدیلیوں کی تاریخ'],
+  'Instruction and answer':['التعليمات والإجابة','ہدایت اور جواب'],
+  'Instruction':['التعليمات','ہدایت'],
+  'Question asked':['السؤال المطروح','پوچھا گیا سوال'],
+  'Answer':['الإجابة','جواب'],
+  'Expected':['المتوقع','متوقع'],
+  'Ask again':['اسأل مجدداً','دوبارہ پوچھیں'],
+  'Review answer request':['مراجعة طلب الإجابة','جواب کی درخواست دیکھیں'],
+  'Request another answer?':['طلب إجابة أخرى؟','ایک اور جواب کی درخواست کریں؟'],
+  'Choose a future deadline within 30 days.':['اختر موعداً لاحقاً خلال 30 يوماً.','اگلے 30 دنوں میں آئندہ وقت منتخب کریں۔'],
+  'You will review the deadline before sending.':['ستراجع الموعد قبل الإرسال.','بھیجنے سے پہلے آخری وقت دیکھیں گے۔'],
+  'Review the answer deadline before sending.':['راجع موعد الإجابة قبل الإرسال.','بھیجنے سے پہلے جواب کا آخری وقت دیکھیں۔'],
+  'The case stays open until you resolve it.':['تبقى الحالة مفتوحة حتى تغلقها.','معاملہ حل کرنے تک کھلا رہے گا۔'],
+  'Answer translation is not available.':['ترجمة الإجابة غير متاحة.','جواب کا ترجمہ دستیاب نہیں۔'],
+  'No fact-level explanation was saved.':['لم يُحفظ تفسير لكل معلومة.','ہر نکتے کی وضاحت محفوظ نہیں کی گئی۔'],
+  'Check the answer, then choose how to follow up.':['راجع الإجابة، ثم اختر طريقة المتابعة.','جواب دیکھیں، پھر رابطے کا طریقہ منتخب کریں۔'],
+  'Answer requested':['تم طلب إجابة','جواب مانگا گیا'],
+  'The case is overdue and stays open until resolved.':['تجاوزت الحالة الموعد وتبقى مفتوحة حتى إغلاقها.','معاملے کا وقت گزر گیا ہے اور حل ہونے تک کھلا رہے گا۔'],
+  'If unresolved, this case becomes overdue at the case deadline.':['إذا لم تُغلق الحالة، تصبح متأخرة عند حلول موعدها النهائي.','حل نہ ہونے پر معاملہ اپنی آخری تاریخ پر تاخیر کا شکار ہو جائے گا۔'],
+  'Change case deadline':['تغيير موعد الحالة','معاملے کا آخری وقت بدلیں'],
+  'The worker receives the saved question in their language. Its exact text is not available to preview here.':['يتلقى العامل السؤال المحفوظ بلغته. النص الدقيق غير متاح للمعاينة هنا.','کارکن کو محفوظ سوال ان کی زبان میں ملے گا۔ اصل متن یہاں پیشگی دستیاب نہیں ہے۔'],
+  'The worker can answer the original question again. No new question is sent.':['يمكن للعامل الإجابة عن السؤال الأصلي مجدداً. لن يُرسل سؤال جديد.','کارکن اصل سوال کا دوبارہ جواب دے سکتا ہے۔ نیا سوال نہیں بھیجا جائے گا۔'],
+  '{hours}h {minutes}m after the case deadline.':['بعد موعد الحالة بـ {hours} ساعة و{minutes} دقيقة.','معاملے کے آخری وقت کے {hours} گھنٹے {minutes} منٹ بعد۔'],
+  'This deadline has passed. Choose a future deadline.':['انقضى هذا الموعد. اختر موعداً لاحقاً.','یہ آخری وقت گزر چکا ہے۔ آئندہ وقت منتخب کریں۔'],
+  'Use case deadline':['استخدام موعد الحالة','معاملے کا آخری وقت استعمال کریں'],
+  'Send anyway; the case may become overdue':['الإرسال رغم ذلك؛ قد تتأخر الحالة','پھر بھی بھیجیں؛ معاملہ تاخیر کا شکار ہو سکتا ہے'],
+  'Cancel and choose a custom deadline':['إلغاء واختيار موعد آخر','منسوخ کریں اور اپنا وقت منتخب کریں'],
+  'No fact-level explanation was saved. Confirm the answer with the worker before deciding.':['لم يُحفظ تفسير لكل معلومة. تحقّق من الإجابة مع العامل قبل القرار.','ہر نکتے کی وضاحت محفوظ نہیں کی گئی۔ فیصلہ کرنے سے پہلے کارکن سے جواب کی تصدیق کریں۔'],
+  'Recorded answer quote':['اقتباس محفوظ من الإجابة','جواب سے محفوظ اقتباس'],
+  'No quote recorded':['لا يوجد اقتباس محفوظ','کوئی اقتباس محفوظ نہیں'],
+  'Answer translation is not available. Ask someone who speaks this language to review it.':['ترجمة الإجابة غير متاحة. اطلب مراجعتها من شخص يتحدث هذه اللغة.','جواب کا ترجمہ دستیاب نہیں۔ یہ زبان بولنے والے کسی فرد سے اس کی جانچ کروائیں۔'],
+  'Case settings':['إعدادات الحالة','معاملے کی ترتیبات'],
+  'Send a check-back question?':['إرسال سؤال تحقق؟','جانچ کا سوال بھیجیں؟'],
+  'Send question':['إرسال السؤال','سوال بھیجیں'],
+  'The answer deadline is after the case deadline.':['موعد الإجابة بعد الموعد النهائي للحالة.','جواب کی آخری تاریخ معاملے کی آخری تاریخ کے بعد ہے۔'],
+  'No further follow-up is needed.':['لا حاجة إلى متابعة إضافية.','مزید کسی رابطے کی ضرورت نہیں۔'],
+  'Follow-up outcome':['نتيجة المتابعة','رابطے کا نتیجہ'],
+  'Choose an outcome':['اختر النتيجة','نتیجہ منتخب کریں'],
+  'Explained; worker can continue':['تم الشرح؛ يمكن للعامل المتابعة','سمجھا دیا؛ کارکن جاری رکھ سکتا ہے'],
+  'Work cannot proceed':['لا يمكن متابعة العمل','کام جاری نہیں رکھا جا سکتا'],
+  'Work cancelled':['أُلغي العمل','کام منسوخ ہو گیا'],
+  'No outcome was recorded.':['لم تُسجَّل نتيجة.','کوئی نتیجہ درج نہیں ہوا۔'],
+  'No follow-up notes were recorded.':['لم تُسجَّل ملاحظات متابعة.','متابعتی نوٹ درج نہیں ہوئے۔'],
   'Record a disagreement with the original assessment.':['سجّل اعتراضاً على التقييم الأصلي.','اصل جانچ سے اختلاف درج کریں۔'],
   'Repeat history':['سجل طلبات الإعادة','دوبارہ جواب کی تاریخ'],
   'Check-back and repeat requests for this case.':['أسئلة التحقق وطلبات الإعادة لهذه الحالة.','اس معاملے کے جانچ سوالات اور دوبارہ جواب کی درخواستیں۔'],
@@ -38,7 +84,7 @@ export const caseTranslations={
   'Case management':['إدارة الحالة','معاملے کا انتظام'],
   'Instruction context':['سياق التعليمات','ہدایت کا سیاق'],
   'Original instruction':['التعليمات الأصلية','اصل ہدایت'],
-  'Resolve case':['إغلاق الحالة بعد المتابعة','معاملہ حل کریں'],
+  'Resolve case':['إغلاق الحالة','معاملہ حل کریں'],
   'Recorded resolution':['المعالجة المسجّلة','درج کردہ حل'],
   'Visible to authorized staff only.':['مرئية للموظفين المخوّلين فقط.','صرف مجاز عملے کو نظر آتا ہے۔'],
   'Clarifications could not be loaded.':['تعذّر تحميل التوضيحات.','وضاحتیں لوڈ نہیں ہو سکیں۔'],
@@ -131,7 +177,8 @@ export const caseTranslations={
   'Worker help request':['طلب مساعدة العامل','کارکن کی مدد کی درخواست'],
   'Question and key facts':['السؤال والمعلومات الأساسية','سوال اور اہم معلومات'],
   'Question content is no longer retained.':['لم يعد محتوى السؤال محفوظاً.','سوال کا متن اب محفوظ نہیں۔'],
-  'Follow-up due':['موعد المتابعة','رابطے کا آخری وقت'],
+  'Case deadline':['الموعد النهائي للحالة','کیس کی آخری تاریخ'],
+  'Answer by':['أجب بحلول','جواب اس وقت تک'],
   'Escalated':['تم التصعيد','مزید توجہ کے لیے بھیجا گیا'],
   'Recent responses ({count})':['الإجابات الأخيرة ({count})','حالیہ جوابات ({count})'],
   'Assessment pending':['التقييم قيد الانتظار','جانچ زیر التوا ہے'],
@@ -139,6 +186,8 @@ export const caseTranslations={
   'Matched':['تطابق','مطابقت'],
   'Answer not correct':['الإجابة غير صحيحة','جواب درست نہیں'],
   'Send check-back question':['أرسل سؤال التحقق','جانچ کا سوال بھیجیں'],
+  'The worker gets a generated question and 24 hours to answer.':['يتلقى العامل سؤالاً مُنشأ و24 ساعة للإجابة.','کارکن کو تیار کردہ سوال اور جواب کے لیے 24 گھنٹے ملتے ہیں۔'],
+  'Set a custom deadline':['حدد موعداً نهائياً مخصصاً','اپنی مرضی کی آخری تاریخ مقرر کریں'],
   "Sends the generated question in the worker's language and requests another answer within 24 hours.":['يرسل السؤال المُنشأ بلغة العامل ويطلب إجابة أخرى خلال 24 ساعة.','تیار کردہ سوال کارکن کی زبان میں بھیجتا ہے اور 24 گھنٹوں میں نیا جواب مانگتا ہے۔'],
   'Sending check-back question...':['جارٍ إرسال سؤال التحقق...','جانچ کا سوال بھیجا جا رہا ہے...'],
   'Check-back question sent. The worker has 24 hours to answer again.':['أُرسل سؤال التحقق. لدى العامل 24 ساعة للإجابة مرة أخرى.','جانچ کا سوال بھیج دیا گیا۔ کارکن کے پاس دوبارہ جواب دینے کے لیے 24 گھنٹے ہیں۔'],
@@ -355,7 +404,11 @@ export function caseState(locale:CaseLocale,value:string|null|undefined){
   const names:Record<string,CaseTextKey>={open:'Open',resolved:'Resolved',matched:'Matched',clarification:'Answer not correct',unassessable:'Could not be assessed',pending:'Pending',submitted:'Submitted',cancelled:'Cancelled',deleted:'Deleted',expired:'Expired'};
   return caseText(locale,value?names[value]||'Status unavailable':'Assessment pending');
 }
-export function caseLanguage(locale:CaseLocale,value:WorkerLocaleCode){return ['en','ar','ur'].includes(value)?caseText(locale,({en:'English',ar:'Arabic',ur:'Urdu'} as Record<string,string>)[value] as CaseTextKey):workerLocale(value)?.name || value;}
+export function caseLanguage(locale:CaseLocale,value:WorkerLocaleCode){
+  if(['en','ar','ur'].includes(value))return caseText(locale,({en:'English',ar:'Arabic',ur:'Urdu'} as Record<string,string>)[value] as CaseTextKey);
+  try{const name=new Intl.DisplayNames([locale],{type:'language'}).of(value);if(name)return name;}catch{/* Older runtimes fall back to the native language name. */}
+  return workerLocale(value)?.name||value;
+}
 export function caseReason(locale:CaseLocale,value:string){
   const codes:Record<string,CaseTextKey>={missing_asked_fact:'Missing fact',missing_fact:'Missing fact','Missing fact':'Missing fact',incorrect_choice:'Incorrect choice','Incorrect choice':'Incorrect choice',asked_facts_present:'Key facts were present',unclear_audio:'Unclear audio','Unclear audio':'Unclear audio','Help requested':'Help requested','Voice help requested':'Help requested','[Deleted]':'Deleted','[Expired]':'Expired'};
   if(codes[value])return caseText(locale,codes[value]);
@@ -370,8 +423,8 @@ export function caseTimeError(locale:CaseLocale,message:string,timezone:string){
 export function caseTimestamp(locale:CaseLocale,value:string,timezone='UTC'){
   const date=new Date(value);if(!Number.isFinite(date.getTime()))throw Error('Invalid case timestamp');
   let zone=timezone;try{new Intl.DateTimeFormat('en',{timeZone:zone});}catch{zone='UTC';}
-  const tag=locale==='ar'?'ar-LB':locale==='ur'?'ur':'en-GB';
-  const text=date.toLocaleString(tag,{timeZone:zone,dateStyle:'medium',timeStyle:'short'});
+  const tag=locale==='ar'?'ar-LB-u-nu-latn':locale==='ur'?'ur':'en-GB';
+  const text=date.toLocaleString(tag,{timeZone:zone,year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
   const offset=new Intl.DateTimeFormat('en',{timeZone:zone,timeZoneName:'shortOffset',hour:'2-digit'}).formatToParts(date).find(part=>part.type==='timeZoneName')?.value;
   if(!offset)throw Error('Case offset unavailable');return {text,offset:offset==='GMT+0'||offset==='GMT-0'?'GMT':offset};
 }

@@ -389,6 +389,13 @@ export default function App() {
   const pendingWorkspace=session?.authenticated&&session.role==='staff'&&isPendingWorkspacePlan(session.workspacePlan);
   const registerView=view==='register'||/^register\/(pro|business|enterprise)$/.test(view);
   const signInDestination=authBusy||workerEntryRecovery.pending||workerEntryRecovery.error||sessionGuard.isLocked()?null:signedInDestination(session,view);
+  const staffDocumentActive=!!session?.authenticated&&session.role==='staff'&&!signInDestination&&!workerEntryRecovery.pending&&!workerEntryRecovery.error&&!registerView&&!isPublicLandingView(view)&&!['operations','verify-registration','walkthrough','pilot','worker-access','accept-invitation','account-recovery','reset-password'].includes(view);
+  useEffect(()=>{
+    if(!staffDocumentActive)return;
+    const root=document.documentElement,lang=root.lang,dir=root.dir;
+    root.lang=staffUiLanguage;root.dir=workerUiDirection(staffUiLanguage);
+    return()=>{root.lang=lang;root.dir=dir;};
+  },[staffDocumentActive,staffUiLanguage]);
   useEffect(()=>{
     if(pendingWorkspace||registerView||!validPageSession(session)||isPublicLandingView(view)||['walkthrough','pilot','contact','register','verify-registration','account-recovery','reset-password','accept-invitation','worker-access'].includes(view))return;
     document.dispatchEvent(new CustomEvent('understood:account-entry',{detail:session!.clientContext}));
@@ -631,7 +638,7 @@ return <StaffLanguageContext.Provider value={staffUiLanguage}><StaffTimezoneCont
     {['owner','supervisor','auditor'].includes(session.staffRole || '') && <NotificationBell session={session} locale={staffUiLanguage} label={staffUi.notifications} onSessionLost={sessionGuard.invalidate} disabled={siteTransition} onOpen={()=>navigate('notifications')}/>}
     </div></div>
   </header><nav className="supervisor-bottom-nav" aria-label={staffUiLanguage==='ar'?'التنقل الرئيسي':'Main navigation'}>{[['overview','Today',Home],['briefings','Instructions',FileText],['clarifications','Clarifications',MessageCircle]].map(([path,label,Icon])=>{const key=path as string;const NavIcon=Icon as typeof Home;return <button key={key} aria-current={view===key||view.startsWith(key+'/')?'page':undefined} disabled={siteTransition} onClick={()=>navigate(key)}><NavIcon size={21}/><span>{key==='overview'?staffUiLanguage==='ar'?'اليوم':'Today':staffT(label as string)}</span></button>;})}<button aria-expanded={sidebarOpen} disabled={siteTransition} onClick={()=>setSidebarOpen(value=>!value)}><PanelLeft size={21}/><span>{staffUiLanguage==='ar'?'المزيد':'More'}</span></button></nav>{siteTransition ? <main className="staff-content" id="staff-main" tabIndex={-1}><h1>{staffUi.siteSession}</h1>{siteTransitionError ? <><p role="alert">{staffUi.siteError}</p><button className="button outline" onClick={()=>void recheckSite()}><RefreshCw size={18}/>{staffUi.recheck}</button></> : <p role="status">{staffUi.checkingSite}</p>}</main> : <main className="staff-content" id="staff-main" tabIndex={-1} key={`${session.staffScope}:${session.staffRole}`}>
-    {siteInterfaceLanguage==='ur'&&<Notice>Supervisor workspace is currently available in English and Arabic. English is shown.</Notice>}
+    {siteInterfaceLanguage==='ur'&&!clarificationRoute(view)&&<Notice>Supervisor workspace is currently available in English and Arabic. English is shown.</Notice>}
     <SettingsLayout active={view==='settings'||view.startsWith('settings/')} view={view} role={session.staffRole||''} credential={isCredentialMode(session.mode)&&!!session.staffScope} organization={session.organization} site={session.site} navigate={navigate}>
 {session.siteState==='archived' && <Notice tone="blue">{staffUi.archived}</Notice>}
 {view === 'overview' && <Overview key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} name={session.name} greeting={staffGreeting(session.timezone,clock)} />}

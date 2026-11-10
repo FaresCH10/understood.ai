@@ -61,6 +61,20 @@ test('deadline DST errors and offsets localize without changing the selected ins
   }
 });
 
+test('case timestamps use explicit long months and 24-hour time including midnight',()=>{
+  for(const [locale,tag,month] of [['en','en-GB','October'],['ar','ar-LB-u-nu-latn','تشرين الأول'],['ur','ur','اکتوبر']]){
+    for(const [value,clock] of [['2026-10-20T00:05:00.000Z','00:05'],['2026-10-20T23:07:00.000Z','23:07']]){
+      const {text,offset}=caseTimestamp(locale,value,'UTC');
+      const expected=new Intl.DateTimeFormat(tag,{timeZone:'UTC',year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(value));
+      assert.equal(text,expected,`${locale}: ${clock}`);
+      assert.ok(text.includes(month),`${locale}: long month`);
+      assert.ok(text.includes(clock),`${locale}: ${clock}`);
+      assert.ok(text.includes('2026'),`${locale}: full year`);
+      assert.equal(offset,'GMT');
+    }
+  }
+});
+
 test('case timestamps keep locale text separate from exact unbroken UTC offsets across DST and safe fallback',()=>{
   for(const locale of ['en','ar','ur']){
     const earlier=caseTimestamp(locale,'2026-11-01T05:30:00.000Z','America/New_York'),later=caseTimestamp(locale,'2026-11-01T06:30:00.000Z','America/New_York');
