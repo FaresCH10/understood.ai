@@ -195,7 +195,7 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     return {...row,attempts:row.attempts+1,token};
   });
   if (!job) return false;
-  let translating=false;
+  let translating=false,questionFailure=null;
   try {
     if (job.attempts>3) throw new Error('Preparation interrupted too many times');
     const briefing=await domainTransaction(pool,schema,async (client) => (await client.query(`SELECT b.source,b.title,b.state,b.revision,
@@ -258,6 +258,14 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     if(instruction?.delivery_mode==='text' && typeof instructionTextAdapter?.prepare==='function') {
       base=await instructionTextAdapter.prepare({source:briefing.source,title:briefing.title},instruction).catch(()=>null);
       providerPrepared=!!base;
+      // A checked question is the provider's job. Falling back to the generic
+      // template would publish a questionnaire nobody reviewed, so fail the
+      // send instead and let staff retry.
+      if(!providerPrepared && instruction.response_mode==='question') {
+        questionFailure=Error('Question provider could not generate a checked question');
+        questionFailure.code='question_alignment_failed';
+        throw questionFailure;
+      }
     }
     base ??= instruction
       ? syntheticInstructionPrepare({source:briefing.source,title:briefing.title},instruction)
@@ -332,8 +340,11 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       await appendPreparationStage(client,job,systemStage('worker','failed',preparationErrorCode(error)));
       const translationLabel=instructionTextAdapter?.translationLabel ?? instructionTextAdapter?.label ?? 'The text provider';
       const detail=translating && error?.translationCause?` (${error.translationCause})`:'';
+      const failure=questionFailure
+        ? `${instructionTextAdapter?.label ?? 'The question provider'} could not generate a checked question. Retry delivery.`
+        : translating?`${translationLabel} could not prepare the translations${detail}. Retry delivery.`:'Synthetic preparation failed';
       await client.query(`UPDATE jobs SET status='failed',lease_token=NULL,lease_until=NULL,error=$2 WHERE id=$1`,
-        [job.id,translating?`${translationLabel} could not prepare the translations${detail}. Retry delivery.`:'Synthetic preparation failed']);
+        [job.id,failure]);
       await client.query(`UPDATE briefings SET state='failed',updated_at=clock_timestamp() WHERE id=$1 AND org_id=$2 AND site_id=$3 AND revision=$4 AND state='processing'`,[job.briefing_id,job.org_id,job.site_id,job.revision]);
     });
   }

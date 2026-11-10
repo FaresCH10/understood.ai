@@ -78,6 +78,66 @@ test('Nemotron prepares one grounded English question with four checked choices'
   assert.equal(await malformed.prepare({source,title:'Carton routing'},{response_mode:'question',delivery_mode:'text'}),null);
 });
 
+test('a generic provider answer is rejected and retried, then fails instead of publishing',async()=>{
+  const generic={...prepared,question:'Which action follows the instruction “Carton routing”?',
+    choices:['Carry on with another task without following this instruction.','Do the opposite of this instruction.',
+      'Replace this instruction with your own steps.','on the blue shelf']};
+  const retryMock=fetcher((body,count)=>reply(count===1?generic:prepared));
+  const retried=nemotronInstructionDelivery(baseEnv,retryMock.fetch);
+  const value=await retried.prepare({source,title:'Carton routing'},{response_mode:'question',delivery_mode:'text'});
+  assert.equal(retryMock.calls.length,2);
+  assert.equal(value.question,question);
+  assert.equal(value.languages.en.choices.find(choice=>choice.id===value.rubric.correctChoiceId).text,choices[0]);
+
+  const genericMock=fetcher(()=>reply(generic));
+  const rejected=nemotronInstructionDelivery(baseEnv,genericMock.fetch);
+  assert.equal(await rejected.prepare({source,title:'Carton routing'},{response_mode:'question',delivery_mode:'text'}),null);
+  assert.equal(genericMock.calls.length,2);
+});
+
+test('a transient NVIDIA failure is retried once',async()=>{
+  let calls=0;
+  const adapter=nemotronInstructionDelivery(baseEnv,async()=>{
+    calls++;
+    return calls===1?new Response('busy',{status:503}):reply(prepared);
+  });
+  const value=await adapter.prepare({source,title:'Carton routing'},{response_mode:'question',delivery_mode:'text'});
+  assert.equal(calls,2);
+  assert.equal(value.question,question);
+});
+
+test('a failed provider question fails the send instead of publishing the generic template',async()=>{
+  const db=new PGlite();
+  const pool={async connect(){return {query:async(sql,args)=>args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)||{rows:[]},release(){}};}};
+  const schema='understood_test_nemotron_generic';
+  try {
+    await db.exec(`CREATE SCHEMA ${schema}; SET search_path TO ${schema},pg_catalog`);
+    await runMigrations(pool,{schema});
+    await db.exec("INSERT INTO organizations(id,name) VALUES('a','Synthetic');INSERT INTO sites(id,org_id,name,timezone) VALUES('a','a','Synthetic','UTC');INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','a','a','Owner','owner');INSERT INTO workers(id,org_id,site_id,code,language) VALUES('w1','a','a','001','ru');");
+    const owner={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'};
+    const scope={schema};
+    const adapter={mode:'nemotron-text',label:'Nemotron 3 Ultra 550B',translationLabel:'DeepL',
+      provenanceAdapter:NEMOTRON_DELIVERY_ADAPTER,model:NEMOTRON_ULTRA_MODEL,textLanguages:DEEPL_TRANSLATE_LANGUAGES,
+      async prepare(){return null;},
+      async translate(){throw Error('Translation must not run');}};
+    const input={requestId:randomUUID(),title:'сделай бутерброд',
+      source:'Сделай мне сэндвич с куриной шаурмой, чесноком и маринованными огурчиками.',
+      audience:{type:'all'},responseMode:'question',deliveryMode:'text'};
+    const started=await startInstructionSend(pool,owner,input,scope);
+    assert.equal(await processOnePreparation(pool,{schema,integrationMode:'synthetic',briefingId:started.briefingId,
+      instructionTextAdapter:adapter}),true);
+    const result=await completeInstructionSend(pool,owner,input.requestId,scope);
+    assert.equal(result.state,'failed');
+    assert.equal(result.delivered,0);
+    assert.match(result.error,/checked question/);
+    const briefing=(await db.query('SELECT state,prepared_json FROM briefings WHERE id=$1',[input.requestId])).rows[0];
+    assert.equal(briefing.state,'failed');
+    assert.equal(briefing.prepared_json,null);
+  } finally {
+    await db.close();
+  }
+});
+
 test('an Arabic source is translated to English before Nemotron generates and DeepL translates',async()=>{
   const arabic={title:'توجيه الكراتين',text:'ضع كرتين على الرف الأزرق قبل الساعة 4 مساءً. أبقِ الممر خالياً.'};
   const mock=fetcher((body,count,url)=>{

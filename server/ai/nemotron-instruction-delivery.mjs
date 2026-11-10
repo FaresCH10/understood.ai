@@ -16,6 +16,33 @@ const grounded=(source,value)=>{
   const sourceWords=words(source),target=[...words(value)];
   return !target.length || target.filter(word=>sourceWords.has(word)).length/target.length>=0.7;
 };
+// "Follow the instruction" questionnaires are the ungrounded template the
+// delivery path must never publish as a generated question. The full bundle
+// pipeline rejects them with a model check; this inline path needs a
+// deterministic gate because a failed generation used to be indistinguishable
+// from a successful generic one.
+const genericQuestion=[/\b(?:which|what) (?:action|step)s? (?:follows|comes (?:after|next)|is (?:required|needed|next)) (?:this|the) (?:instruction|command)\b/i,
+  /\b(?:does|should) (?:this|the) (?:instruction|command) (?:require|need|involve)\b/i,
+  /\b(?:following|follows) (?:this|the) (?:instruction|command)\b/i,
+  /\baccording to (?:this|the) (?:instruction|command)\b/i];
+const genericChoice=[/\b(?:without|not) following (?:this|the) (?:instruction|command)\b/i,
+  /\bopposite of (?:this|the) (?:instruction|command)\b/i,
+  /\breplace (?:this|the) (?:instruction|command) with\b/i,
+  /\b(?:ignore|skip) (?:this|the) (?:instruction|command)\b/i,
+  /\b(?:carry|continue) (?:on )?with (?:another|other|the next) (?:task|job|assignment|work)\b/i,
+  /\byour own (?:steps|instructions)\b/i];
+const checkedGeneration=(english,generated)=>{
+  if(!Array.isArray(generated?.facts) || !Array.isArray(generated?.choices) || generated.choices.length!==4)
+    throw Error('Generated question was malformed');
+  if(genericQuestion.some(pattern=>pattern.test(generated.question))
+    || generated.choices.some(choice=>genericChoice.some(pattern=>pattern.test(choice))))
+    throw Error('Generated question was generic');
+  if(!languageTextMatches('en',generated.question) || !generated.facts.every(fact=>languageTextMatches('en',fact))
+    || !generated.choices.every(choice=>languageTextMatches('en',choice))
+    || !generated.facts.every(fact=>grounded(english.text,fact)) || !grounded(english.text,generated.choices[0]))
+    throw Error('Generated question was ungrounded');
+  return generated;
+};
 
 // The Vercel synthetic runtime has no worker budget ledger. This adapter is
 // bounded to a single send request, so the journal contract stays explicit.
@@ -58,10 +85,16 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
         const english=NON_LATIN_SCRIPT.test(original.title) || NON_LATIN_SCRIPT.test(original.text)
           ? await translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,remaining()-500)).translateToEnglish(original)
           : original;
-        const generated=await adapterFor(PREPARE_TIMEOUT_MS).prepare(english.text,{multipleChoice:true});
-        if(!languageTextMatches('en',generated.question) || !generated.facts.every(fact=>languageTextMatches('en',fact))
-          || !generated.choices.every(choice=>languageTextMatches('en',choice))
-          || !generated.facts.every(fact=>grounded(english.text,fact)) || !grounded(english.text,generated.choices[0]))return null;
+        // NIM occasionally fails or returns the generic template. One retry
+        // keeps a transient failure from costing the whole send.
+        let generated=null;
+        for(let attempt=0;attempt<2&&!generated;attempt++) {
+          const left=remaining();
+          if(left<3000)break;
+          try { generated=checkedGeneration(english,await adapterFor(Math.min(PREPARE_TIMEOUT_MS,left-1000)).prepare(english.text,{multipleChoice:true})); }
+          catch { generated=null; }
+        }
+        if(!generated)return null;
         const title=english.title;
         return withMultipleChoice({
           responseMode:instruction.response_mode,title,source:briefing.source,
