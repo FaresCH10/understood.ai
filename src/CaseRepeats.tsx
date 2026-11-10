@@ -1,6 +1,6 @@
 import {CaseTime} from './CaseTime';
 import {useEffect,useRef,useState} from 'react';
-import {ChevronLeft,ChevronRight,RefreshCw,Repeat2} from 'lucide-react';
+import {ChevronLeft,ChevronRight,RefreshCw,Repeat2,Send} from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {CaseWorkflowError,checkedRepeatPage,checkedRepeatReceipt,type RepeatPage,type RepeatRow} from './case-workflow-contract';
 import {CaseRecoveryError,readCaseRepeat,retainCaseRepeat,clearCaseRepeat,mayReleaseFreshCaseRejection,type PendingRepeat} from './case-workflow-recovery';
@@ -11,12 +11,12 @@ import {caseText,caseMessage,caseState,type CaseLocale,type CaseTextKey} from '.
 
 const empty:CaseDeadlineDraft={value:'',occurrence:''};
 const blockedCopy={read_only:'Your role cannot request another answer.',workspace_archived:'This workspace is archived.',worker_unavailable:'Worker access is unavailable.',content_expired:'The instruction content is no longer available.',case_resolved:'This case is resolved.',publication_unavailable:'The publication is no longer available.',no_answer:'An earlier submitted answer is required before requesting a repeat.',active_repeat:'Another answer is already requested for this assignment.'};
-export function CaseRepeats({caseId,authority,available,canWrite,closed,timezone='UTC',onDirtyChange,onAttentionChange,language:locale='en'}:{caseId:string;authority:StaffRequestAuthority;available:boolean;canWrite:boolean;closed:boolean;timezone?:string;onDirtyChange:(dirty:boolean)=>void;onAttentionChange?:(attention:boolean)=>void;language?:CaseLocale}){
+export function CaseRepeats({caseId,authority,available,canWrite,closed,checkBack=false,timezone='UTC',onDirtyChange,onAttentionChange,language:locale='en'}:{caseId:string;authority:StaffRequestAuthority;available:boolean;canWrite:boolean;closed:boolean;checkBack?:boolean;timezone?:string;onDirtyChange:(dirty:boolean)=>void;onAttentionChange?:(attention:boolean)=>void;language?:CaseLocale}){
   const t=(key:CaseTextKey)=>caseText(locale,key);
-  const api=useStaffRequest(authority),[page,setPage]=useState(1),[tick,setTick]=useState(0),[draft,setDraft]=useState(empty),[pending,setPending]=useState<PendingRepeat|null>(null),[receipt,setReceipt]=useState<RepeatRow|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[recoveryFailed,setRecoveryFailed]=useState(false);
+  const api=useStaffRequest(authority),[page,setPage]=useState(1),[tick,setTick]=useState(0),[draft,setDraft]=useState(empty),[pending,setPending]=useState<PendingRepeat|null>(null),[receipt,setReceipt]=useState<RepeatRow|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[recoveryFailed,setRecoveryFailed]=useState(false),[questionBusy,setQuestionBusy]=useState(false),[questionSent,setQuestionSent]=useState(false);
   const [read,setRead]=useState<{key:string;data:RepeatPage|null;loading:boolean;error:string}>({key:'',data:null,loading:true,error:''});
-  const live=useRef(false),inFlight=useRef(false),command=useRef<AbortController|null>(null),refreshButton=useRef<HTMLButtonElement>(null),form=useRef<HTMLFormElement>(null),latest=useRef({draft,available,canWrite,authority,onDirtyChange});latest.current={draft,available,canWrite,authority,onDirtyChange};
-  const path=`/api/clarifications/${encodeURIComponent(caseId)}/repeats`,key=JSON.stringify([page,tick,available]);
+  const live=useRef(false),inFlight=useRef(false),command=useRef<AbortController|null>(null),refreshButton=useRef<HTMLButtonElement>(null),form=useRef<HTMLFormElement>(null),claim=useRef(false),latest=useRef({draft,available,canWrite,authority,onDirtyChange});latest.current={draft,available,canWrite,authority,onDirtyChange};
+  const path=`/api/clarifications/${encodeURIComponent(caseId)}/repeats`,questionPath=`/api/clarifications/${encodeURIComponent(caseId)}/question-repeat`,key=JSON.stringify([page,tick,available]);
   const data=read.key===key&&api.current()?read.data:null,loading=read.key!==key||read.loading,writeRole=['owner','supervisor'].includes(authority.session.staffRole||'');
   const current=()=>live.current&&api.current(),writable=()=>current()&&latest.current.available&&latest.current.canWrite&&latest.current.authority.canMutate();
   const dirty=!!draft.value||busy;
@@ -30,6 +30,30 @@ export function CaseRepeats({caseId,authority,available,canWrite,closed,timezone
       if(!alive||!current())return;if(reason instanceof CaseWorkflowError&&reason.code==='session'){authority.onSessionLost();return;}setRead({key,data:null,loading:false,error:'Repeat history could not be verified. Refresh to try again.'});
     });return()=>{alive=false;controller.abort();};
   },[key,api]);
+  useEffect(()=>{
+    if(questionSent&&claim.current&&data?.canRequest)setQuestionSent(false);
+  },[data,questionSent]);
+  async function sendQuestion(){
+    if(inFlight.current||!current()||recoveryFailed||pending||!writable()||!data?.canRequest||closed)return;
+    inFlight.current=true;setBusy(true);setQuestionBusy(true);setError('');setReceipt(null);const controller=new AbortController();command.current=controller;
+    let retained:PendingRepeat|null=null;
+    try{
+      const old=readCaseRepeat(sessionStorage,authority.session,caseId);
+      if(old){setPending(old);setError('The check-back question was not confirmed. Refresh the case before retrying.');return;}
+      retained=retainCaseRepeat(sessionStorage,authority.session,caseId,new Date(Date.now()+24*60*60*1000).toISOString(),writable);
+      if(!current())return;setPending(retained);
+      const value=await api.request<unknown>(questionPath,{requestId:retained.id,dueAt:retained.dueAt},controller.signal);
+      if(!current())return;const confirmed=checkedRepeatReceipt(value,caseId,retained,authority.session.clientContext!);
+      if(!current())return;setReceipt(confirmed);claim.current=true;setQuestionSent(true);
+      try{clearCaseRepeat(sessionStorage,authority.session,caseId,retained);setPending(null);setRecoveryFailed(false);}catch{setRecoveryFailed(true);setError('The check-back question was not confirmed. Refresh the case before retrying.');}
+      setTick(n=>n+1);
+    }catch(reason){
+      if(!current())return;if(reason instanceof CaseWorkflowError&&reason.code==='session'){authority.onSessionLost();return;}
+      if(retained&&mayReleaseFreshCaseRejection(true,reason)){
+        try{clearCaseRepeat(sessionStorage,authority.session,caseId,retained);setPending(null);setError('The check-back question was not accepted. Refresh the case before trying again.');setTick(n=>n+1);}catch{setRecoveryFailed(true);setError('The check-back question was not confirmed. Refresh the case before retrying.');}
+      }else setError(retained?'The check-back question was not confirmed. Refresh the case before retrying.':'The check-back question was not accepted. Refresh the case before trying again.');
+    }finally{inFlight.current=false;if(current()){setBusy(false);setQuestionBusy(false);}}
+  }
   async function act(check=false){
     if(inFlight.current||!current()||!check&&(recoveryFailed||!writable()||!data?.canRequest||closed))return;
     inFlight.current=true;setBusy(true);setError('');if(!check)setReceipt(null);const controller=new AbortController();command.current=controller;
@@ -60,6 +84,8 @@ export function CaseRepeats({caseId,authority,available,canWrite,closed,timezone
     {data&&!data.items.length&&page<=pages&&<p>{t("No repeat requests yet.")}</p>}{data&&page>pages&&<p>{t("This history page is no longer available.")}{' '}<button className="back-link" disabled={dirty} onClick={()=>setPage(1)}>{t("Return to first page")}</button></p>}
     {data&&pages>1&&page<=pages&&<div className="audit-pagination"><span>{caseText(locale,'Page {page} of {pages}',{page,pages})}</span><div className="actions"><button className="icon-button" title={t('Newer repeat requests')} aria-label={t('Newer repeat requests')} disabled={page<=1||dirty} onClick={()=>setPage(n=>n-1)}>{locale==='en'?<ChevronLeft size={18}/>:<ChevronRight size={18}/>}</button><button className="icon-button" title={t('Older repeat requests')} aria-label={t('Older repeat requests')} disabled={page>=pages||dirty} onClick={()=>setPage(n=>n+1)}>{locale==='en'?<ChevronRight size={18}/>:<ChevronLeft size={18}/>}</button></div></div>}
     {data?.blockedReason&&<p role="status">{caseMessage(locale,blockedCopy[data.blockedReason])}</p>}
+    {checkBack&&writeRole&&!closed&&data?.canRequest&&!questionSent&&<div className="notice notice-blue"><p><strong>{t('Answer not correct')}</strong></p><p>{t("Sends the generated question in the worker's language and requests another answer within 24 hours.")}</p><button type="button" className="button primary" disabled={!canWrite||busy||questionBusy||!api.current()||recoveryFailed||!!pending} onClick={()=>void sendQuestion()}><Send size={18}/>{questionBusy?t('Sending check-back question...'):t('Send check-back question')}</button></div>}
+    {questionSent&&<p role="status">{t('Check-back question sent. The worker has 24 hours to answer again.')}</p>}
     {pending&&!busy&&<div className="notice notice-amber"><p>{receipt?t("Server receipt verified; local recovery still needs attention."):t("A repeat request has no verified receipt on this screen.")}</p><p>{t("Original deadline:")}{' '}<CaseTime value={pending.dueAt} language={locale} timezone={timezone}/></p><button className="button outline" disabled={busy||!api.current()} onClick={()=>void act(true)}><RefreshCw size={18}/>{t("Check repeat receipt")}</button></div>}
     {writeRole&&(data?.canRequest||!!draft.value||!!pending)&&<form ref={form} onSubmit={event=>{event.preventDefault();void act();}}><CaseDeadlineInput required language={locale} label={t("Answer deadline")} timezone={timezone} draft={draft} readOnly={!editable} onChange={setDraft}/><button className="button outline" disabled={!editable||!draft.value&&!pending}><Repeat2 size={18}/>{pending?t("Retry exact repeat request"):t("Request another answer")}</button></form>}
     {!available&&draft.value&&<p role="status">{t("Your deadline draft is still here. Requesting an answer is unavailable until the case is verified again.")}</p>}

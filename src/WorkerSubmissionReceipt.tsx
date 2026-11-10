@@ -30,7 +30,7 @@ export function WorkerSubmissionReceipt({resolvedLabel,choices,session,selection
   useEffect(()=>{
     if(!data||workerSubmissionState(data.receipt)!=='pending')return;
     const refresh=()=>{if(document.visibilityState==='visible'&&current())setRetry(value=>value+1);};
-    const timer=window.setTimeout(refresh,10000);document.addEventListener('visibilitychange',refresh);
+    const timer=window.setTimeout(refresh,3000);document.addEventListener('visibilitychange',refresh);
     return()=>{window.clearTimeout(timer);document.removeEventListener('visibilitychange',refresh);};
   },[data,key]);
   const state=data?workerSubmissionState(data.receipt):null;
@@ -48,6 +48,7 @@ export function WorkerSubmissionReceipt({resolvedLabel,choices,session,selection
       <li><CheckCircle2 size={32} aria-hidden="true"/><div><strong>{t.received}</strong><span>{t.submitted}</span></div></li>
       <li data-state={state??'unknown'}>{state==='matched'?<CheckCircle2 size={32} aria-hidden="true"/>:state==='pending'||state==='paused'||!state?<Clock3 size={32} aria-hidden="true"/>:<TriangleAlert size={32} aria-hidden="true"/>}<div><strong>{state?resolvedLabel&&['clarification','unassessable','paused'].includes(state)?resolvedLabel:t[state]:failed?workerReceiptUnknownText[language]:t.loading}</strong>{state==='pending'&&<span>{t.checking}</span>}</div></li>
     </ol>
+    {state==='clarification'&&<p role="alert" className="notice notice-amber">{t.wrongBody}</p>}
     {failed&&<p role="alert" className="notice notice-amber">{t.failed}</p>}
     {!data&&!failed&&<p role="status">{t.loading}</p>}
     <button type="button" className="icon-button" aria-label={t.refresh} title={t.refresh} disabled={disabled||read.key!==key||read.loading} onClick={()=>setRetry(value=>value+1)}><RefreshCw size={20}/></button>

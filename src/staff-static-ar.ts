@@ -2302,6 +2302,7 @@ export const staffStaticArabic={
   "Clarification conversation updated": "حُدّثت محادثة التوضيح",
   "Worker requested a language change": "طلب عامل تغيير اللغة",
   "Answer needs review or clarification": "إجابة بحاجة إلى مراجعة أو توضيح",
+  "Answer is not correct": "الإجابة غير صحيحة",
   "Instruction delivery was incomplete": "لم يكتمل تسليم التعليمات",
   "Instruction assignment is overdue": "تأخر موعد تنفيذ التعليمات",
   "Report export ready": "الملف المصدّر للتقرير جاهز",

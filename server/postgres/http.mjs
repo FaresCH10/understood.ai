@@ -155,7 +155,7 @@ for(const message of ['Case review request conflict','Case deadline changed','Ca
 for(const message of ['Case review unavailable','Case review receipt unavailable','Original assessment unavailable'])unavailable.add(message);
 for(const message of ['Voice receipt unavailable','Voice audio unavailable'])unavailable.add(message);
 for(const message of ['Voice request conflict','Voice storage in progress','Voice recording was not received'])conflicts.add(message);
-for(const message of ['Repeat request unavailable','Repeat receipt unavailable'])unavailable.add(message);
+for(const message of ['Repeat request unavailable','Repeat receipt unavailable','Check-back question unavailable'])unavailable.add(message);
 for(const message of ['Settings request conflict','Settings revision changed','Settings unchanged']) conflicts.add(message);
 for(const message of ['Retention request conflict','Retention revision changed'])conflicts.add(message);
 for(const message of ['Text retention request conflict','Text retention revision changed'])conflicts.add(message);
@@ -737,6 +737,12 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         if(requestId && req.method==='GET'){if(url.search)throw Error('Invalid case review');return send(res,200,{...await caseReviewReceipt(pool,session,id,requestId,repository),clientContext:context});}
         if(!requestId && req.method==='GET'){if(!url.search)return send(res,200,await listCaseReviews(pool,session,id,repository));if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid case workflow page');return send(res,200,{...await caseReviewPage(pool,session,id,Object.fromEntries(url.searchParams),repository),clientContext:context});}
         if(!requestId && req.method==='POST'){if(url.search)throw Error('Invalid case review');return send(res,200,{...await saveCaseReview(pool,session,id,await readJson(req),repository),clientContext:context});}
+      }
+      const questionRepeat=path.match(/^\/api\/clarifications\/([^/]+)\/question-repeat$/);
+      if(questionRepeat) {
+        if(req.method!=='POST')throw Error('Invalid repeat request');
+        if(url.search)throw Error('Invalid repeat request');
+        return send(res,200,{...await requestCaseRepeat(pool,session,questionRepeat[1],await readJson(req),{...repository,withQuestion:true}),clientContext:clientSessionContext(session).clientContext});
       }
       const repeat=path.match(/^\/api\/clarifications\/([^/]+)\/repeats(?:\/([^/]+))?$/);
       if(repeat) {

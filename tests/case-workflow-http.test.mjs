@@ -79,3 +79,44 @@ test('PostgreSQL workflow HTTP pages and receipts enforce captured context, exac
     assert.equal((await db.query('SELECT count(*)::int n FROM case_messages')).rows[0].n,0);
   }finally{if(server)await new Promise(resolve=>server.close(resolve));await db.close();}
 });
+
+test('check-back HTTP route sends the frozen worker-language question once and fences methods, input and context',async()=>{
+  const db=new PGlite(),schema='understood_test_case_workflow_http_checkback',options={schema};
+  const pool={async connect(){return {query:async(sql,args)=>args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)||{rows:[]},release(){}};}};
+  let server;
+  try{
+    await db.exec(`CREATE SCHEMA ${schema};SET search_path TO ${schema},pg_catalog`);await runMigrations(pool,options);
+    await db.exec(`INSERT INTO organizations VALUES('qa','Synthetic check-back');INSERT INTO sites VALUES('qa','qa','Synthetic site','Asia/Beirut');
+      INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','qa','qa','Synthetic owner','owner');
+      INSERT INTO workers(id,org_id,site_id,code,language) VALUES('worker','qa','qa','Worker 014','en');
+      INSERT INTO briefings(id,org_id,site_id,title,source,state) VALUES('brief','qa','qa','Synthetic','Finished blue. Unfinished yellow.','draft');
+      INSERT INTO publications(id,org_id,site_id,briefing_id,version,snapshot_json,state) VALUES('publication','qa','qa','brief',3,'{"title":"Synthetic","question":"Where?","facts":["Finished blue","Unfinished yellow"],"rubric":{"askedFacts":["Finished blue","Unfinished yellow"]},"languages":{"en":{"title":"Synthetic shelf","text":"Finished blue. Unfinished yellow.","question":"Where do items go?"}}}','published');
+      INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES('assignment','qa','qa','publication','worker','en');`);
+    const worker={principal_type:'worker',principal_id:'worker',org_id:'qa',site_id:'qa'};
+    await submitAnswer(pool,worker,'assignment',randomUUID(),'Finished blue.',options);
+    await processOneAssessment(pool,{assess:async()=>({outcome:'clarification',reasons:['missing_asked_fact'],evidence:[]})},options);
+    const caseId=(await db.query('SELECT id FROM clarifications')).rows[0].id,original=JSON.stringify((await db.query('SELECT * FROM attempts ORDER BY id')).rows);
+    await provisionStaffCredential(pool,{staffId:'owner',orgId:'qa',siteId:'qa',email:'owner@qa.example.test',password:'Synthetic check-back password'},options);
+    const origin='http://127.0.0.1:3031';server=createPostgresRehearsalServer(pool,{...options,tier:'local',dataClass:'synthetic',aiMode:'synthetic',accessMode:'credential',publicOrigin:origin});
+    await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+    const base=`http://127.0.0.1:${server.address().port}/api`,call=(path,cookie,context,body)=>fetch(base+path,{method:body===undefined?'GET':'POST',headers:{origin,...(cookie?{cookie}:{}),...(context===undefined?{}:{'x-client-session-context':context}),...(body===undefined?{}:{'content-type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});
+    const login=await call('/auth/staff/login',null,undefined,{email:'owner@qa.example.test',password:'Synthetic check-back password'});assert.equal(login.status,200);
+    const cookie=login.headers.get('set-cookie').split(';')[0],session=await (await call('/session',cookie)).json(),context=session.clientContext;
+    const path=`/clarifications/${caseId}/question-repeat`,requestId=randomUUID(),dueAt=new Date(Date.now()+3600000).toISOString(),body={requestId,dueAt};
+    assert.equal((await call(path,undefined,undefined,body)).status,401);assert.equal((await call(path,cookie)).status,409);assert.equal((await call(path,cookie,'f'.repeat(64))).status,409);
+    assert.equal((await call(path,cookie,undefined,body)).status,409);assert.equal((await call(path,cookie,context)).status,400);assert.equal((await call(path+'?x=1',cookie,context,body)).status,400);
+    for(const input of [{...body,extra:true},{...body,dueAt:'bad'},{...body,requestId:'bad'}])assert.equal((await call(path,cookie,context,input)).status,400);
+    assert.equal((await call(`/clarifications/${randomUUID()}/question-repeat`,cookie,context,body)).status,404);
+    const accepted=await call(path,cookie,context,body);assert.equal(accepted.status,200);assert.equal(accepted.headers.get('cache-control'),'no-store');
+    const receipt=checkedRepeatReceipt(await accepted.json(),caseId,{id:requestId,dueAt},context);assert.equal(receipt.status,'pending');
+    const message=(await db.query('SELECT * FROM case_messages')).rows[0];
+    assert.equal(message.text,'Synthetic shelf\n\nWhere do items go?');assert.equal(message.language,'en');assert.equal(message.actor_type,'staff');assert.equal(message.actor_id,'owner');
+    assert.deepEqual((await db.query('SELECT status,actor_role FROM case_repeats')).rows[0],{status:'pending',actor_role:'owner'});
+    assert.deepEqual(checkedRepeatReceipt(await (await call(path,cookie,context,body)).json(),caseId,{id:requestId,dueAt},context),receipt);
+    assert.equal((await call(path,cookie,context,{requestId:randomUUID(),dueAt})).status,409);
+    assert.equal((await db.query('SELECT count(*)::int n FROM case_messages')).rows[0].n,1);assert.equal((await db.query('SELECT count(*)::int n FROM case_repeats')).rows[0].n,1);
+    assert.deepEqual((await db.query("SELECT kind FROM notification_events WHERE audience='worker' ORDER BY kind")).rows.map(row=>row.kind),['clarification.followup','repeat.available']);
+    assert.equal((await db.query('SELECT count(*)::int n FROM audit WHERE action=\'clarification.message\'')).rows[0].n,1);
+    assert.equal(JSON.stringify((await db.query('SELECT * FROM attempts ORDER BY id')).rows),original);
+  }finally{if(server)await new Promise(resolve=>server.close(resolve));await db.close();}
+});

@@ -2,7 +2,7 @@ import {postgresWorkspace} from '../server/postgres/workspace.mjs';
 import {workerSubmission} from '../server/postgres/responses.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {randomUUID} from 'node:crypto';
+import {randomUUID,createHash} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {submitAnswer} from '../server/postgres/domain.mjs';
@@ -30,13 +30,13 @@ async function fixture() {
     INSERT INTO workers(id,org_id,site_id,code,language) VALUES('worker-14','cedar','beirut','Worker 014','en'),('worker-2','cedar','beirut','Worker 002','en');
     INSERT INTO briefings(id,org_id,site_id,title,source,state) VALUES('shelf','cedar','beirut','Synthetic','Synthetic','draft');
     INSERT INTO publications(id,org_id,site_id,briefing_id,version,snapshot_json,state) VALUES('shelf-v3','cedar','beirut','shelf',3,
-      '{"title":"Synthetic","question":"Where do items go?","facts":["Finished: blue","Unfinished: yellow"],"rubric":{"askedFacts":["Finished: blue","Unfinished: yellow"]},"languages":{"en":{"title":"Synthetic","text":"Finished: blue. Unfinished: yellow.","question":"Where do items go?"}}}','published');
+      '{"title":"Synthetic","question":"Where do items go?","facts":["Finished: blue","Unfinished: yellow"],"rubric":{"askedFacts":["Finished: blue","Unfinished: yellow"]},"languages":{"en":{"title":"Synthetic","text":"Finished: blue. Unfinished: yellow.","question":"Where do items go?"},"ar":{"title":"تعليمات الرف","text":"الأزرق مكتمل. الأصفر غير مكتمل.","question":"أين توضع العناصر؟"}}}','published');
     INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES('assignment-14','cedar','beirut','shelf-v3','worker-14','en');`);
   const original=await submitAnswer(pool,worker,'assignment-14',randomUUID(),'Finished: blue');
   await processOneAssessment(pool,{assess:async()=>missing});
   const caseId=(await db.query('SELECT id FROM clarifications')).rows[0].id;
   await db.exec("UPDATE assignments SET due_at=clock_timestamp()-interval '1 hour'");
-  return {db,pool,caseId,original,close:()=>db.close(),request:input=>requestCaseRepeat(pool,owner,caseId,input)};
+  return {db,pool,caseId,original,close:()=>db.close(),request:(input,options={})=>requestCaseRepeat(pool,owner,caseId,input,options)};
 }
 test('repeat admits one new typed receipt after original deadline, preserves original evidence and reassesses without a duplicate case',async()=>{
   const f=await fixture();try {
@@ -65,6 +65,54 @@ test('repeat admits one new typed receipt after original deadline, preserves ori
     await assert.rejects(f.db.exec("UPDATE case_repeats SET status='pending',submission_id=NULL,submitted_at=NULL"),/immutable/);
     await assert.rejects(f.db.exec('DELETE FROM case_repeats'),/immutable/);
   } finally {await f.close();}
+});
+test('check-back sends the frozen worker-language question with an atomic repeat and exact retry stays idempotent',async()=>{
+  const f=await fixture();try{
+    const input=command(),receipt=await f.request(input,{withQuestion:true}),text='Synthetic\n\nWhere do items go?';
+    assert.equal(receipt.status,'pending');
+    const messages=(await f.db.query('SELECT * FROM case_messages')).rows;
+    assert.equal(messages.length,1);
+    assert.deepEqual({id:messages[0].id,case_id:messages[0].case_id,assignment_id:messages[0].assignment_id,actor_type:messages[0].actor_type,actor_id:messages[0].actor_id,language:messages[0].language,text:messages[0].text,request_hash:messages[0].request_hash},
+      {id:input.requestId,case_id:f.caseId,assignment_id:'assignment-14',actor_type:'staff',actor_id:'maya',language:'en',text,request_hash:createHash('sha256').update(text).digest('hex')});
+    assert.deepEqual(await f.request(input,{withQuestion:true}),receipt);
+    assert.equal((await f.db.query('SELECT count(*)::int n FROM case_messages')).rows[0].n,1);
+    assert.deepEqual((await f.db.query('SELECT kind FROM notification_events WHERE object_id=$1 ORDER BY kind',[input.requestId])).rows.map(row=>row.kind),['clarification.followup','repeat.available']);
+    await submitAnswer(f.pool,worker,'assignment-14',randomUUID(),'Finished: blue. Unfinished: yellow.');
+    assert.equal((await f.request(input,{withQuestion:true})).status,'submitted');
+  }finally{await f.close();}
+});
+test('check-back uses the assignment language question and fences plain repeats and message failures',async()=>{
+  const f=await fixture();try{
+    await f.db.exec("INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES('assignment-ar','cedar','beirut','shelf-v3','worker-2','ar')");
+    await submitAnswer(f.pool,{...worker,principal_id:'worker-2'},'assignment-ar',randomUUID(),'إجابة أولية');
+    await processOneAssessment(f.pool,{assess:async()=>missing});
+    const caseAr=(await f.db.query("SELECT id FROM clarifications WHERE assignment_id='assignment-ar'")).rows[0].id;
+    await requestCaseRepeat(f.pool,owner,caseAr,command(),{withQuestion:true});
+    const message=(await f.db.query('SELECT language,text FROM case_messages WHERE case_id=$1',[caseAr])).rows[0];
+    assert.equal(message.language,'ar');assert.equal(message.text,'تعليمات الرف\n\nأين توضع العناصر؟');
+    await assert.rejects(requestCaseRepeat(f.pool,owner,caseAr,command(),{withQuestion:true}),/already requested/);
+    await resolveClarification(f.pool,owner,caseAr,{notes:'Synthetic check-back closure'});
+    await assert.rejects(requestCaseRepeat(f.pool,owner,caseAr,command(),{withQuestion:true}),/unavailable/);
+  }finally{await f.close();}
+  const g=await fixture();try{
+    const plain=command();await g.request(plain);
+    await assert.rejects(g.request(plain,{withQuestion:true}),/Repeat request conflict/);
+    assert.equal((await g.db.query('SELECT count(*)::int n FROM case_messages')).rows[0].n,0);
+  }finally{await g.close();}
+  const h=await fixture();try{
+    await h.db.exec("INSERT INTO workers(id,org_id,site_id,code,language) VALUES('worker-3','cedar','beirut','Worker 003','en');INSERT INTO assignments(id,org_id,site_id,publication_id,worker_id,language) VALUES('assignment-hi','cedar','beirut','shelf-v3','worker-3','hi')");
+    await submitAnswer(h.pool,{...worker,principal_id:'worker-3'},'assignment-hi',randomUUID(),'Synthetic answer');
+    await processOneAssessment(h.pool,{assess:async()=>missing});
+    const caseHi=(await h.db.query("SELECT id FROM clarifications WHERE assignment_id='assignment-hi'")).rows[0].id;
+    await assert.rejects(requestCaseRepeat(h.pool,owner,caseHi,command(),{withQuestion:true}),/Check-back question unavailable/);
+    assert.equal((await h.db.query("SELECT count(*)::int n FROM case_repeats WHERE assignment_id='assignment-hi'")).rows[0].n,0);
+  }finally{await h.close();}
+  const j=await fixture();try{
+    await j.db.exec("CREATE FUNCTION deny_case_message() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Synthetic message failure'; END $$;CREATE TRIGGER deny_case_message BEFORE INSERT ON case_messages FOR EACH ROW EXECUTE FUNCTION deny_case_message()");
+    await assert.rejects(j.request(command(),{withQuestion:true}),/Synthetic message failure/);
+    assert.equal((await j.db.query('SELECT count(*)::int n FROM case_repeats')).rows[0].n,0);
+    assert.equal((await j.db.query('SELECT count(*)::int n FROM case_messages')).rows[0].n,0);
+  }finally{await j.close();}
 });
 test('repeat role, site, worker activation, publication, deadline and prior-answer fences are enforced',async()=>{
   const f=await fixture();try {

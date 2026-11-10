@@ -122,7 +122,13 @@ export const caseTranslations={
   'Assessment pending':['التقييم قيد الانتظار','جانچ زیر التوا ہے'],
   'Status unavailable':['الحالة غير متاحة','حالت دستیاب نہیں'],
   'Matched':['تطابق','مطابقت'],
-  'Needs clarification':['يحتاج إلى توضيح','وضاحت درکار ہے'],
+  'Answer not correct':['الإجابة غير صحيحة','جواب درست نہیں'],
+  'Send check-back question':['أرسل سؤال التحقق','جانچ کا سوال بھیجیں'],
+  "Sends the generated question in the worker's language and requests another answer within 24 hours.":['يرسل السؤال المُنشأ بلغة العامل ويطلب إجابة أخرى خلال 24 ساعة.','تیار کردہ سوال کارکن کی زبان میں بھیجتا ہے اور 24 گھنٹوں میں نیا جواب مانگتا ہے۔'],
+  'Sending check-back question...':['جارٍ إرسال سؤال التحقق...','جانچ کا سوال بھیجا جا رہا ہے...'],
+  'Check-back question sent. The worker has 24 hours to answer again.':['أُرسل سؤال التحقق. لدى العامل 24 ساعة للإجابة مرة أخرى.','جانچ کا سوال بھیج دیا گیا۔ کارکن کے پاس دوبارہ جواب دینے کے لیے 24 گھنٹے ہیں۔'],
+  'The check-back question was not accepted. Refresh the case before trying again.':['لم يُقبل سؤال التحقق. حدّث الحالة قبل المحاولة مجدداً.','جانچ کا سوال قبول نہیں ہوا۔ دوبارہ کوشش سے پہلے معاملہ تازہ کریں۔'],
+  'The check-back question was not confirmed. Refresh the case before retrying.':['لم يتم تأكيد سؤال التحقق. حدّث الحالة قبل إعادة المحاولة.','جانچ کے سوال کی تصدیق نہیں ہوئی۔ دوبارہ کوشش سے پہلے معاملہ تازہ کریں۔'],
   'Could not be assessed':['تعذّر التقييم','جانچ نہیں ہو سکی'],
   'Pending':['قيد الانتظار','زیر التوا'],
   'Submitted':['تم التقديم','جمع شدہ'],
@@ -331,7 +337,7 @@ export function caseMessage(locale:CaseLocale,value:string){
   return value?caseText(locale,'The operation could not be confirmed. Your draft and pending recovery are retained.'):'';
 }
 export function caseState(locale:CaseLocale,value:string|null|undefined){
-  const names:Record<string,CaseTextKey>={open:'Open',resolved:'Resolved',matched:'Matched',clarification:'Needs clarification',unassessable:'Could not be assessed',pending:'Pending',submitted:'Submitted',cancelled:'Cancelled',deleted:'Deleted',expired:'Expired'};
+  const names:Record<string,CaseTextKey>={open:'Open',resolved:'Resolved',matched:'Matched',clarification:'Answer not correct',unassessable:'Could not be assessed',pending:'Pending',submitted:'Submitted',cancelled:'Cancelled',deleted:'Deleted',expired:'Expired'};
   return caseText(locale,value?names[value]||'Status unavailable':'Assessment pending');
 }
 export function caseLanguage(locale:CaseLocale,value:WorkerLocaleCode){return ['en','ar','ur'].includes(value)?caseText(locale,({en:'English',ar:'Arabic',ur:'Urdu'} as Record<string,string>)[value] as CaseTextKey):workerLocale(value)?.name || value;}

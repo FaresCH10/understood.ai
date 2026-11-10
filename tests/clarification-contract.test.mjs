@@ -58,7 +58,7 @@ test('action receipt acceptance is exact and never treats rejection as applied',
 });
 
 test('staff clarification JSON context fence includes roots and exact action receipts, but not media URLs',()=>{
-  for(const path of ['/api/clarifications','/api/clarifications/case-14','/api/clarifications/case-14/actions/request-1'])for(const method of ['GET','HEAD'])assert.equal(staffClarificationContextRequired(path,method),true);
+  for(const path of ['/api/clarifications','/api/clarifications/case-14','/api/clarifications/case-14/actions/request-1','/api/clarifications/case-14/question-repeat'])for(const method of ['GET','HEAD'])assert.equal(staffClarificationContextRequired(path,method),true);
   for(const path of ['/api/clarification-creations','/api/clarification-creations/subjects','/api/clarification-creations/subjects/assignment-14','/api/clarification-creations/request-1'])for(const method of ['GET','HEAD','POST'])assert.equal(staffClarificationContextRequired(path,method),true);
   for(const action of ['assign','resolve'])assert.equal(staffClarificationContextRequired('/api/clarifications/case-14/'+action,'POST'),true);
   for(const path of ['/api/clarifications/case-14/messages','/api/recordings/recording-1/audio','/api/clarifications/case-14/messages/message-1/voice'])assert.equal(staffClarificationContextRequired(path,'GET'),false);

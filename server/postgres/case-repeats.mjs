@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {domainTransaction,requirePrincipal,domainAudit} from './domain.mjs';
 import {requireSiteOperational} from './site-lifecycle.mjs';
 import {requireWritableEntitlement} from './entitlements.mjs';
@@ -5,6 +6,16 @@ import {recordWorkerEvent} from './notification-events.mjs';
 
 const uuid=value=>typeof value==='string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(value);
 const iso=value=>value instanceof Date?value.toISOString():value;
+// The frozen worker-language question is already translated, so no provider call is needed.
+function checkBackMessage(snapshot,language) {
+  const content=snapshot && typeof snapshot==='object' && !Array.isArray(snapshot) ? snapshot : {};
+  const localized=content.languages?.[language] ?? {};
+  const title=typeof localized.title==='string' && localized.title.trim() ? localized.title.trim() : typeof content.title==='string' ? content.title.trim() : '';
+  const question=typeof localized.question==='string' ? localized.question.trim() : '';
+  const text=title && question ? `${title}\n\n${question}` : '';
+  if(!text || text.length>1000)throw Error('Check-back question unavailable');
+  return {text,hash:createHash('sha256').update(text).digest('hex')};
+}
 export const repeatRow=row=>({id:row.id,caseId:row.case_id,status:row.status,dueAt:iso(row.due_at),createdAt:iso(row.created_at),submittedAt:iso(row.submitted_at)});
 export const pendingRepeatPredicate=`EXISTS(SELECT 1 FROM case_repeats cr JOIN clarifications cc ON cc.id=cr.case_id AND cc.org_id=cr.org_id AND cc.site_id=cr.site_id
   WHERE cr.assignment_id=a.id AND cr.org_id=a.org_id AND cr.site_id=a.site_id AND cr.status='pending' AND cr.due_at>clock_timestamp() AND cc.status='open')`;
@@ -21,9 +32,9 @@ async function repeatCase(client,session,caseId,write=false) {
     WHERE c.id=$1 AND c.org_id=$2 AND c.site_id=$3`,[caseId,session.org_id,session.site_id])).rows[0];
   if(!identity)throw Error('Clarification unavailable');
   const worker=(await client.query('SELECT active FROM workers WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[identity.worker_id,session.org_id,session.site_id])).rows[0];
-  const assignment=(await client.query('SELECT id,publication_id FROM assignments WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',[identity.id,session.org_id,session.site_id])).rows[0];
+  const assignment=(await client.query('SELECT id,publication_id,language FROM assignments WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',[identity.id,session.org_id,session.site_id])).rows[0];
   const row=(await client.query('SELECT id,status FROM clarifications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',[caseId,session.org_id,session.site_id])).rows[0];
-  return {...row,worker_id:identity.worker_id,assignment_id:assignment.id,publication_id:assignment.publication_id,active:worker?.active};
+  return {...row,worker_id:identity.worker_id,assignment_id:assignment.id,publication_id:assignment.publication_id,language:assignment.language,active:worker?.active};
 }
 export function listCaseRepeats(pool,session,caseId,{schema='public'}={}) {
   return domainTransaction(pool,schema,async client=>{
@@ -39,7 +50,7 @@ export async function caseRepeatReceipt(pool,session,caseId,requestId,{schema='p
     if(!row)throw Error('Repeat receipt unavailable');return repeatRow(row);
   });
 }
-export async function requestCaseRepeat(pool,session,caseId,input,{schema='public'}={}) {
+export async function requestCaseRepeat(pool,session,caseId,input,{schema='public',withQuestion=false}={}) {
   if(!input || Object.keys(input).sort().join(',')!=='dueAt,requestId' || !uuid(input.requestId)
     || typeof input.dueAt!=='string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(input.dueAt) || !Number.isFinite(Date.parse(input.dueAt))
     || new Date(input.dueAt).toISOString()!==input.dueAt)throw Error('Invalid repeat request');
@@ -49,18 +60,29 @@ export async function requestCaseRepeat(pool,session,caseId,input,{schema='publi
     const old=(await client.query('SELECT * FROM case_repeats WHERE id=$1',[input.requestId])).rows[0];
     if(old) {
       if(old.case_id!==caseId || old.org_id!==session.org_id || old.site_id!==session.site_id || old.actor_id!==session.principal_id || old.actor_role!==session.role
-        || iso(old.due_at)!==input.dueAt)throw Error('Repeat request conflict');return repeatRow(old);
+        || iso(old.due_at)!==input.dueAt)throw Error('Repeat request conflict');
+      if(withQuestion && !(await client.query('SELECT 1 FROM case_messages WHERE id=$1 AND case_id=$2 AND org_id=$3 AND site_id=$4',[input.requestId,caseId,session.org_id,session.site_id])).rows.length)throw Error('Repeat request conflict');
+      return repeatRow(old);
     }
     await requireWritableEntitlement(client,session.org_id);
-    const publication=(await client.query('SELECT state,publication_content_available(id) AS content_available FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE',[thread.publication_id,session.org_id,session.site_id])).rows[0];
+    const publication=(await client.query(`SELECT state,publication_content_available(id) AS content_available,${withQuestion?'snapshot_json':'NULL AS snapshot_json'} FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3 FOR SHARE`,[thread.publication_id,session.org_id,session.site_id])).rows[0];
     if(thread.status!=='open' || !thread.active || publication?.state!=='published' || !publication.content_available)throw Error('Repeat request unavailable');
     if(!(await client.query("SELECT $1::timestamptz>clock_timestamp() AND $1::timestamptz<=clock_timestamp()+interval '30 days' AS valid",[input.dueAt])).rows[0].valid)throw Error('Invalid repeat deadline');
     if(!(await client.query('SELECT 1 FROM submission_receipts WHERE assignment_id=$1 AND org_id=$2 LIMIT 1',[thread.assignment_id,session.org_id])).rows.length)throw Error('Repeat requires an earlier answer');
+    const message=withQuestion?checkBackMessage(publication.snapshot_json,thread.language):null;
     await client.query(`UPDATE case_repeats cr SET status=CASE WHEN cr.due_at<=clock_timestamp() THEN 'expired' ELSE 'cancelled' END
       WHERE cr.assignment_id=$1 AND cr.status='pending' AND (cr.due_at<=clock_timestamp() OR EXISTS(SELECT 1 FROM clarifications cc WHERE cc.id=cr.case_id AND cc.status='resolved'))`,[thread.assignment_id]);
     if((await client.query("SELECT 1 FROM case_repeats WHERE assignment_id=$1 AND status='pending'",[thread.assignment_id])).rows.length)throw Error('Repeat already requested');
     const row=(await client.query(`INSERT INTO case_repeats(id,org_id,site_id,case_id,assignment_id,publication_id,actor_id,actor_role,due_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[input.requestId,session.org_id,session.site_id,caseId,thread.assignment_id,thread.publication_id,session.principal_id,session.role,input.dueAt])).rows[0];
+    if(message) {
+      await client.query(`INSERT INTO case_messages(id,org_id,site_id,case_id,assignment_id,actor_type,actor_id,language,text,request_hash,created_at)
+        VALUES($1,$2,$3,$4,$5,'staff',$6,$7,$8,$9,clock_timestamp())`,
+        [input.requestId,session.org_id,session.site_id,caseId,thread.assignment_id,session.principal_id,thread.language,message.text,message.hash]);
+      await domainAudit(client,session,'clarification.message',input.requestId);
+      await recordWorkerEvent(client,{orgId:session.org_id,siteId:session.site_id,workerId:thread.worker_id,
+        kind:'clarification.followup',objectType:'case_message',objectId:input.requestId,dedupeKey:`clarification.followup:${input.requestId}`});
+    }
     await domainAudit(client,session,'clarification.repeat_requested',row.id);
     await recordWorkerEvent(client,{orgId:session.org_id,siteId:session.site_id,workerId:thread.worker_id,
       kind:'repeat.available',objectType:'case_repeat',objectId:row.id,dedupeKey:`repeat.available:${row.id}`});

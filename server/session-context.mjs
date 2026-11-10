@@ -100,7 +100,7 @@ export function staffApplicationContextRequired(path,method) {
 export function staffClarificationContextRequired(path,method) {
   if(/^\/api\/clarifications\/[^/]+\/in-person-recordings(?:\/[^/]+)?$/.test(path))return ['GET','HEAD','POST'].includes(method);
   if(/^\/api\/clarification-creations(?:\/subjects(?:\/[^/]+)?|\/[^/]+)?$/.test(path))return ['GET','HEAD','POST'].includes(method);
-  return ['GET','HEAD'].includes(method) && (/^\/api\/clarifications(?:\/[^/]+(?:\/actions\/[^/]+)?)?$/.test(path) || /^\/api\/clarifications\/[^/]+\/timeline$/.test(path) || /^\/api\/clarifications\/[^/]+\/(repeats|reviews)(?:\/[^/]+)?$/.test(path))
+  return ['GET','HEAD'].includes(method) && (/^\/api\/clarifications(?:\/[^/]+(?:\/actions\/[^/]+)?)?$/.test(path) || /^\/api\/clarifications\/[^/]+\/timeline$/.test(path) || /^\/api\/clarifications\/[^/]+\/(question-repeat|repeats|reviews)(?:\/[^/]+)?$/.test(path))
     || method==='POST' && /^\/api\/clarifications\/[^/]+\/(assign|resolve)$/.test(path);
 }
 
@@ -108,7 +108,7 @@ export function verifyClientSession(req,session,path) {
   const provided=req.headers['x-client-session-context'];
   const briefingJson=session.principal_type==='staff' && (staffBriefingContextRequired(path,req.method) || staffBillingContextRequired(path,req.method) || staffPeopleContextRequired(path,req.method) || staffResponseContextRequired(path,req.method) || staffPolicyContextRequired(path,req.method) || staffWorkspaceContextRequired(path,req.method) || staffArtifactContextRequired(path,req.method) || staffReportContextRequired(path,req.method) || staffNotificationContextRequired(path,req.method) || staffOnboardingContextRequired(path,req.method) || staffUsageContextRequired(path,req.method) || staffApplicationContextRequired(path,req.method));
   const required=path.startsWith('/api/workspace/') || briefingJson || session.principal_type==='worker' && ['GET','HEAD'].includes(req.method) && path==='/api/privacy/recording-notice' || session.principal_type==='staff' && staffClarificationContextRequired(path,req.method) || /^\/api\/settings\/(staff|invitations)(?:\/|$)/.test(path) || req.method!=='GET' && req.method!=='HEAD' && (path==='/api/usage/requests' || path==='/api/source-audio' || path==='/api/settings/sites' || path==='/api/settings/sites/access' || path==='/api/settings/sites/lifecycle'
-    || /^\/api\/clarifications\/[^/]+\/(messages|followups|repeats|reviews)$/.test(path)
+    || /^\/api\/clarifications\/[^/]+\/(messages|followups|question-repeat|repeats|reviews)$/.test(path)
     || /^\/api\/clarifications\/[^/]+\/voice\/[^/]+$/.test(path)
     || (session.principal_type==='worker' && (path.startsWith('/api/worker/') || path==='/api/logout')));
   if(provided===undefined && !required)return;
