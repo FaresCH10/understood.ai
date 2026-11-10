@@ -1,3 +1,4 @@
+// Labels are part of the wire contract: deployed clients compare them to their bundled copy.
 export const notificationKinds = Object.freeze({
   'briefing.prepared': {label:'Briefing preparation completed',destination:'briefings'},
   'briefing.published': {label:'Briefing published',destination:'briefings'},
@@ -9,7 +10,7 @@ export const notificationKinds = Object.freeze({
   'clarification.resolved': {label:'Human follow-up recorded',destination:'clarifications'},
   'clarification.message': {label:'Clarification conversation updated',destination:'clarifications'},
   'worker.language_requested': {label:'Worker requested a language change',destination:'people'},
-  'answer.needs_attention': {label:'Answer is not correct',destination:'clarifications'},
+  'answer.needs_attention': {label:'Answer needs review or clarification',destination:'clarifications'},
   'instruction.send_incomplete': {label:'Instruction delivery was incomplete',destination:'briefings'},
   'instruction.completed': {label:'Worker completed an instruction',destination:'briefings'},
   'assignment.overdue': {label:'Instruction assignment is overdue',destination:'briefings'},
