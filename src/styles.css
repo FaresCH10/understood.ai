@@ -481,6 +481,9 @@ button.device-action-row:hover{background:#f7faf9}
 .worker-evidence-preview img{display:block;max-width:280px;max-height:220px;object-fit:contain;border:1px solid #e2e7e7;border-radius:8px;background:#f5f7f6}
 .worker-evidence-add{display:flex;align-items:center;justify-content:center;cursor:pointer}
 .question-label{display:flex;align-items:center;gap:12px;color:#9a5900;font-weight:700;margin-bottom:18px}
+.worker-followup{background:#f4f9ff;border-color:#d8ebf7}
+.worker-followup .question-label{color:#1174ae}
+.worker-followup-message{margin:0 0 14px;padding:14px 16px;border:1px solid #d8ebf7;border-radius:7px;background:#fff;line-height:1.8;white-space:pre-line;overflow-wrap:anywhere}
 .answer-mode{margin:14px 0 18px}
 .answer-mode button{min-height:52px}
 .record-answer{display:grid;gap:10px;min-width:0}

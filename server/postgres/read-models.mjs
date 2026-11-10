@@ -267,7 +267,7 @@ export async function workerBriefings(pool,session,{schema='public',history=fals
       p.snapshot_json->>'responseMode' AS response_mode,p.snapshot_json->>'deliveryMode' AS delivery_mode,
       (SELECT d.content_json FROM instruction_deliveries d WHERE d.assignment_id=a.id AND d.org_id=a.org_id
         AND d.site_id=a.site_id AND d.worker_id=a.worker_id AND d.state='available') AS delivery_content_json,
-      ${pendingRepeatColumns},
+      ${pendingRepeatColumns()},
       CASE WHEN ${available} AND a.due_at>$6::timestamptz AND NOT ${accepted} THEN
         (SELECT r.finished_at FROM assignment_reminders r WHERE r.assignment_id=a.id AND r.org_id=a.org_id AND r.site_id=a.site_id AND r.worker_id=a.worker_id AND r.state='visible') END AS reminder_at,
       ${responseColumns} ${scope}
@@ -287,7 +287,7 @@ export async function workerBriefing(pool,session,assignmentId,{schema='public'}
       p.snapshot_json->>'responseMode' AS response_mode,p.snapshot_json->>'deliveryMode' AS delivery_mode,p.snapshot_json->>'evidenceMode' AS evidence_mode,
       d.content_json AS delivery_content_json,
       ae.mime AS evidence_mime,ae.bytes AS evidence_bytes,ae.sha256 AS evidence_sha256,ae.received_at AS evidence_at,
-      (gb.state='attached') AS speech_active,${pendingRepeatColumns},${responseColumns}
+      (gb.state='attached') AS speech_active,${pendingRepeatColumns({message:true})},${responseColumns}
       FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
       JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
       LEFT JOIN generated_bundles gb ON gb.id::text=p.snapshot_json->'artifactBundle'->>'id' AND gb.org_id=p.org_id AND gb.site_id=p.site_id

@@ -911,6 +911,13 @@ const workerAux:Record<WorkerUiLanguage,WorkerAux> = {
   id: { emptyTodo: 'Tidak ada instruksi untuk dikerjakan.', emptyDone: 'Belum ada instruksi yang selesai.', loading: 'Memuat...', unavailable: 'Instruksi tidak tersedia', outcome: 'Hasil tercatat', assessment: 'Ini penilaian sintetis lokal. Supervisor Anda dapat meninjau jawaban asli.', audioPending: 'Rekaman diterima. Pemeriksaan AI tertunda.', audioFailed: 'Rekaman tidak dapat diperiksa. Minta bantuan supervisor atau rekam lagi.', typeInstead: 'Ketik', recordInstead: 'Rekam', matched: 'Fakta kunci cocok', clarification: 'Jawaban tidak benar', wrongBody: 'Jawaban Anda tidak sesuai dengan instruksi. Supervisor telah diberi tahu dan dapat mengirim pertanyaan pemeriksaan.', unassessable: 'Tidak dapat dinilai', saved: 'Tersimpan.' },
 };
 
+const workerFollowupTitle:Record<WorkerUiLanguage,string>={
+  en:'New follow-up from your supervisor',ar:'متابعة جديدة من المشرف',ur:'سپروائزر کی طرف سے نئی پیروی',
+  hi:'आपके सुपरवाइज़र से नया फ़ॉलो-अप',bn:'আপনার সুপারভাইজারের নতুন ফলো-আপ',ml:'നിങ്ങളുടെ സൂപ്പർവൈസറിൽ നിന്നുള്ള പുതിയ തുടർച്ച',
+  ta:'உங்கள் மேற்பார்வையாளரிடமிருந்து புதிய தொடர்வு',te:'మీ సూపర్‌వైజర్ నుండి కొత్త ఫాలో-అప్',ne:'तपाईंको सुपरभाइजरबाट नयाँ फलो-अप',
+  fil:'Bagong follow-up mula sa iyong supervisor',si:'ඔබේ අධීක්ෂකගෙන් නව අනුගමනයක්',ru:'Новое уточнение от вашего руководителя',
+  'pa-Guru':'ਤੁਹਾਡੇ ਸੁਪਰਵਾਈਜ਼ਰ ਵੱਲੋਂ ਨਵਾਂ ਫਾਲੋ-ਅੱਪ','pa-Arab':'تہاڈے سپروائزر ولوں نواں فالو اپ',id:'Tindak lanjut baru dari supervisor Anda'};
+
 type WorkerEvidenceText={title:string;body:string;add:string;change:string;received:string;needed:string;invalid:string};
 const workerEvidenceText:Record<WorkerUiLanguage,WorkerEvidenceText>={
   en:{title:'Photo confirmation',body:'Attach a photo, then confirm you have read or listened to the instruction.',add:'Add photo',change:'Change photo',received:'Photo received',needed:'Add the required photo before confirming.',invalid:'Choose a JPEG, PNG or WebP photo up to 5 MB.'},
@@ -1414,6 +1421,11 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   </div>}
                 </section>
                   <InstructionFiles language={language} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost}/>
+                {detail.data.repeatRequest?.message && <section className="worker-card worker-followup" aria-label={workerFollowupTitle[language]}>
+                  <div className="question-label"><MessageCircle size={24} aria-hidden="true"/>{workerFollowupTitle[language]}</div>
+                  <blockquote className="worker-followup-message" lang={detail.data.language} dir="auto">{detail.data.repeatRequest.message}</blockquote>
+                  <p className="muted">{t.repeatSaved} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></p>
+                </section>}
                 <section className="worker-card question-card" id="worker-question" tabIndex={-1}>
                   {responseMode==='acknowledge' ? <>
                     <div className="question-label"><CheckCircle2 size={24} />{t.receipt}</div>
@@ -1432,7 +1444,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   </> : <>
                   <div className="question-label"><HelpCircle size={24} />{t.question}</div>
                   <h2 lang={translatedQuestion?session.language:detail.data.language} dir="auto">{translatedQuestion||detail.data.content.question}</h2>
-                  {detail.data.repeatRequest && <Notice tone="amber">{t.repeatSaved} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></Notice>}
+                  {detail.data.repeatRequest && !detail.data.repeatRequest.message && <Notice tone="amber">{t.repeatSaved} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></Notice>}
                   {!translatedQuestion && deliveryMode!=='text' && (detail.data.speechUrls?.question ? <WorkerAudioPlayer key={`${id}:question:${detail.data.publicationId}:${detail.data.version}`} src={detail.data.speechUrls.question} label={detail.data.speechUrls.includesChoices?workerWorkflowCopy[language][2]:t.playQuestion} language={language} onPlayer={element=>{speechPlayers.current.question=element;}} onPlay={()=>{stopDeviceSpeech();speechPlayers.current.body?.pause();}}/> : <button className="audio-button compact" aria-pressed={speakingPart==='question'} disabled={detail.data.content.speech!=='device-synthesis-demo'} onClick={() => speak(detail.data.content.question,'question')}>{speakingPart==='question'?<Square size={18} />:<Play size={20} />}{speakingPart==='question'?workerStopText[language]:t.playQuestion}</button>)}
                   {responseState?.assessmentFailed&&<p className="notice notice-amber" role="alert">{statusText.failed} {t.help}</p>}
                   {!detail.data.repeatRequest && detail.data.audioStatus && !['failed','blocked'].includes(detail.data.audioStatus) ? (

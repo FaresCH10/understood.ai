@@ -48,7 +48,7 @@ test('repeat admits one new typed receipt after original deadline, preserves ori
     await assert.rejects(f.request(command()),/already requested/);
     await assert.rejects(caseRepeatReceipt(f.pool,{...owner,principal_id:'other',role:'supervisor'},f.caseId,input.requestId),/unavailable/);
     for(const view of ['todo','followup']){const inbox=await workerBriefings(f.pool,worker,{}, {view});assert.equal(inbox.total,1);assert.equal(inbox.items[0].repeatRequest.id,input.requestId);}
-    const detail=await workerBriefing(f.pool,worker,'assignment-14');assert.equal(detail.repeatRequest.id,input.requestId);assert.equal(detail.outcome,'clarification');assert.equal(JSON.stringify(detail).includes('reasons_json'),false);
+    const detail=await workerBriefing(f.pool,worker,'assignment-14');assert.equal(detail.repeatRequest.id,input.requestId);assert.equal(detail.repeatRequest.message,undefined);assert.equal(detail.outcome,'clarification');assert.equal(JSON.stringify(detail).includes('reasons_json'),false);
     const id=randomUUID(),text='Finished: blue. Unfinished: yellow.',next=await submitAnswer(f.pool,worker,'assignment-14',id,text);assert.equal(next.assessmentStatus,'pending');
     assert.equal((await f.request(input)).status,'submitted');assert.equal((await submitAnswer(f.pool,worker,'assignment-14',id,text)).duplicate,true);
     assert.equal((await workerBriefings(f.pool,worker,{}, {view:'todo'})).total,0);
@@ -76,6 +76,9 @@ test('check-back sends the frozen worker-language question with an atomic repeat
       {id:input.requestId,case_id:f.caseId,assignment_id:'assignment-14',actor_type:'staff',actor_id:'maya',language:'en',text,request_hash:createHash('sha256').update(text).digest('hex')});
     assert.deepEqual(await f.request(input,{withQuestion:true}),receipt);
     assert.equal((await f.db.query('SELECT count(*)::int n FROM case_messages')).rows[0].n,1);
+    const detail=await workerBriefing(f.pool,worker,'assignment-14');
+    assert.equal(detail.repeatRequest.message,text);
+    assert.equal((await workerBriefings(f.pool,worker,{}, {view:'todo'})).items[0].repeatRequest.message,undefined);
     assert.deepEqual((await f.db.query('SELECT kind FROM notification_events WHERE object_id=$1 ORDER BY kind',[input.requestId])).rows.map(row=>row.kind),['clarification.followup','repeat.available']);
     await submitAnswer(f.pool,worker,'assignment-14',randomUUID(),'Finished: blue. Unfinished: yellow.');
     assert.equal((await f.request(input,{withQuestion:true})).status,'submitted');

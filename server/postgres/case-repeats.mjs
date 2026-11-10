@@ -19,10 +19,13 @@ function checkBackMessage(snapshot,language) {
 export const repeatRow=row=>({id:row.id,caseId:row.case_id,status:row.status,dueAt:iso(row.due_at),createdAt:iso(row.created_at),submittedAt:iso(row.submitted_at)});
 export const pendingRepeatPredicate=`EXISTS(SELECT 1 FROM case_repeats cr JOIN clarifications cc ON cc.id=cr.case_id AND cc.org_id=cr.org_id AND cc.site_id=cr.site_id
   WHERE cr.assignment_id=a.id AND cr.org_id=a.org_id AND cr.site_id=a.site_id AND cr.status='pending' AND cr.due_at>clock_timestamp() AND cc.status='open')`;
-export const pendingRepeatColumns=`(SELECT jsonb_build_object('id',cr.id,'caseId',cr.case_id,'dueAt',cr.due_at) FROM case_repeats cr
+// A check-back repeat shares its id with the frozen worker-language message, so the worker page can show it verbatim.
+export function pendingRepeatColumns({message=false}={}) {
+  return `(SELECT jsonb_strip_nulls(jsonb_build_object('id',cr.id,'caseId',cr.case_id,'dueAt',cr.due_at${message?",'message',(SELECT m.text FROM case_messages m WHERE m.id=cr.id AND m.case_id=cr.case_id AND m.org_id=cr.org_id AND m.site_id=cr.site_id)":''})) FROM case_repeats cr
   JOIN clarifications cc ON cc.id=cr.case_id AND cc.org_id=cr.org_id AND cc.site_id=cr.site_id
   WHERE cr.assignment_id=a.id AND cr.org_id=a.org_id AND cr.site_id=a.site_id AND cr.status='pending' AND cr.due_at>clock_timestamp()
     AND cc.status='open' AND p.state='published') AS repeat_request`;
+}
 
 async function repeatCase(client,session,caseId,write=false) {
   await requirePrincipal(client,session,'staff',write?['owner','supervisor']:['owner','supervisor','auditor']);
