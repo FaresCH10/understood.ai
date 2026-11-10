@@ -35,7 +35,7 @@ import {
   Eye, EyeOff,PanelLeft,Pencil,
   FileText, HelpCircle, Home, Languages, LogOut, MessageCircle, Plus,
   Search, Send, Settings, Sparkles, TriangleAlert, Users, UsersRound, ContactRound, Volume2, X, Square,
-  BarChart3, CalendarDays, Download, Play, RefreshCw, ShieldCheck,KeyRound,Smartphone,QrCode,
+  BarChart3, CalendarClock, CalendarDays, Download, Play, RefreshCw, Repeat2, ShieldCheck,KeyRound,Smartphone,QrCode,
 } from 'lucide-react';
 import './styles.css';
 import {isPublicLandingView} from './public-navigation';
@@ -111,6 +111,7 @@ import {prepareEvidencePhoto} from './worker-evidence-photo';
 import {WorkerSubmissionReceipt} from './WorkerSubmissionReceipt';
 import { canManageStaff,staffDate,staffGreeting } from './staff-policy';
 import { WorkerHelpHistory, workerStatusText, workerVersionText } from './WorkerHelpHistory';
+import {workerFollowupText} from './worker-followup-text';
 import {CaseVoiceRecorder} from './CaseVoiceRecorder';
 import type {RecordingLanguage} from './recording-notice';
 import {readWorkerRecordingNotice,WorkerRecordingNoticeError} from './worker-recording-notice';
@@ -911,13 +912,6 @@ const workerAux:Record<WorkerUiLanguage,WorkerAux> = {
   id: { emptyTodo: 'Tidak ada instruksi untuk dikerjakan.', emptyDone: 'Belum ada instruksi yang selesai.', loading: 'Memuat...', unavailable: 'Instruksi tidak tersedia', outcome: 'Hasil tercatat', assessment: 'Ini penilaian sintetis lokal. Supervisor Anda dapat meninjau jawaban asli.', audioPending: 'Rekaman diterima. Pemeriksaan AI tertunda.', audioFailed: 'Rekaman tidak dapat diperiksa. Minta bantuan supervisor atau rekam lagi.', typeInstead: 'Ketik', recordInstead: 'Rekam', matched: 'Fakta kunci cocok', clarification: 'Jawaban tidak benar', wrongBody: 'Jawaban Anda tidak sesuai dengan instruksi. Supervisor telah diberi tahu dan dapat mengirim pertanyaan pemeriksaan.', unassessable: 'Tidak dapat dinilai', saved: 'Tersimpan.' },
 };
 
-const workerFollowupTitle:Record<WorkerUiLanguage,string>={
-  en:'New follow-up from your supervisor',ar:'متابعة جديدة من المشرف',ur:'سپروائزر کی طرف سے نئی پیروی',
-  hi:'आपके सुपरवाइज़र से नया फ़ॉलो-अप',bn:'আপনার সুপারভাইজারের নতুন ফলো-আপ',ml:'നിങ്ങളുടെ സൂപ്പർവൈസറിൽ നിന്നുള്ള പുതിയ തുടർച്ച',
-  ta:'உங்கள் மேற்பார்வையாளரிடமிருந்து புதிய தொடர்வு',te:'మీ సూపర్‌వైజర్ నుండి కొత్త ఫాలో-అప్',ne:'तपाईंको सुपरभाइजरबाट नयाँ फलो-अप',
-  fil:'Bagong follow-up mula sa iyong supervisor',si:'ඔබේ අධීක්ෂකගෙන් නව අනුගමනයක්',ru:'Новое уточнение от вашего руководителя',
-  'pa-Guru':'ਤੁਹਾਡੇ ਸੁਪਰਵਾਈਜ਼ਰ ਵੱਲੋਂ ਨਵਾਂ ਫਾਲੋ-ਅੱਪ','pa-Arab':'تہاڈے سپروائزر ولوں نواں فالو اپ',id:'Tindak lanjut baru dari supervisor Anda'};
-
 type WorkerEvidenceText={title:string;body:string;add:string;change:string;received:string;needed:string;invalid:string};
 const workerEvidenceText:Record<WorkerUiLanguage,WorkerEvidenceText>={
   en:{title:'Photo confirmation',body:'Attach a photo, then confirm you have read or listened to the instruction.',add:'Add photo',change:'Change photo',received:'Photo received',needed:'Add the required photo before confirming.',invalid:'Choose a JPEG, PNG or WebP photo up to 5 MB.'},
@@ -1041,6 +1035,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const t = workerText[language];
   const a = workerAux[language];
   const statusText = workerStatusText[language];
+  const followup=workerFollowupText(language);
   const pagingText=workerPagingText[language];
   const pageOfText=workerPageOfText[language];
   const audioMessage = a.audioPending;
@@ -1342,8 +1337,8 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const pages=Math.max(1,Math.ceil((inbox.data?.total || 0)/(inbox.data?.pageSize||10)));
   function revealHelp(){
     const section=document.getElementById('worker-help');
-    if(section instanceof HTMLDetailsElement)section.open=true;
-    (section?.querySelector<HTMLElement>('textarea:not(:disabled)')||section?.querySelector<HTMLElement>('summary'))?.focus();
+    section?.scrollIntoView({block:'start'});
+    (section?.querySelector<HTMLElement>('textarea:not(:disabled)')||section)?.focus();
   }
   // Do not unmount an unsent recording as the wall clock crosses a deadline. The server rechecks acceptance on upload.
   const responseState = useMemo(() => detail.data ? workerResponseState(detail.data) : null, [detail.data]);
@@ -1416,15 +1411,21 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   </>}
                   <WorkerPresentationView key={`presentation:${id}:${detail.data.publicationId}:${detail.data.version}`} assignmentId={id} version={detail.data.version} sourceKind="instruction" originalLanguage={detail.data.language} approvedLanguage={session.language || ''} uiLanguage={language} session={session} disabled={busy||detailUnavailable} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} onActive={setAnswerPresentationId} onChoices={setTranslatedChoices} onQuestion={setTranslatedQuestion} onContent={setTranslatedContent} requiresChoices={detail.data.content.questionType==='multiple-choice'}/>
                   {(responseState?.canRespond||responseState?.canHelp)&&<div className="worker-assignment-actions">
-                    {responseState.canRespond&&<button type="button" className="button outline" onClick={()=>document.getElementById('worker-question')?.focus()}>{responseMode==='acknowledge'?<CheckCircle2 size={18} aria-hidden="true"/>:<HelpCircle size={18} aria-hidden="true"/>}{responseMode==='acknowledge'?t.ackTitle:t.question}</button>}
+                    {responseState.canRespond&&<button type="button" className="button outline" onClick={()=>document.getElementById('worker-question')?.focus()}>{responseMode==='acknowledge'?<><CheckCircle2 size={18} aria-hidden="true"/>{t.ackTitle}</>:detail.data.repeatRequest?<><Repeat2 size={18} aria-hidden="true"/>{followup.answerAgain}</>:<><HelpCircle size={18} aria-hidden="true"/>{t.question}</>}</button>}
                     {responseState.canHelp&&<button type="button" className="button outline" onClick={revealHelp}><MessageCircle size={18} aria-hidden="true"/>{t.help}</button>}
                   </div>}
                 </section>
                   <InstructionFiles language={language} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost}/>
-                {detail.data.repeatRequest?.message && <section className="worker-card worker-followup" aria-label={workerFollowupTitle[language]}>
-                  <div className="question-label"><MessageCircle size={24} aria-hidden="true"/>{workerFollowupTitle[language]}</div>
-                  <blockquote className="worker-followup-message" lang={detail.data.language} dir="auto">{detail.data.repeatRequest.message}</blockquote>
-                  <p className="muted">{t.repeatSaved} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></p>
+                {detail.data.repeatRequest && <section className={`worker-card worker-followup-card ${detail.data.repeatRequest.message?'is-checkback':'is-repeat'}`} aria-labelledby="worker-followup-title">
+                  <div className="worker-followup-head">
+                    <span className="worker-followup-icon" aria-hidden="true">{detail.data.repeatRequest.message?<Repeat2 size={22}/>:<CalendarClock size={22}/>}</span>
+                    <div><h2 id="worker-followup-title">{detail.data.repeatRequest.message?followup.checkTitle:followup.manualTitle}</h2>
+                    <p className="muted">{detail.data.repeatRequest.message?followup.checkBody:followup.manualBody}</p></div>
+                  </div>
+                  <div className="worker-followup-foot">
+                    <p className="worker-followup-due"><Clock3 size={17} aria-hidden="true"/><span>{followup.due} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></span></p>
+                    {responseState?.canRespond&&<button type="button" className="button primary" onClick={()=>document.getElementById('worker-question')?.focus()}>{followup.answerAgain}</button>}
+                  </div>
                 </section>}
                 <section className="worker-card question-card" id="worker-question" tabIndex={-1}>
                   {responseMode==='acknowledge' ? <>
@@ -1442,9 +1443,8 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                     </section>}
                     {detail.data.acknowledgedAt ? <><Status value={statusText.acknowledged}/><p className="muted"><time dateTime={detail.data.acknowledgedAt}>{new Date(detail.data.acknowledgedAt).toLocaleString(language,{timeZone:session.timezone,dateStyle:'medium',timeStyle:'short'})}</time></p></> : !responseState?.closed && responseState?.canRespond ? <button className="button primary full" disabled={busy || acknowledging || detailUnavailable || (evidenceMode==='photo' && !evidencePhoto)} onClick={()=>void acknowledge()}>{acknowledging?t.saving:<><CheckCircle2 size={20}/>{t.ackAction}</>}</button> : null}
                   </> : <>
-                  <div className="question-label"><HelpCircle size={24} />{t.question}</div>
+                  <div className="question-label">{detail.data.repeatRequest?<Repeat2 size={24} aria-hidden="true"/>:<HelpCircle size={24} aria-hidden="true"/>}{detail.data.repeatRequest?followup.answerAgain:t.question}</div>
                   <h2 lang={translatedQuestion?session.language:detail.data.language} dir="auto">{translatedQuestion||detail.data.content.question}</h2>
-                  {detail.data.repeatRequest && !detail.data.repeatRequest.message && <Notice tone="amber">{t.repeatSaved} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></Notice>}
                   {!translatedQuestion && deliveryMode!=='text' && (detail.data.speechUrls?.question ? <WorkerAudioPlayer key={`${id}:question:${detail.data.publicationId}:${detail.data.version}`} src={detail.data.speechUrls.question} label={detail.data.speechUrls.includesChoices?workerWorkflowCopy[language][2]:t.playQuestion} language={language} onPlayer={element=>{speechPlayers.current.question=element;}} onPlay={()=>{stopDeviceSpeech();speechPlayers.current.body?.pause();}}/> : <button className="audio-button compact" aria-pressed={speakingPart==='question'} disabled={detail.data.content.speech!=='device-synthesis-demo'} onClick={() => speak(detail.data.content.question,'question')}>{speakingPart==='question'?<Square size={18} />:<Play size={20} />}{speakingPart==='question'?workerStopText[language]:t.playQuestion}</button>)}
                   {responseState?.assessmentFailed&&<p className="notice notice-amber" role="alert">{statusText.failed} {t.help}</p>}
                   {!detail.data.repeatRequest && detail.data.audioStatus && !['failed','blocked'].includes(detail.data.audioStatus) ? (
@@ -1489,13 +1489,16 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   {responseState?.pending && <button className="icon-button" aria-label={statusText.check} title={statusText.check} disabled={busy} onClick={() => setAudioRefresh((value) => value + 1)}><RefreshCw size={20} /></button>}
                   </>}
                 </section>
-                {responseState?.canHelp&&<details className="worker-card worker-help-disclosure" id="worker-help" open={!!helpText||helpVoiceUnsent||helpSent}>
-                  <summary>{t.helpTitle}<ChevronDown size={18} aria-hidden="true"/></summary><div>
-                  {helpSent&&<div className="notice notice-green" role="status"><p>{t.saved}</p><button className="button outline" onClick={()=>{const section=document.getElementById('worker-followup-history');if(section instanceof HTMLDetailsElement)section.open=true;section?.scrollIntoView({block:'start'});}}>{statusText.history}</button></div>}
-                  {responseState?.canHelp && <><label className="field">{t.helpPrompt}<textarea rows={3} value={helpText} disabled={busy || helpVoiceUnsent || inputAvailability.helpBlocked} onChange={(event) => setHelpText(event.target.value)} maxLength={500} /></label>
+                {responseState?.canHelp&&<section className="worker-card worker-help-card" id="worker-help" tabIndex={-1} aria-labelledby="worker-help-title">
+                  <div className="worker-followup-head">
+                    <span className="worker-followup-icon is-help" aria-hidden="true"><MessageCircle size={22}/></span>
+                    <div><h2 id="worker-help-title">{t.helpTitle}</h2><p className="muted">{followup.helpBody}</p></div>
+                  </div>
+                  {helpSent&&<div className="notice notice-green" role="status"><p>{t.saved}</p><button className="button outline" onClick={()=>document.getElementById('worker-followup-history')?.scrollIntoView({block:'start'})}>{followup.readMessages}</button></div>}
+                  <label className="field">{t.helpPrompt}<textarea rows={3} value={helpText} disabled={busy || helpVoiceUnsent || inputAvailability.helpBlocked} onChange={(event) => setHelpText(event.target.value)} maxLength={500} /></label>
                   <button className="button outline full" disabled={helpText.trim().length < 3 || helpVoiceUnsent || inputAvailability.helpBlocked || busy || detailUnavailable} onClick={help}><MessageCircle size={18} />{t.help}</button>
-                  {detail.data.canVoiceHelp && <CaseVoiceRecorder key={`help-voice:${id}`} scope={{kind:'help',id}} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} current={()=>!sessionInvalid()&&currentAssignment.current===id} language={language} noticeLanguage={contentLanguage} disabled={busy || detailUnavailable || inputAvailability.helpBlocked || !!helpText.trim()} onDirtyChange={setHelpVoiceUnsent} onSessionLost={onSessionLost} onReceived={()=>setAudioRefresh(value=>value+1)}/>}</>}
-                </div></details>}
+                  {detail.data.canVoiceHelp && <CaseVoiceRecorder key={`help-voice:${id}`} scope={{kind:'help',id}} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} current={()=>!sessionInvalid()&&currentAssignment.current===id} language={language} noticeLanguage={contentLanguage} disabled={busy || detailUnavailable || inputAvailability.helpBlocked || !!helpText.trim()} onDirtyChange={setHelpVoiceUnsent} onSessionLost={onSessionLost} onReceived={()=>setAudioRefresh(value=>value+1)}/>}
+                </section>}
               </>
             )}
 
@@ -1511,9 +1514,9 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
               current={()=>!sessionInvalid() && validWorkerSession(session) && currentAssignment.current===id && !detailUnavailable}
               onRestore={value=>{setAnswer(value.answer);setHelpText(value.help);setPendingReceipts(value.receipts);if(value.answer)setAnswerMode('type');}}/>
             </div></details>
-            <details id="worker-followup-history" className="worker-detail-disclosure" open={conversationUnsent||helpSent||!!view.split('/')[2]}><summary>{journeyText.history}<ChevronDown size={18} aria-hidden="true"/></summary><div>
+            <div id="worker-followup-history" className="worker-messages-card"><WorkerHelpHistory requestedCaseId={view.split('/')[2]} key={`help-history:${id}`} assignmentId={id} version={detail.data.version} contentLanguage={detail.data.language} language={language} timezone={session.timezone} refresh={refresh + audioRefresh} session={session} current={()=>!sessionInvalid()&&currentAssignment.current===id} canWrite={!busy&&!detailUnavailable&&!inputAvailability.conversationBlocked} onDirtyChange={setConversationUnsent} onSessionLost={onSessionLost}/></div>
+            <details className="worker-detail-disclosure"><summary>{followup.answerHistory}<ChevronDown size={18} aria-hidden="true"/></summary><div>
             <WorkerSubmissions choices={translatedChoices||detail.data.content?.choices} key={`submissions:${id}`} assignmentId={id} version={detail.data.version} contentLanguage={detail.data.language} session={session} language={language} timezone={session.timezone} refresh={refresh + audioRefresh} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost}/>
-            <WorkerHelpHistory requestedCaseId={view.split('/')[2]} key={`help-history:${id}`} assignmentId={id} version={detail.data.version} contentLanguage={detail.data.language} language={language} timezone={session.timezone} refresh={refresh + audioRefresh} session={session} current={()=>!sessionInvalid()&&currentAssignment.current===id} canWrite={!busy&&!detailUnavailable&&!inputAvailability.conversationBlocked} onDirtyChange={setConversationUnsent} onSessionLost={onSessionLost}/>
             </div></details>
           </>
         )}

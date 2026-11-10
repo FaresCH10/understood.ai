@@ -54,6 +54,7 @@
 .ci-case:hover .ci-case-link { color: var(--ci-accent); }
 .ci-owner { display: block; margin-top: 4px; color: var(--ci-muted); font-size: 12px; line-height: 1.5; }
 .ci-language { display: inline-flex; padding: 1px 6px; border: 1px solid #e2e9e5; border-radius: 4px; color: var(--ci-muted); margin-top: 7px; font-size: 11px; line-height: 1.6; }
+.ci-kind-line { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 7px; }
 .ci-topic { display: block; font-size: 14px; font-weight: 600; line-height: 1.5; }
 .ci-topic bdi { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .ci-version { display: block; margin-top: 4px; color: var(--ci-muted); font-size: 11px; line-height: 1.6; }

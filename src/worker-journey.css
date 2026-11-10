@@ -107,12 +107,6 @@
 .worker-assignment-actions>.button { flex:1 1 9rem;min-width:0;overflow-wrap:anywhere; }
 #worker-question,#worker-help textarea { scroll-margin-block:82px; }
 #worker-question:focus-visible { outline:2px solid #277c61;outline-offset:3px; }
-.worker-help-disclosure>summary { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; min-height:44px; font-size:18px; font-weight:650; list-style:none; }
-.worker-help-disclosure>summary::-webkit-details-marker { display:none; }
-.worker-help-disclosure>summary svg { flex-shrink:0; }
-.worker-help-disclosure[open]>summary { margin-bottom:18px; }
-.worker-help-disclosure[open]>summary svg { transform:rotate(180deg); }
-.worker-help-disclosure>summary:focus-visible { outline:2px solid #277c61; outline-offset:4px; }
 @media(max-width:600px) {
  .worker-state-filters { gap:6px; }
  .worker-state-filters button { flex:1 1 calc(50% - 6px); font-size:13px; }

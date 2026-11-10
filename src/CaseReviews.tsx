@@ -1,6 +1,6 @@
 import {CaseTime} from './CaseTime';
 import {useEffect,useRef,useState} from 'react';
-import {CalendarClock,ChevronLeft,ChevronRight,MessageSquareWarning,RefreshCw} from 'lucide-react';
+import {CalendarClock,ChevronLeft,ChevronRight,History,MessageSquareWarning,RefreshCw} from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {CaseWorkflowError,checkedReviewPage,checkedReviewReceipt,type ReviewPage,type ReviewRow} from './case-workflow-contract';
 import {CaseRecoveryError,canonicalCaseReview,caseReviewRecoveryHash,readCaseReview,retainCaseReview,clearCaseReview,mayReleaseFreshCaseRejection,type PendingReview,type ReviewContent} from './case-workflow-recovery';
@@ -11,12 +11,10 @@ import {caseText,caseMessage,type CaseLocale,type CaseTextKey} from './clarifica
 
 const empty:CaseDeadlineDraft={value:'',occurrence:''};
 const blockedCopy={read_only:'Your role cannot record a supervisor review.',workspace_archived:'This workspace is archived.',worker_unavailable:'Worker access is unavailable.',content_expired:'Private case content is no longer retained.'};
-export function CaseReviews({caseId,authority,available,canWrite,closed,timezone='UTC',onDirtyChange,onDeadlineChange,onAttentionChange,language:locale='en'}:{caseId:string;authority:StaffRequestAuthority;available:boolean;canWrite:boolean;closed:boolean;timezone?:string;onDirtyChange:(dirty:boolean)=>void;onDeadlineChange:(dueAt:string)=>void;onAttentionChange?:(attention:boolean)=>void;language?:CaseLocale}){
+export function CaseReviews({caseId,authority,available,canWrite,closed,timezone='UTC',onDirtyChange,onDeadlineChange,language:locale='en'}:{caseId:string;authority:StaffRequestAuthority;available:boolean;canWrite:boolean;closed:boolean;timezone?:string;onDirtyChange:(dirty:boolean)=>void;onDeadlineChange:(dueAt:string)=>void;language?:CaseLocale}){
   const t=(key:CaseTextKey)=>caseText(locale,key);
   const api=useStaffRequest(authority),[page,setPage]=useState(1),[tick,setTick]=useState(0),[draft,setDraft]=useState(empty),[expectedDueAt,setExpectedDueAt]=useState<string|null>(null),[reason,setReason]=useState(''),[pending,setPending]=useState<PendingReview|null>(null),[receipt,setReceipt]=useState<ReviewRow|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[recoveryFailed,setRecoveryFailed]=useState(false);
   const [read,setRead]=useState<{key:string;data:ReviewPage|null;loading:boolean;error:string}>({key:'',data:null,loading:true,error:''});
-  const needsAttention=!!pending||!!error||!!read.error||recoveryFailed;
-  useEffect(()=>{onAttentionChange?.(needsAttention);},[needsAttention,onAttentionChange]);
   const live=useRef(false),inFlight=useRef(false),command=useRef<AbortController|null>(null),refreshButton=useRef<HTMLButtonElement>(null),forms=useRef<HTMLDivElement>(null),latest=useRef({draft,expectedDueAt,reason,available,canWrite,authority,onDirtyChange,onDeadlineChange});latest.current={draft,expectedDueAt,reason,available,canWrite,authority,onDirtyChange,onDeadlineChange};
   const path=`/api/clarifications/${encodeURIComponent(caseId)}/reviews`,key=JSON.stringify([page,tick,available]);
   const data=read.key===key&&api.current()?read.data:null,loading=read.key!==key||read.loading,writeRole=['owner','supervisor'].includes(authority.session.staffRole||'');
@@ -57,21 +55,41 @@ export function CaseReviews({caseId,authority,available,canWrite,closed,timezone
     }finally{inFlight.current=false;if(current())setBusy(false);}
   }
   const editable=writable()&&!busy&&!recoveryFailed,canDeadline=editable&&!!data?.canChangeDeadline&&!closed,canDisagree=editable&&!!data?.canDisagree,pages=Math.max(1,Math.ceil((data?.total||0)/10));
-  return <section className="panel case-workflow"><div className="worker-card-head"><h2>{t("Supervisor review")}</h2><button ref={refreshButton} className="icon-button" title={t("Refresh case reviews")} aria-label={t("Refresh case reviews")} disabled={busy} onClick={()=>setTick(n=>n+1)}><RefreshCw size={18}/></button></div>
+  const deadlineForm=writeRole&&(!closed||!!draft.value)&&(!data?.blockedReason||!!draft.value),disagreementForm=writeRole&&(data?.hasAssessment||!!reason)&&(!data?.blockedReason||!!reason);
+  return <div className="cd-action-stack" ref={forms}>
     {error&&<p role="alert" className="record-error">{caseMessage(locale,error)}</p>}{read.key===key&&read.error&&<p role="alert" className="record-error">{caseMessage(locale,read.error)}</p>}
-    {receipt&&<p role="status">{receipt.kind==='deadline'?t("Case deadline receipt verified."):t("Disagreement receipt verified. Original assessment unchanged.")}</p>}
-    {loading?<p data-page-loading role="status">{t("Loading review history...")}</p>:data?.items.map(row=><article className="case-attempt" key={row.id}><strong>{row.kind==='deadline'?t("Deadline changed"):t("Assessment disagreement")}</strong><CaseTime value={row.createdAt} language={locale} timezone={timezone}/>{row.reason&&<p dir="auto">{row.reason}</p>}{row.dueAt&&<p>{t("Due")}{' '}<CaseTime value={row.dueAt} language={locale} timezone={timezone}/></p>}</article>)}
-    {data&&!data.items.length&&page<=pages&&<p>{t("No supervisor reviews yet.")}</p>}{data&&page>pages&&<p>{t("This history page is no longer available.")}{' '}<button className="back-link" disabled={dirty} onClick={()=>setPage(1)}>{t("Return to first page")}</button></p>}
-    {data&&pages>1&&page<=pages&&<div className="audit-pagination"><span>{caseText(locale,'Page {page} of {pages}',{page,pages})}</span><div className="actions"><button className="icon-button" title={t('Newer reviews')} aria-label={t('Newer reviews')} disabled={page<=1||dirty} onClick={()=>setPage(n=>n-1)}>{locale==='en'?<ChevronLeft size={18}/>:<ChevronRight size={18}/>}</button><button className="icon-button" title={t('Older reviews')} aria-label={t('Older reviews')} disabled={page>=pages||dirty} onClick={()=>setPage(n=>n+1)}>{locale==='en'?<ChevronRight size={18}/>:<ChevronLeft size={18}/>}</button></div></div>}
-    {data?.blockedReason&&<p role="status">{caseMessage(locale,blockedCopy[data.blockedReason])}</p>}
     {pending&&!busy&&<div className="notice notice-amber"><p>{receipt?t("Server receipt verified; local recovery still needs attention."):t("A review has no verified receipt on this screen. Only the exact original review can be resent.")}</p><button className="button outline" disabled={busy||!api.current()} onClick={()=>void act('check')}><RefreshCw size={18}/>{t("Check review receipt")}</button></div>}
-    <div ref={forms}>
-      {writeRole&&(!closed||!!draft.value)&&<form onSubmit={event=>{event.preventDefault();void act('deadline');}}><CaseDeadlineInput language={locale} label={t("Case follow-up deadline")} timezone={timezone} draft={draft} readOnly={!canDeadline} onChange={value=>{if(!draft.value)setExpectedDueAt(data?.effectiveDueAt??null);setDraft(value);}}/>
-        {data&&draft.value&&expectedDueAt!==data.effectiveDueAt&&<div className="notice notice-amber"><p>{t("The current case deadline changed. Your draft is retained.")}</p><button className="button outline" disabled={!canDeadline||!!pending} onClick={()=>setExpectedDueAt(data.effectiveDueAt)}>{t("Use current deadline as starting point")}</button></div>}
-        <button className="button outline" disabled={!canDeadline||!draft.value||!!pending&&pending.kind!=='deadline'}><CalendarClock size={18}/>{pending?.kind==='deadline'?t("Retry exact deadline"):t("Save case deadline")}</button></form>}
-      {writeRole&&(data?.hasAssessment||!!reason)&&<form onSubmit={event=>{event.preventDefault();void act('disagree');}}><label className="field">{t("Disagreement reason (supervisor only)")}<textarea dir="auto" value={reason} maxLength={1000} rows={3} readOnly={!canDisagree} onChange={event=>setReason(event.target.value)}/></label><button className="button outline" disabled={!canDisagree||reason.trim().length<5||!!pending&&pending.kind!=='disagree'}><MessageSquareWarning size={18}/>{pending?.kind==='disagree'?t("Retry exact disagreement"):t("Record disagreement")}</button></form>}
-    </div>
+
+    <section className="cd-action-card" aria-labelledby="cd-deadline-title">
+      <header className="cd-action-head"><span className="cd-action-icon" aria-hidden="true"><CalendarClock size={19}/></span><div className="cd-action-copy"><h2 id="cd-deadline-title">{t('Change follow-up deadline')}</h2><p>{t('Update when this follow-up is due.')}</p></div></header>
+      <div className="cd-action-body">
+        <p className="cd-action-meta"><span>{t('Follow-up due')}</span>{data?.effectiveDueAt?<CaseTime value={data.effectiveDueAt} language={locale} timezone={timezone}/>:<span>{t('No deadline')}</span>}</p>
+        {deadlineForm&&<form onSubmit={event=>{event.preventDefault();void act('deadline');}}><CaseDeadlineInput language={locale} label={t("Case follow-up deadline")} timezone={timezone} draft={draft} readOnly={!canDeadline} onChange={value=>{if(!draft.value)setExpectedDueAt(data?.effectiveDueAt??null);setDraft(value);}}/>
+          {data&&draft.value&&expectedDueAt!==data.effectiveDueAt&&<div className="notice notice-amber"><p>{t("The current case deadline changed. Your draft is retained.")}</p><button className="button outline" disabled={!canDeadline||!!pending} onClick={()=>setExpectedDueAt(data.effectiveDueAt)}>{t("Use current deadline as starting point")}</button></div>}
+          <button className="button outline" disabled={!canDeadline||!draft.value||!!pending&&pending.kind!=='deadline'}><CalendarClock size={18}/>{pending?.kind==='deadline'?t("Retry exact deadline"):t("Save case deadline")}</button></form>}
+        {receipt?.kind==='deadline'&&<p role="status">{t("Case deadline receipt verified.")}</p>}
+        {!deadlineForm&&closed&&<p role="status">{t('This case is resolved.')}</p>}
+        {!deadlineForm&&!closed&&data?.blockedReason&&<p role="status">{caseMessage(locale,blockedCopy[data.blockedReason])}</p>}
+      </div>
+    </section>
+
+    {(writeRole||!!reason)&&(data?.hasAssessment||!!reason)&&<section className="cd-action-card" aria-labelledby="cd-disagree-title">
+      <header className="cd-action-head"><span className="cd-action-icon" aria-hidden="true"><MessageSquareWarning size={19}/></span><div className="cd-action-copy"><h2 id="cd-disagree-title">{t('Assessment review')}</h2><p>{t('Record a disagreement with the original assessment.')}</p></div></header>
+      <div className="cd-action-body">
+        {disagreementForm&&<form onSubmit={event=>{event.preventDefault();void act('disagree');}}><label className="field">{t("Disagreement reason (supervisor only)")}<textarea dir="auto" value={reason} maxLength={1000} rows={3} readOnly={!canDisagree} onChange={event=>setReason(event.target.value)}/></label><button className="button outline" disabled={!canDisagree||reason.trim().length<5||!!pending&&pending.kind!=='disagree'}><MessageSquareWarning size={18}/>{pending?.kind==='disagree'?t("Retry exact disagreement"):t("Record disagreement")}</button></form>}
+        {receipt?.kind==='disagree'&&<p role="status">{t("Disagreement receipt verified. Original assessment unchanged.")}</p>}
+        {!disagreementForm&&data?.blockedReason&&<p role="status">{caseMessage(locale,blockedCopy[data.blockedReason])}</p>}
+      </div>
+    </section>}
+
+    <section className="cd-action-card cd-action-card--history" aria-labelledby="cd-review-history-title">
+      <header className="cd-action-head"><span className="cd-action-icon" aria-hidden="true"><History size={19}/></span><div className="cd-action-copy"><h2 id="cd-review-history-title">{t('Review history')}</h2><p>{t('Deadline changes and assessment disagreements.')}</p></div><button ref={refreshButton} className="icon-button" title={t("Refresh case reviews")} aria-label={t("Refresh case reviews")} disabled={busy} onClick={()=>setTick(n=>n+1)}><RefreshCw size={18}/></button></header>
+      {loading?<p data-page-loading role="status">{t("Loading review history...")}</p>:data?.items.map(row=><article className="case-attempt cd-history-row" key={row.id}><div className="cd-history-head"><span className={`cd-kind ${row.kind==='deadline'?'':'cd-kind--answer'}`}>{row.kind==='deadline'?t("Deadline changed"):t("Assessment disagreement")}</span><CaseTime value={row.createdAt} language={locale} timezone={timezone}/></div>{row.reason&&<p dir="auto">{row.reason}</p>}{row.dueAt&&<p>{t("Due")}{' '}<CaseTime value={row.dueAt} language={locale} timezone={timezone}/></p>}</article>)}
+      {data&&!data.items.length&&page<=pages&&<p>{t("No supervisor reviews yet.")}</p>}{data&&page>pages&&<p>{t("This history page is no longer available.")}{' '}<button className="back-link" disabled={dirty} onClick={()=>setPage(1)}>{t("Return to first page")}</button></p>}
+      {data&&pages>1&&page<=pages&&<div className="audit-pagination"><span>{caseText(locale,'Page {page} of {pages}',{page,pages})}</span><div className="actions"><button className="icon-button" title={t('Newer reviews')} aria-label={t('Newer reviews')} disabled={page<=1||dirty} onClick={()=>setPage(n=>n-1)}>{locale==='en'?<ChevronLeft size={18}/>:<ChevronRight size={18}/>}</button><button className="icon-button" title={t('Older reviews')} aria-label={t('Older reviews')} disabled={page>=pages||dirty} onClick={()=>setPage(n=>n+1)}>{locale==='en'?<ChevronRight size={18}/>:<ChevronLeft size={18}/>}</button></div></div>}
+    </section>
+
     {!available&&(draft.value||reason)&&<p role="status">{t("Your review drafts are still here. Saving is unavailable until the case is verified again.")}</p>}
     <CaseWorkflowClear language={locale} label="review" token={JSON.stringify([draft,expectedDueAt,reason])} visible={!!draft.value||!!reason} disabled={busy} current={current} onClear={()=>{setDraft(empty);setReason('');setExpectedDueAt(data?.effectiveDueAt??null);if(!recoveryFailed&&!pending)setError('');}} focusFallback={()=>{const field=forms.current?.querySelector<HTMLInputElement|HTMLTextAreaElement>('input,textarea');if(field)field.focus();else refreshButton.current?.focus();}}/>
-  </section>;
+  </div>;
 }
