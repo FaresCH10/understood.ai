@@ -104,11 +104,15 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
             target_language:job.presentation_language,question:job.presented_question} : null);
         const repeat=(await client.query(`SELECT case_id FROM case_repeats WHERE assignment_id=$1 AND submission_id=$2
           AND org_id=$3 AND site_id=$4 AND status='submitted'`,[job.assignment_id,job.submission_id,job.org_id,job.site_id])).rows[0];
-        if (result.outcome!=='matched' && !repeat) {
-          const caseId=randomUUID();await client.query(`INSERT INTO clarifications(id,org_id,site_id,assignment_id,attempt_id,reason,status)
-          VALUES ($1,$2,$3,$4,$5,$6,'open')`,[caseId,job.org_id,job.site_id,job.assignment_id,attemptId,result.reasons[0]]);
-          await routeNewCase(client,job.org_id,job.site_id,caseId);
-          await staffAuditOnce(client,{orgId:job.org_id,siteId:job.site_id,action:'answer.needs_attention',objectId:caseId});
+        if (result.outcome!=='matched') {
+          if (!repeat) {
+            const caseId=randomUUID();await client.query(`INSERT INTO clarifications(id,org_id,site_id,assignment_id,attempt_id,reason,status)
+            VALUES ($1,$2,$3,$4,$5,$6,'open')`,[caseId,job.org_id,job.site_id,job.assignment_id,attemptId,result.reasons[0]]);
+            await routeNewCase(client,job.org_id,job.site_id,caseId);
+            await staffAuditOnce(client,{orgId:job.org_id,siteId:job.site_id,action:'answer.needs_attention',objectId:caseId});
+          }
+          // The repeat's case is already open and the case-scoped key is spent, so alert per attempt.
+          else await staffAuditOnce(client,{orgId:job.org_id,siteId:job.site_id,action:'answer.needs_attention',objectId:attemptId});
         }
         await domainAudit(client,{...job,principal_type:'system',principal_id:'recording-worker'},'answer.checked',attemptId);
       }

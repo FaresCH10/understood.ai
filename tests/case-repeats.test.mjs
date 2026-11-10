@@ -9,6 +9,7 @@ import {submitAnswer,domainTransaction} from '../server/postgres/domain.mjs';
 import {processOneAssessment} from '../server/postgres/assessment-worker.mjs';
 import {requestCaseRepeat,caseRepeatReceipt,listCaseRepeats,consumeRepeat} from '../server/postgres/case-repeats.mjs';
 import {getClarification,resolveClarification,requestHelp} from '../server/postgres/clarifications.mjs';
+import {listNotifications} from '../server/postgres/notifications.mjs';
 import {workerBriefing,workerBriefings} from '../server/postgres/read-models.mjs';
 import {readPublicationReport} from '../server/postgres/reports.mjs';
 import {receiveRecording} from '../server/postgres/recordings.mjs';
@@ -65,6 +66,47 @@ test('repeat admits one new typed receipt after original deadline, preserves ori
     await assert.rejects(f.db.exec("UPDATE case_repeats SET status='pending',submission_id=NULL,submitted_at=NULL"),/immutable/);
     await assert.rejects(f.db.exec('DELETE FROM case_repeats'),/immutable/);
   } finally {await f.close();}
+});
+test('a wrong check-back answer alerts supervisors per attempt without opening a duplicate case',async()=>{
+  const f=await fixture();try{
+    const auditIds=async()=>new Set((await f.db.query("SELECT object_id FROM audit WHERE action='answer.needs_attention'")).rows.map(row=>row.object_id));
+    const staffEvents=async()=>Object.fromEntries((await f.db.query(`SELECT recipient_id,count(*)::int AS n FROM notification_events
+      WHERE audience='staff' AND kind='answer.needs_attention' GROUP BY recipient_id ORDER BY recipient_id`)).rows.map(row=>[row.recipient_id,row.n]));
+    assert.deepEqual(await auditIds(),new Set([f.caseId]));
+    const input=command();await f.request(input);
+    const submissionId=randomUUID(),answer=await submitAnswer(f.pool,worker,'assignment-14',submissionId,'Still unsure about yellow');
+    assert.equal(await processOneAssessment(f.pool,{assess:async()=>missing}),true);
+    assert.equal((await f.db.query('SELECT count(*)::int n FROM clarifications')).rows[0].n,1);
+    assert.deepEqual(await auditIds(),new Set([f.caseId,answer.id]));
+    assert.deepEqual(await staffEvents(),{maya:2,other:2});
+    const inbox=await listNotifications(f.pool,owner,{status:'unread'});
+    assert.equal(inbox.items.filter(item=>item.kind==='answer.needs_attention').length,2);
+    assert.equal((await getClarification(f.pool,owner,f.caseId)).attempts.find(attempt=>attempt.id===answer.id).outcome,'clarification');
+    assert.equal(await processOneAssessment(f.pool,{assess:async()=>missing}),false);
+    await f.request(command());
+    const second=await submitAnswer(f.pool,worker,'assignment-14',randomUUID(),'Still unsure again');
+    await processOneAssessment(f.pool,{assess:async()=>missing});
+    assert.equal((await f.db.query('SELECT count(*)::int n FROM clarifications')).rows[0].n,1);
+    assert.deepEqual(await auditIds(),new Set([f.caseId,answer.id,second.id]));
+    assert.deepEqual(await staffEvents(),{maya:3,other:3});
+  }finally{await f.close();}
+});
+test('a wrong check-back recording alerts supervisors per attempt without a duplicate case',async()=>{
+  const f=await fixture();try{
+    await f.request(command());
+    const bytes=Buffer.from(encodeWav({duration:1,sampleRate:16000,numberOfChannels:1,getChannelData:()=>new Float32Array(16000).fill(0.2)})),objects=new Map();
+    const storage={async save(row,data){objects.set(row.id,Buffer.from(data));},async remove(row){objects.delete(row.id);},read:async row=>objects.get(row.id)};
+    const receipt=await receiveRecording(f.pool,worker,'assignment-14',randomUUID(),bytes,storage);
+    await processOneRecording(f.pool,{transcribe:async()=>({text:'Still unsure about yellow'}),assess:async()=>missing},storage);
+    const attempt=(await f.db.query('SELECT id FROM attempts WHERE submission_id=(SELECT submission_id FROM recordings WHERE id=$1)',[receipt.id])).rows[0];
+    assert.ok(attempt);
+    assert.equal((await f.db.query('SELECT count(*)::int n FROM clarifications')).rows[0].n,1);
+    assert.deepEqual(new Set((await f.db.query("SELECT object_id FROM audit WHERE action='answer.needs_attention'")).rows.map(row=>row.object_id)),new Set([f.caseId,attempt.id]));
+    const events=Object.fromEntries((await f.db.query(`SELECT recipient_id,count(*)::int AS n FROM notification_events
+      WHERE audience='staff' AND kind='answer.needs_attention' GROUP BY recipient_id ORDER BY recipient_id`)).rows.map(row=>[row.recipient_id,row.n]));
+    assert.deepEqual(events,{maya:2,other:2});
+    assert.equal((await listNotifications(f.pool,owner,{status:'unread'})).items.filter(item=>item.kind==='answer.needs_attention').length,2);
+  }finally{await f.close();}
 });
 test('repeat consumption copies the stored receipt timestamp instead of a JS date that would drop microseconds',async()=>{
   const f=await fixture();try{
