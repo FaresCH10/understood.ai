@@ -78,6 +78,29 @@ test('Nemotron prepares one grounded English question with four checked choices'
   assert.equal(await malformed.prepare({source,title:'Carton routing'},{response_mode:'question',delivery_mode:'text'}),null);
 });
 
+test('spelling corrections and paraphrased facts stay grounded while invented details are rejected',async()=>{
+  const typoSource='make me a chiken shwarma sandwich with gralic and pickles';
+  const corrected={title:'Chicken Shawarma Sandwich with Garlic and Pickles',
+    facts:['User wants a chicken shawarma sandwich.','Sandwich must include garlic.','Sandwich must include pickles.'],
+    question:'What three components does the user explicitly request for the sandwich?',
+    askedFacts:['User wants a chicken shawarma sandwich.','Sandwich must include garlic.','Sandwich must include pickles.'],
+    choices:['Chicken shawarma, garlic, and pickles','Chicken shawarma, garlic, and tomatoes','Beef shawarma, garlic, and pickles','Chicken shawarma, onions, and pickles']};
+  const adapter=nemotronInstructionDelivery(baseEnv,fetcher(()=>reply(corrected)).fetch);
+  const value=await adapter.prepare({source:typoSource,title:'make a sandwich'},{response_mode:'question',delivery_mode:'text'});
+  assert.equal(value.languages.en.question,corrected.question);
+  assert.equal(value.languages.en.choices.find(choice=>choice.id===value.rubric.correctChoiceId).text,corrected.choices[0]);
+
+  const invented={...corrected,
+    choices:['Pita bread or flatbread','Hamburger bun','Sliced sandwich bread','Baguette']};
+  assert.equal(await nemotronInstructionDelivery(baseEnv,fetcher(()=>reply(invented)).fetch)
+    .prepare({source:typoSource,title:'make a sandwich'},{response_mode:'question',delivery_mode:'text'}),null);
+
+  const wrongQuantity={...prepared,facts:['Place 3 cartons on the blue shelf before 4 pm.'],
+    askedFacts:['Place 3 cartons on the blue shelf before 4 pm.']};
+  assert.equal(await nemotronInstructionDelivery(baseEnv,fetcher(()=>reply(wrongQuantity)).fetch)
+    .prepare({source,title:'Carton routing'},{response_mode:'question',delivery_mode:'text'}),null);
+});
+
 test('a generic provider answer is rejected and retried, then fails instead of publishing',async()=>{
   const generic={...prepared,question:'Which action follows the instruction “Carton routing”?',
     choices:['Carry on with another task without following this instruction.','Do the opposite of this instruction.',

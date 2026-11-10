@@ -11,10 +11,50 @@ const MAX_CONCURRENCY=8;
 // Staff sources are English or Arabic by product scope. Any other worker-script
 // source is normalized too, so generation always runs on English text.
 const NON_LATIN_SCRIPT=/[\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Malayalam}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Sinhala}\p{Script=Cyrillic}\p{Script=Gurmukhi}]/u;
-const words=value=>new Set(value.normalize('NFKC').toLocaleLowerCase().replace(/[\p{P}\p{Z}\s]+/gu,' ').trim().split(' ').filter(word=>word.length>2));
+const tokens=value=>value.normalize('NFKC').toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+const words=value=>new Set(tokens(value).filter(word=>word.length>2||/\d/.test(word)));
+// Paraphrases such as "User wants a chicken shawarma sandwich" are valid
+// restatements of a source with typos; only the substantive nouns and values
+// need to match. These link words carry no grounding evidence either way.
+const paraphrase=new Set(['user','users','want','wants','wanted','need','needs','needed','must','should','shall',
+  'include','includes','included','including','contain','contains','containing','request','requests','requested',
+  'requesting','specify','specifies','specified','explicit','explicitly','make','makes','made','making','add','adds',
+  'added','adding','use','uses','used','using','have','has','having','provide','provides','provided','ensure','ensures',
+  'ensured','also','only','just','both','each','every','all','any','some','the','that','this','these','those','with',
+  'and','plus','for','from','into','onto','then','than','will','would','can','could','may','might','its','was','were',
+  'been','being']);
+const editDistance=(left,right)=>{
+  if(Math.abs(left.length-right.length)>2)return 3;
+  let before=null,row=Array.from({length:right.length+1},(_,index)=>index);
+  for(let i=1;i<=left.length;i++) {
+    const next=[i];
+    for(let j=1;j<=right.length;j++) {
+      const cost=left[i-1]===right[j-1]?0:1;
+      next[j]=Math.min(row[j]+1,next[j-1]+1,row[j-1]+cost);
+      if(i>1&&j>1&&left[i-1]===right[j-2]&&left[i-2]===right[j-1])next[j]=Math.min(next[j],before[j-2]+1);
+    }
+    before=row;row=next;
+  }
+  return row[right.length];
+};
+// NIM normalizes misspellings ("chiken" -> "chicken") and inflections
+// ("sandwiches" -> "sandwich"); exact token overlap rejected those valid
+// corrections and failed otherwise good sends.
+const close=(left,right)=>{
+  if(left===right)return true;
+  const short=Math.min(left.length,right.length);
+  if(short<5)return false;
+  if(short>=8&&Math.abs(left.length-right.length)<=3&&(left.startsWith(right)||right.startsWith(left)))return true;
+  return editDistance(left,right)<=(short>=8?2:1);
+};
+const numbers=value=>new Set(tokens(value).filter(token=>/\d/.test(token)));
 const grounded=(source,value)=>{
-  const sourceWords=words(source),target=[...words(value)];
-  return !target.length || target.filter(word=>sourceWords.has(word)).length/target.length>=0.7;
+  const sourceWords=[...words(source)],target=[...words(value)];
+  if(!target.length)return true;
+  if([...numbers(value)].some(number=>!numbers(source).has(number)))return false;
+  const substantive=target.filter(word=>!paraphrase.has(word));
+  if(!substantive.length)return target.every(word=>sourceWords.some(candidate=>close(word,candidate)));
+  return substantive.filter(word=>sourceWords.some(candidate=>close(word,candidate))).length/substantive.length>0.5;
 };
 // "Follow the instruction" questionnaires are the ungrounded template the
 // delivery path must never publish as a generated question. The full bundle
