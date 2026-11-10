@@ -1410,8 +1410,8 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   </details>
                   </>}
                   <WorkerPresentationView key={`presentation:${id}:${detail.data.publicationId}:${detail.data.version}`} assignmentId={id} version={detail.data.version} sourceKind="instruction" originalLanguage={detail.data.language} approvedLanguage={session.language || ''} uiLanguage={language} session={session} disabled={busy||detailUnavailable} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} onActive={setAnswerPresentationId} onChoices={setTranslatedChoices} onQuestion={setTranslatedQuestion} onContent={setTranslatedContent} requiresChoices={detail.data.content.questionType==='multiple-choice'}/>
-                  {(responseState?.canRespond||responseState?.canHelp)&&<div className="worker-assignment-actions">
-                    {responseState.canRespond&&<button type="button" className="button outline" onClick={()=>document.getElementById('worker-question')?.focus()}>{responseMode==='acknowledge'?<><CheckCircle2 size={18} aria-hidden="true"/>{t.ackTitle}</>:detail.data.repeatRequest?<><Repeat2 size={18} aria-hidden="true"/>{followup.answerAgain}</>:<><HelpCircle size={18} aria-hidden="true"/>{t.question}</>}</button>}
+                  {(responseState?.canHelp||responseState?.canRespond&&!detail.data.repeatRequest)&&<div className="worker-assignment-actions">
+                    {responseState.canRespond&&!detail.data.repeatRequest&&<button type="button" className="button outline" onClick={()=>document.getElementById('worker-question')?.focus()}>{responseMode==='acknowledge'?<><CheckCircle2 size={18} aria-hidden="true"/>{t.ackTitle}</>:<><HelpCircle size={18} aria-hidden="true"/>{t.question}</>}</button>}
                     {responseState.canHelp&&<button type="button" className="button outline" onClick={revealHelp}><MessageCircle size={18} aria-hidden="true"/>{t.help}</button>}
                   </div>}
                 </section>
@@ -1423,7 +1423,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                     <p className="muted">{detail.data.repeatRequest.message?followup.checkBody:followup.manualBody}</p></div>
                   </div>
                   <div className="worker-followup-foot">
-                    <p className="worker-followup-due"><Clock3 size={17} aria-hidden="true"/><span>{followup.due} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone})}</time></span></p>
+                    <p className="worker-followup-due"><Clock3 size={17} aria-hidden="true"/><span>{followup.due} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone,dateStyle:'medium',timeStyle:'short'})}</time></span></p>
                     {responseState?.canRespond&&<button type="button" className="button primary" onClick={()=>document.getElementById('worker-question')?.focus()}>{followup.answerAgain}</button>}
                   </div>
                 </section>}

@@ -503,6 +503,8 @@ button.device-action-row:hover{background:#f7faf9}
 .worker-kind--help{border-color:#d8e8f4;background:#f2f8fd;color:#1b628f}
 .worker-kind--check{border-color:#ecd9b1;background:#fff8e8;color:#8a5312}
 .worker-help-entry>p{margin-top:8px}
+.worker-help-entry>small{display:block;margin-top:4px}
+.worker-help-entry>.button{margin-top:10px}
 @media(max-width:480px){.worker-followup-foot{align-items:stretch}.worker-followup-foot .button{width:100%}}
 .answer-mode{margin:14px 0 18px}
 .answer-mode button{min-height:52px}
