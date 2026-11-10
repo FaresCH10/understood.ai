@@ -21,11 +21,13 @@ test('recorder and lazy-error boundary select message copy only for private Help
 
 test('worker primary flow precedes mounted saved-work tools without hiding recovery controls',async()=>{
   const source=await readFile(new URL('../src/main.tsx',import.meta.url),'utf8');
-  const question=source.indexOf('<section className="worker-card question-card" id="worker-question"'),help=source.search(/<details\b[^>]*\bid="worker-help"/);
+  const question=source.indexOf('<section className="worker-card question-card" id="worker-question"'),help=source.indexOf('id="worker-help"');
+  const helpStart=source.lastIndexOf('<section',help),helpEnd=source.indexOf('</section>',help);
   const tools=['<WorkerOfflineSaveView key=','<WorkerAudioDraftView key=','<WorkerTextDraftView key='].map(value=>source.indexOf(value));
   const submissions=source.indexOf('<WorkerSubmissions ');
   assert.ok(question>0&&help>question);
-  assert.match(source.slice(help,source.indexOf('</details>',help)),/<summary>/);
+  assert.match(source.slice(helpStart,help+60),/<section className="worker-card worker-help-card" id="worker-help"/);
+  assert.match(source.slice(help,helpEnd),/<textarea /);
   for(const position of tools)assert.ok(position>help&&position<submissions);
   assert.equal(source.match(/<WorkerOfflineSaveView key=/g).length,1);assert.equal(source.match(/<WorkerAudioDraftView key=/g).length,1);assert.equal(source.match(/<WorkerTextDraftView key=/g).length,1);
   for(const position of tools)assert.doesNotMatch(source.slice(position,source.indexOf('/>',position)),/\bhidden\b/);
