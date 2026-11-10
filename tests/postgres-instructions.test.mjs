@@ -289,6 +289,7 @@ test('PostgreSQL late-prepared language rejoins the original publication and ser
     assert.equal(started.state,'preparing');assert.equal(started.audience.count,3);
     assert.deepEqual(started.deliveryStates,{preparing:3,available:0,blocked:0,failed:0,withdrawn:0});
     await prepare(pool);
+    const hindi=(await db.query("SELECT prepared_json->'languages'->'hi' AS content FROM briefings WHERE id=$1",[input.requestId])).rows[0].content;
     await db.query("UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages}',(prepared_json->'languages')-'hi') WHERE id=$1",[input.requestId]);
     const first=await completeInstructionSend(pool,owner,input.requestId,scope);
     assert.equal(first.state,'published');assert.equal(first.delivered,2);assert.equal(first.undelivered,1);
@@ -298,7 +299,7 @@ test('PostgreSQL late-prepared language rejoins the original publication and ser
     const publicationId=first.publicationId;
     assert.equal((await db.query('SELECT COUNT(*)::int n FROM publications WHERE briefing_id=$1',[input.requestId])).rows[0].n,1);
 
-    await db.query(`UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages,hi}',prepared_json->'languages'->'en') WHERE id=$1`,[input.requestId]);
+    await db.query(`UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages,hi}',$2::jsonb) WHERE id=$1`,[input.requestId,JSON.stringify(hindi)]);
     const retryRequestId=randomUUID();
     const retried=await retryInstructionSend(pool,owner,input.requestId,{requestId:retryRequestId},scope);
     assert.equal(retried.retried,1);assert.equal(retried.released,1);
@@ -331,7 +332,6 @@ test('PostgreSQL retries re-check workers, replay per receipt and stop after thr
     const input={...instruction(),responseMode:'question',deliveryMode:'both'};
     await startInstructionSend(pool,owner,input,scope);
     await prepare(pool);
-    await db.query(`UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages,hi}',prepared_json->'languages'->'en') WHERE id=$1`,[input.requestId]);
     await db.query("UPDATE workers SET active=false WHERE id='w1'");
     const first=await completeInstructionSend(pool,owner,input.requestId,scope);
     assert.equal(first.delivered,2);assert.equal(first.undelivered,1);
@@ -355,7 +355,6 @@ test('PostgreSQL retries re-check workers, replay per receipt and stop after thr
     const limitRequest=randomUUID();
     await startInstructionSend(pool,owner,{...input,requestId:limitRequest},scope);
     await prepare(pool);
-    await db.query(`UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages,hi}',prepared_json->'languages'->'en') WHERE id=$1`,[limitRequest]);
     await db.query("UPDATE workers SET language='ar' WHERE id='w1'");
     const changed=await completeInstructionSend(pool,owner,limitRequest,scope);
     assert.equal(changed.delivered,2);
@@ -377,10 +376,11 @@ test('PostgreSQL background completion releases late content after preparation',
     const requestId=randomUUID();
     await startInstructionSend(pool,owner,{...instruction(),requestId,responseMode:'question',deliveryMode:'both'},scope);
     await prepare(pool);
+    const hindi=(await db.query("SELECT prepared_json->'languages'->'hi' AS content FROM briefings WHERE id=$1",[requestId])).rows[0].content;
     await db.query("UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages}',(prepared_json->'languages')-'hi') WHERE id=$1",[requestId]);
     const first=await completeInstructionSend(pool,owner,requestId,scope);
     assert.equal(first.delivered,2);
-    const late=(await db.query("SELECT jsonb_set(prepared_json,'{languages,hi}',prepared_json->'languages'->'en') AS prepared FROM briefings WHERE id=$1",[requestId])).rows[0].prepared;
+    const late=(await db.query("SELECT jsonb_set(prepared_json,'{languages,hi}',$2::jsonb) AS prepared FROM briefings WHERE id=$1",[requestId,JSON.stringify(hindi)])).rows[0].prepared;
 
     const queued=await retryInstructionSend(pool,owner,requestId,{requestId:randomUUID()},scope);
     assert.equal(queued.retried,1);assert.equal(queued.released,0);assert.equal(queued.deliveryStates.preparing,1);
@@ -402,11 +402,12 @@ test('PostgreSQL a passed deadline blocks late release and leaves reminders for 
     try {
     await startInstructionSend(pool,owner,{...instruction(),requestId,dueAt,reminderMinutes:60,responseMode:'question',deliveryMode:'both'},scope);
     await prepare(pool);
+    const hindi=(await db.query("SELECT prepared_json->'languages'->'hi' AS content FROM briefings WHERE id=$1",[requestId])).rows[0].content;
     await db.query("UPDATE briefings SET prepared_json=jsonb_set(prepared_json,'{languages}',(prepared_json->'languages')-'hi') WHERE id=$1",[requestId]);
     const first=await completeInstructionSend(pool,owner,requestId,scope);
     assert.equal(first.delivered,2);assert.equal(first.dueAt,dueAt);assert.equal(first.reminderMinutes,60);
     assert.equal((await db.query('SELECT COUNT(*)::int n FROM assignment_reminders WHERE publication_id=$1',[first.publicationId])).rows[0].n,2);
-    const late=(await db.query("SELECT jsonb_set(prepared_json,'{languages,hi}',prepared_json->'languages'->'en') AS prepared FROM briefings WHERE id=$1",[requestId])).rows[0].prepared;
+    const late=(await db.query("SELECT jsonb_set(prepared_json,'{languages,hi}',$2::jsonb) AS prepared FROM briefings WHERE id=$1",[requestId,JSON.stringify(hindi)])).rows[0].prepared;
     const queued=await retryInstructionSend(pool,owner,requestId,{requestId:randomUUID()},scope);
     assert.equal(queued.retried,1);assert.equal(queued.released,0);
     Date.now=()=>realNow()+1200000;
@@ -536,7 +537,11 @@ test('PostgreSQL instruction and acknowledgment HTTP routes enforce session cont
       assert.equal((await request('/instructions/sends/'+payload.requestId+'/retry?scope=x',staff,{...post({requestId:randomUUID()}),headers:auth})).status,400);
       assert.equal((await request('/instructions/sends/'+payload.requestId+'/retry',staff,{...post({requestId:'not-a-uuid'}),headers:auth})).status,400);
       assert.equal((await request('/instructions/sends/'+payload.requestId+'/retry',staff,{...post({}),headers:auth})).status,400);
-      await db.query(`UPDATE briefings SET prepared_json=jsonb_set(jsonb_set(prepared_json,'{languages,ur}',prepared_json->'languages'->'en'),'{languages,hi}',prepared_json->'languages'->'en') WHERE id=$1`,[payload.requestId]);
+      const english=(await db.query("SELECT prepared_json->'languages'->'en' AS content FROM briefings WHERE id=$1",[payload.requestId])).rows[0].content;
+      const urdu={...english,title:'لوڈنگ بے گیٹ بند کریں',text:'رات کی شفٹ سے پہلے لوڈنگ بے گیٹ بند کریں۔'};
+      const hindi={...english,title:'लोडिंग बे गेट बंद करें',text:'रात की शिफ्ट से पहले लोडिंग बे गेट बंद करें।'};
+      await db.query(`UPDATE briefings SET prepared_json=jsonb_set(jsonb_set(prepared_json,'{languages,ur}',$2::jsonb),'{languages,hi}',$3::jsonb) WHERE id=$1`,
+        [payload.requestId,JSON.stringify(urdu),JSON.stringify(hindi)]);
       const retryRequestId=randomUUID(),retried=await request('/instructions/sends/'+payload.requestId+'/retry',staff,{...post({requestId:retryRequestId}),headers:auth});
       assert.equal(retried.status,201);
       const retriedBody=await retried.json();

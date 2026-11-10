@@ -1,3 +1,5 @@
+import {preparedLanguageMismatch} from './languages.mjs';
+
 const nonempty=(value,max)=>typeof value==='string' && value.trim().length>0 && value.length<=max;
 const RESPONSE_MODES=['question','acknowledge'];
 const DELIVERY_MODES=['text','voice','both'];
@@ -15,6 +17,8 @@ export function recipientDeliveryReadiness(prepared,worker,modes={}) {
     return {delivery:false,reason:'content_unavailable',language};
   if(responseMode==='question' && !nonempty(content.question,500))
     return {delivery:false,reason:'question_unavailable',language};
+  if(preparedLanguageMismatch(language,content,{questionMode:responseMode==='question'}))
+    return {delivery:false,reason:'language_unavailable',language};
   const generatedSpeech=prepared?.artifactBundle && typeof content.speech==='object'
     && typeof content.speech?.body?.id==='string' && (responseMode!=='question' || typeof content.speech?.question?.id==='string');
   if(deliveryMode!=='text' && content.speech!=='device-synthesis-demo' && !generatedSpeech)

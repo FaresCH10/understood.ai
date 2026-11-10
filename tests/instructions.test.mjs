@@ -331,7 +331,9 @@ test('canonical acknowledge-only text sends reach every prepared language',async
 test('delivery readiness isolates an incomplete target language from ready recipients',()=>{
   const owner={principal_type:'staff',principal_id:'maya',org_id:'cedar',site_id:'beirut',role:'owner'};
   const full={title:'Ladder move',text:source,question:'What does this instruction ask you to do?',speech:'device-synthesis-demo'};
-  const prepared={languages:{en:full,ar:{...full,question:''},ur:{...full,speech:null}}};
+  const ar={title:'نقل السلم',text:'انقل السلم الأحمر إلى الخليج الشمالي قبل وردية الليل.',question:'ما المطلوب منك؟',speech:'device-synthesis-demo'};
+  const ur={title:'سیڑھی کی منتقلی',text:'رات کی شفٹ سے پہلے سرخ سیڑھی کو شمالی خلیج میں منتقل کریں۔',question:'آپ سے کیا مطلوب ہے؟',speech:'device-synthesis-demo'};
+  const prepared={languages:{en:full,ar:{...ar,question:''},ur:{...ur,speech:null}}};
   assert.deepEqual(recipientDeliveryReadiness(prepared,{language:'en'},{responseMode:'question',deliveryMode:'both'}),
     {delivery:true,reason:null,language:'en'});
   assert.equal(recipientDeliveryReadiness(prepared,{language:'hi'},{responseMode:'question',deliveryMode:'both'}).reason,'language_unavailable');
@@ -340,6 +342,7 @@ test('delivery readiness isolates an incomplete target language from ready recip
   assert.equal(recipientDeliveryReadiness(prepared,{language:'ar'},{responseMode:'acknowledge',deliveryMode:'both'}).delivery,true);
   assert.equal(recipientDeliveryReadiness(prepared,{language:'ur'},{responseMode:'acknowledge',deliveryMode:'text'}).delivery,true);
   assert.equal(recipientDeliveryReadiness({languages:{en:{...full,text:' '}}},{language:'en'},{responseMode:'acknowledge',deliveryMode:'text'}).reason,'content_unavailable');
+  assert.equal(recipientDeliveryReadiness({languages:{ar:{...ar,text:source}}},{language:'ar'},{responseMode:'acknowledge',deliveryMode:'text'}).reason,'language_unavailable');
 
   const db=openDatabase(':memory:');seed(db);
   try {
@@ -349,7 +352,7 @@ test('delivery readiness isolates an incomplete target language from ready recip
     const briefing=db.prepare('SELECT * FROM briefings WHERE id=?').get(requestId);
     assert.equal(briefing.state,'ready');
     const bundle=JSON.parse(briefing.prepared_json);
-    bundle.languages.ar={title:'Ladder move',text:source,question:'ما المطلوب؟',speech:null};
+    bundle.languages.ar={title:'نقل السلم',text:'انقل السلم الأحمر إلى الخليج الشمالي قبل وردية الليل.',question:'ما المطلوب؟',speech:null};
     db.prepare('UPDATE briefings SET prepared_json=? WHERE id=?').run(JSON.stringify(bundle),requestId);
     const result=completeInstructionSend(db,owner,requestId);
     assert.equal(result.state,'published');

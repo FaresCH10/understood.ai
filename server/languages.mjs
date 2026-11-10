@@ -38,6 +38,17 @@ export function languageTextMatches(code,text){
     && (locale.script==='Latin' ? /[A-Za-z]/u.test(text) : scripts[locale.script]?.test(text)===true);
 }
 
+// Prepared content is valid for a locale only while every displayed field keeps
+// that locale's script; letter-free choices such as numbers are allowed.
+export function preparedLanguageMismatch(code,content,{questionMode=true}={}) {
+  const choices=Array.isArray(content?.choices)?content.choices:[];
+  return !languageTextMatches(code,content?.text)
+    || (questionMode && typeof content?.question==='string' && !!content.question.trim()
+      && !languageTextMatches(code,content.question))
+    || choices.some(choice=>typeof choice?.text!=='string'
+      || (/\p{L}/u.test(choice.text) && !languageTextMatches(code,choice.text)));
+}
+
 // Current runtime evidence, not a wish list. UI is available for every locale; the
 // synthetic bundle fixture stores demo text for every locale, private speech and
 // transcription exist only for en/ar, and typed assessment fixtures cover en/ar/ur.
