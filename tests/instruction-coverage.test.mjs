@@ -49,6 +49,22 @@ test('coverage mirrors configured pipeline text and speech declarations for voic
   assert.equal(disabled.languages[0].reason,'language_unavailable');
 });
 
+test('coverage accepts an Arabic source when a translating provider is configured',()=>{
+  const adapter={textLanguages:['en','hi','ru'],normalizesSource:true};
+  const source='ضع الصندوق على الرف قبل الظهر.';
+  const text=instructionCoverage({workers:workers('hi'),source,deliveryMode:'text',instructionTextAdapter:adapter});
+  assert.equal(text.ready,1);
+  assert.deepEqual(text.languages,[{language:'hi',workers:1,ready:true,reason:null}]);
+  const voice=instructionCoverage({workers:workers('hi'),source,deliveryMode:'voice',instructionTextAdapter:adapter});
+  assert.equal(voice.ready,0);
+  assert.equal(voice.languages[0].reason,'speech_unavailable');
+  const fixture=instructionCoverage({workers:workers('hi'),source,deliveryMode:'text'});
+  assert.equal(fixture.languages[0].reason,'language_unavailable');
+  const unnormalized=instructionCoverage({workers:workers('hi'),source,deliveryMode:'text',
+    instructionTextAdapter:{textLanguages:['en','hi']}});
+  assert.equal(unnormalized.languages[0].reason,'language_unavailable');
+});
+
 test('coverage refuses empty and oversized audiences',()=>{
   assert.throws(()=>instructionCoverage({workers:[],source:CANONICAL_SOURCE}),/audience is empty/);
   const many=Array.from({length:5001},(_,index)=>({id:`w${index}`,language:'en'}));

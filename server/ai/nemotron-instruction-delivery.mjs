@@ -8,6 +8,9 @@ const PREPARE_TIMEOUT_MS=16000;
 const TRANSLATE_TIMEOUT_MS=6000;
 const BUDGET_MS=25000;
 const MAX_CONCURRENCY=8;
+// Staff sources are English or Arabic by product scope. Any other worker-script
+// source is normalized too, so generation always runs on English text.
+const NON_LATIN_SCRIPT=/[\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Malayalam}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Sinhala}\p{Script=Cyrillic}\p{Script=Gurmukhi}]/u;
 const words=value=>new Set(value.normalize('NFKC').toLocaleLowerCase().replace(/[\p{P}\p{Z}\s]+/gu,' ').trim().split(' ').filter(word=>word.length>2));
 const grounded=(source,value)=>{
   const sourceWords=words(source),target=[...words(value)];
@@ -43,21 +46,27 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
     translationLabel:'DeepL',
     translationAdapter:DEEPL_TRANSLATE_ADAPTER,
     textLanguages:DEEPL_TRANSLATE_LANGUAGES,
+    normalizesSource:true,
     provenanceAdapter:NEMOTRON_DELIVERY_ADAPTER,
     model:textModel,
     async prepare(briefing,instruction) {
       deadline=Date.now()+BUDGET_MS;
-      if(instruction?.response_mode!=='question' || !languageTextMatches('en',briefing.source))return null;
+      if(instruction?.response_mode!=='question')return null;
       try {
-        const generated=await adapterFor(PREPARE_TIMEOUT_MS).prepare(briefing.source,{multipleChoice:true});
+        const original={title:briefing?.title?.trim(),text:briefing?.source?.trim()};
+        if(!original.title || !original.text)return null;
+        const english=NON_LATIN_SCRIPT.test(original.title) || NON_LATIN_SCRIPT.test(original.text)
+          ? await translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,remaining()-500)).translateToEnglish(original)
+          : original;
+        const generated=await adapterFor(PREPARE_TIMEOUT_MS).prepare(english.text,{multipleChoice:true});
         if(!languageTextMatches('en',generated.question) || !generated.facts.every(fact=>languageTextMatches('en',fact))
           || !generated.choices.every(choice=>languageTextMatches('en',choice))
-          || !generated.facts.every(fact=>grounded(briefing.source,fact)) || !grounded(briefing.source,generated.choices[0]))return null;
-        const title=briefing.title.trim();
+          || !generated.facts.every(fact=>grounded(english.text,fact)) || !grounded(english.text,generated.choices[0]))return null;
+        const title=english.title;
         return withMultipleChoice({
           responseMode:instruction.response_mode,title,source:briefing.source,
           facts:generated.facts,question:generated.question,rubric:{mode:'keywords',askedFacts:generated.askedFacts},
-          languages:{en:{title,text:briefing.source,question:generated.question,answerChoices:generated.choices,speech:'device-synthesis-demo'}},
+          languages:{en:{title,text:english.text,question:generated.question,answerChoices:generated.choices,speech:'device-synthesis-demo'}},
           provenance:{adapter:'synthetic-instruction-v1',live:false},
         },{preserveQuestions:true,preserveAskedFacts:true});
       } catch { return null; }

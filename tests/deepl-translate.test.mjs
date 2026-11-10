@@ -35,6 +35,27 @@ test('DeepL sends every instruction segment in one ordered free-tier request',as
   assert.deepEqual(mock.calls[0].body,{text:values(english),source_lang:'EN',target_lang:'HI'});
 });
 
+test('DeepL normalizes a non-English source to English with detected source language',async()=>{
+  const arabic={title:'توجيه الكراتين',text:'ضع كرتين على الرف الأزرق قبل الساعة 4 مساءً. أبقِ الممر خالياً.'};
+  const mock=fetcher(()=>Response.json({translations:[
+    {detected_source_language:'AR',text:english.title},
+    {detected_source_language:'AR',text:english.text},
+  ]}));
+  const adapter=createDeepLTranslateAdapter({apiKey:'test-only:fx',fetchImpl:mock.fetch});
+  assert.deepEqual(await adapter.translateToEnglish(arabic),{title:english.title,text:english.text});
+  assert.equal(mock.calls.length,1);
+  assert.deepEqual(mock.calls[0].body,{text:[arabic.title,arabic.text],target_lang:'EN-GB'});
+});
+
+test('DeepL rejects a source normalization that does not return English',async()=>{
+  const arabic={title:'توجيه الكراتين',text:'ضع كرتين على الرف الأزرق قبل الساعة 4 مساءً.'};
+  const adapter=createDeepLTranslateAdapter({apiKey:'test-only:fx',fetchImpl:fetcher(()=>Response.json({translations:[
+    {detected_source_language:'AR',text:arabic.title},{detected_source_language:'AR',text:arabic.text},
+  ]})).fetch});
+  await assert.rejects(()=>adapter.translateToEnglish(arabic),/invalid title translation/);
+  await assert.rejects(()=>adapter.translateToEnglish({title:english.title,text:''}),/Invalid translation input/);
+});
+
 test('DeepL selects the pro endpoint for a pro key',async()=>{
   const mock=fetcher(()=>deeplReply(values(hindi)));
   const adapter=createDeepLTranslateAdapter({apiKey:'test-only-pro-key',fetchImpl:mock.fetch});

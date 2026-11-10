@@ -8,11 +8,18 @@ export function syntheticInstructionLanguages(source) {
 }
 
 export function hostedInstructionLanguages(source,instructionTextAdapter) {
-  const speechLanguages=/\p{Script=Arabic}/u.test(source)?[]:syntheticInstructionLanguages(source);
+  // A configured provider normalizes an Arabic source to English before
+  // generation, so its translated text is available; speech still requires a
+  // generated artifact and stays unavailable for that path.
+  const arabic=/\p{Script=Arabic}/u.test(source);
+  const speechLanguages=arabic?[]:syntheticInstructionLanguages(source);
   const declared=Array.isArray(instructionTextAdapter?.textLanguages)
     ? WORKER_LANGUAGE_CODES.filter(code=>instructionTextAdapter.textLanguages.includes(code)) : null;
+  const textSupported=!!instructionTextAdapter && (arabic
+    ? instructionTextAdapter.normalizesSource===true
+    : speechLanguages.length>0);
   return {
-    textLanguages:instructionTextAdapter && speechLanguages.length?declared??[...WORKER_LANGUAGE_CODES]:speechLanguages,
+    textLanguages:textSupported?declared??[...WORKER_LANGUAGE_CODES]:speechLanguages,
     speechLanguages,
   };
 }

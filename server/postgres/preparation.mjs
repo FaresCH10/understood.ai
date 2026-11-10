@@ -262,7 +262,9 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     base ??= instruction
       ? syntheticInstructionPrepare({source:briefing.source,title:briefing.title},instruction)
       : checkedSyntheticReview(await prepare(briefing.source),review);
-    if(base.languages?.en)base={...base,title:briefing.title,languages:{...base.languages,en:{...base.languages.en,title:briefing.title}}};
+    // Provider bundles already carry an English title for their English base
+    // bundle; a non-English staff title must not overwrite it before translation.
+    if(!providerPrepared && base.languages?.en)base={...base,title:briefing.title,languages:{...base.languages,en:{...base.languages.en,title:briefing.title}}};
     if(providerPrepared)base={...base,languages:{en:base.languages.en}};
     let prepared=checkedSyntheticGlossary(base,glossary);
     const missing=targets.filter(language=>!prepared.languages[language]);

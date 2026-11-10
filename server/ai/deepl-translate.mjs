@@ -25,10 +25,10 @@ export function createDeepLTranslateAdapter({apiKey,fetchImpl=fetch,timeoutMs=80
   if(!Number.isInteger(timeoutMs) || timeoutMs<1000 || timeoutMs>30000) throw Error('Invalid translation timeout');
   const endpoint=apiKey.endsWith(':fx')?FREE_ENDPOINT:PRO_ENDPOINT;
 
-  async function request(target,segments) {
+  async function request(target,segments,sourceLanguage='EN') {
     const response=await fetchImpl(endpoint,{method:'POST',redirect:'error',signal:AbortSignal.timeout(timeoutMs),
       headers:{authorization:`DeepL-Auth-Key ${apiKey}`,'content-type':'application/json',accept:'application/json'},
-      body:JSON.stringify({text:segments,source_lang:'EN',target_lang:target})});
+      body:JSON.stringify({text:segments,...(sourceLanguage?{source_lang:sourceLanguage}:{}),target_lang:target})});
     if(!response.ok) throw Error(`DeepL request failed (${response.status})`);
     const value=await response.json();
     const translations=value?.translations;
@@ -41,6 +41,14 @@ export function createDeepLTranslateAdapter({apiKey,fetchImpl=fetch,timeoutMs=80
   return {
     provenance:Object.freeze({adapter:DEEPL_TRANSLATE_ADAPTER,model:'deepl-v2'}),
     languages:DEEPL_TRANSLATE_LANGUAGES,
+    // Question generation is English-only, so the original staff source is
+    // normalized before generation; DeepL detects the source language itself.
+    async translateToEnglish(content) {
+      if(!nonempty(content?.title,120) || !nonempty(content?.text,5000))
+        throw Error('Invalid translation input');
+      const [title,text]=await request('EN-GB',[content.title,content.text],null);
+      return {title:validateField(title,'en',120,'title'),text:validateField(text,'en',5000,'text')};
+    },
     async translate(content,language) {
       const target=deeplLanguage[language];
       if(!target) throw Error(`DeepL does not support ${language}`);

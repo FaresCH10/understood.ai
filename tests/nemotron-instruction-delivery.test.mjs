@@ -21,7 +21,7 @@ const hindi={title:'कार्टन वितरण',text:'नीली श�
   question:'2 कार्टन 4 बजे से पहले कहाँ रखने हैं, और रास्ता कैसा रखना है?',
   answerChoices:['नीली शेल्फ़ पर','पीली शेल्फ़ पर','लाल शेल्फ़ पर','हरी शेल्फ़ पर']};
 const reply=value=>Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(value)}}]});
-const fetcher=handler=>{const calls=[];return {calls,fetch:async(url,options)=>{const body=JSON.parse(options.body);calls.push({url,body,headers:options.headers});return handler(body,calls.length);}};};
+const fetcher=handler=>{const calls=[];return {calls,fetch:async(url,options)=>{const body=JSON.parse(options.body);calls.push({url,body,headers:options.headers});return handler(body,calls.length,url);}};};
 const deeplReply=texts=>Response.json({translations:texts.map(text=>({detected_source_language:'EN',text}))});
 const hindiValues=[hindi.title,hindi.text,hindi.question,...hindi.answerChoices];
 const english={title:'Carton routing',text:source,question,questionType:'multiple-choice',
@@ -47,7 +47,8 @@ test('Nemotron Vercel delivery is explicitly gated and advertises its provider m
     providerLabel:'Nemotron 3 Ultra 550B',translationProviderLabel:'DeepL',
     textLanguages:DEEPL_TRANSLATE_LANGUAGES,speechLanguages:['en']});
   assert.deepEqual(instructionReadiness({instructionTextAdapter:adapter},'ضع الصندوق على الرف'),{mode:'nemotron-text',
-    providerLabel:'Nemotron 3 Ultra 550B',translationProviderLabel:'DeepL',textLanguages:[],speechLanguages:[]});
+    providerLabel:'Nemotron 3 Ultra 550B',translationProviderLabel:'DeepL',
+    textLanguages:DEEPL_TRANSLATE_LANGUAGES,speechLanguages:[]});
 });
 
 test('Nemotron prepares one grounded English question with four checked choices',async()=>{
@@ -77,6 +78,44 @@ test('Nemotron prepares one grounded English question with four checked choices'
   assert.equal(await malformed.prepare({source,title:'Carton routing'},{response_mode:'question',delivery_mode:'text'}),null);
 });
 
+test('an Arabic source is translated to English before Nemotron generates and DeepL translates',async()=>{
+  const arabic={title:'توجيه الكراتين',text:'ضع كرتين على الرف الأزرق قبل الساعة 4 مساءً. أبقِ الممر خالياً.'};
+  const mock=fetcher((body,count,url)=>{
+    if(url==='https://integrate.api.nvidia.com/v1/chat/completions')return reply(prepared);
+    if(body.target_lang==='EN-GB')return Response.json({translations:[
+      {detected_source_language:'AR',text:'Carton routing'},
+      {detected_source_language:'AR',text:source},
+    ]});
+    return deeplReply(hindiValues);
+  });
+  const adapter=nemotronInstructionDelivery(baseEnv,mock.fetch);
+  const value=await adapter.prepare({source:arabic.text,title:arabic.title},{response_mode:'question',delivery_mode:'text'});
+  assert.equal(value.source,arabic.text);
+  assert.equal(value.title,'Carton routing');
+  assert.equal(value.languages.en.title,'Carton routing');
+  assert.equal(value.languages.en.text,source);
+  assert.equal(value.languages.en.question,question);
+  assert.equal(value.question,question);
+  const normalize=mock.calls.find(call=>call.body.target_lang==='EN-GB');
+  assert.deepEqual(normalize.body,{text:[arabic.title,arabic.text],target_lang:'EN-GB'});
+  const generation=mock.calls.find(call=>call.url.includes('nvidia'));
+  assert.deepEqual(JSON.parse(generation.body.messages[1].content),{source,review:null});
+  assert.equal(mock.calls.length,2);
+
+  await resetBudget(adapter);
+  const english={title:value.languages.en.title,text:value.languages.en.text,question:value.languages.en.question,
+    questionType:'multiple-choice',choices:value.languages.en.choices};
+  assert.deepEqual(await adapter.translate('hi',english),{title:hindi.title,text:hindi.text,question:hindi.question,
+    questionType:'multiple-choice',choices:hindi.answerChoices.map((text,index)=>({id:english.choices[index].id,text}))});
+  assert.deepEqual(mock.calls.at(-1).body,{text:[english.title,english.text,english.question,...english.choices.map(choice=>choice.text)],source_lang:'EN',target_lang:'HI'});
+
+  const unavailable=nemotronInstructionDelivery(baseEnv,async url=>{
+    if(url.includes('deepl'))return new Response('denied',{status:403});
+    assert.fail('NVIDIA must not be called without an English source');
+  });
+  assert.equal(await unavailable.prepare({source:arabic.text,title:arabic.title},{response_mode:'question',delivery_mode:'text'}),null);
+});
+
 test('DeepL translates instruction text and ordered choices for the worker language',async()=>{
   const mock=fetcher(()=>deeplReply(hindiValues));
   const adapter=nemotronInstructionDelivery(baseEnv,mock.fetch);
@@ -103,6 +142,48 @@ test('DeepL rejects translated scripts or choices that drift from the source',as
   }
 });
 
+test('a Vercel instruction send from an Arabic source publishes after English generation and DeepL translation',async()=>{
+  const db=new PGlite();
+  const pool={async connect(){return {query:async(sql,args)=>args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)||{rows:[]},release(){}};}};
+  const schema='understood_test_nemotron_arabic';
+  try {
+    await db.exec(`CREATE SCHEMA ${schema}; SET search_path TO ${schema},pg_catalog`);
+    await runMigrations(pool,{schema});
+    await db.exec("INSERT INTO organizations(id,name) VALUES('a','Synthetic');INSERT INTO sites(id,org_id,name,timezone) VALUES('a','a','Synthetic','UTC');INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','a','a','Owner','owner');INSERT INTO workers(id,org_id,site_id,code,language) VALUES('w1','a','a','001','hi');");
+    const owner={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'};
+    const scope={schema};
+    const arabic={title:'توجيه الكراتين',text:'ضع كرتين على الرف الأزرق قبل الساعة 4 مساءً. أبقِ الممر خالياً.'};
+    const mock=fetcher((body,count,url)=>{
+      if(url==='https://integrate.api.nvidia.com/v1/chat/completions')return reply(prepared);
+      if(body.target_lang==='EN-GB')return Response.json({translations:[
+        {detected_source_language:'AR',text:'Carton routing'},
+        {detected_source_language:'AR',text:source},
+      ]});
+      return deeplReply(hindiValues);
+    });
+    const adapter=nemotronInstructionDelivery(baseEnv,mock.fetch);
+    const input={requestId:randomUUID(),title:arabic.title,source:arabic.text,audience:{type:'all'},
+      responseMode:'question',deliveryMode:'text'};
+    const started=await startInstructionSend(pool,owner,input,scope);
+    assert.equal(await processOnePreparation(pool,{schema,integrationMode:'synthetic',briefingId:started.briefingId,
+      instructionTextAdapter:adapter}),true);
+    const row=(await db.query('SELECT prepared_json,state FROM briefings WHERE id=$1',[input.requestId])).rows[0];
+    assert.equal(row.state,'ready');
+    assert.equal(row.prepared_json.source,arabic.text);
+    assert.equal(row.prepared_json.title,'Carton routing');
+    assert.equal(row.prepared_json.languages.en.text,source);
+    assert.equal(row.prepared_json.languages.en.question,question);
+    assert.equal(row.prepared_json.languages.hi.text,hindi.text);
+    assert.equal(row.prepared_json.languages.hi.question,hindi.question);
+    assert.equal(row.prepared_json.provenance.questionAdapter,NEMOTRON_DELIVERY_ADAPTER);
+    const result=await completeInstructionSend(pool,owner,input.requestId,scope);
+    assert.equal(result.state,'published');
+    assert.equal(result.delivered,1);
+    assert.equal(result.undelivered,0);
+  } finally {
+    await db.close();
+  }
+});
 test('a Vercel instruction send publishes supported languages and leaves Sinhala undelivered',async()=>{
   const db=new PGlite();
   const pool={async connect(){return {query:async(sql,args)=>args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)||{rows:[]},release(){}};}};
