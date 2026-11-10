@@ -151,6 +151,8 @@ for(const message of ['Select your language first','Language already selected','
 for(const message of ['Historical crew snapshot unavailable','Report crew unavailable'])conflicts.add(message);
 for(const message of ['Conversation request conflict','Conversation is closed'])conflicts.add(message);
 for(const message of ['Repeat request conflict','Repeat already requested','Repeat requires an earlier answer'])conflicts.add(message);
+for(const message of ['Repeat evidence is immutable','Repeat scope mismatch','Repeat receipt mismatch'])conflicts.add(message);
+for(const message of ['Presentation binding scope mismatch','Presentation binding is immutable','Presentation evidence is immutable','Presentation scope mismatch','Expired briefing cannot accept new work'])conflicts.add(message);
 for(const message of ['Case review request conflict','Case deadline changed','Case deadline unchanged'])conflicts.add(message);
 for(const message of ['Case review unavailable','Case review receipt unavailable','Original assessment unavailable'])unavailable.add(message);
 for(const message of ['Voice receipt unavailable','Voice audio unavailable'])unavailable.add(message);
@@ -1131,6 +1133,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if (typeof message==='string' && message.startsWith('Worker capacity reached')) return send(res,409,{error:message});
       if (conflicts.has(message)) return send(res,409,{error:message});
       if (badInput.has(message) || /^Recipient language is unavailable: (?:unknown|[A-Z]{2}(?:-[A-Z]+)?(?:, [A-Z]{2}(?:-[A-Z]+)?)*)$/.test(message)) return send(res,['Request too large','Recording is too large','CSV exceeds 256 KiB limit','Evidence photo is too large'].includes(message) ? 413 : 400,{error:message});
+      console.error('Unmapped API error', requestPath, error?.code ?? 'none', String(message ?? error).replace(/\s+/g,' ').slice(0,200));
       return send(res,503,{error:'Operation unavailable. Retry after checking the service.'});
     }
   };

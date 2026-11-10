@@ -63,11 +63,13 @@ export async function receiveRecording(pool,session,assignmentId,submissionId,by
       const current = (await client.query(`SELECT id FROM recordings WHERE id=$1 AND org_id=$2 AND site_id=$3 AND status='storing'
         AND lease_token=$4 AND lease_until>clock_timestamp() FOR UPDATE`,[staged.id,session.org_id,session.site_id,staged.token])).rows[0];
       if (!current) throw new Error('Recording storage lease expired');
-      const accepted = (await client.query(`INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at)
-        VALUES ($1,$2,$3,'audio',clock_timestamp()) RETURNING received_at`,[session.org_id,assignmentId,submissionId])).rows[0];
-      const row = (await client.query(`UPDATE recordings SET status='received',received_at=$2,lease_token=NULL,lease_until=NULL,error=NULL WHERE id=$1
-        RETURNING id,status,received_at`,[staged.id,accepted.received_at])).rows[0];
-      await consumeRepeat(client,repeatId,submissionId,accepted.received_at);
+      await client.query(`INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at)
+        VALUES ($1,$2,$3,'audio',clock_timestamp())`,[session.org_id,assignmentId,submissionId]);
+      const row = (await client.query(`UPDATE recordings SET status='received',
+        received_at=(SELECT r.received_at FROM submission_receipts r WHERE r.org_id=$2 AND r.assignment_id=$3 AND r.submission_id=$4),
+        lease_token=NULL,lease_until=NULL,error=NULL WHERE id=$1
+        RETURNING id,status,received_at`,[staged.id,session.org_id,assignmentId,submissionId])).rows[0];
+      await consumeRepeat(client,repeatId,submissionId);
       await domainAudit(client,session,'answer.received',staged.id);
       return receipt(row,false);
     });

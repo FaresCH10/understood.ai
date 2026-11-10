@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
 import {runMigrations} from '../server/postgres/migrate.mjs';
-import {submitAnswer} from '../server/postgres/domain.mjs';
+import {submitAnswer,domainTransaction} from '../server/postgres/domain.mjs';
 import {processOneAssessment} from '../server/postgres/assessment-worker.mjs';
-import {requestCaseRepeat,caseRepeatReceipt,listCaseRepeats} from '../server/postgres/case-repeats.mjs';
+import {requestCaseRepeat,caseRepeatReceipt,listCaseRepeats,consumeRepeat} from '../server/postgres/case-repeats.mjs';
 import {getClarification,resolveClarification,requestHelp} from '../server/postgres/clarifications.mjs';
 import {workerBriefing,workerBriefings} from '../server/postgres/read-models.mjs';
 import {readPublicationReport} from '../server/postgres/reports.mjs';
@@ -65,6 +65,23 @@ test('repeat admits one new typed receipt after original deadline, preserves ori
     await assert.rejects(f.db.exec("UPDATE case_repeats SET status='pending',submission_id=NULL,submitted_at=NULL"),/immutable/);
     await assert.rejects(f.db.exec('DELETE FROM case_repeats'),/immutable/);
   } finally {await f.close();}
+});
+test('repeat consumption copies the stored receipt timestamp instead of a JS date that would drop microseconds',async()=>{
+  const f=await fixture();try{
+    const input=command();await f.request(input);
+    const submissionId=randomUUID();
+    await f.db.query(`INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at)
+      VALUES('cedar','assignment-14',$1,'typed',clock_timestamp()+interval '123 microseconds')`,[submissionId]);
+    const stored=(await f.db.query("SELECT to_char(received_at,'US') AS micros FROM submission_receipts WHERE submission_id=$1",[submissionId])).rows[0];
+    assert.notEqual(stored.micros,'000000');
+    await assert.rejects(f.db.query(`UPDATE case_repeats SET status='submitted',submission_id=$1,
+      submitted_at=(SELECT received_at+interval '1 microsecond' FROM submission_receipts WHERE submission_id=$1) WHERE id=$2`,[submissionId,input.requestId]),/Repeat receipt mismatch/);
+    await domainTransaction(f.pool,'public',client=>consumeRepeat(client,input.requestId,submissionId));
+    const row=(await f.db.query(`SELECT cr.status,cr.submitted_at=r.received_at AS exact FROM case_repeats cr
+      JOIN submission_receipts r ON r.org_id=cr.org_id AND r.assignment_id=cr.assignment_id AND r.submission_id=cr.submission_id
+      WHERE cr.id=$1`,[input.requestId])).rows[0];
+    assert.equal(row.status,'submitted');assert.equal(row.exact,true);
+  }finally{await f.close();}
 });
 test('check-back sends the frozen worker-language question with an atomic repeat and exact retry stays idempotent',async()=>{
   const f=await fixture();try{

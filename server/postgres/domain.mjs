@@ -255,7 +255,7 @@ export async function submitAnswer(pool,session,assignmentId,submissionId,answer
       VALUES ($1,$2,$3,$4,$5,$6,NULL,'[]',$7,'pending')`,[attemptId,session.org_id,session.site_id,assignmentId,submissionId,answer,receipt.received_at]);
     await client.query(`INSERT INTO assessment_jobs(id,org_id,site_id,assignment_id,attempt_id) VALUES ($1,$2,$3,$4,$5)`,[randomUUID(),session.org_id,session.site_id,assignmentId,attemptId]);
     await recordPresentationBinding(client,attemptId,presentation);
-    await consumeRepeat(client,repeatId,submissionId,receipt.received_at);
+    await consumeRepeat(client,repeatId,submissionId);
     await domainAudit(client,session,'answer.received',attemptId);
     return {id:attemptId,outcome:null,assessmentStatus:'pending',duplicate:false};
   });

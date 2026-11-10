@@ -102,6 +102,11 @@ export async function acceptingRepeat(client,session,assignment) {
   if((await client.query(`SELECT sr.kind,r.status FROM submission_receipts sr LEFT JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.submission_id=sr.submission_id AND r.org_id=sr.org_id WHERE sr.assignment_id=$1 AND sr.org_id=$2 ORDER BY sr.sequence DESC LIMIT 1`,[assignment.id,session.org_id])).rows.some(row=>row.kind!=='audio'||!['failed','blocked'].includes(row.status)))throw Error('Another answer requires an approved repeat');
   return null;
 }
-export async function consumeRepeat(client,id,submissionId,receivedAt) {
-  if(id)await client.query("UPDATE case_repeats SET status='submitted',submission_id=$2,submitted_at=$3 WHERE id=$1 AND status='pending'",[id,submissionId,receivedAt]);
+// The guard compares submitted_at to the receipt exactly, so copy it inside SQL;
+// a JS timestamp round-trip loses the sub-millisecond digits the guard preserves.
+export async function consumeRepeat(client,id,submissionId) {
+  if(id)await client.query(`UPDATE case_repeats cr SET status='submitted',submission_id=$2,
+    submitted_at=(SELECT r.received_at FROM submission_receipts r
+      WHERE r.org_id=cr.org_id AND r.assignment_id=cr.assignment_id AND r.submission_id=$2)
+    WHERE cr.id=$1 AND cr.status='pending'`,[id,submissionId]);
 }
