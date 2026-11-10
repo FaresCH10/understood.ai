@@ -351,7 +351,26 @@ export async function startInstructionSend(pool,session,input,{schema='public'}=
       [value.requestId,session.org_id,session.site_id])).rows[0];
     if(old) {
       if(!requestMatches(old.request_json,value.request)) throw new Error('Instruction request conflict');
-      return sendView(client,old,true);
+      if(old.state!=='failed') return sendView(client,old,true);
+      // A failed send delivered nothing, and the composer keeps the same
+      // request id when the supervisor retries. Replaying the stored failure
+      // made every retry show the original error without a new provider call.
+      // Lock the send before the briefing, matching the retry endpoint.
+      const failed=(await client.query('SELECT * FROM instruction_sends WHERE request_id=$1 AND org_id=$2 AND site_id=$3 FOR UPDATE',
+        [value.requestId,session.org_id,session.site_id])).rows[0];
+      if(!failed || failed.state!=='failed') return sendView(client,failed ?? old,true);
+      await requireWritableEntitlement(client,session.org_id);
+      const briefing=(await client.query('SELECT state,revision FROM briefings WHERE id=$1 AND org_id=$2 AND site_id=$3',
+        [failed.briefing_id,session.org_id,session.site_id])).rows[0];
+      if(briefing && ['draft','failed'].includes(briefing.state))
+        await queuePreparationInTransaction(client,session,failed.briefing_id,briefing.revision);
+      const now=await nowOf(client);
+      await client.query(`UPDATE instruction_deliveries SET state='preparing',reason=NULL,updated_at=$1
+        WHERE request_id=$2 AND org_id=$3 AND site_id=$4 AND state='failed' AND reason='preparation_failed'`,
+      [now,value.requestId,session.org_id,session.site_id]);
+      const reset=await syncSendCounts(client,failed,{state:'preparing',publicationId:null,error:null,now});
+      await domainAudit(client,session,'instruction.send_retried',value.requestId);
+      return sendView(client,reset,false);
     }
     await requireWritableEntitlement(client,session.org_id);
     const composition=(await client.query('SELECT staff_id,org_id,site_id FROM instruction_compositions WHERE id=$1 FOR UPDATE',[value.requestId])).rows[0];

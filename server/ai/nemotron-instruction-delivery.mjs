@@ -4,7 +4,7 @@ import {createNemotronAdapter,NEMOTRON_ULTRA_MODEL} from './nemotron.mjs';
 import {NEMOTRON_DELIVERY_ADAPTER} from './instruction-text-providers.mjs';
 import {createDeepLTranslateAdapter,DEEPL_TRANSLATE_ADAPTER,DEEPL_TRANSLATE_LANGUAGES} from './deepl-translate.mjs';
 
-const PREPARE_TIMEOUT_MS=16000;
+const PREPARE_TIMEOUT_MS=20000;
 const TRANSLATE_TIMEOUT_MS=6000;
 const BUDGET_MS=25000;
 const MAX_CONCURRENCY=8;
@@ -83,6 +83,18 @@ const checkedGeneration=(english,generated)=>{
     throw Error('Generated question was ungrounded');
   return generated;
 };
+// Staff see this code, and it is stored in the failed job, so it must stay a
+// fixed, sanitized vocabulary: no provider bodies, keys or URLs.
+const causeOf=error=>{
+  const message=typeof error?.message==='string'?error.message:'';
+  const status=/NVIDIA request failed \((\d{3})\)/.exec(message)?.[1];
+  if(status)return `provider_http_${status}`;
+  if(error?.name==='TimeoutError' || error?.name==='AbortError' || /timeout|abort/i.test(message))return 'provider_timeout';
+  if(/was generic/.test(message))return 'question_generic';
+  if(/was ungrounded/.test(message))return 'question_ungrounded';
+  if(/malformed|blocked or incomplete|was empty|too large|failed validation/.test(message))return 'model_response_invalid';
+  return 'generation_failed';
+};
 
 // The Vercel synthetic runtime has no worker budget ledger. This adapter is
 // bounded to a single send request, so the journal contract stays explicit.
@@ -103,6 +115,7 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
   // must start on each preparation, not when the adapter is constructed.
   let deadline=0;
   let active=0;const waiting=[];
+  const failures=new WeakMap();
   const acquire=()=>active<MAX_CONCURRENCY?(active++,Promise.resolve()):new Promise(resolve=>waiting.push(resolve)).then(()=>{active++;});
   const release=()=>{active--;waiting.shift()?.();};
   const remaining=()=>deadline-Date.now();
@@ -118,23 +131,28 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
     model:textModel,
     async prepare(briefing,instruction) {
       deadline=Date.now()+BUDGET_MS;
+      const fail=code=>{if(briefing && typeof briefing==='object')failures.set(briefing,code);return null;};
       if(instruction?.response_mode!=='question')return null;
       try {
         const original={title:briefing?.title?.trim(),text:briefing?.source?.trim()};
-        if(!original.title || !original.text)return null;
-        const english=NON_LATIN_SCRIPT.test(original.title) || NON_LATIN_SCRIPT.test(original.text)
-          ? await translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,remaining()-500)).translateToEnglish(original)
-          : original;
-        // NIM occasionally fails or returns the generic template. One retry
-        // keeps a transient failure from costing the whole send.
-        let generated=null;
+        if(!original.title || !original.text)return fail('invalid_source');
+        let english;
+        try {
+          english=NON_LATIN_SCRIPT.test(original.title) || NON_LATIN_SCRIPT.test(original.text)
+            ? await translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,remaining()-500)).translateToEnglish(original)
+            : original;
+        } catch { return fail('source_translation_failed'); }
+        // NIM occasionally fails or returns the generic template. A retry
+        // covers transient and content failures, but a timed-out attempt has
+        // no budget left to be useful, so the caller sees that cause instead.
+        let generated=null,cause=null;
         for(let attempt=0;attempt<2&&!generated;attempt++) {
           const left=remaining();
-          if(left<3000)break;
+          if(left<3000){cause ??= 'budget_exhausted';break;}
           try { generated=checkedGeneration(english,await adapterFor(Math.min(PREPARE_TIMEOUT_MS,left-1000)).prepare(english.text,{multipleChoice:true})); }
-          catch { generated=null; }
+          catch(error) { generated=null;cause=causeOf(error);if(cause==='provider_timeout')break; }
         }
-        if(!generated)return null;
+        if(!generated)return fail(cause ?? 'budget_exhausted');
         const title=english.title;
         return withMultipleChoice({
           responseMode:instruction.response_mode,title,source:briefing.source,
@@ -142,7 +160,10 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
           languages:{en:{title,text:english.text,question:generated.question,answerChoices:generated.choices,speech:'device-synthesis-demo'}},
           provenance:{adapter:'synthetic-instruction-v1',live:false},
         },{preserveQuestions:true,preserveAskedFacts:true});
-      } catch { return null; }
+      } catch { return fail('generation_failed'); }
+    },
+    failureCause(briefing) {
+      return failures.get(briefing) ?? null;
     },
     async translate(language,content) {
       await acquire();

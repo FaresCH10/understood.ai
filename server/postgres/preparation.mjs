@@ -254,9 +254,10 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       return true;
     }
     if(intent) throw Error('Generated target regeneration requires its configured adapter');
-    let providerPrepared=false,base=null;
+    let providerPrepared=false,base=null,providerInput=null;
     if(instruction?.delivery_mode==='text' && typeof instructionTextAdapter?.prepare==='function') {
-      base=await instructionTextAdapter.prepare({source:briefing.source,title:briefing.title},instruction).catch(()=>null);
+      providerInput={source:briefing.source,title:briefing.title};
+      base=await instructionTextAdapter.prepare(providerInput,instruction).catch(()=>null);
       providerPrepared=!!base;
       // A checked question is the provider's job. Falling back to the generic
       // template would publish a questionnaire nobody reviewed, so fail the
@@ -264,6 +265,8 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       if(!providerPrepared && instruction.response_mode==='question') {
         questionFailure=Error('Question provider could not generate a checked question');
         questionFailure.code='question_alignment_failed';
+        questionFailure.causeCode=typeof instructionTextAdapter.failureCause==='function'
+          ? instructionTextAdapter.failureCause(providerInput) : null;
         throw questionFailure;
       }
     }
@@ -340,8 +343,10 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       await appendPreparationStage(client,job,systemStage('worker','failed',preparationErrorCode(error)));
       const translationLabel=instructionTextAdapter?.translationLabel ?? instructionTextAdapter?.label ?? 'The text provider';
       const detail=translating && error?.translationCause?` (${error.translationCause})`:'';
+      const cause=typeof questionFailure?.causeCode==='string' && /^[a-z0-9_]{1,40}$/.test(questionFailure.causeCode)
+        ? ` (${questionFailure.causeCode})` : '';
       const failure=questionFailure
-        ? `${instructionTextAdapter?.label ?? 'The question provider'} could not generate a checked question. Retry delivery.`
+        ? `${instructionTextAdapter?.label ?? 'The question provider'} could not generate a checked question${cause}. Retry delivery.`
         : translating?`${translationLabel} could not prepare the translations${detail}. Retry delivery.`:'Synthetic preparation failed';
       await client.query(`UPDATE jobs SET status='failed',lease_token=NULL,lease_until=NULL,error=$2 WHERE id=$1`,
         [job.id,failure]);

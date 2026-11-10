@@ -129,6 +129,29 @@ test('a transient NVIDIA failure is retried once',async()=>{
   assert.equal(value.question,question);
 });
 
+test('provider failures keep a sanitized cause for the send error',async()=>{
+  const unauthorized=nemotronInstructionDelivery(baseEnv,async()=>new Response('denied',{status:401}));
+  const unauthorizedInput={source,title:'Carton routing'};
+  assert.equal(await unauthorized.prepare(unauthorizedInput,{response_mode:'question',delivery_mode:'text'}),null);
+  assert.equal(unauthorized.failureCause(unauthorizedInput),'provider_http_401');
+
+  const generic={...prepared,question:'Which action follows the instruction “Carton routing”?',
+    choices:['Carry on with another task without following this instruction.','Do the opposite of this instruction.',
+      'Replace this instruction with your own steps.','on the blue shelf']};
+  const rejected=nemotronInstructionDelivery(baseEnv,fetcher(()=>reply(generic)).fetch);
+  const rejectedInput={source,title:'Carton routing'};
+  assert.equal(await rejected.prepare(rejectedInput,{response_mode:'question',delivery_mode:'text'}),null);
+  assert.equal(rejected.failureCause(rejectedInput),'question_generic');
+
+  const timedOut=nemotronInstructionDelivery(baseEnv,async()=>{
+    const error=Error('The operation was aborted due to timeout');error.name='TimeoutError';throw error;
+  });
+  const timeoutInput={source,title:'Carton routing'};
+  assert.equal(await timedOut.prepare(timeoutInput,{response_mode:'question',delivery_mode:'text'}),null);
+  assert.equal(timedOut.failureCause(timeoutInput),'provider_timeout');
+  assert.equal(timedOut.failureCause({source,title:'Different input'}),null);
+});
+
 test('a failed provider question fails the send instead of publishing the generic template',async()=>{
   const db=new PGlite();
   const pool={async connect(){return {query:async(sql,args)=>args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)||{rows:[]},release(){}};}};
@@ -141,7 +164,7 @@ test('a failed provider question fails the send instead of publishing the generi
     const scope={schema};
     const adapter={mode:'nemotron-text',label:'Nemotron 3 Ultra 550B',translationLabel:'DeepL',
       provenanceAdapter:NEMOTRON_DELIVERY_ADAPTER,model:NEMOTRON_ULTRA_MODEL,textLanguages:DEEPL_TRANSLATE_LANGUAGES,
-      async prepare(){return null;},
+      async prepare(){return null;},failureCause(){return 'provider_http_401';},
       async translate(){throw Error('Translation must not run');}};
     const input={requestId:randomUUID(),title:'сделай бутерброд',
       source:'Сделай мне сэндвич с куриной шаурмой, чесноком и маринованными огурчиками.',
@@ -153,9 +176,53 @@ test('a failed provider question fails the send instead of publishing the generi
     assert.equal(result.state,'failed');
     assert.equal(result.delivered,0);
     assert.match(result.error,/checked question/);
+    assert.match(result.error,/provider_http_401/);
     const briefing=(await db.query('SELECT state,prepared_json FROM briefings WHERE id=$1',[input.requestId])).rows[0];
     assert.equal(briefing.state,'failed');
     assert.equal(briefing.prepared_json,null);
+  } finally {
+    await db.close();
+  }
+});
+
+test('re-sending a failed instruction prepares again instead of replaying the stored failure',async()=>{
+  const db=new PGlite();
+  const pool={async connect(){return {query:async(sql,args)=>args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)||{rows:[]},release(){}};}};
+  const schema='understood_test_nemotron_resend';
+  try {
+    await db.exec(`CREATE SCHEMA ${schema}; SET search_path TO ${schema},pg_catalog`);
+    await runMigrations(pool,{schema});
+    await db.exec("INSERT INTO organizations(id,name) VALUES('a','Synthetic');INSERT INTO sites(id,org_id,name,timezone) VALUES('a','a','Synthetic','UTC');INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','a','a','Owner','owner');INSERT INTO workers(id,org_id,site_id,code,language) VALUES('w1','a','a','001','en');");
+    const owner={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'};
+    const scope={schema};
+    const failing={mode:'nemotron-text',label:'Nemotron 3 Ultra 550B',translationLabel:'DeepL',
+      provenanceAdapter:NEMOTRON_DELIVERY_ADAPTER,model:NEMOTRON_ULTRA_MODEL,textLanguages:DEEPL_TRANSLATE_LANGUAGES,
+      async prepare(){return null;},failureCause(){return 'provider_timeout';},
+      async translate(){throw Error('Translation must not run');}};
+    const input={requestId:randomUUID(),title:'Carton routing',source,audience:{type:'all'},
+      responseMode:'question',deliveryMode:'text'};
+    const started=await startInstructionSend(pool,owner,input,scope);
+    await processOnePreparation(pool,{schema,integrationMode:'synthetic',briefingId:started.briefingId,
+      instructionTextAdapter:failing});
+    const failed=await completeInstructionSend(pool,owner,input.requestId,scope);
+    assert.equal(failed.state,'failed');
+    assert.match(failed.error,/provider_timeout/);
+    assert.equal((await db.query('SELECT state FROM briefings WHERE id=$1',[input.requestId])).rows[0].state,'failed');
+
+    // The composer keeps its request id when the supervisor retries.
+    const retried=await startInstructionSend(pool,owner,input,scope);
+    assert.equal(retried.state,'preparing');
+    assert.equal(retried.duplicate,false);
+    assert.equal((await db.query('SELECT state FROM briefings WHERE id=$1',[input.requestId])).rows[0].state,'processing');
+    assert.equal((await db.query("SELECT status FROM jobs WHERE briefing_id=$1 AND kind='prepare'",[input.requestId])).rows[0].status,'queued');
+    assert.equal((await db.query("SELECT state FROM instruction_deliveries WHERE request_id=$1",[input.requestId])).rows[0].state,'preparing');
+
+    const working=nemotronInstructionDelivery(baseEnv,fetcher(()=>reply(prepared)).fetch);
+    assert.equal(await processOnePreparation(pool,{schema,integrationMode:'synthetic',briefingId:input.requestId,
+      instructionTextAdapter:working}),true);
+    const published=await completeInstructionSend(pool,owner,input.requestId,scope);
+    assert.equal(published.state,'published');
+    assert.equal(published.delivered,1);
   } finally {
     await db.close();
   }
