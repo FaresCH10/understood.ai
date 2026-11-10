@@ -1,4 +1,5 @@
 import {validateMultipleChoice} from './multiple-choice-input.mjs';
+import {languageTextMatches} from './languages.mjs';
 import {TRANSLATED_TEXT_ADAPTERS} from './ai/instruction-text-providers.mjs';
 import {translationEdits} from './translation-input.mjs';
 import {generationLanguages} from './settings-input.mjs';
@@ -97,6 +98,18 @@ export function readySnapshot(briefing,workers,integrationMode,modes={}) {
       || (deliveryMode!=='text' && language.speech!=='device-synthesis-demo');
   }).map(worker=>worker.language);
   if(missingLanguages.length) throw new Error(unavailableRecipientLanguage(missingLanguages));
+  // A provider can return the asked language for some fields and another language
+  // for others. Presence of the target script is the cheap cross-language invariant
+  // that stops a worker from receiving a mixed-script instruction.
+  const mismatchedLanguages=[...new Set(workers.map(worker=>worker.language))].filter((language)=>{
+    const content=value.languages?.[language];
+    const choices=Array.isArray(content.choices)?content.choices:[];
+    return !languageTextMatches(language,content.text)
+      || (questionMode && !languageTextMatches(language,content.question))
+      || choices.some(choice=>typeof choice?.text!=='string'
+        || (/\p{L}/u.test(choice.text) && !languageTextMatches(language,choice.text)));
+  });
+  if(mismatchedLanguages.length) throw new Error(`Prepared content language mismatch: ${mismatchedLanguages.join(', ')}`);
   if (Buffer.byteLength(JSON.stringify(value))>100000) throw new Error('Prepared content exceeds limit');
   if(value.rubric?.mode==='multiple-choice' && !validateMultipleChoice({...value,languages:Object.fromEntries(workers.map(worker=>[worker.language,value.languages?.[worker.language]]))}))throw new Error('Briefing is not technically ready');
   return {...value,responseMode,deliveryMode,evidenceMode};
