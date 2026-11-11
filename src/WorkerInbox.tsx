@@ -1,5 +1,5 @@
 import {workerWorkflowCopy} from './worker-workflow-copy';
-import {workerVersionText} from './WorkerHelpHistory';
+import {workerVersionText} from './worker-status-text';
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,ArrowRight,Check,ChevronLeft,ChevronRight,Clock3,FileText,HelpCircle,MessageCircle,RefreshCw,Search} from 'lucide-react';
 import {workerJourneyText} from './worker-journey-text';

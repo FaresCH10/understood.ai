@@ -217,7 +217,10 @@ test('SQLite instruction chats count open cases per assignment and expose only t
     requestHelp(db,worker,'assignment-30',{requestId:randomUUID(),text:'And where do the brushes go?'});
     requestHelp(db,{...worker,principal_id:'worker-29'},'assignment-29',{requestId:randomUUID(),text:'Question on another instruction'});
     assert.equal(listed().openCases,1);assert.equal(listed('29').openCases,1);
-    assert.deepEqual(getPublicationResponse(db,staff,'shelf-v3','assignment-30').cases.map(item=>({id:item.id,status:item.status})),[{id:helpId,status:'open'}]);
+    const cases=getPublicationResponse(db,staff,'shelf-v3','assignment-30').cases;
+    assert.deepEqual(cases.map(item=>({id:item.id,status:item.status})),[{id:helpId,status:'open'}]);
+    assert.equal(cases[0].helpText,'Which shelf should wet paint go on?');
+    assert.ok(Number.isFinite(Date.parse(cases[0].createdAt)));
     db.prepare("UPDATE clarifications SET status='resolved' WHERE id=?").run(helpId);
     assert.equal(listed().openCases,0);assert.equal(listed('29').openCases,1);
 

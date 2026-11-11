@@ -1,11 +1,3 @@
-import { useEffect,useRef,useState } from 'react';
-import { MessageCircle,Repeat2,RefreshCw,ChevronLeft,ChevronRight } from 'lucide-react';
-import {CaseConversation} from './CaseConversation';
-import {validWorkerSession,type PageSession} from './session-state';
-import {readWorkerHelpHistory,WorkerHelpHistoryError,type HelpHistoryScope,type WorkerHelpPage} from './worker-help-history';
-import {workerUiDirection,type WorkerUiLanguage} from './worker-ui-language';
-import {workerFollowupText} from './worker-followup-text';
-
 export const workerVersionText = { en: 'History', ar: 'السجل', ur: 'تاریخ', hi: 'इतिहास', bn: 'ইতিহাস', ml: 'ചരിത്രം', ta: 'வரலாறு', te: 'చరిత్ర', ne: 'इतिहास', fil: 'Kasaysayan', si: 'ඉතිහාසය', ru: 'История', 'pa-Guru': 'ਇਤਿਹਾਸ', 'pa-Arab': 'تریخ', id: 'Riwayat' };
 export const workerStatusText = {
   en: { sent: 'Sent answers', emptySent: 'No sent answers yet.', check: 'Refresh answer status', pending: 'Answer received. The check is pending.', closed: 'This assignment is closed for new answers and help requests.', history: 'Help requests and follow-up', refresh: 'Refresh requests', empty: 'No help requests or follow-up yet.', open: 'Open', resolved: 'Resolved', followup: 'Response follow-up', unassigned: 'No supervisor assigned yet.', loading: 'Loading requests...', failed: 'Requests could not be loaded.', acknowledged: 'Acknowledged' },
@@ -24,46 +16,3 @@ export const workerStatusText = {
   'pa-Arab': { sent: 'بھیجے گئے جواب', emptySent: 'ہالے کوئی جواب نہیں بھیجیا گیا۔', check: 'جواب دی حالت تازہ کرو', pending: 'جواب موصول ہو گیا۔ جانچ باقی اے۔', closed: 'ایہہ اسائنمنٹ نویں جواباں تے مدد دیاں درخواستاں لئی بند اے۔', history: 'مدد دیاں درخواستاں تے فالو اپ', refresh: 'درخواستاں تازہ کرو', empty: 'ہالے کوئی مدد دی درخواست یا فالو اپ نہیں۔', open: 'کھلی', resolved: 'حل ہو گئی', followup: 'جواب تے فالو اپ', unassigned: 'ہالے کوئی سپروائزر مقرر نہیں۔', loading: 'درخواستاں لوڈ ہو رہیاں نیں...', failed: 'درخواستاں لوڈ نہیں ہو سکیاں۔', acknowledged: 'تصدیق شدہ' },
   id: { sent: 'Jawaban terkirim', emptySent: 'Belum ada jawaban terkirim.', check: 'Segarkan status jawaban', pending: 'Jawaban diterima. Pemeriksaan menunggu.', closed: 'Penugasan ini ditutup untuk jawaban baru dan permintaan bantuan.', history: 'Permintaan bantuan dan tindak lanjut', refresh: 'Segarkan permintaan', empty: 'Belum ada permintaan bantuan atau tindak lanjut.', open: 'Terbuka', resolved: 'Selesai', followup: 'Tindak lanjut jawaban', unassigned: 'Belum ada pengawas yang ditugaskan.', loading: 'Memuat permintaan...', failed: 'Permintaan tidak dapat dimuat.', acknowledged: 'Dikonfirmasi' },
 };
-
-export function WorkerHelpHistory({requestedCaseId,assignmentId,version,contentLanguage,language,refresh,session,current,onDirtyChange,onSessionLost,timezone,canWrite=true}:{requestedCaseId?:string;assignmentId:string;version:number;contentLanguage:HelpHistoryScope['language'];language:WorkerUiLanguage;refresh:number;session:PageSession;current:()=>boolean;onDirtyChange:(value:boolean)=>void;onSessionLost:()=>void;timezone?:string;canWrite?:boolean}) {
-  const copy = workerStatusText[language] || workerStatusText.en,followup=workerFollowupText(language),direction=workerUiDirection(language);
-  const [retry, setRetry] = useState(0);
-  const scopeKey=JSON.stringify([session.clientContext,session.expiresAt,assignmentId,version,contentLanguage]);
-  const [paging,setPaging]=useState({scope:scopeKey,page:1});const page=paging.scope===scopeKey?paging.page:1,key=JSON.stringify([scopeKey,page]);
-  const selected=useRef(key);selected.current=key;
-  const callbacks=useRef({current,onSessionLost,onDirtyChange});callbacks.current={current,onSessionLost,onDirtyChange};
-  const [read,setRead]=useState<{key:string;data:WorkerHelpPage|null;failed:boolean}>({key:'',data:null,failed:false});
-  const data=read.key===key?read.data:null,failed=read.key===key&&read.failed;
-  const [conversation,setConversation]=useState<{scope:string;id:string}|null>(null),[dirty,setDirty]=useState(false);
-  const caseId=conversation?.scope===scopeKey&&current()&&validWorkerSession(session)?conversation.id:null;
-  const conversationRef=useRef<HTMLDivElement>(null);
-  const pagingCopy={en:{previous:'Newer messages',next:'Older messages',count:'messages'},ar:{previous:'الرسائل الأحدث',next:'الرسائل الأقدم',count:'رسائل'},ur:{previous:'نئے پیغامات',next:'پرانے پیغامات',count:'پیغامات'},hi:{previous:'नए संदेश',next:'पुराने संदेश',count:'संदेश'},bn:{previous:'নতুন বার্তা',next:'পুরোনো বার্তা',count:'বার্তা'},ml:{previous:'പുതിയ സന്ദേശങ്ങൾ',next:'പഴയ സന്ദേശങ്ങൾ',count:'സന്ദേശങ്ങൾ'},ta:{previous:'புதிய செய்திகள்',next:'பழைய செய்திகள்',count:'செய்திகள்'},te:{previous:'కొత్త సందేశాలు',next:'పాత సందేశాలు',count:'సందేశాలు'},ne:{previous:'नयाँ सन्देश',next:'पुराना सन्देश',count:'सन्देश'},fil:{previous:'Mas bagong mensahe',next:'Mas lumang mensahe',count:'mensahe'},si:{previous:'නව පණිවිඩ',next:'පැරණි පණිවිඩ',count:'පණිවිඩ'},ru:{previous:'Более новые сообщения',next:'Более старые сообщения',count:'сообщений'},'pa-Guru':{previous:'ਨਵੇਂ ਸੁਨੇਹੇ',next:'ਪੁਰਾਣੇ ਸੁਨੇਹੇ',count:'ਸੁਨੇਹੇ'},'pa-Arab':{previous:'نویں سنیہے',next:'پرانے سنیہے',count:'سنیہے'},id:{previous:'Pesan lebih baru',next:'Pesan lebih lama',count:'pesan'}}[language];
-  useEffect(()=>{if(requestedCaseId&&data?.cases.some(item=>item.id===requestedCaseId)&&!dirty)setConversation({scope:scopeKey,id:requestedCaseId});},[requestedCaseId,data,scopeKey,dirty]);
-  function open(id:string){if(dirty||!callbacks.current.current()||!validWorkerSession(session))return;if(caseId===id)conversationRef.current?.focus();else setConversation({scope:scopeKey,id});}
-  useEffect(()=>{if(caseId)conversationRef.current?.focus();},[caseId]);
-  useEffect(() => {
-    const controller=new AbortController();let alive=true,timedOut=false;
-    const isCurrent=()=>alive&&selected.current===key&&callbacks.current.current()&&validWorkerSession(session);
-    setRead(old=>({key,data:old.key===key?old.data:null,failed:false}));
-    const timeout=window.setTimeout(()=>{timedOut=true;controller.abort();},15000);
-    readWorkerHelpHistory(fetch,session,{assignmentId,version,language:contentLanguage},page,controller.signal,isCurrent)
-      .then(value=>{if(isCurrent())setRead({key,data:value,failed:false});}).catch(error=>{
-        if(!alive||selected.current!==key||controller.signal.aborted&&!timedOut)return;
-        setRead({key,data:null,failed:true});
-        if(error instanceof WorkerHelpHistoryError&&error.code==='session')callbacks.current.onSessionLost();
-      }).finally(()=>window.clearTimeout(timeout));
-    return()=>{alive=false;controller.abort();window.clearTimeout(timeout);};
-  },[key,refresh,retry]);
-  return <><section className="worker-card">
-    <div className="worker-card-head"><h2>{followup.messagesTitle}</h2><button className="icon-button" aria-label={copy.refresh} title={copy.refresh} onClick={() => setRetry((value) => value + 1)}><RefreshCw size={20} /></button></div>
-    <p className="muted">{followup.messagesBody}</p>
-    <div role={failed?'alert':'status'}>{failed ? copy.failed : data === null ? copy.loading : !data.total ? followup.messagesEmpty : null}</div>
-    {data?.cases.map((item) => <article className="worker-help-entry" key={item.id}>
-      <div className="worker-card-head"><strong>{item.status === 'resolved' ? copy.resolved : copy.open}</strong><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString(language,{timeZone:timezone})}</time></div>
-      <span className={`worker-kind ${item.helpText?'worker-kind--help':'worker-kind--check'}`}>{item.helpText?<MessageCircle size={14} aria-hidden="true"/>:<Repeat2 size={14} aria-hidden="true"/>}{item.helpText?followup.helpRequest:followup.answerCheck}</span>
-      <p dir="auto">{item.helpText || followup.checkRow}</p><small><bdi>{item.owner || copy.unassigned}</bdi></small>
-      <button className="button outline" aria-expanded={caseId===item.id} aria-controls={caseId===item.id?'worker-help-conversation':undefined} disabled={dirty && caseId!==item.id} onClick={()=>open(item.id)}><MessageCircle size={18} aria-hidden="true"/>{followup.readMessages}</button>
-    </article>)}
-    {data&&data.total>0&&<div className="audit-pagination"><span>{page} / {Math.max(1,Math.ceil(data.total/5))} · {data.total} {pagingCopy.count}</span><div className="actions"><button className="icon-button" aria-label={pagingCopy.previous} title={pagingCopy.previous} disabled={dirty||page<=1} onClick={()=>setPaging({scope:scopeKey,page:page-1})}>{direction==='rtl'?<ChevronRight size={20}/>:<ChevronLeft size={20}/>}</button><button className="icon-button" aria-label={pagingCopy.next} title={pagingCopy.next} disabled={dirty||page>=Math.ceil(data.total/5)||page>=5000} onClick={()=>setPaging({scope:scopeKey,page:page+1})}>{direction==='rtl'?<ChevronLeft size={20}/>:<ChevronRight size={20}/>}</button></div></div>}
-  </section>{caseId && <div id="worker-help-conversation" ref={conversationRef} tabIndex={-1} role="region" aria-label={followup.messagesTitle}><CaseConversation key={`${caseId}:${scopeKey}`} caseId={caseId} assignmentId={assignmentId} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} language={language} timezone={timezone} current={()=>callbacks.current.current()&&validWorkerSession(session)} worker canWrite={canWrite} onDirtyChange={value=>{setDirty(value);callbacks.current.onDirtyChange(value);}} onSessionLost={onSessionLost}/></div>}</>;
-}

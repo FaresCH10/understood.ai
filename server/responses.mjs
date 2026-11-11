@@ -297,7 +297,9 @@ export function getPublicationResponse(db,session,publicationId,assignmentId,inp
     if(delivered?.language===assignment.language && delivered.content_json) {
       try{deliveredContent=JSON.parse(delivered.content_json);}catch{deliveredContent=null;}
     }
-    const cases=db.prepare('SELECT id,status,reason FROM clarifications WHERE assignment_id=? AND org_id=? ORDER BY created_at DESC,id DESC LIMIT 100').all(assignmentId,session.org_id);
+    const cases=db.prepare(`SELECT c.id,c.status,c.reason,c.created_at AS createdAt,h.text AS helpText FROM clarifications c
+      LEFT JOIN help_requests h ON h.case_id=c.id AND h.org_id=c.org_id AND h.site_id=?
+      WHERE c.assignment_id=? AND c.org_id=? ORDER BY c.created_at DESC,c.id DESC LIMIT 100`).all(session.site_id,assignmentId,session.org_id);
     const acknowledgment=db.prepare('SELECT received_at FROM acknowledgments WHERE assignment_id=? AND org_id=? AND site_id=?')
       .get(assignmentId,session.org_id,session.site_id);
     const completion=db.prepare('SELECT completed_at FROM assignment_completions WHERE assignment_id=? AND org_id=? AND site_id=?')

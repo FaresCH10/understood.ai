@@ -1,8 +1,9 @@
-import {useEffect,useId,useRef,useState,type ReactNode} from 'react';
+import {Fragment,useEffect,useId,useRef,useState,type ReactNode} from 'react';
 import {ChevronLeft,ChevronRight,Info,RefreshCw,Send,Trash2} from 'lucide-react';
 import {clearPendingMessage,readPendingMessage,retainMessage,type MessageSession,type PendingMessage} from './case-message-recovery';
 import {CaseVoiceRecorder} from './CaseVoiceRecorder';
-import {conversationComposerPolicy,requestConversation,ConversationRequestError,validConversationSession,type ConversationOperation,type ConversationPage,type ConversationReceipt,type ConversationFailure} from './conversation-request';
+import {chatEnterToSend,resizeChatComposer} from './chat-composer';
+import {conversationComposerPolicy,requestConversation,ConversationRequestError,validConversationSession,type ConversationMessage,type ConversationOperation,type ConversationPage,type ConversationReceipt,type ConversationFailure} from './conversation-request';
 import {keepDialogFocus} from './dialog-focus';
 import {workerUiDirection,type WorkerUiLanguage} from './worker-ui-language';
 import type {RecordingLanguage} from './recording-notice';
@@ -84,15 +85,15 @@ const stateCopy:Record<WorkerUiLanguage,{invalid:string;blocked:string;recovery:
   'pa-Arab':{invalid:'گفتگو دے جواب دی تصدیق نہیں ہو سکی۔ دوبارہ کوشش لئی تازہ کرو۔',blocked:'بھیجنا عارضی طور تے دستیاب نہیں اے۔',recovery:'مقامی پیغام دی بازیابی دی تصدیق نہیں ہو سکی۔ دوبارہ کوشش توں پہلاں کوئی وی زیر التوا وصولی چیک کرو۔',clear:'نہ بھیجیا متن صاف کرو',clearTitle:'ایہ نہ بھیجیا متن صاف کرنا اے؟',clearImpact:'ایہ صرف ایس اسکرین دا متن صاف کردا اے۔ زیر التوا درخواست منسوخ یا بھیجیا پیغام حذف نہیں کردا۔',cancel:'منسوخ کرو',confirm:'متن صاف کرو',draft:'تہاڈا نہ بھیجیا متن اجے وی ایتھے اے۔ گفتگو دوبارہ دستیاب ہون تک بھیجنا دستیاب نہیں۔'},
   id:{invalid:'Tidak dapat memverifikasi respons percakapan. Muat ulang untuk mencoba lagi.',blocked:'Pengiriman sementara tidak tersedia.',recovery:'Tidak dapat memverifikasi pemulihan pesan lokal. Periksa tanda terima yang tertunda sebelum mencoba lagi.',clear:'Hapus teks yang belum terkirim',clearTitle:'Hapus teks yang belum terkirim ini?',clearImpact:'Ini hanya menghapus teks di layar ini. Tidak membatalkan permintaan yang tertunda atau menghapus pesan yang sudah terkirim.',cancel:'Batal',confirm:'Hapus teks',draft:'Teks yang belum terkirim masih ada di sini. Pengiriman tidak tersedia sampai percakapan tersedia lagi.'},
 };
-type Props={caseId:string;assignmentId?:string;session:MessageSession;language?:WorkerUiLanguage;worker?:boolean;synthetic?:boolean;embedded?:boolean;canWrite?:boolean;current?:()=>boolean;canMutate?:()=>boolean;timezone?:string;onDirtyChange?:(value:boolean)=>void;onSessionLost?:()=>void;afterComposer?:ReactNode};
+type Props={caseId:string;assignmentId?:string;session:MessageSession;language?:WorkerUiLanguage;worker?:boolean;synthetic?:boolean;embedded?:boolean;canWrite?:boolean;current?:()=>boolean;canMutate?:()=>boolean;timezone?:string;initialText?:string;leadingMessage?:{text:string;createdAt:string}|null;focusSignal?:number;refreshSignal?:number;onDirtyChange?:(value:boolean)=>void;onSessionLost?:()=>void;afterComposer?:ReactNode};
 export function CaseConversation(props:Props){
   return <ConversationContent key={JSON.stringify([props.caseId,props.session.clientContext,props.session.expiresAt,!!props.worker])} {...props}/>;
 }
-function ConversationContent({caseId,assignmentId,session,language='en',worker=false,synthetic=true,embedded=false,canWrite=true,current=()=>true,canMutate=()=>true,timezone,onDirtyChange,onSessionLost,afterComposer}:Props){
+function ConversationContent({caseId,assignmentId,session,language='en',worker=false,synthetic=true,embedded=false,canWrite=true,current=()=>true,canMutate=()=>true,timezone,initialText='',leadingMessage,focusSignal,refreshSignal,onDirtyChange,onSessionLost,afterComposer}:Props){
   const locale=language,t=copy[locale],g=generationCopy[locale],s=stateCopy[locale];
   const closed=worker?t.closed:staffClosedCopy[locale==='ar'||locale==='ur'?locale:'en'];
   const rtl=workerUiDirection(locale)==='rtl';
-  const composerId=useId(),composerCountId=useId(),composerLimitId=useId();
+  const composerId=useId(),composerInputId=useId(),composerCountId=useId(),composerLimitId=useId();
   const [page,setPage]=useState(1),[tick,setTick]=useState(0),[text,setText]=useState(''),[failure,setFailure]=useState<ConversationFailure|null>(null),[notice,setNotice]=useState(false),[busy,setBusy]=useState(false),[pending,setPending]=useState<PendingMessage|null>(null),[recoveryFailed,setRecoveryFailed]=useState(false);
   const [voiceDirty,setVoiceDirty]=useState(false),[includeAudio,setIncludeAudio]=useState(true),[generationStatus,setGenerationStatus]=useState<ConversationReceipt['status']|null>(null);
   const readKey=JSON.stringify([page]);
@@ -100,11 +101,42 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
   const mounted=useRef(false),inFlight=useRef(false),command=useRef<AbortController|null>(null),callbacks=useRef({current,canWrite,canMutate,onDirtyChange,onSessionLost});callbacks.current={current,canWrite,canMutate,onDirtyChange,onSessionLost};
   const dialog=useRef<HTMLDialogElement>(null),clearTrigger=useRef<HTMLElement|null>(null),clearIntent=useRef<string|null>(null);
   useEffect(()=>{const timer=window.setInterval(()=>{if(document.visibilityState==='visible'&&current())setTick(value=>value+1);},15000);return()=>window.clearInterval(timer);},[]);
-  const composer=useRef<HTMLTextAreaElement>(null),refreshButton=useRef<HTMLButtonElement>(null);
+  const composer=useRef<HTMLTextAreaElement>(null),refreshButton=useRef<HTMLButtonElement>(null),thread=useRef<HTMLDivElement>(null),scrolled=useRef(false);
   const draft=useRef(text);draft.current=text;
+  const seeded=useRef(false),seedFocus=useRef(false),focusWanted=useRef(0),focusPending=useRef(false),refreshHandled=useRef(refreshSignal??0);
+  useEffect(()=>{
+    if(seeded.current||!initialText)return;
+    seeded.current=true;seedFocus.current=true;setText(value=>value||initialText);
+  },[initialText]);
+  useEffect(()=>{
+    if(!seedFocus.current||!text)return;
+    seedFocus.current=false;composer.current?.focus();
+  },[text]);
+  useEffect(()=>{
+    if(focusSignal===undefined||focusSignal===focusWanted.current)return;
+    focusWanted.current=focusSignal;
+    if(!composer.current){focusPending.current=true;thread.current?.focus();return;}
+    composer.current.focus();
+  },[focusSignal]);
+  useEffect(()=>{
+    if(!focusPending.current||!composer.current)return;
+    focusPending.current=false;composer.current.focus();
+  },[read]);
+  useEffect(()=>{
+    if(refreshSignal===undefined||refreshSignal===refreshHandled.current)return;
+    refreshHandled.current=refreshSignal;setFailure(null);setTick(value=>value+1);
+  },[refreshSignal]);
+  useEffect(()=>{if(embedded)resizeChatComposer(composer.current);},[text,embedded]);
   const isCurrent=()=>mounted.current&&callbacks.current.current()&&validConversationSession(session);
   const canSend=()=>isCurrent()&&callbacks.current.canWrite&&callbacks.current.canMutate();
   const data=read.key===readKey&&current()&&validConversationSession(session)?read.data:null;
+  useEffect(()=>{scrolled.current=false;},[page]);
+  useEffect(()=>{
+    const node=thread.current;if(!node||!data)return;
+    const nearBottom=node.scrollHeight-node.scrollTop-node.clientHeight<80;
+    if(!scrolled.current||nearBottom)node.scrollTop=node.scrollHeight;
+    scrolled.current=true;
+  },[data,page]);
   const contentLanguage:RecordingLanguage=data?.language ?? locale;
   const loading=read.key!==readKey||read.loading;
   const composerPolicy=conversationComposerPolicy({worker,pendingKind:pending?pending.kind==='followup'?'followup':'message':null,canGenerate:!!data?.canGenerate,language:data?.language,includeAudio});
@@ -169,8 +201,62 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
   const error=failure==='closed'?closed:failure==='translation'?t.translation:failure==='blocked'?s.blocked:failure==='recovery'?s.recovery:failure==='conflict'?t.unknown:failure==='invalid'?s.invalid:failure?t.failed:null;
   function askClear(){if(busy||voiceDirty||!text||!isCurrent())return;clearIntent.current=text;clearTrigger.current=document.activeElement as HTMLElement;dialog.current?.showModal();}
   function confirmClear(){if(!busy&&!voiceDirty&&isCurrent()&&text===clearIntent.current){setText('');setFailure(null);}dialog.current?.close();}
+  const dateLocale=locale==='ar'?'ar-LB-u-nu-latn':locale==='ur'?'ur':'en-GB';
+  const dayKey=(value:string)=>new Date(value).toLocaleDateString(dateLocale,{timeZone:timezone});
+  const dayLabel=(value:string)=>new Date(value).toLocaleDateString(dateLocale,{timeZone:timezone,dateStyle:'medium'});
+  const clock=(value:string)=>new Date(value).toLocaleTimeString(dateLocale,{timeZone:timezone,hour:'2-digit',minute:'2-digit'});
+  const chatMessages:ConversationMessage[]=data?[
+    ...(leadingMessage?.text?[{id:'leading',caseId,language:data.language,createdAt:leadingMessage.createdAt,author:'worker' as const,authorName:'',text:leadingMessage.text}]:[]),
+    ...[...data.items].reverse()
+  ]:[];
   if(!current()||!validConversationSession(session))return <section className={`${worker?'worker-card':'panel'}${embedded?' case-conversation-embedded':''}`}><p role="alert">{t.failed}</p></section>;
-  return <section className={`${worker?'worker-card':'panel'}${embedded?' case-conversation-embedded':''}`} lang={locale} dir={rtl?'rtl':'ltr'}>
+  return <section className={`${worker?'worker-card':'panel'}${embedded?' case-conversation-embedded chat-conversation':''}`} lang={locale} dir={rtl?'rtl':'ltr'}>
+    {embedded?<>
+      <div className="chat-thread" ref={thread} role="log" aria-label={t.title} tabIndex={0}>
+        {data&&data.total>20&&<div className="chat-pager">
+          <button type="button" className="chat-pager-button" title={t.previous} aria-label={t.previous} disabled={busy||voiceDirty||!!text||page<=1} onClick={()=>setPage(value=>value-1)}>{rtl?<ChevronRight size={16} aria-hidden="true"/>:<ChevronLeft size={16} aria-hidden="true"/>}<span>{t.previous}</span></button>
+          <span className="chat-pager-count" dir="ltr">{page} / {Math.ceil(data.total/20)}</span>
+          <button type="button" className="chat-pager-button" title={t.next} aria-label={t.next} disabled={busy||voiceDirty||!!text||page*20>=data.total||page>=5000} onClick={()=>setPage(value=>value+1)}><span>{t.next}</span>{rtl?<ChevronLeft size={16} aria-hidden="true"/>:<ChevronRight size={16} aria-hidden="true"/>}</button>
+        </div>}
+        {read.key===readKey&&read.failure?<p role="alert" className="chat-empty">{read.failure==='invalid'?s.invalid:t.failed}</p>
+        :loading&&!data?<p data-page-loading role="status" className="chat-empty">{t.loading}</p>
+        :!data?null
+        :!chatMessages.length?<p className="chat-empty">{t.empty}</p>
+        :<div className="chat-thread-list">{chatMessages.map((item,index)=>{
+          const previous=index?dayKey(chatMessages[index-1].createdAt):null,stamp=dayKey(item.createdAt),self=worker?item.author==='worker':item.author==='staff';
+          return <Fragment key={item.id}>
+            {stamp!==previous&&<div className="chat-day"><span>{dayLabel(item.createdAt)}</span></div>}
+            <article className={`chat-bubble ${self?'is-self':'is-other'}`}>
+              {!self&&<p className="chat-sender"><bdi>{item.author==='worker'?t.worker:item.authorName==='Supervisor'?t.supervisor:item.authorName}</bdi></p>}
+              <p className="chat-text" lang={item.language} dir={workerUiDirection(item.language)}>{item.text}</p>
+              {item.audioUrl&&<audio className="chat-audio" controls preload="none" src={item.audioUrl} aria-label={g.play}/>}
+              <time className="chat-time" dateTime={item.createdAt} title={new Date(item.createdAt).toISOString()}>{clock(item.createdAt)}</time>
+            </article>
+          </Fragment>;
+        })}</div>}
+      </div>
+      <div className="chat-notices">
+        {error&&<p role="alert" className="record-error">{error}</p>}{notice&&<p role="status">{t.received}</p>}{generationStatus==='failed'&&<p role="alert" className="record-error">{g.failed}</p>}
+        {pending&&!busy&&<div className="notice notice-amber"><p role="status">{generationStatus==='queued'?g.queued:generationStatus==='processing'?g.processing:t.unknown}</p><button className="button outline" disabled={busy||recoveryFailed} onClick={()=>void check()}><RefreshCw size={18}/>{t.check}</button></div>}
+        {data&&!data.canReply&&<p className="chat-closed" role="status">{closed}</p>}
+        {unavailable&&data.canReply&&<p className="chat-closed" role="status">{t.translation}</p>}
+        {worker&&!canWrite&&data?.canReply&&<p className="chat-closed" role="status">{s.blocked}</p>}
+      </div>
+      {(replyAvailable||!!text)&&<div className="chat-composer-area">
+        {!!text&&!replyAvailable&&<p role="status" className="chat-composer-note">{s.draft}</p>}
+        {!worker&&data?.canGenerate&&synthetic&&<p className="chat-composer-note">{freeTierCopy[locale]}</p>}
+        {!worker&&data?.canGenerate&&data.language==='en'&&<label className="chat-audio-toggle"><input type="checkbox" checked={includeAudio} disabled={busy||!!pending} onChange={event=>setIncludeAudio(event.target.checked)}/>{g.audio}</label>}
+        {worker&&assignmentId&&<CaseVoiceRecorder scope={{kind:'reply',id:caseId,assignmentId}} session={session} language={locale} noticeLanguage={contentLanguage} current={isCurrent} canMutate={canSend} available={!!data?.canVoice&&canWrite} disabled={!replyAvailable||busy||!!text||!!pending||recoveryFailed} onDirtyChange={setVoiceDirty} onSessionLost={onSessionLost} onReceived={()=>{if(isCurrent()){setPage(1);setTick(value=>value+1);}}}/>}
+        <form id={composerId} className="chat-composer" onSubmit={event=>{event.preventDefault();void send();}}>
+          <div className="chat-pill">
+            <label className="sr-only" htmlFor={composerInputId}>{t.reply}</label>
+            <textarea ref={composer} id={composerInputId} className="chat-input" aria-describedby={overLimit?composerLimitId:undefined} aria-invalid={overLimit} maxLength={composerPolicy.limit} rows={1} value={text} readOnly={!replyAvailable||busy||voiceDirty||recoveryFailed||generationStatus==='queued'||generationStatus==='processing'} onChange={event=>setText(event.target.value)} onKeyDown={chatEnterToSend}/>
+            <button type="submit" className="chat-send" title={pending?t.retry:composerPolicy.kind==='followup'?g.send:t.send} aria-label={pending?t.retry:composerPolicy.kind==='followup'?g.send:t.send} disabled={!replyAvailable||busy||voiceDirty||recoveryFailed||overLimit||generationStatus==='queued'||generationStatus==='processing'||!text.trim()}>{pending?<RefreshCw size={20} aria-hidden="true"/>:<Send size={20} aria-hidden="true"/>}</button>
+          </div>
+          {overLimit&&<p id={composerLimitId} role="alert" className="record-error">{limitCopy[locale]}</p>}
+        </form>
+      </div>}
+    </>:<>
     <div className="worker-card-head"><h2 className={embedded?'sr-only':undefined}>{t.title}</h2><button ref={refreshButton} className="icon-button" title={t.refresh} aria-label={t.refresh} disabled={busy||voiceDirty} onClick={()=>{setFailure(null);setTick(value=>value+1);}}><RefreshCw size={18}/></button></div>
     {error&&<p role="alert" className="record-error">{error}</p>}{notice&&<p role="status">{t.received}</p>}{generationStatus==='failed'&&<p role="alert" className="record-error">{g.failed}</p>}
     {read.key===readKey&&read.failure?<p role="alert">{read.failure==='invalid'?s.invalid:t.failed}</p>:loading&&!data?<p data-page-loading role="status">{t.loading}</p>:!data?null:!data.items.length?<p>{t.empty}</p>:<div className="row-list">{data.items.map(item=><article className="worker-help-entry" key={item.id}><div className="worker-card-head"><strong><bdi>{item.author==='worker'?t.worker:item.authorName==='Supervisor'?t.supervisor:item.authorName}</bdi></strong><time dateTime={item.createdAt} title={new Date(item.createdAt).toISOString()}>{new Date(item.createdAt).toLocaleString(locale==='ar'?'ar-LB-u-nu-latn':locale==='ur'?'ur':'en-GB',{timeZone:timezone,dateStyle:'medium',timeStyle:'short'})}</time></div><p lang={item.language} dir={workerUiDirection(item.language)}>{item.text}</p>{item.audioUrl&&<audio controls preload="none" src={item.audioUrl} aria-label={g.play}/>}</article>)}</div>}
@@ -191,6 +277,7 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
     </div>
     {worker&&!canWrite&&<p role="status">{s.blocked}</p>}
     {worker&&assignmentId&&<CaseVoiceRecorder scope={{kind:'reply',id:caseId,assignmentId}} session={session} language={locale} noticeLanguage={contentLanguage} current={isCurrent} canMutate={canSend} available={!!data?.canVoice&&canWrite} disabled={!replyAvailable||busy||!!text||!!pending||recoveryFailed} onDirtyChange={setVoiceDirty} onSessionLost={onSessionLost} onReceived={()=>{if(isCurrent()){setPage(1);setTick(value=>value+1);}}}/>}
+    </>}
     <dialog ref={dialog} className="withdraw-dialog" aria-labelledby="conversation-clear-title" aria-describedby="conversation-clear-impact" onKeyDown={keepDialogFocus} onClose={()=>{clearIntent.current=null;if(clearTrigger.current?.isConnected)clearTrigger.current.focus();else(composer.current||refreshButton.current)?.focus();}}><h2 id="conversation-clear-title">{s.clearTitle}</h2><p id="conversation-clear-impact">{s.clearImpact}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>dialog.current?.close()}>{s.cancel}</button><button className="button danger" onClick={confirmClear}>{s.confirm}</button></div></dialog>
   </section>;
 }

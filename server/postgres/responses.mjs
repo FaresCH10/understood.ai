@@ -124,7 +124,11 @@ export async function getPublicationResponse(pool,session,publicationId,assignme
     if(!row) throw new Error('Response unavailable');
     const acknowledgment=(await client.query('SELECT received_at FROM acknowledgments WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3',[assignmentId,session.org_id,session.site_id])).rows[0];
     const completion=(await client.query('SELECT completed_at FROM assignment_completions WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3',[assignmentId,session.org_id,session.site_id])).rows[0];
-    const cases=(await client.query('SELECT id,status,reason FROM clarifications WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 ORDER BY created_at DESC,id DESC LIMIT 100',[assignmentId,session.org_id,session.site_id])).rows;
+    const cases=(await client.query(`SELECT c.id,c.status,c.reason,c.created_at,h.text AS help_text FROM clarifications c
+      LEFT JOIN help_requests h ON h.case_id=c.id AND h.org_id=c.org_id AND h.site_id=c.site_id
+      WHERE c.assignment_id=$1 AND c.org_id=$2 AND c.site_id=$3 ORDER BY c.created_at DESC,c.id DESC LIMIT 100`,
+      [assignmentId,session.org_id,session.site_id])).rows
+      .map(row=>({id:row.id,status:row.status,reason:row.reason,createdAt:row.created_at instanceof Date?row.created_at.toISOString():row.created_at,helpText:row.help_text??null}));
     const responseMode=snapshot.responseMode || 'question',deliveryMode=snapshot.deliveryMode || 'both';
     const evidenceMode=responseMode==='acknowledge' && snapshot.evidenceMode==='photo'?'photo':'none';
     const evidence=evidenceMode==='photo'?await assignmentEvidence(client,session.org_id,session.site_id,assignmentId):null;

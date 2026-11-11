@@ -105,7 +105,7 @@
 .worker-detail-disclosure .worker-card { margin-bottom:12px; }
 .worker-assignment-actions { display:flex;flex-wrap:wrap;gap:8px;margin-block-start:12px; }
 .worker-assignment-actions>.button { flex:1 1 9rem;min-width:0;overflow-wrap:anywhere; }
-#worker-question,#worker-help textarea { scroll-margin-block:82px; }
+#worker-question { scroll-margin-block:82px; }
 #worker-question:focus-visible { outline:2px solid #277c61;outline-offset:3px; }
 @media(max-width:600px) {
  .worker-state-filters { gap:6px; }

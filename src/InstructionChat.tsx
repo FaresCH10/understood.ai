@@ -4,12 +4,12 @@ import {keepDialogFocus} from './dialog-focus';
 import './instruction-chat.css';
 
 export type InstructionChatCopy={close:string;closeTitle:string;closeBody:string;keepWriting:string;closeConfirm:string};
-type Props={title:string;launcher:string;count?:number;countLabel?:string;open:boolean;onOpen:()=>void;onClose:()=>void;dirty?:boolean;dir:'ltr'|'rtl';lang:string;variant:'worker'|'staff';copy:InstructionChatCopy;children:ReactNode};
-export function InstructionChat({title,launcher,count=0,countLabel,open,onOpen,onClose,dirty=false,dir,lang,variant,copy,children}:Props){
+type Props={title:string;subtitle?:ReactNode;actions?:ReactNode;launcher:string;count?:number;countLabel?:string;open:boolean;onOpen:()=>void;onClose:()=>void;dirty?:boolean;dir:'ltr'|'rtl';lang:string;variant:'worker'|'staff';copy:InstructionChatCopy;children:ReactNode};
+export function InstructionChat({title,subtitle,actions,launcher,count=0,countLabel,open,onOpen,onClose,dirty=false,dir,lang,variant,copy,children}:Props){
   const base=useId(),panelId=`${base}-panel`,titleId=`${base}-title`,closeTitleId=`${base}-close-title`,closeBodyId=`${base}-close-body`;
-  const launcherRef=useRef<HTMLButtonElement>(null),headingRef=useRef<HTMLHeadingElement>(null),confirmRef=useRef<HTMLDialogElement>(null),wasOpen=useRef(open);
+  const launcherRef=useRef<HTMLButtonElement>(null),headingRef=useRef<HTMLHeadingElement>(null),panelRef=useRef<HTMLElement>(null),confirmRef=useRef<HTMLDialogElement>(null),wasOpen=useRef(open);
   useEffect(()=>{
-    if(open&&!wasOpen.current)headingRef.current?.focus();
+    if(open&&!wasOpen.current){if(!panelRef.current?.contains(document.activeElement))headingRef.current?.focus();}
     else if(!open&&wasOpen.current)launcherRef.current?.focus();
     wasOpen.current=open;
   },[open]);
@@ -17,19 +17,26 @@ export function InstructionChat({title,launcher,count=0,countLabel,open,onOpen,o
   const badge=Math.max(0,count);
   const label=badge&&countLabel?`${launcher} · ${countLabel.replace('{count}',new Intl.NumberFormat(lang).format(badge))}`:launcher;
   return <>
-    <button ref={launcherRef} type="button" className={`instruction-chat-launcher is-${variant}`} aria-expanded={open} aria-controls={panelId} aria-label={open?copy.close:label} title={open?copy.close:label} onClick={()=>{if(open)requestClose();else onOpen();}}>
+    <button ref={launcherRef} type="button" className={`instruction-chat-launcher is-${variant}`} aria-expanded={open} aria-controls={panelId} aria-label={open?copy.close:label} title={open?copy.close:label} hidden={open} onClick={()=>{if(open)requestClose();else onOpen();}}>
       {open?<X size={20} aria-hidden="true"/>:<MessageCircle size={20} aria-hidden="true"/>}
       <span className="instruction-chat-launcher-label" aria-hidden="true">{open?copy.close:launcher}</span>
       {!open&&badge>0&&<span className="instruction-chat-badge" aria-hidden="true">{new Intl.NumberFormat(lang).format(badge)}</span>}
     </button>
-    <section id={panelId} role="dialog" aria-modal="false" aria-labelledby={titleId} className={`instruction-chat is-${variant}`} dir={dir} lang={lang} hidden={!open} onKeyDown={event=>{
+    <section ref={panelRef} id={panelId} role="dialog" aria-modal="false" aria-labelledby={titleId} className={`instruction-chat is-${variant}`} dir={dir} lang={lang} hidden={!open} onKeyDown={event=>{
       if(event.key!=='Escape'||event.defaultPrevented)return;
       if(event.target instanceof Element&&event.target.closest('dialog[open]'))return;
       event.preventDefault();event.stopPropagation();requestClose();
     }}>
       <header className="instruction-chat-head">
-        <h2 id={titleId} ref={headingRef} tabIndex={-1}>{title}</h2>
-        <button type="button" className="icon-button" aria-label={copy.close} title={copy.close} onClick={requestClose}><X size={18} aria-hidden="true"/></button>
+        <span className="instruction-chat-avatar" aria-hidden="true"><MessageCircle size={22}/></span>
+        <div className="instruction-chat-identity">
+          <h2 id={titleId} ref={headingRef} tabIndex={-1}>{title}</h2>
+          {subtitle&&<p>{subtitle}</p>}
+        </div>
+        <div className="instruction-chat-head-actions">
+          {actions}
+          <button type="button" className="icon-button" aria-label={copy.close} title={copy.close} onClick={requestClose}><X size={20} aria-hidden="true"/></button>
+        </div>
       </header>
       <div className="instruction-chat-body">{children}</div>
     </section>

@@ -413,7 +413,10 @@ test('PostgreSQL instruction chats expose open case counts and gate the worker a
     list=await listPublicationResponses(pool,owner,pub.id,{},options);
     assert.deepEqual(list.items.map(row=>[row.assignmentId,row.openCases]),[[assignment,1],[other,1]]);
     assert.ok(!/answerText/.test(JSON.stringify(list)));
-    assert.deepEqual((await getPublicationResponse(pool,owner,pub.id,assignment,{},options)).cases.map(item=>({id:item.id,status:item.status})),[{id:help.id,status:'open'}]);
+    const cases=(await getPublicationResponse(pool,owner,pub.id,assignment,{},options)).cases;
+    assert.deepEqual(cases.map(item=>({id:item.id,status:item.status})),[{id:help.id,status:'open'}]);
+    assert.equal(cases[0].helpText,'Which shelf should wet paint go on?');
+    assert.match(cases[0].createdAt,/^\d{4}-\d{2}-\d{2}T.*Z$/);
     await resolveClarification(pool,owner,help.id,{notes:'Use the blue shelf for wet paint'},options);
     list=await listPublicationResponses(pool,owner,pub.id,{},options);
     assert.deepEqual(list.items.map(row=>[row.assignmentId,row.openCases]),[[assignment,0],[other,1]]);
