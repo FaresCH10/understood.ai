@@ -19,6 +19,19 @@ test('recorder and lazy-error boundary select message copy only for private Help
   }
 });
 
+test('conversation recorders collapse the recording notice behind an expandable info button',async()=>{
+  const recorder=await readFile(new URL('../src/WorkerRecorder.tsx',import.meta.url),'utf8');
+  const chatRecorder=await readFile(new URL('../src/CaseVoiceRecorder.tsx',import.meta.url),'utf8');
+  assert.match(recorder,/compactNotice\?:boolean/);
+  assert.match(recorder,/compactNotice=false/);
+  assert.match(recorder,/recording-notice-compact/);
+  assert.match(recorder,/aria-expanded=\{noticeOpen\}/);
+  assert.match(recorder,/aria-controls=\{noticeId\}/);
+  assert.match(recorder,/recording-notice-pop/);
+  assert.match(recorder,/<aside className="recording-notice"/,'answer and in-person recorders keep the full notice');
+  assert.match(chatRecorder,/<WorkerRecorderView[^]*?purpose=\{scope\.kind\} compactNotice/);
+});
+
 test('worker primary flow precedes mounted saved-work tools without a duplicate inline help section',async()=>{
   const source=await readFile(new URL('../src/main.tsx',import.meta.url),'utf8');
   const question=source.indexOf('<section className="worker-card question-card" id="worker-question"');
