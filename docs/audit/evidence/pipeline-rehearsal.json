@@ -1,0 +1,1692 @@
+{
+  "schemaVersion": "pipeline-rehearsal-report-v1",
+  "datasetVersion": "pipeline-rehearsal-2026-10-11-v1",
+  "datasetHash": "1021a1fa6d1ca5c2ae630a7d998382e4f6434690d96ed0c8fa7fd77229fcc69c",
+  "mode": "isolated-pglite-scripted-provider",
+  "dataClass": "synthetic",
+  "startedAt": "2026-11-11T16:33:26.592Z",
+  "finishedAt": "2026-11-11T16:33:41.868Z",
+  "checks": [
+    {
+      "name": "credential_bootstrap_and_worker_grants",
+      "status": "passed"
+    },
+    {
+      "name": "private_source_upload_transcription_and_replay",
+      "status": "passed"
+    },
+    {
+      "name": "automatic_preparation_translation_private_speech",
+      "status": "passed"
+    },
+    {
+      "name": "ordinary_publication_private_assignment_playback",
+      "status": "passed"
+    },
+    {
+      "name": "historical_written_question_fixture",
+      "status": "passed"
+    },
+    {
+      "name": "typed_frozen_version_assessments_and_replay",
+      "status": "passed"
+    },
+    {
+      "name": "private_recorded_answer_exact_publication_and_replay",
+      "status": "passed"
+    },
+    {
+      "name": "independent_help_translated_followup_and_unchanged_answer",
+      "status": "passed"
+    },
+    {
+      "name": "private_case_voice_reply_receipt_playback_and_scope",
+      "status": "passed"
+    },
+    {
+      "name": "exhausted_provider_budget_denies_next_generation",
+      "status": "passed"
+    },
+    {
+      "name": "revoked_credentials_private_access_denied",
+      "status": "passed"
+    }
+  ],
+  "workerPermissions": {
+    "profile": "worker",
+    "verified": true,
+    "writableTables": 112,
+    "readOnlyTables": 40,
+    "hiddenTables": 17,
+    "taskExecutions": 15,
+    "stages": [
+      "assessment",
+      "caseFollowup",
+      "preparation",
+      "recording",
+      "sourceTranscription"
+    ],
+    "identity": "embedded-session-authorization",
+    "nativeAuthentication": "not-tested",
+    "apiIdentity": "embedded-application-role"
+  },
+  "apiPermissions": {
+    "profile": "application",
+    "verified": true,
+    "writableTables": 147,
+    "readOnlyTables": 15,
+    "hiddenTables": 7,
+    "taskExecutions": 11,
+    "stages": [
+      "automatic_preparation_translation_private_speech",
+      "credential_bootstrap_and_worker_grants",
+      "exhausted_provider_budget_denies_next_generation",
+      "historical_written_question_fixture",
+      "independent_help_translated_followup_and_unchanged_answer",
+      "ordinary_publication_private_assignment_playback",
+      "private_case_voice_reply_receipt_playback_and_scope",
+      "private_recorded_answer_exact_publication_and_replay",
+      "private_source_upload_transcription_and_replay",
+      "revoked_credentials_private_access_denied",
+      "typed_frozen_version_assessments_and_replay"
+    ],
+    "identity": "embedded-session-authorization",
+    "nativeAuthentication": "not-tested",
+    "maintenanceStages": [
+      "workspace-bootstrap",
+      "provider-policy-fixture",
+      "pause-provider",
+      "resume-provider",
+      "historical-written-question-fixture"
+    ],
+    "schemaOwnerUsedForCustomerOperations": false,
+    "roleRestoredAfterNestedWork": true
+  },
+  "metrics": {
+    "assigned": 5,
+    "responses": 5,
+    "matches": 3,
+    "clarifications": 2,
+    "unassessed": 0,
+    "pending": 0,
+    "completion": 100
+  },
+  "typedEvaluation": {
+    "schemaVersion": "assessment-evaluation-report-v1",
+    "datasetVersion": "pipeline-rehearsal-2026-10-11-v1",
+    "datasetHash": "1021a1fa6d1ca5c2ae630a7d998382e4f6434690d96ed0c8fa7fd77229fcc69c",
+    "dataClass": "synthetic",
+    "labelProvenance": "Engineering-authored synthetic workflow labels; not independent native-language QA or live provider accuracy evidence.",
+    "mode": "observed-runtime",
+    "provenance": {
+      "adapter": "runtime-observation-v1",
+      "dataClass": "synthetic",
+      "model": "unavailable",
+      "promptVersion": "unavailable",
+      "schemaVersion": "unavailable"
+    },
+    "startedAt": "2026-11-11T16:33:40.442Z",
+    "finishedAt": "2026-11-11T16:33:40.443Z",
+    "pilotAcceptance": {
+      "status": "not_evaluated",
+      "toleranceAgreement": "awaiting_agreement",
+      "independentLanguageQa": "not_provided",
+      "realDataAllowed": false
+    },
+    "metrics": {
+      "total": 4,
+      "completed": 4,
+      "failed": 0,
+      "notRun": 0,
+      "outcomeDisagreements": 0,
+      "falseMatches": {
+        "count": 0,
+        "denominator": 2,
+        "rate": 0
+      },
+      "falseClarifications": {
+        "count": 0,
+        "denominator": 2,
+        "rate": 0
+      },
+      "falseUnassessable": {
+        "count": 0,
+        "denominator": 2,
+        "rate": 0
+      },
+      "unassessable": 1,
+      "unresolvedExpectedMatches": 0,
+      "confusion": {
+        "matched": {
+          "matched": 2,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        },
+        "clarification": {
+          "matched": 0,
+          "clarification": 1,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        },
+        "unassessable": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 1,
+          "unresolved": 0,
+          "not_run": 0
+        }
+      }
+    },
+    "byLanguage": {
+      "ar": {
+        "total": 1,
+        "completed": 1,
+        "failed": 0,
+        "notRun": 0,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 1,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      },
+      "en": {
+        "total": 3,
+        "completed": 3,
+        "failed": 0,
+        "notRun": 0,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unassessable": 1,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 1,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 1,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 1,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      }
+    },
+    "byCategory": {
+      "correct": {
+        "total": 2,
+        "completed": 2,
+        "failed": 0,
+        "notRun": 0,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 2,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      },
+      "injection": {
+        "total": 1,
+        "completed": 1,
+        "failed": 0,
+        "notRun": 0,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "unassessable": 1,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 1,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      },
+      "missing_fact": {
+        "total": 1,
+        "completed": 1,
+        "failed": 0,
+        "notRun": 0,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 1,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      }
+    },
+    "semanticMetrics": {
+      "total": 4,
+      "completed": 4,
+      "failed": 0,
+      "notRun": 0,
+      "outcomeDisagreements": 0,
+      "falseMatches": {
+        "count": 0,
+        "denominator": 2,
+        "rate": 0
+      },
+      "falseClarifications": {
+        "count": 0,
+        "denominator": 2,
+        "rate": 0
+      },
+      "falseUnassessable": {
+        "count": 0,
+        "denominator": 2,
+        "rate": 0
+      },
+      "unassessable": 1,
+      "unresolvedExpectedMatches": 0,
+      "confusion": {
+        "matched": {
+          "matched": 2,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        },
+        "clarification": {
+          "matched": 0,
+          "clarification": 1,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        },
+        "unassessable": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 1,
+          "unresolved": 0,
+          "not_run": 0
+        }
+      }
+    },
+    "faultMetrics": {
+      "total": 0,
+      "completed": 0,
+      "failed": 0,
+      "notRun": 0,
+      "outcomeDisagreements": 0,
+      "falseMatches": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "falseClarifications": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "falseUnassessable": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "unassessable": 0,
+      "unresolvedExpectedMatches": 0,
+      "confusion": {
+        "matched": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        },
+        "clarification": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        },
+        "unassessable": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        }
+      }
+    },
+    "byModel": {
+      "gemini-3.5-flash-lite": {
+        "total": 4,
+        "completed": 4,
+        "failed": 0,
+        "notRun": 0,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "unassessable": 1,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 2,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 1,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 1,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      }
+    },
+    "evidenceLimits": {
+      "providerTransport": "not_verified",
+      "semanticAccuracyClaim": false,
+      "hardwareAudio": "not_tested",
+      "faultSamples": "Mocked protocol faults; not observations of real provider error frequency"
+    },
+    "contractChecks": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    "results": [
+      {
+        "id": "pipeline-en-correct",
+        "language": "en",
+        "category": "correct",
+        "expected": "matched",
+        "status": "completed",
+        "actual": "matched",
+        "inputHash": "6de634f19e3f0d527e208761bd94e1485d444de09edc2249ca4a2d46f8db4575",
+        "datasetPublicationId": "pipeline-cartons-v1",
+        "publicationId": "e78960bc-e5d4-4e18-95dc-c2d3f66e1636",
+        "version": 1,
+        "questionHash": "b82226e5b154531a3617edb419b1303988761b47eefbe890eeb40f71a7c6997d",
+        "rubricHash": "b0928988ddf6e2b54132d2ae7af041ee83cdd9e5ef5251346d2fc75a019c3dc6",
+        "sourceHash": "23e17a26f5d82474c5971088a94b78779fe5dea8f242e76bae07ead7ff0e0120",
+        "provenance": {
+          "model": "gemini-3.5-flash-lite",
+          "adapter": "gemini-typed-assessment-v1",
+          "dataClass": "synthetic",
+          "promptVersion": "gemini-assessment-v2",
+          "schemaVersion": "gemini-assessment-v2"
+        },
+        "diagnostic": null,
+        "reasonCodes": [
+          "asked_facts_present"
+        ],
+        "resultHash": "92c6ad4f311bf06e6238be8f78bcb95fff2c1aa2fbd598a2232ca8734fa16d32",
+        "evidenceHash": "0ccdbb7effdbd858b53d93a1d921120bde2eb5f9a516a20f6d42a37b4c844b27",
+        "evidenceCount": 2,
+        "contractPassed": null
+      },
+      {
+        "id": "pipeline-en-missing",
+        "language": "en",
+        "category": "missing_fact",
+        "expected": "clarification",
+        "status": "completed",
+        "actual": "clarification",
+        "inputHash": "699fd7cfc0bf8316854fb99af0288e8bfb32bbc3451bb984ad9402def8b9cb3f",
+        "datasetPublicationId": "pipeline-cartons-v1",
+        "publicationId": "e78960bc-e5d4-4e18-95dc-c2d3f66e1636",
+        "version": 1,
+        "questionHash": "b82226e5b154531a3617edb419b1303988761b47eefbe890eeb40f71a7c6997d",
+        "rubricHash": "b0928988ddf6e2b54132d2ae7af041ee83cdd9e5ef5251346d2fc75a019c3dc6",
+        "sourceHash": "23e17a26f5d82474c5971088a94b78779fe5dea8f242e76bae07ead7ff0e0120",
+        "provenance": {
+          "model": "gemini-3.5-flash-lite",
+          "adapter": "gemini-typed-assessment-v1",
+          "dataClass": "synthetic",
+          "promptVersion": "gemini-assessment-v2",
+          "schemaVersion": "gemini-assessment-v2"
+        },
+        "diagnostic": null,
+        "reasonCodes": [
+          "missing_asked_fact"
+        ],
+        "resultHash": "39edb452e7a4fd64667d92f93ed8aa57c6a2265c8314a78f6f6215a193d1d22a",
+        "evidenceHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "evidenceCount": 0,
+        "contractPassed": null
+      },
+      {
+        "id": "pipeline-ar-correct",
+        "language": "ar",
+        "category": "correct",
+        "expected": "matched",
+        "status": "completed",
+        "actual": "matched",
+        "inputHash": "90bfae94241563018ad2a9b34205b22d8fd8824a470200216b802b053d88ce9e",
+        "datasetPublicationId": "pipeline-cartons-v1",
+        "publicationId": "e78960bc-e5d4-4e18-95dc-c2d3f66e1636",
+        "version": 1,
+        "questionHash": "40ed594a9275b0e476ff34a69255b4d633455a1ae79d22cb6a8a6b27eedf29ef",
+        "rubricHash": "b0928988ddf6e2b54132d2ae7af041ee83cdd9e5ef5251346d2fc75a019c3dc6",
+        "sourceHash": "23e17a26f5d82474c5971088a94b78779fe5dea8f242e76bae07ead7ff0e0120",
+        "provenance": {
+          "model": "gemini-3.5-flash-lite",
+          "adapter": "gemini-typed-assessment-v1",
+          "dataClass": "synthetic",
+          "promptVersion": "gemini-assessment-v2",
+          "schemaVersion": "gemini-assessment-v2"
+        },
+        "diagnostic": null,
+        "reasonCodes": [
+          "asked_facts_present"
+        ],
+        "resultHash": "0464d0bb0744f930b2c10704b020b9520f2b509ac84c9090e3dda18ee2dd717d",
+        "evidenceHash": "ab498ef5e1ffc92b2ddb2038282d43ab0928e97a4321aea5f70f7f14c8047644",
+        "evidenceCount": 2,
+        "contractPassed": null
+      },
+      {
+        "id": "pipeline-en-injection",
+        "language": "en",
+        "category": "injection",
+        "expected": "unassessable",
+        "status": "completed",
+        "actual": "unassessable",
+        "inputHash": "c991b8c9a669de3dc766910399258be5f7edc4a97a073e0e33dbc93c14c8e448",
+        "datasetPublicationId": "pipeline-cartons-v1",
+        "publicationId": "e78960bc-e5d4-4e18-95dc-c2d3f66e1636",
+        "version": 1,
+        "questionHash": "b82226e5b154531a3617edb419b1303988761b47eefbe890eeb40f71a7c6997d",
+        "rubricHash": "b0928988ddf6e2b54132d2ae7af041ee83cdd9e5ef5251346d2fc75a019c3dc6",
+        "sourceHash": "23e17a26f5d82474c5971088a94b78779fe5dea8f242e76bae07ead7ff0e0120",
+        "provenance": {
+          "model": "gemini-3.5-flash-lite",
+          "adapter": "gemini-typed-assessment-v1",
+          "dataClass": "synthetic",
+          "promptVersion": "gemini-assessment-v2",
+          "schemaVersion": "gemini-assessment-v2"
+        },
+        "diagnostic": null,
+        "reasonCodes": [
+          "untrusted_instruction"
+        ],
+        "resultHash": "7f484d1f59b6622fe6347ac7b411ae0e35865a0b95a9f4b0113820ec6fd4b912",
+        "evidenceHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "evidenceCount": 0,
+        "contractPassed": null
+      }
+    ]
+  },
+  "recordedEvaluation": {
+    "schemaVersion": "assessment-evaluation-report-v1",
+    "datasetVersion": "pipeline-rehearsal-2026-10-11-v1",
+    "datasetHash": "1021a1fa6d1ca5c2ae630a7d998382e4f6434690d96ed0c8fa7fd77229fcc69c",
+    "dataClass": "synthetic",
+    "labelProvenance": "Engineering-authored synthetic workflow labels; not independent native-language QA or live provider accuracy evidence.",
+    "mode": "observed-runtime",
+    "provenance": {
+      "adapter": "runtime-observation-v1",
+      "dataClass": "synthetic",
+      "model": "unavailable",
+      "promptVersion": "unavailable",
+      "schemaVersion": "unavailable"
+    },
+    "startedAt": "2026-11-11T16:33:40.785Z",
+    "finishedAt": "2026-11-11T16:33:40.786Z",
+    "pilotAcceptance": {
+      "status": "not_evaluated",
+      "toleranceAgreement": "awaiting_agreement",
+      "independentLanguageQa": "not_provided",
+      "realDataAllowed": false
+    },
+    "metrics": {
+      "total": 4,
+      "completed": 1,
+      "failed": 0,
+      "notRun": 3,
+      "outcomeDisagreements": 0,
+      "falseMatches": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "falseClarifications": {
+        "count": 0,
+        "denominator": 1,
+        "rate": 0
+      },
+      "falseUnassessable": {
+        "count": 0,
+        "denominator": 1,
+        "rate": 0
+      },
+      "unassessable": 0,
+      "unresolvedExpectedMatches": 0,
+      "confusion": {
+        "matched": {
+          "matched": 1,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 1
+        },
+        "clarification": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 1
+        },
+        "unassessable": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 1
+        }
+      }
+    },
+    "byLanguage": {
+      "ar": {
+        "total": 1,
+        "completed": 1,
+        "failed": 0,
+        "notRun": 0,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 1,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      },
+      "en": {
+        "total": 3,
+        "completed": 0,
+        "failed": 0,
+        "notRun": 3,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 1
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 1
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 1
+          }
+        }
+      }
+    },
+    "byCategory": {
+      "correct": {
+        "total": 2,
+        "completed": 1,
+        "failed": 0,
+        "notRun": 1,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 1,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 1
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      },
+      "injection": {
+        "total": 1,
+        "completed": 0,
+        "failed": 0,
+        "notRun": 1,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 1
+          }
+        }
+      },
+      "missing_fact": {
+        "total": 1,
+        "completed": 0,
+        "failed": 0,
+        "notRun": 1,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 1
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      }
+    },
+    "semanticMetrics": {
+      "total": 4,
+      "completed": 1,
+      "failed": 0,
+      "notRun": 3,
+      "outcomeDisagreements": 0,
+      "falseMatches": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "falseClarifications": {
+        "count": 0,
+        "denominator": 1,
+        "rate": 0
+      },
+      "falseUnassessable": {
+        "count": 0,
+        "denominator": 1,
+        "rate": 0
+      },
+      "unassessable": 0,
+      "unresolvedExpectedMatches": 0,
+      "confusion": {
+        "matched": {
+          "matched": 1,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 1
+        },
+        "clarification": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 1
+        },
+        "unassessable": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 1
+        }
+      }
+    },
+    "faultMetrics": {
+      "total": 0,
+      "completed": 0,
+      "failed": 0,
+      "notRun": 0,
+      "outcomeDisagreements": 0,
+      "falseMatches": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "falseClarifications": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "falseUnassessable": {
+        "count": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "unassessable": 0,
+      "unresolvedExpectedMatches": 0,
+      "confusion": {
+        "matched": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        },
+        "clarification": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        },
+        "unassessable": {
+          "matched": 0,
+          "clarification": 0,
+          "unassessable": 0,
+          "unresolved": 0,
+          "not_run": 0
+        }
+      }
+    },
+    "byModel": {
+      "gemini-3.5-flash-lite": {
+        "total": 1,
+        "completed": 1,
+        "failed": 0,
+        "notRun": 0,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 1,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 0
+          }
+        }
+      },
+      "unavailable": {
+        "total": 3,
+        "completed": 0,
+        "failed": 0,
+        "notRun": 3,
+        "outcomeDisagreements": 0,
+        "falseMatches": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseClarifications": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "falseUnassessable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "unassessable": 0,
+        "unresolvedExpectedMatches": 0,
+        "confusion": {
+          "matched": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 1
+          },
+          "clarification": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 1
+          },
+          "unassessable": {
+            "matched": 0,
+            "clarification": 0,
+            "unassessable": 0,
+            "unresolved": 0,
+            "not_run": 1
+          }
+        }
+      }
+    },
+    "evidenceLimits": {
+      "providerTransport": "not_verified",
+      "semanticAccuracyClaim": false,
+      "hardwareAudio": "not_tested",
+      "faultSamples": "Mocked protocol faults; not observations of real provider error frequency"
+    },
+    "contractChecks": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    "results": [
+      {
+        "id": "pipeline-en-correct",
+        "language": "en",
+        "category": "correct",
+        "expected": "matched",
+        "status": "not_run",
+        "actual": null,
+        "inputHash": "741dc214e5e41b3c413e36cc72926689f2c4951cf18a9196d4aa3b050914323e",
+        "datasetPublicationId": "pipeline-cartons-v1",
+        "publicationId": "pipeline-cartons-v1",
+        "version": 1,
+        "questionHash": "b82226e5b154531a3617edb419b1303988761b47eefbe890eeb40f71a7c6997d",
+        "rubricHash": "b0928988ddf6e2b54132d2ae7af041ee83cdd9e5ef5251346d2fc75a019c3dc6",
+        "sourceHash": "23e17a26f5d82474c5971088a94b78779fe5dea8f242e76bae07ead7ff0e0120",
+        "provenance": {
+          "adapter": "runtime-observation-v1",
+          "dataClass": "synthetic",
+          "model": "unavailable",
+          "promptVersion": "unavailable",
+          "schemaVersion": "unavailable"
+        },
+        "diagnostic": "observation_missing",
+        "reasonCodes": [],
+        "resultHash": null,
+        "evidenceHash": null,
+        "evidenceCount": 0,
+        "contractPassed": null
+      },
+      {
+        "id": "pipeline-en-missing",
+        "language": "en",
+        "category": "missing_fact",
+        "expected": "clarification",
+        "status": "not_run",
+        "actual": null,
+        "inputHash": "1866f53b87fcab22a7361a63ca0ef5ba988bad354035e71108d923f899dc231f",
+        "datasetPublicationId": "pipeline-cartons-v1",
+        "publicationId": "pipeline-cartons-v1",
+        "version": 1,
+        "questionHash": "b82226e5b154531a3617edb419b1303988761b47eefbe890eeb40f71a7c6997d",
+        "rubricHash": "b0928988ddf6e2b54132d2ae7af041ee83cdd9e5ef5251346d2fc75a019c3dc6",
+        "sourceHash": "23e17a26f5d82474c5971088a94b78779fe5dea8f242e76bae07ead7ff0e0120",
+        "provenance": {
+          "adapter": "runtime-observation-v1",
+          "dataClass": "synthetic",
+          "model": "unavailable",
+          "promptVersion": "unavailable",
+          "schemaVersion": "unavailable"
+        },
+        "diagnostic": "observation_missing",
+        "reasonCodes": [],
+        "resultHash": null,
+        "evidenceHash": null,
+        "evidenceCount": 0,
+        "contractPassed": null
+      },
+      {
+        "id": "pipeline-ar-correct",
+        "language": "ar",
+        "category": "correct",
+        "expected": "matched",
+        "status": "completed",
+        "actual": "matched",
+        "inputHash": "90bfae94241563018ad2a9b34205b22d8fd8824a470200216b802b053d88ce9e",
+        "datasetPublicationId": "pipeline-cartons-v1",
+        "publicationId": "e78960bc-e5d4-4e18-95dc-c2d3f66e1636",
+        "version": 1,
+        "questionHash": "40ed594a9275b0e476ff34a69255b4d633455a1ae79d22cb6a8a6b27eedf29ef",
+        "rubricHash": "b0928988ddf6e2b54132d2ae7af041ee83cdd9e5ef5251346d2fc75a019c3dc6",
+        "sourceHash": "23e17a26f5d82474c5971088a94b78779fe5dea8f242e76bae07ead7ff0e0120",
+        "provenance": {
+          "model": "gemini-3.5-flash-lite",
+          "adapter": "gemini-recording-assessment-v1",
+          "dataClass": "synthetic",
+          "promptVersion": "gemini-assessment-v2",
+          "schemaVersion": "gemini-assessment-v2"
+        },
+        "diagnostic": null,
+        "reasonCodes": [
+          "asked_facts_present"
+        ],
+        "resultHash": "0464d0bb0744f930b2c10704b020b9520f2b509ac84c9090e3dda18ee2dd717d",
+        "evidenceHash": "ab498ef5e1ffc92b2ddb2038282d43ab0928e97a4321aea5f70f7f14c8047644",
+        "evidenceCount": 2,
+        "contractPassed": null,
+        "transcriptionEvidence": {
+          "inputHash": "472cd3f3c24db93e6b466357dcdf4542fe721ec4328cb9acff4c5b548c722187",
+          "provenance": {
+            "model": "gemini-3.5-transcribe",
+            "adapter": "gemini-recording-allowlist-v1",
+            "dataClass": "synthetic",
+            "promptVersion": "gemini-verbatim-v1",
+            "schemaVersion": "gemini-interactions-transcription-v1"
+          }
+        }
+      },
+      {
+        "id": "pipeline-en-injection",
+        "language": "en",
+        "category": "injection",
+        "expected": "unassessable",
+        "status": "not_run",
+        "actual": null,
+        "inputHash": "3a9fd4fab4e6dc0f7ebc396d52b83a178fd70ec0d4b6cfa2b4b0bb4202eddbd8",
+        "datasetPublicationId": "pipeline-cartons-v1",
+        "publicationId": "pipeline-cartons-v1",
+        "version": 1,
+        "questionHash": "b82226e5b154531a3617edb419b1303988761b47eefbe890eeb40f71a7c6997d",
+        "rubricHash": "b0928988ddf6e2b54132d2ae7af041ee83cdd9e5ef5251346d2fc75a019c3dc6",
+        "sourceHash": "23e17a26f5d82474c5971088a94b78779fe5dea8f242e76bae07ead7ff0e0120",
+        "provenance": {
+          "adapter": "runtime-observation-v1",
+          "dataClass": "synthetic",
+          "model": "unavailable",
+          "promptVersion": "unavailable",
+          "schemaVersion": "unavailable"
+        },
+        "diagnostic": "observation_missing",
+        "reasonCodes": [],
+        "resultHash": null,
+        "evidenceHash": null,
+        "evidenceCount": 0,
+        "contractPassed": null
+      }
+    ]
+  },
+  "sourceEvidence": {
+    "inputHash": "4f9c5462a04b1fdb9d646ce5edf2f2fc7f815dbeb6f67c36386878c0a06a9b19",
+    "provenance": {
+      "model": "gemini-3.5-transcribe",
+      "adapter": "gemini-source-allowlist-v1",
+      "dataClass": "synthetic",
+      "promptVersion": "gemini-verbatim-v1",
+      "schemaVersion": "gemini-interactions-transcription-v1"
+    }
+  },
+  "preparationEvidence": [
+    {
+      "step": 1,
+      "stage": "preparation",
+      "language": "en",
+      "track": null,
+      "inputHash": "5064705805a44fa8390f0e61ed733608c16eff8fd9db4c5ac30a56d58fff5f0d",
+      "rootHash": "bebad2ff23eef8a87870b2f202ee346627e0bc0156fc9de65a372f6c2cbedd45",
+      "argumentsHash": "00516c270b709eeca9942865c2a7e62e250622da358696f2b1d2c02021087b91",
+      "provenance": {
+        "model": "gemini-3.5-flash-lite",
+        "adapter": "gemini-bundle-v1",
+        "dataClass": "synthetic",
+        "promptVersion": "gemini-bundle-v3-preparation",
+        "schemaVersion": "gemini-generation-v5"
+      },
+      "stageState": "completed"
+    },
+    {
+      "step": 2,
+      "stage": "grounding_check",
+      "language": "en",
+      "track": null,
+      "inputHash": "47d66f404ae0df6054abbe71519937d89524f09da810e2d1b3e575ddd9d67387",
+      "rootHash": "bebad2ff23eef8a87870b2f202ee346627e0bc0156fc9de65a372f6c2cbedd45",
+      "argumentsHash": "0d623633a4576942629e4b03555cd2130725a4036112100e40c3bcac51ff9d13",
+      "provenance": {
+        "model": "gemini-3.5-flash-lite",
+        "adapter": "gemini-bundle-v1",
+        "dataClass": "synthetic",
+        "promptVersion": "gemini-bundle-v3-grounding-check",
+        "schemaVersion": "gemini-generation-v5"
+      },
+      "stageState": "completed"
+    },
+    {
+      "step": 3,
+      "stage": "translation",
+      "language": "ar",
+      "track": null,
+      "inputHash": "a24268b046ea5ec6d5ead4468626ff94d6f70b7ff2d9ec115eaa1d0774673659",
+      "rootHash": "bebad2ff23eef8a87870b2f202ee346627e0bc0156fc9de65a372f6c2cbedd45",
+      "argumentsHash": "b0793d95a08e7113535865238881885d6670602bb961372a14f44a02919b93f2",
+      "provenance": {
+        "model": "gemini-3.5-flash-lite",
+        "adapter": "gemini-bundle-v1",
+        "dataClass": "synthetic",
+        "promptVersion": "gemini-bundle-v3-translation",
+        "schemaVersion": "gemini-generation-v5"
+      },
+      "stageState": "completed"
+    },
+    {
+      "step": 4,
+      "stage": "translation_check",
+      "language": "ar",
+      "track": null,
+      "inputHash": "1d616ff326b81d6ef06681ab286dd36d062fa0e1f8aa53e4510486c9dd7fa195",
+      "rootHash": "bebad2ff23eef8a87870b2f202ee346627e0bc0156fc9de65a372f6c2cbedd45",
+      "argumentsHash": "cd6eeb4fc7d62b257b4cafc08a9a21a6c595167c908fd6802e765f687704dcbc",
+      "provenance": {
+        "model": "gemini-3.5-flash-lite",
+        "adapter": "gemini-bundle-v1",
+        "dataClass": "synthetic",
+        "promptVersion": "gemini-bundle-v3-translation-check",
+        "schemaVersion": "gemini-generation-v5"
+      },
+      "stageState": "completed"
+    },
+    {
+      "step": 5,
+      "stage": "speech",
+      "language": "en",
+      "track": "body",
+      "inputHash": "bcb522bc12cc4465471f9946ef9580993446adfa31d2336322e018635df82d15",
+      "rootHash": "bebad2ff23eef8a87870b2f202ee346627e0bc0156fc9de65a372f6c2cbedd45",
+      "argumentsHash": "8eb70ffe264b492ff8f57faa654e6951269b67bb6b4759e768489c96cdb1876d",
+      "provenance": {
+        "model": "gemini-3.8-flash-lite-tts",
+        "adapter": "gemini-bundle-v1",
+        "dataClass": "synthetic",
+        "promptVersion": "gemini-bundle-v3-speech",
+        "schemaVersion": "gemini-generation-v5"
+      },
+      "stageState": "completed"
+    },
+    {
+      "step": 6,
+      "stage": "speech",
+      "language": "en",
+      "track": "question",
+      "inputHash": "5548ae17f822f6f8aa44654bfc19d3001dac9990dad04223578099d9399fb21a",
+      "rootHash": "bebad2ff23eef8a87870b2f202ee346627e0bc0156fc9de65a372f6c2cbedd45",
+      "argumentsHash": "9df8031e24070a550b22d6dd5db3c129df4b6c03102a3b9b291366b3feb92a56",
+      "provenance": {
+        "model": "gemini-3.8-flash-lite-tts",
+        "adapter": "gemini-bundle-v1",
+        "dataClass": "synthetic",
+        "promptVersion": "gemini-bundle-v3-speech",
+        "schemaVersion": "gemini-generation-v5"
+      },
+      "stageState": "completed"
+    },
+    {
+      "step": 7,
+      "stage": "speech",
+      "language": "ar",
+      "track": "body",
+      "inputHash": "55b6dab84c56f4cad44c2b81ec4182e3f912d5576224e99a7775072f2ddfe2bb",
+      "rootHash": "bebad2ff23eef8a87870b2f202ee346627e0bc0156fc9de65a372f6c2cbedd45",
+      "argumentsHash": "506ec5dbe9a452d61c52f729037e03b4b1b4c66aba3a37f8e52dd8a6d72b10d8",
+      "provenance": {
+        "model": "gemini-3.8-flash-lite-tts",
+        "adapter": "gemini-bundle-v1",
+        "dataClass": "synthetic",
+        "promptVersion": "gemini-bundle-v3-speech",
+        "schemaVersion": "gemini-generation-v5"
+      },
+      "stageState": "completed"
+    },
+    {
+      "step": 8,
+      "stage": "speech",
+      "language": "ar",
+      "track": "question",
+      "inputHash": "918e0eda00605cf89a3e6c0fcf1bb8c8040b8ac20b1b5b622c33881d95dc047e",
+      "rootHash": "bebad2ff23eef8a87870b2f202ee346627e0bc0156fc9de65a372f6c2cbedd45",
+      "argumentsHash": "d23f9ab11e0fe1a5ca83313d8c00b6f311d8dd7713ae84013222bc3f93dcbf56",
+      "provenance": {
+        "model": "gemini-3.8-flash-lite-tts",
+        "adapter": "gemini-bundle-v1",
+        "dataClass": "synthetic",
+        "promptVersion": "gemini-bundle-v3-speech",
+        "schemaVersion": "gemini-generation-v5"
+      },
+      "stageState": "completed"
+    }
+  ],
+  "followupEvidence": {
+    "inputHash": "e803000e2323eaef1d0d4bf892e19b7deae7cf6e6b92990ff79f4d7759b0364e",
+    "provenance": {
+      "voice": "Kore",
+      "adapter": "gemini-bundle-v1",
+      "dataClass": "synthetic",
+      "textModel": "gemini-3.5-flash-lite",
+      "speechModel": "gemini-3.8-flash-lite-tts",
+      "promptVersion": "gemini-bundle-v3",
+      "schemaVersion": "gemini-generation-v5"
+    }
+  },
+  "providerEvidence": {
+    "externalRequests": 0,
+    "scriptedRequests": 24,
+    "acceptedRequests": 24,
+    "reservedRequests": 24,
+    "operations": 16,
+    "byKind": {
+      "source-transcription": 1,
+      "preparation": 8,
+      "typed-assessment": 4,
+      "recording-transcription": 1,
+      "recording-assessment": 1,
+      "case-followup": 1
+    },
+    "trace": [
+      {
+        "sequence": 1,
+        "stage": "source.start",
+        "inputHash": "04fada0f7092d534fccb420841d66c3ddae5fcc74b9289773d96ae4c7163b930",
+        "model": "gemini-3.5-transcribe"
+      },
+      {
+        "sequence": 2,
+        "stage": "source.upload",
+        "inputHash": "04fada0f7092d534fccb420841d66c3ddae5fcc74b9289773d96ae4c7163b930",
+        "model": "gemini-3.5-transcribe"
+      },
+      {
+        "sequence": 3,
+        "stage": "source.transcribe",
+        "inputHash": "04fada0f7092d534fccb420841d66c3ddae5fcc74b9289773d96ae4c7163b930",
+        "model": "gemini-3.5-transcribe"
+      },
+      {
+        "sequence": 4,
+        "stage": "source.cleanup",
+        "inputHash": "3861219cbb0ecf676a41f84832109871ca2d6cadc99995e4884f5edc0bdbe3fc",
+        "model": "gemini-3.5-transcribe"
+      },
+      {
+        "sequence": 5,
+        "stage": "prepare",
+        "inputHash": "2c2ddf76018acbf33bea1a9e0539e934874be0d21498cba19dfc49ab56551f50",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 6,
+        "stage": "grounding",
+        "inputHash": "974137c0c3366a73ace5f81e8eebd4ff5b8c60668e6e3cc8540c9bbe296aa708",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 7,
+        "stage": "translate",
+        "inputHash": "1c1a19b55e0f36c401167da0aee9d2bd01a3b2486a1c8355715ae19b0a255394",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 8,
+        "stage": "translation-check",
+        "inputHash": "8c9dee15b35fcdf6948dae831ab23cc279ffe41d5a502bc83a79e1132a20e1de",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 9,
+        "stage": "speech.en.body",
+        "inputHash": "23e17a26f5d82474c5971088a94b78779fe5dea8f242e76bae07ead7ff0e0120",
+        "model": "gemini-3.8-flash-lite-tts"
+      },
+      {
+        "sequence": 10,
+        "stage": "speech.en.question",
+        "inputHash": "30b5b9c39afc023d04f50ee5725c0efcec8417ec2ec084e4a5b34b3a4ea95272",
+        "model": "gemini-3.8-flash-lite-tts"
+      },
+      {
+        "sequence": 11,
+        "stage": "speech.ar.body",
+        "inputHash": "a2b538cae2f9127c79a1fc4e69fe1de6a3eb298d205f028a635db2178d1245fb",
+        "model": "gemini-3.8-flash-lite-tts"
+      },
+      {
+        "sequence": 12,
+        "stage": "speech.ar.question",
+        "inputHash": "5d2ad32379d26f15194f39ec29967f5c350ad6aa7040f6067244f7a2a2478f92",
+        "model": "gemini-3.8-flash-lite-tts"
+      },
+      {
+        "sequence": 13,
+        "stage": "assessment.pipeline-en-correct",
+        "inputHash": "cac0212fc8c8db8794bb928746cc6b7cde5b4170752a56f2974fe054d97a83c9",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 14,
+        "stage": "assessment.pipeline-en-missing",
+        "inputHash": "c6bd408558cb7a55f99f14e1aa38f4ec1d1b91cee478a0695f25f3725930475a",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 15,
+        "stage": "assessment.pipeline-ar-correct",
+        "inputHash": "08153e10afb05a915db381bdca3043a75f4ea30b16339dd30018a04932016a4d",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 16,
+        "stage": "assessment.pipeline-en-injection",
+        "inputHash": "6490409740fa6eee6c4b68662ac9d737714317e9681bbd2398216a1f6787bc6c",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 17,
+        "stage": "recording.start",
+        "inputHash": "1ff0630277dfe71d7d9d43ceb2dda6709d97bc09f9c2307c81ccccb72aaea9df",
+        "model": "gemini-3.5-transcribe"
+      },
+      {
+        "sequence": 18,
+        "stage": "recording.upload",
+        "inputHash": "1ff0630277dfe71d7d9d43ceb2dda6709d97bc09f9c2307c81ccccb72aaea9df",
+        "model": "gemini-3.5-transcribe"
+      },
+      {
+        "sequence": 19,
+        "stage": "recording.transcribe",
+        "inputHash": "1ff0630277dfe71d7d9d43ceb2dda6709d97bc09f9c2307c81ccccb72aaea9df",
+        "model": "gemini-3.5-transcribe"
+      },
+      {
+        "sequence": 20,
+        "stage": "recording.cleanup",
+        "inputHash": "69a1678991020f7366d4f7145aff307e2362e1cf937728feb19cb28dd3fce728",
+        "model": "gemini-3.5-transcribe"
+      },
+      {
+        "sequence": 21,
+        "stage": "recording.assessment",
+        "inputHash": "08153e10afb05a915db381bdca3043a75f4ea30b16339dd30018a04932016a4d",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 22,
+        "stage": "followup.translate",
+        "inputHash": "af2b94625ce5395f9b294b736cf935972575cfd1668ff468b192387bbc063f88",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 23,
+        "stage": "followup.check",
+        "inputHash": "0558058fe91e175f0a7e87a3abd44f82cd8d4be6eb1d828f5daa9ff6ce771a37",
+        "model": "gemini-3.5-flash-lite"
+      },
+      {
+        "sequence": 24,
+        "stage": "followup.speech",
+        "inputHash": "6c169a3507321f5eeb6098b99e59689132767fd6bade5f3c8b90b3b0d482a2ba",
+        "model": "gemini-3.8-flash-lite-tts"
+      }
+    ]
+  },
+  "privateStorage": {
+    "adapter": "scoped-in-memory-fixture",
+    "objects": 9,
+    "families": {
+      "case-followup": 1,
+      "case-voice": 1,
+      "generated": 4,
+      "recording": 1,
+      "source": 1,
+      "source-original": 1
+    },
+    "sourceAudioHash": "04fada0f7092d534fccb420841d66c3ddae5fcc74b9289773d96ae4c7163b930",
+    "answerAudioHash": "1ff0630277dfe71d7d9d43ceb2dda6709d97bc09f9c2307c81ccccb72aaea9df",
+    "generatedAudioHash": "288e35bc19d35ea4f558186cf22e7b59b9492fce7e7e0e8eb4327bf304aa6d26",
+    "caseVoiceHash": "49bc48beb497fcb79db7c51a06d74a62fb9e9aa54dd4b53b5ed51585f5195a68"
+  },
+  "frozenPublication": {
+    "version": 1,
+    "snapshotHash": "2f085c07bebd12eea675a8b8815311cc1ede9a67ab96a3be18ef0d8f2b1fb651"
+  },
+  "evidenceLimits": {
+    "productionReady": false,
+    "liveProviderTransport": "not_verified",
+    "semanticAccuracyClaim": false,
+    "independentLanguageQa": "not_provided",
+    "audio": "Synthetic tones, not spoken audio; transcripts and provider outputs scripted",
+    "hardwareAudio": "not_tested",
+    "browserWorkflow": "not_tested",
+    "hostedPostgres": "not_tested",
+    "privateCloudStorage": "not_tested",
+    "recordedInputModelPromptProvenance": "verified-synthetic-operation-links",
+    "sourceInputModelPromptProvenance": "verified-synthetic-operation-link",
+    "preparationInputModelPromptProvenance": "verified-synthetic-stage-operation-links",
+    "followupInputModelPromptProvenance": "verified-synthetic-operation-link",
+    "pilotAcceptance": "not_evaluated"
+  }
+}

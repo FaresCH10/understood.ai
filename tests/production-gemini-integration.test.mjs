@@ -1,3 +1,4 @@
+import {DEEPL_TRANSLATE_LANGUAGES} from '../server/ai/deepl-translate.mjs';
 import {request as httpRequest} from 'node:http';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,7 +34,9 @@ async function fixture(){
   const f=productionFixture(),calls=[],objects=new Map();
   const reply=value=>Response.json({candidates:[{finishReason:'STOP',content:{parts:[{thought:true,text:'Ignored model thought fixture'},{text:typeof value==='string'?value:JSON.stringify(value)}]}}]});
   const fetchImpl=async(url,options)=>{
-    assert.equal(new URL(url).origin,'https://generativelanguage.googleapis.com');assert.equal(options.redirect,'error');calls.push({url,body:JSON.parse(options.body)});
+    assert.equal(options.redirect,'error');calls.push({url,body:JSON.parse(options.body)});
+    if(new URL(url).origin==='https://api.deepl.com'){const body=JSON.parse(options.body),map={AR:'ar',HI:'hi',UR:'ur',BN:'bn',ML:'ml',TA:'ta',TE:'te',NE:'ne',TL:'fil',RU:'ru',PA:'pa-Guru',ID:'id','EN-GB':'en'};const language=map[body.target_lang];assert.ok(language);return Response.json({translations:body.text.map(text=>({text:samples[language]+' '+text}))});}
+    assert.equal(new URL(url).origin,'https://generativelanguage.googleapis.com');
     const body=JSON.parse(options.body),model=new URL(url).pathname.match(/models\/([^:]+):/)[1];
     if(model===f.env.UNDERSTOOD_GEMINI_SPEECH_MODEL)return Response.json({candidates:[{finishReason:'STOP',content:{parts:[{inlineData:{mimeType:'audio/wav',data:audio.toString('base64')}}]}}]});
     if(model===f.env.UNDERSTOOD_GEMINI_TRANSCRIPTION_MODEL){assert.equal(body.contents[0].parts[0].inlineData.mimeType,'audio/wav');return reply(source);}
@@ -48,7 +51,7 @@ async function fixture(){
   const config=productionServiceConfig(f.env,{service:'worker',approvalManifest:f.approvalManifest},{fetchImpl});
   await db.exec(`CREATE SCHEMA ${config.schema};SET search_path TO ${config.schema},pg_catalog`);await runMigrations(pool,{schema:config.schema});
   await db.exec("INSERT INTO organizations(id,name) VALUES('a','Fixture');INSERT INTO sites(id,org_id,name,timezone) VALUES('a','a','Fixture','UTC');INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','a','a','Owner','owner');INSERT INTO provider_policies(scope_key,org_id,revision,enabled,max_daily_requests) VALUES('global',NULL,1,true,1000),('tenant:a','a',1,true,1000)");
-  for(const [index,language] of WORKER_LANGUAGE_CODES.entries())await db.query("INSERT INTO workers(id,org_id,site_id,code,language) VALUES($1,'a','a',$1,$2)",['w'+index,language]);
+  for(const [index,language] of DEEPL_TRANSLATE_LANGUAGES.entries())await db.query("INSERT INTO workers(id,org_id,site_id,code,language) VALUES($1,'a','a',$1,$2)",['w'+index,language]);
   const storage={async save(row,bytes){assert.ok(!objects.has(row.id));objects.set(row.id,Buffer.from(bytes));},async read(row){assert.ok(objects.has(row.id));return Buffer.from(objects.get(row.id));},async remove(row){objects.delete(row.id);},async exists(row){return objects.has(row.id);},async saveOriginal(row,bytes){objects.set(row.id,Buffer.from(bytes));},async readOriginal(row){return Buffer.from(objects.get(row.id));},async removeOriginal(row){objects.delete(row.id);},async existsOriginal(row){return objects.has(row.id);}};
   return {db,pool,config,calls,objects,storage,errors,options:{schema:config.schema,integrationMode:'live',storage},close:()=>db.close()};
 }
@@ -66,7 +69,7 @@ test('production Gemini admission requires explicit models, paid account, comple
   assert.throws(()=>assertProductionAdmission({...config}),/approval/);
 });
 
-test('production preparation publishes checked private speech and grades MCQs across all 15 locales',async()=>{
+test('production preparation publishes checked private speech and grades MCQs across reviewed DeepL locales, with no implicit fallback',async()=>{
   const f=await fixture();try{
     const input={requestId:randomUUID(),title:'Supervisor title',source,audience:{type:'all'},responseMode:'question',deliveryMode:'both'};
     await startInstructionSend(f.pool,owner,input,f.options);
@@ -75,11 +78,11 @@ test('production preparation publishes checked private speech and grades MCQs ac
     assert.equal(draft.state,'ready',JSON.stringify(draft));
     assert.equal(await processOneInstructionSend(f.pool,f.options),true);
     const pub=(await f.db.query('SELECT * FROM publications WHERE briefing_id=$1',[input.requestId])).rows[0],snapshot=pub.snapshot_json;
-    assert.equal(snapshot.provenance.dataClass,'real');assert.equal(snapshot.languages.en.title,input.title);assert.equal(Object.keys(snapshot.languages).length,15);
+    assert.equal(snapshot.provenance.dataClass,'real');assert.equal(snapshot.languages.en.title,input.title);assert.equal(Object.keys(snapshot.languages).length,DEEPL_TRANSLATE_LANGUAGES.length);
     const assignments=(await f.db.query('SELECT * FROM assignments WHERE publication_id=$1 ORDER BY worker_id',[pub.id])).rows;
     for(const assignment of assignments){const answer=assignment.worker_id==='w1'?snapshot.languages[assignment.language].choices.find(choice=>choice.id!==snapshot.rubric.correctChoiceId).id:snapshot.rubric.correctChoiceId;await submitAnswer(f.pool,asWorker(assignment.worker_id),assignment.id,randomUUID(),answer,f.options);}
     const before=f.calls.length;while(await processOneAssessment(f.pool,f.config.assessmentAdapter,f.options)){}assert.equal(f.calls.length,before);
-    assert.equal((await f.db.query("SELECT count(*)::int n FROM attempts WHERE outcome='matched'")).rows[0].n,14);
+    assert.equal((await f.db.query("SELECT count(*)::int n FROM attempts WHERE outcome='matched'")).rows[0].n,DEEPL_TRANSLATE_LANGUAGES.length-1);
     const caseId=(await f.db.query('SELECT id FROM clarifications')).rows[0].id;
     await queueCaseFollowup(f.pool,owner,caseId,{requestId:randomUUID(),text:'Please explain where the finished items go.'},{...f.options,adapter:f.config.caseFollowupAdapter,dataClass:'real'});
     assert.equal(await processOneCaseFollowup(f.pool,f.config.caseFollowupAdapter,f.storage,{...f.options,dataClass:'real'}),true);
@@ -198,4 +201,14 @@ test('password-session presentation jobs run under restricted worker grants and 
     assert.ok((await f.db.query('SELECT state FROM presentation_translation_jobs')).rows.some(row=>row.state==='failed'));
     await assert.rejects(createPresentation(f.pool,session,'session',{requestId:randomUUID(),sourceKind:'instruction'},{...f.options,queueGeneration:true}),/Sign in/);
   }finally{if(acting)await f.db.exec('SET SESSION AUTHORIZATION postgres;RESET ROLE');await f.close();}
+});
+
+test('production blocks unsupported DeepL locales, free credentials, legacy routing and API-held secrets',()=>{
+ const f=productionFixture();
+ for(const locale of ['si','pa-Arab']){
+  const manifest=structuredClone(f.approvalManifest);manifest.scope.languages.push(locale);
+  assert.ok(productionAdmissionBlockers(f.env,{service:'worker',approvalManifest:manifest}).includes('production_translation_configuration_invalid'));
+ }
+ for(const patch of [{DEEPL_API_KEY:'free:fx'},{UNDERSTOOD_TRANSLATION_ADAPTER:'gemini-approved-v1'},{UNDERSTOOD_PREPARATION_ADAPTER:'gemini-approved-v1'},{UNDERSTOOD_PROVIDER_FALLBACK:'gemini'},{UNDERSTOOD_DEEPL_CAPABILITY_REFERENCE:''}])assert.ok(productionAdmissionBlockers({...f.env,...patch},{service:'worker',approvalManifest:f.approvalManifest}).length);
+ const api=productionFixture('api');assert.ok(productionAdmissionBlockers({...api.env,DEEPL_API_KEY:'not-an-api-secret'},{service:'api',approvalManifest:api.approvalManifest}).some(value=>value.startsWith('provider_secret_separation_failed')));
 });

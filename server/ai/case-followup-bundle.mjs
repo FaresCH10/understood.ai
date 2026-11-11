@@ -36,7 +36,7 @@ export function caseFollowupInputHash(row,provider) {
 }
 
 export function checkedFollowupProvenance(value,model,language) {
-  if(!keys(value,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion']) || !providerDataClass(value)
+  if(!keys(value,value?.adapter==='gemini-deepl-approved-v1'?[...['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion'],'translationAdapter','translationModel','translationCapabilityHash']:['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion']) || !providerDataClass(value)
     || !['adapter','textModel','speechModel','voice','promptVersion','schemaVersion'].every(key=>typeof value[key]==='string' && /^[A-Za-z0-9._-]{1,100}$/.test(value[key]))
     || !isWorkerLanguage(language) || model!==value[language==='en'?'speechModel':'textModel'])fail('invalid_provider');
   return Object.freeze({...value});

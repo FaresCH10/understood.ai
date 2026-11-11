@@ -47,7 +47,7 @@ export async function processOnePresentation(pool,adapter,{schema='public'}={}){
     const {reserveProviderOperation,providerRequestJournal}=await import('./provider-budget.mjs');
     const {createPresentation}=await import('./presentations.mjs');
     const call=async(method,...args)=>{
-      const provenance={adapter:adapter.provenance.adapter,dataClass:'real',model:adapter.provenance.textModel,promptVersion:'gemini-presentation-v1',schemaVersion:'gemini-generation-v4'};
+      const provenance={adapter:adapter.provenance.adapter,dataClass:'real',model:method==='translate'&&adapter.provenance.translationModel?adapter.provenance.translationModel:adapter.provenance.textModel,promptVersion:'gemini-presentation-v1',schemaVersion:'gemini-generation-v4'};
       let operation;try{operation=await domainTransaction(pool,schema,client=>reserveProviderOperation(client,{orgId:job.org_id,kind:'presentation',referenceId:job.id,claimToken:job.token,model:provenance.model,dataClass:'real',maxRequests:1,inputHash:job.source_hash,provenance}));}catch(error){if(/quota is closed|quota reached|dispatch paused|Workspace is read-only/i.test(error.message))throw Object.assign(Error('Presentation generation deferred'),{code:'presentation_deferred'});throw error;}
       return adapter.withJournal(providerRequestJournal(pool,operation,{schema}))[method](...args);
     };

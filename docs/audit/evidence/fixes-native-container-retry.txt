@@ -1,0 +1,28 @@
+Unable to find image 'postgres:18-bookworm' locally
+18-bookworm: Pulling from library/postgres
+dd051e1b8c92: Pulling fs layer
+a8f8dff36ade: Pulling fs layer
+4c15b1dacf71: Pulling fs layer
+45759bcf6a4b: Pulling fs layer
+9bb37150231e: Pulling fs layer
+02c52c643efd: Pulling fs layer
+9b9b33d059d0: Pulling fs layer
+f24ab7b12bc2: Pulling fs layer
+c7fa8ef43f35: Pulling fs layer
+6432f252ba4f: Pulling fs layer
+c655dd92eb76: Pulling fs layer
+98765332bf2e: Pulling fs layer
+447daba5d8af: Pulling fs layer
+797d15f88330: Download complete
+c7fa8ef43f35: Download complete
+02c52c643efd: Download complete
+a8f8dff36ade: Download complete
+9bb37150231e: Download complete
+4c15b1dacf71: Download complete
+f59e7816fa0b: Download complete
+9b9b33d059d0: Download complete
+c655dd92eb76: Download complete
+45759bcf6a4b: Download complete
+6432f252ba4f: Download complete
+98765332bf2e: Download complete
+447daba5d8af: Download complete

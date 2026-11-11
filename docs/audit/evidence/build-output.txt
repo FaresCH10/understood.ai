@@ -1,0 +1,110 @@
+
+> understood@0.1.0 build
+> tsc --noEmit && vite build
+
+vite v8.3.2 building client environment for production...
+transforming...
+✓ 2300 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/operator.html                                   2.14 kB │ gzip:   0.89 kB
+dist/index.html                                      4.05 kB │ gzip:   1.37 kB
+dist/.vite/manifest.json                            26.31 kB │ gzip:   3.13 kB
+dist/assets/Onboarding-DS8Oml43.css                  1.43 kB │ gzip:   0.59 kB
+dist/assets/ProviderStageTests-DadH-i3N.css          1.59 kB │ gzip:   0.56 kB
+dist/assets/Notifications-DM4nYdu3.css               7.12 kB │ gzip:   1.82 kB
+dist/assets/WorkerDevice-8IMuQZ2o.css                7.40 kB │ gzip:   1.72 kB
+dist/assets/CalendarPage-DZ6azpZ4.css               17.75 kB │ gzip:   3.97 kB
+dist/assets/Reports-B9oBlkkI.css                    20.04 kB │ gzip:   4.02 kB
+dist/assets/SettingsLayout-BQ3gMxOR.css             24.67 kB │ gzip:   4.81 kB
+dist/assets/AuthLayout-Z9vIA2Nl.css                 27.26 kB │ gzip:   5.72 kB
+dist/assets/Clarifications-DtJRdepk.css             37.70 kB │ gzip:   7.26 kB
+dist/assets/Operations-DQD1DO-x.css                 40.57 kB │ gzip:   7.66 kB
+dist/assets/PublicProduct-BAv5Dqa3.css             109.04 kB │ gzip:  20.08 kB
+dist/assets/customer-CPxiU9Cu.css                  110.56 kB │ gzip:  20.31 kB
+dist/assets/ui-refresh-D3JT026m.css                175.69 kB │ gzip:  33.29 kB
+dist/assets/plus-DP2j7XK_.js                         0.18 kB │ gzip:   0.16 kB
+dist/assets/menu-ayU4HEgc.js                         0.22 kB │ gzip:   0.17 kB
+dist/assets/mail-sn9X_SpX.js                         0.24 kB │ gzip:   0.22 kB
+dist/assets/download-DhOXl8yy.js                     0.26 kB │ gzip:   0.21 kB
+dist/assets/rotate-ccw-clock-j3YM6s_J.js             0.30 kB │ gzip:   0.23 kB
+dist/assets/operator-PTtJmIEt.js                     0.31 kB │ gzip:   0.22 kB
+dist/assets/send-BkkXPo8v.js                         0.32 kB │ gzip:   0.24 kB
+dist/assets/languages-D4WGUK9j.js                    0.35 kB │ gzip:   0.23 kB
+dist/assets/check-check-B4K_pdxc.js                  0.35 kB │ gzip:   0.24 kB
+dist/assets/dialog-focus-BUjEvIBq.js                 0.36 kB │ gzip:   0.23 kB
+dist/assets/file-text-DRUTj_vU.js                    0.42 kB │ gzip:   0.27 kB
+dist/assets/hard-drive-Bedbr9hX.js                   0.42 kB │ gzip:   0.27 kB
+dist/assets/pencil-CL6lfaZm.js                       0.53 kB │ gzip:   0.34 kB
+dist/assets/worker-state-CUDZ-bp9.js                 0.64 kB │ gzip:   0.34 kB
+dist/assets/CaseLocalePicker-WeTkwZNF.js             0.68 kB │ gzip:   0.40 kB
+dist/assets/rolldown-runtime-hePW80VL.js             0.71 kB │ gzip:   0.42 kB
+dist/assets/staff-input-CWXYObDH.js                  0.84 kB │ gzip:   0.44 kB
+dist/assets/policy-state-BkuO-zsc.js                 0.87 kB │ gzip:   0.49 kB
+dist/assets/preload-helper-DjzSQ1t3.js               1.38 kB │ gzip:   0.75 kB
+dist/assets/audio-CxVNbuAQ.js                        1.42 kB │ gzip:   0.78 kB
+dist/assets/WorkerTextDraft-B4vbJk_m.js              2.11 kB │ gzip:   0.95 kB
+dist/assets/ProviderStageTests-fvhxN445.js           2.67 kB │ gzip:   1.03 kB
+dist/assets/PublicationRecovery-Ca7jnq23.js          2.78 kB │ gzip:   1.27 kB
+dist/assets/notice-recovery-BLeWe4ME.js              2.98 kB │ gzip:   1.17 kB
+dist/assets/RecordingNoticeSettings-CWX7RS2o.js      3.40 kB │ gzip:   1.50 kB
+dist/assets/WorkerAudioDraft-W3Z1BsUh.js             3.58 kB │ gzip:   1.49 kB
+dist/assets/useStaffRequest-vRQgbkq2.js              4.06 kB │ gzip:   1.78 kB
+dist/assets/PrivacyWorkers-7bifepkL.js               4.28 kB │ gzip:   1.57 kB
+dist/assets/StaffSearch-BcZaxvPK.js                  4.45 kB │ gzip:   1.83 kB
+dist/assets/PublicationSchedules-BGcEiPmp.js         4.50 kB │ gzip:   1.77 kB
+dist/assets/SourceAudioUploads-CK-4b0Us.js           4.50 kB │ gzip:   1.78 kB
+dist/assets/AuthLayout-Bog0Ec7_.js                   5.39 kB │ gzip:   2.03 kB
+dist/assets/invitation-recovery-ruHXE9AR.js          5.77 kB │ gzip:   2.11 kB
+dist/assets/LanguageReadiness-soYcRSTA.js            5.81 kB │ gzip:   1.93 kB
+dist/assets/Regeneration-TT0cyjEm.js                 6.09 kB │ gzip:   2.35 kB
+dist/assets/SettingsLayout-MQLBhW1g.js               6.45 kB │ gzip:   2.91 kB
+dist/assets/briefing-input-BLGeaEoG.js               7.65 kB │ gzip:   2.43 kB
+dist/assets/case-workflow-recovery-iZ6wm-tF.js       7.92 kB │ gzip:   2.87 kB
+dist/assets/AcceptInvitation-BvmiBhmr.js             8.35 kB │ gzip:   2.86 kB
+dist/assets/TextRetentionSettings-DSJAi_IL.js        8.67 kB │ gzip:   3.01 kB
+dist/assets/RetentionSettings-DwG4-GiL.js            9.54 kB │ gzip:   3.07 kB
+dist/assets/WorkerDeletion-Bl57T1dF.js               9.70 kB │ gzip:   3.40 kB
+dist/assets/jsx-runtime-BXfRkjr-.js                 11.28 kB │ gzip:   4.43 kB
+dist/assets/BriefingControls-BNO-7SOz.js            12.71 kB │ gzip:   3.62 kB
+dist/assets/source-audio-upload-D6LAcTTq.js         14.04 kB │ gzip:   4.89 kB
+dist/assets/Onboarding-DEtkTAL7.js                  15.16 kB │ gzip:   4.70 kB
+dist/assets/ClarificationCreate-BX0pbzNB.js         16.58 kB │ gzip:   5.52 kB
+dist/assets/PublishForm-CeoYnm8l.js                 18.14 kB │ gzip:   5.72 kB
+dist/assets/Notifications-CdXanyD9.js               19.10 kB │ gzip:   5.99 kB
+dist/assets/session-state-DAqM280j.js               21.06 kB │ gzip:   7.41 kB
+dist/assets/LanguageArtifacts-Cs9gbnKG.js           21.63 kB │ gzip:   7.01 kB
+dist/assets/NewBriefing-DOd29-j5.js                 22.59 kB │ gzip:   6.89 kB
+dist/assets/Billing-Bp9HR3gE.js                     24.91 kB │ gzip:   7.13 kB
+dist/assets/worker-text-draft-cgPe3VQ0.js           26.64 kB │ gzip:   8.30 kB
+dist/assets/PlanUsage-DHyW0c7K.js                   26.76 kB │ gzip:   6.88 kB
+dist/assets/worker-device-policy-DLHJRkzH.js        28.24 kB │ gzip:   8.83 kB
+dist/assets/CalendarPage-BFGlkv50.js                31.37 kB │ gzip:   9.47 kB
+dist/assets/Reports-o0fHrNaV.js                     35.09 kB │ gzip:   9.26 kB
+dist/assets/worker-audio-draft-CdWaMlfx.js          39.09 kB │ gzip:  12.23 kB
+dist/assets/WorkerRecorder-L72Ki99N.js              40.15 kB │ gzip:  11.78 kB
+dist/assets/SendInstruction-CA_d7YPo.js             44.99 kB │ gzip:  12.95 kB
+dist/assets/recording-notice-B9B2hnnx.js            51.47 kB │ gzip:  13.30 kB
+dist/assets/clarification-locale-XTLnS4yL.js        63.10 kB │ gzip:  15.60 kB
+dist/assets/WorkerAccessEntry-DW8w5Yak.js           65.22 kB │ gzip:  18.08 kB
+dist/assets/gsap-BpjtTlCK.js                        70.44 kB │ gzip:  27.69 kB
+dist/assets/WorkerOffline-BZMvjlJX.js               73.48 kB │ gzip:  19.94 kB
+dist/assets/WorkerDevice-BT4ItUcw.js                84.94 kB │ gzip:  23.90 kB
+dist/assets/Operations-BPaqBvNg.js                  88.02 kB │ gzip:  21.74 kB
+dist/assets/Clarifications-CeEC4P5B.js              97.85 kB │ gzip:  25.78 kB
+dist/assets/client-C9G_qJWO.js                     122.21 kB │ gzip:  22.96 kB
+dist/assets/PublicProduct-b-gwv-cF.js              128.63 kB │ gzip:  38.04 kB
+dist/assets/civil-time-DpEPXHDU.js                 160.74 kB │ gzip:  46.33 kB
+dist/assets/ui-refresh-Cma_KYeW.js               1,025.74 kB │ gzip: 522.79 kB
+dist/assets/customer-n8XOXD_I.js                 1,357.80 kB │ gzip: 375.19 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+[INEFFECTIVE_DYNAMIC_IMPORT] src/worker-offline.ts is dynamically imported by src/worker-local-data.ts but also statically imported by src/StaffSessionLock.tsx, src/WorkerOffline.tsx, src/main.tsx, src/useWorkerSessionGuard.ts, dynamic import will not move module into another chunk.
+
+[INEFFECTIVE_DYNAMIC_IMPORT] src/StaffInvitations.tsx is dynamically imported by src/main.tsx but also statically imported by src/StaffAccess.tsx, dynamic import will not move module into another chunk.
+
+✓ built in 2.24s

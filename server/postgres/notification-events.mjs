@@ -44,7 +44,7 @@ export function listWorkerNotifications(pool,session,filters={},{schema='public'
       ${status==='unread'?'AND r.event_id IS NULL':''} ORDER BY e.created_at DESC,e.id DESC LIMIT $8 OFFSET $9`,
     [...args,pageSize,(page-1)*pageSize])).rows;
     const items=[];
-    for(const row of rows){const subject=(await client.query(`SELECT a.id AS assignment_id,c.id AS case_id,p.snapshot_json->'languages'->a.language->>'title' AS instruction_title,s.name AS supervisor_name
+    for(const row of rows){const subject=(await client.query(`SELECT a.id AS assignment_id,c.id AS case_id,COALESCE(p.snapshot_json->'languages'->a.language->>'title',(SELECT d.content_json->>'title' FROM instruction_deliveries d WHERE d.assignment_id=a.id AND d.org_id=a.org_id AND d.site_id=a.site_id AND d.worker_id=a.worker_id AND d.language=a.language AND d.state='available')) AS instruction_title,s.name AS supervisor_name
  FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
  LEFT JOIN clarifications c ON c.assignment_id=a.id AND c.org_id=a.org_id
  LEFT JOIN staff s ON s.id=c.owner_staff_id AND s.org_id=a.org_id AND s.site_id=a.site_id

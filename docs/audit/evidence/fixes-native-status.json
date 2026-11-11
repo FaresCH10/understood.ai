@@ -1,0 +1,12 @@
+{
+  "status": "blocked/not executed",
+  "initialDaemon": "unavailable; Docker Desktop not running",
+  "action": "started Docker Desktop for a disposable PostgreSQL 18 test instance",
+  "firstAttempt": "registry DNS lookup failure",
+  "retry": "cancelled after download did not complete",
+  "containersCreated": 0,
+  "testDatabaseCreated": false,
+  "listener49179": false,
+  "cleanup": "all-container inventory empty; stopped the Docker Desktop instance started for this task",
+  "nativeTestsPassed": 0
+}

@@ -1,0 +1,154 @@
+{
+  "mode": "synthetic-local",
+  "exitCode": 1,
+  "datasetVersion": "synthetic-assessment-2026-10-10-v1",
+  "provenance": {
+    "adapter": "synthetic-local-v1",
+    "dataClass": "synthetic",
+    "model": "none",
+    "promptVersion": "synthetic-shelf-v1",
+    "schemaVersion": "synthetic-shelf-v1"
+  },
+  "semanticMetrics": {
+    "total": 34,
+    "completed": 24,
+    "failed": 0,
+    "notRun": 10,
+    "outcomeDisagreements": 5,
+    "falseMatches": {
+      "count": 0,
+      "denominator": 16,
+      "rate": 0
+    },
+    "falseClarifications": {
+      "count": 0,
+      "denominator": 8,
+      "rate": 0
+    },
+    "falseUnassessable": {
+      "count": 3,
+      "denominator": 8,
+      "rate": 0.375
+    },
+    "unassessable": 5,
+    "unresolvedExpectedMatches": 0,
+    "confusion": {
+      "matched": {
+        "matched": 5,
+        "clarification": 0,
+        "unassessable": 3,
+        "unresolved": 0,
+        "not_run": 5
+      },
+      "clarification": {
+        "matched": 0,
+        "clarification": 12,
+        "unassessable": 0,
+        "unresolved": 0,
+        "not_run": 5
+      },
+      "unassessable": {
+        "matched": 0,
+        "clarification": 2,
+        "unassessable": 2,
+        "unresolved": 0,
+        "not_run": 0
+      }
+    }
+  },
+  "pilotAcceptance": {
+    "status": "not_evaluated",
+    "toleranceAgreement": "awaiting_agreement",
+    "independentLanguageQa": "not_provided",
+    "realDataAllowed": false
+  },
+  "disagreements": [
+    {
+      "id": "ar-paraphrase",
+      "language": "ar",
+      "expected": "matched",
+      "actual": "unassessable",
+      "diagnostic": null
+    },
+    {
+      "id": "ar-dialect",
+      "language": "ar",
+      "expected": "matched",
+      "actual": "unassessable",
+      "diagnostic": null
+    },
+    {
+      "id": "ur-paraphrase",
+      "language": "ur",
+      "expected": "matched",
+      "actual": "unassessable",
+      "diagnostic": null
+    },
+    {
+      "id": "en-noise",
+      "language": "en",
+      "expected": "unassessable",
+      "actual": "clarification",
+      "diagnostic": null
+    },
+    {
+      "id": "fr-unsupported",
+      "language": "fr",
+      "expected": "unassessable",
+      "actual": "clarification",
+      "diagnostic": null
+    }
+  ],
+  "unsupported": [
+    {
+      "id": "v4-new-arrangement",
+      "language": "en",
+      "diagnostic": "unsupported_local_rubric"
+    },
+    {
+      "id": "v4-stale-arrangement",
+      "language": "en",
+      "diagnostic": "unsupported_local_rubric"
+    },
+    {
+      "id": "cartons-correct",
+      "language": "en",
+      "diagnostic": "unsupported_local_rubric"
+    },
+    {
+      "id": "cartons-wrong-count",
+      "language": "en",
+      "diagnostic": "unsupported_local_rubric"
+    },
+    {
+      "id": "cartons-wrong-bay",
+      "language": "en",
+      "diagnostic": "unsupported_local_rubric"
+    },
+    {
+      "id": "cartons-ar",
+      "language": "ar",
+      "diagnostic": "unsupported_local_rubric"
+    },
+    {
+      "id": "cartons-ur",
+      "language": "ur",
+      "diagnostic": "unsupported_local_rubric"
+    },
+    {
+      "id": "cartons-negation",
+      "language": "en",
+      "diagnostic": "unsupported_local_rubric"
+    },
+    {
+      "id": "cartons-v2-missing",
+      "language": "en",
+      "diagnostic": "unsupported_local_rubric"
+    },
+    {
+      "id": "cartons-v2-correct",
+      "language": "en",
+      "diagnostic": "unsupported_local_rubric"
+    }
+  ]
+}

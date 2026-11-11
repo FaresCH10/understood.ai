@@ -1,0 +1,6 @@
+{
+  "javascriptAssets": 74,
+  "reticleMarkers": [],
+  "verdict": "passed",
+  "limit": "Static built-JavaScript marker scan, not runtime penetration or browser acceptance"
+}

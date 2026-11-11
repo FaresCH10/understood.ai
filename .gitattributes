@@ -1,1 +1,5 @@
 server/postgres/migrations/*.sql text eol=lf
+
+# Preserve captured audit evidence and its recorded byte hashes across checkouts.
+docs/audit/** -text whitespace=cr-at-eol
+docs/audit/evidence/** whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof

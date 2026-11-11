@@ -1,3 +1,4 @@
+import {assignmentContent} from './delivered-content.mjs';
 import { requirePrincipal } from './domain.mjs';
 import { withTransaction } from './db.mjs';
 import { schemaName } from './migrate.mjs';
@@ -118,7 +119,7 @@ export async function getPublicationResponse(pool,session,publicationId,assignme
   return responseRead(pool,schema,async (client) => {
     await requirePrincipal(client,session,'staff',['owner','supervisor','auditor']);
     const {publication,snapshot}=await scopedPublication(client,session,publicationId);
-    const row=(await client.query(`SELECT a.id,w.code AS worker,a.language,a.due_at FROM assignments a JOIN workers w
+    const row=(await client.query(`SELECT a.id,a.worker_id,w.code AS worker,a.language,a.due_at FROM assignments a JOIN workers w
       ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id WHERE a.id=$1 AND a.publication_id=$2 AND a.org_id=$3 AND a.site_id=$4`,
       [assignmentId,publicationId,session.org_id,session.site_id])).rows[0];
     if(!row) throw new Error('Response unavailable');
@@ -129,14 +130,15 @@ export async function getPublicationResponse(pool,session,publicationId,assignme
       WHERE c.assignment_id=$1 AND c.org_id=$2 AND c.site_id=$3 ORDER BY c.created_at DESC,c.id DESC LIMIT 100`,
       [assignmentId,session.org_id,session.site_id])).rows
       .map(row=>({id:row.id,status:row.status,reason:row.reason,createdAt:row.created_at instanceof Date?row.created_at.toISOString():row.created_at,helpText:row.help_text??null}));
+    const localized=await assignmentContent(client,{...row,org_id:session.org_id,site_id:session.site_id,publication_id:publicationId},snapshot);
     const responseMode=snapshot.responseMode || 'question',deliveryMode=snapshot.deliveryMode || 'both';
     const evidenceMode=responseMode==='acknowledge' && snapshot.evidenceMode==='photo'?'photo':'none';
     const evidence=evidenceMode==='photo'?await assignmentEvidence(client,session.org_id,session.site_id,assignmentId):null;
     return {publication,assignment:{id:row.id,worker:row.worker,language:row.language,dueAt:row.due_at?.toISOString() || null},
       question:responseMode==='acknowledge'?null:snapshot.question,facts:snapshot.facts,
-      workerQuestion:responseMode==='acknowledge'?null:snapshot.languages?.[row.language]?.question || null,
+      workerQuestion:responseMode==='acknowledge'?null:localized?.question || null,
       responseMode,deliveryMode,evidenceMode,evidence,
-      ...(snapshot.rubric?.mode==='multiple-choice'?{questionType:'multiple-choice',choices:snapshot.languages?.[row.language]?.choices || snapshot.languages?.en?.choices}:{}),
+      ...(snapshot.rubric?.mode==='multiple-choice'?{questionType:'multiple-choice',choices:localized?.choices || []}:{}),
       acknowledgedAt:acknowledgment?.received_at?.toISOString() || null,
       completedAt:completion?.completed_at?.toISOString() || null,
       ...await submissionHistory(client,session,assignmentId,page,pageSize,true),cases};

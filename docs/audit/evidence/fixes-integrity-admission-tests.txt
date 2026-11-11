@@ -1,0 +1,16 @@
+✔ sqlite workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (75.3926ms)
+✔ postgres workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (3934.5352ms)
+✔ production admission rejects staging, demo identities, synthetic modes and fixture redirection (19.9532ms)
+✔ production admission requires an exact candidate, complete gates, named approvals and bounded scope (3.0993ms)
+✔ production admission rejects insecure origins, proxies, database, storage, mail and push shortcuts (8.6397ms)
+✔ production admission rejects mocked speech, synthetic evaluators, free dispatch and unregistered live adapters (4.9633ms)
+✔ operator admission is separately configured and never receives customer secrets (2.483ms)
+✔ the admission check command is read-only, reports blockers and never authorizes deployment (174.728ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4537.3979

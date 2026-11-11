@@ -9,10 +9,10 @@ const id=value=>typeof value==='string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 const keys=(value,names)=>value && typeof value==='object' && !Array.isArray(value) && Object.keys(value).sort().join(',')===[...names].sort().join(',');
 
 export function preparationStageProvenance(provider,stage) {
-  if(!keys(provider,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion']) || !providerDataClass(provider)
+  if(!keys(provider,provider?.adapter==='gemini-deepl-approved-v1'?[...['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion'],'translationAdapter','translationModel','translationCapabilityHash']:['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion']) || !providerDataClass(provider)
     || !Object.values(stages).includes(stage)
     || !['adapter','textModel','speechModel','voice','promptVersion','schemaVersion'].every(key=>typeof provider[key]==='string' && /^[A-Za-z0-9._:/-]{1,100}$/.test(provider[key])))throw Error('Preparation provenance unavailable');
-  return Object.freeze({adapter:provider.adapter,dataClass:provider.dataClass,model:provider[stage==='speech'?'speechModel':'textModel'],
+  return Object.freeze({adapter:provider.adapter,dataClass:provider.dataClass,model:provider[stage==='speech'?'speechModel':stage==='translation'&&provider.translationModel?'translationModel':'textModel'],
     promptVersion:`${provider.promptVersion}-${stage.replaceAll('_','-')}`,schemaVersion:provider.schemaVersion});
 }
 

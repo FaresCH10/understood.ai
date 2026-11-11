@@ -1,0 +1,32 @@
+✔ approved pilot is independently fixed at thirty days and twenty-five workers (1.7582ms)
+✔ Vercel and Node apply the same CSP (7.276ms)
+✔ unknown valid composite ledger schema is never dropped during startup (3.0679ms)
+✔ overlapping cached adapter requests cannot extend each other deadlines (45.1197ms)
+✔ improvement analysis follows latest receipt even when timestamps tie and audio is pending (1.4228ms)
+✔ complete populated composite-key ledger survives repeated schema startup (3.8314ms)
+✖ sqlite workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (68.5587ms)
+✔ postgres workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (4091.4082ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4706.2874
+
+✖ failing tests:
+
+test at tests\audit-workspace-integrity.test.mjs:9:43
+✖ sqlite workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (68.5587ms)
+  Error: no such table: submission_receipts
+      at q (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/audit-workspace-integrity.test.mjs:11:88)
+      at measured (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/audit-workspace-integrity.test.mjs:26:71)
+      at workspaceOperation (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace.mjs:147:21)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/audit-workspace-integrity.test.mjs:27:19)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }

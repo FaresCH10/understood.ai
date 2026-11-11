@@ -16,7 +16,7 @@ export function clarificationPageView(page,context){
   return {rows:page.rows.map(summary),total:page.total,page:page.page,pageSize:page.pageSize,ownerOptions:page.ownerOptions.map(({id,name})=>({id,name})),clientContext:context};
 }
 export function clarificationDetailView(row,context){
-  const choices=row.snapshot.languages?.[row.language]?.choices ?? [];
+  const choices=(row.snapshot.languages?.[row.language] ?? row.deliveredContent)?.choices ?? [];
   const answerText=value=>choices.find(choice=>choice.id===value)?.text ?? value;
   return {...summary(row),...(row.staffCreation?{staffCreation:row.staffCreation}:{}),notes:row.notes??'',clientContext:context,
     snapshot:{source:row.snapshot.source??null,question:row.snapshot.question??null,facts:row.snapshot.facts??[],askedFacts:row.snapshot.rubric?.askedFacts??[]},

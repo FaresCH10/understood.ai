@@ -1,0 +1,15 @@
+✔ approved pilot is independently fixed at thirty days and twenty-five workers (4.2454ms)
+✔ Vercel and Node apply the same CSP (12.3262ms)
+✔ unknown valid composite ledger schema is never dropped during startup (22.6949ms)
+✔ overlapping cached adapter requests cannot extend each other deadlines (130.9024ms)
+✔ late language delivery supports presentation, localized staff evidence and check-back (13053.5864ms)
+✔ PostgreSQL self-healing detects latest clarification, reviews separate drafts and compares scoped follow-up checks (17323.1386ms)
+✔ SQLite self-healing detects latest clarification, reviews separate drafts and compares scoped follow-up checks (4020.1116ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22812.8065

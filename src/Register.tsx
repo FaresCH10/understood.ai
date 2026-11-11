@@ -218,7 +218,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
       <header className="registration-intro"><span className="public-kicker">{t.kicker}</span><h1>{t.title}</h1><p>{t.lead}</p></header>
       {choosingPlan&&<AccessChoice language={language} onClose={()=>setChoosingPlan(false)} onChoose={choice=>{setPlan(choice);setChoosingPlan(false);}}/>}
       <form className="registration-form" onSubmit={submit}>
-        <div className="registration-selected-plan"><div><small>{language==='ar'?'الوصول إلى مساحة العمل':'Workspace access'}</small><strong>{plan==='pilot'?(language==='ar'?'برنامج تجريبي لمدة 14 يوماً':'14-day pilot'):plan?PLAN_NAMES[plan]:(language==='ar'?'اختر خياراً':'Choose how to start')}</strong></div><button type="button" className="button outline" disabled={busy} onClick={()=>setChoosingPlan(true)}>{plan?(language==='ar'?'تغيير':'Change'):(language==='ar'?'اختيار':'Choose')}</button></div>
+        <div className="registration-selected-plan"><div><small>{language==='ar'?'الوصول إلى مساحة العمل':'Workspace access'}</small><strong>{plan==='pilot'?(language==='ar'?'برنامج تجريبي لمدة 30 يوماً':'30-day pilot'):plan?PLAN_NAMES[plan]:(language==='ar'?'اختر خياراً':'Choose how to start')}</strong></div><button type="button" className="button outline" disabled={busy} onClick={()=>setChoosingPlan(true)}>{plan?(language==='ar'?'تغيير':'Change'):(language==='ar'?'اختيار':'Choose')}</button></div>
         <fieldset className="registration-group">
           <legend>{t.accountDetails}</legend>
           <div className="registration-fields">

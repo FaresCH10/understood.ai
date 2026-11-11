@@ -254,6 +254,8 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
       return true;
     }
     if(intent) throw Error('Generated target regeneration requires its configured adapter');
+    // Cached adapters must not share a request's deadline with another job.
+    instructionTextAdapter=instructionTextAdapter?.forRequest?.() ?? instructionTextAdapter;
     let providerPrepared=false,base=null,providerInput=null;
     if(instruction?.delivery_mode==='text' && typeof instructionTextAdapter?.prepare==='function') {
       providerInput={source:briefing.source,title:briefing.title};

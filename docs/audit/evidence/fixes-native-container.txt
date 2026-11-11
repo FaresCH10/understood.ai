@@ -1,0 +1,22 @@
+Unable to find image 'postgres:18-bookworm' locally
+18-bookworm: Pulling from library/postgres
+4c15b1dacf71: Pulling fs layer
+02c52c643efd: Pulling fs layer
+dd051e1b8c92: Pulling fs layer
+9bb37150231e: Pulling fs layer
+f24ab7b12bc2: Pulling fs layer
+c655dd92eb76: Pulling fs layer
+a8f8dff36ade: Pulling fs layer
+6432f252ba4f: Pulling fs layer
+45759bcf6a4b: Pulling fs layer
+98765332bf2e: Pulling fs layer
+c7fa8ef43f35: Pulling fs layer
+9b9b33d059d0: Pulling fs layer
+447daba5d8af: Pulling fs layer
+797d15f88330: Download complete
+447daba5d8af: Download complete
+c655dd92eb76: Download complete
+f59e7816fa0b: Download complete
+docker: failed to copy: httpReadSeeker: failed open: failed to do request: Get "https://registry-1.docker.io/v2/library/postgres/blobs/sha256:6432f252ba4f6bbff177950726ebc8a4b2243ab41a553e1014c7a95b9127962f": dialing registry-1.docker.io:443 container via direct connection because Docker Desktop has no HTTPS proxy: connecting to registry-1.docker.io:443: dial tcp: lookup registry-1.docker.io: getaddrinfow: This is usually a temporary error during hostname resolution and means that the local server did not receive a response from an authoritative server.
+
+Run 'docker run --help' for more information

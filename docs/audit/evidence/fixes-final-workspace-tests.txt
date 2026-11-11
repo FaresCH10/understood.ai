@@ -1,0 +1,26 @@
+✔ sqlite workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (99.2693ms)
+✔ postgres workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (5153.4815ms)
+✔ workspace migration refuses anomalous retained rows without deleting them or advancing its ledger (3504.1118ms)
+✔ audio retention tombstones survive backup and restore without resurrecting deleted recordings (504.5895ms)
+✔ isolated SQLite plus audio restore preserves exact evidence and revokes restored sessions (551.579ms)
+✔ PostgreSQL supports persisted drafts, selected members, attachments and explicit work completion (5782.3658ms)
+✔ resolved assessment follow-up releases work without rewriting its assessment, while fresh help still blocks completion (131.154ms)
+✔ an old resolved assessment cannot approve a newer failed answer (87.5015ms)
+✔ compositions persist incomplete text, appear in drafts and stay private to their author (99.3547ms)
+✔ explicit member audience is validated and never includes other workers (80.1028ms)
+✔ work completion requires understanding, is idempotent, and appears in worker history and library (162.6969ms)
+✔ acknowledging an instruction moves it from sent to in-progress in the worker inbox (112.9174ms)
+✔ work summaries paginate and filter on the server, preserve localized titles and exact worker scope (186.234ms)
+✔ attachments validate bytes and become available only to the assigned worker after publication (179.4901ms)
+✔ workspace HTTP requires current session context for staff and workers (1717.5993ms)
+✔ closing follow-up without explicit readiness cannot release failed understanding (72.6803ms)
+✔ work summaries expose the open supervisor reply case on SQLite (73.1692ms)
+✔ withdrawal notifies assigned workers and remains available in instruction history (98.221ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11661.0926

@@ -106,25 +106,67 @@ export async function workspaceOperation(q,session,operation,input={},options={}
  }
  if(operation==='library'){
   if(!staff)throw Error('Forbidden');
+  if(input.search!==undefined&&typeof input.search!=='string'||input.date!==undefined&&typeof input.date!=='string')throw Error('Invalid instruction filter');
   const page=Number(input.page||1),size=20,search=(input.search||'').trim(),status=input.status||'all',language=input.language||'all',date=input.date||'';
   if(!Number.isInteger(page)||page<1||page>5000||search.length>80||!['all','draft','sent','in-progress','follow-up','done','archived'].includes(status)||!['all',...WORKER_LANGUAGE_CODES].includes(language)||date&&!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Invalid instruction filter');
-  const rows=await q(`SELECT b.id,b.title,b.state,b.next_version,b.updated_at,p.id AS publication_id,p.version AS published_version,p.state AS publication_state,p.snapshot_json,ar.occurred_at AS archived_at FROM briefings b
-   LEFT JOIN publications p ON p.id=(SELECT p2.id FROM publications p2 WHERE p2.briefing_id=b.id AND p2.org_id=b.org_id AND p2.site_id=b.site_id ORDER BY p2.version DESC LIMIT 1)
-   LEFT JOIN briefing_archives ar ON ar.briefing_id=b.id AND ar.org_id=b.org_id AND ar.site_id=b.site_id WHERE b.org_id=? AND b.site_id=?`,scope);
-  const assignments=await q(`SELECT a.id,a.publication_id,a.language,${workColumns} FROM assignments a LEFT JOIN assignment_completions ac ON ac.assignment_id=a.id WHERE a.org_id=? AND a.site_id=?`,scope);
-  const groups=new Map();for(const row of assignments){const group=groups.get(row.publication_id)||[];group.push(row);groups.set(row.publication_id,group);}
-  let items=rows.map(row=>{
-   const assigned=groups.get(row.publication_id)||[],states=assigned.map(assignmentWorkStatus),snapshot=row.snapshot_json?parse(row.snapshot_json):null;
-   const workflowStatus=row.archived_at?'archived':!row.publication_id?'draft':states.includes('follow-up')?'follow-up':states.length&&states.every(value=>value==='done')?'done':states.some(value=>['in-progress','done'].includes(value))?'in-progress':'sent';
-   return {...row,snapshot_json:undefined,workflowStatus,languages:snapshot?Object.keys(snapshot.languages||{}):[],updated_at:iso(row.updated_at),workCounts:{sent:states.filter(v=>v==='sent').length,inProgress:states.filter(v=>v==='in-progress').length,followUp:states.filter(v=>v==='follow-up').length,done:states.filter(v=>v==='done').length,total:assigned.length}};
+  // Aggregate/filter/page in the database; never materialize site history in JS.
+  // Compositions store UTC text, whereas PostgreSQL briefings use timestamptz.
+  // Normalize explicitly rather than inheriting the connection's TimeZone.
+  const libraryUpdatedAt=options.dialect==='postgres'
+   ? `to_char(b.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')` : 'b.updated_at';
+  const cte=`WITH assessed AS (
+   SELECT a.publication_id,${workColumns} FROM assignments a
+   LEFT JOIN assignment_completions ac ON ac.assignment_id=a.id AND ac.org_id=a.org_id AND ac.site_id=a.site_id
+   WHERE a.org_id=? AND a.site_id=?
+  ), work AS (SELECT publication_id,${workStatusSql} AS status FROM assessed),
+  totals AS (SELECT publication_id,COUNT(*) AS total,
+   SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) AS sent,
+   SUM(CASE WHEN status='in-progress' THEN 1 ELSE 0 END) AS in_progress,
+   SUM(CASE WHEN status='follow-up' THEN 1 ELSE 0 END) AS follow_up,
+   SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) AS done FROM work GROUP BY publication_id),
+  history AS (SELECT b.id,b.title,b.state,b.next_version,${libraryUpdatedAt} AS updated_at,
+   p.id AS publication_id,p.version AS published_version,p.state AS publication_state,CAST(ar.occurred_at AS TEXT) AS archived_at,
+   CASE WHEN ar.occurred_at IS NOT NULL THEN 'archived' WHEN p.id IS NULL THEN 'draft'
+    WHEN t.follow_up>0 THEN 'follow-up' WHEN t.total>0 AND t.done=t.total THEN 'done'
+    WHEN t.in_progress+t.done>0 THEN 'in-progress' ELSE 'sent' END AS workflow_status,
+   COALESCE(t.total,0) AS total,COALESCE(t.sent,0) AS sent,COALESCE(t.in_progress,0) AS in_progress,
+   COALESCE(t.follow_up,0) AS follow_up,COALESCE(t.done,0) AS done,0 AS composition
+   FROM briefings b LEFT JOIN publications p ON p.id=(SELECT p2.id FROM publications p2
+    WHERE p2.briefing_id=b.id AND p2.org_id=b.org_id AND p2.site_id=b.site_id ORDER BY p2.version DESC LIMIT 1)
+   LEFT JOIN totals t ON t.publication_id=p.id
+   LEFT JOIN briefing_archives ar ON ar.briefing_id=b.id AND ar.org_id=b.org_id AND ar.site_id=b.site_id
+   WHERE b.org_id=? AND b.site_id=?
+   UNION ALL SELECT c.id,COALESCE(NULLIF(${options.dialect==='postgres'?"(c.content_json::jsonb)->>'title'":"c.content_json->>'title'"},''),'Untitled instruction'),'draft',NULL,c.updated_at,
+    NULL,NULL,NULL,NULL,'draft',0,0,0,0,0,1 FROM instruction_compositions c
+   WHERE c.org_id=? AND c.site_id=? AND c.staff_id=? AND ?=1
+    AND NOT EXISTS(SELECT 1 FROM instruction_sends snd WHERE snd.request_id=c.id))`;
+  const base=[...scope,...scope,...scope,session.principal_id,['owner','supervisor'].includes(session.role)?1:0];
+  const pattern=`%${search.replace(/[!%_]/g,'!$&')}%`;
+  const libraryLower=options.dialect==='postgres'?'LOWER':'understood_workspace_lower';
+  const filter=`WHERE ${libraryLower}(h.title) LIKE ${libraryLower}(?) ESCAPE '!' AND (?='all' OR h.workflow_status=?)
+   AND (?='all' OR EXISTS(SELECT 1 FROM publications lp WHERE lp.id=h.publication_id AND lp.org_id=? AND lp.site_id=?
+    AND (lp.snapshot_json->'languages'->? IS NOT NULL OR EXISTS(SELECT 1 FROM assignments la
+      WHERE la.publication_id=lp.id AND la.org_id=lp.org_id AND la.site_id=lp.site_id AND la.language=?))))
+   AND (?='' OR SUBSTR(h.updated_at,1,10)=?)`;
+  const args=[pattern,status,status,language,...scope,language,language,date,date];
+  const stats=await q(`${cte} SELECT workflow_status,COUNT(*) AS n FROM history GROUP BY workflow_status`,base);
+  const counts=Object.fromEntries(stats.map(row=>[row.workflow_status,Number(row.n)]));
+  const total=Number((await q(`${cte} SELECT COUNT(*) AS n FROM history h ${filter}`,[...base,...args]))[0].n);
+  const rows=await q(`${cte} SELECT h.* FROM history h ${filter}
+   ORDER BY REPLACE(h.updated_at,' ','T') DESC,h.id ASC LIMIT ? OFFSET ?`,[...base,...args,size,(page-1)*size]);
+  const ids=rows.map(row=>row.publication_id).filter(Boolean);
+  const publications=ids.length?await q(`SELECT id,snapshot_json FROM publications WHERE org_id=? AND site_id=? AND id IN (${ids.map(()=>'?').join(',')})`,[...scope,...ids]):[];
+  const assignedLanguages=ids.length?await q(`SELECT DISTINCT publication_id,language FROM assignments WHERE org_id=? AND site_id=? AND publication_id IN (${ids.map(()=>'?').join(',')})`,[...scope,...ids]):[];
+  const items=rows.map(row=>{
+   const snapshot=publications.find(pub=>pub.id===row.publication_id)?.snapshot_json;
+   const languages=[...new Set([...Object.keys(snapshot?parse(snapshot).languages||{}:{}),...assignedLanguages.filter(a=>a.publication_id===row.publication_id).map(a=>a.language)])];
+   return {id:row.id,title:row.title,state:row.state,next_version:row.next_version,publication_id:row.publication_id,
+    published_version:row.published_version,publication_state:row.publication_state,archived_at:row.archived_at?new Date(row.archived_at).toISOString():null,
+    ...(Number(row.composition)?{composition:true}:{}),workflowStatus:row.workflow_status,languages,
+    updated_at:new Date(row.updated_at).toISOString(),workCounts:Number(row.composition)?{total:0}:
+     {total:Number(row.total),sent:Number(row.sent),inProgress:Number(row.in_progress),followUp:Number(row.follow_up),done:Number(row.done)}};
   });
-  if(['owner','supervisor'].includes(session.role)){
-   const drafts=await q(`SELECT c.* FROM instruction_compositions c WHERE c.org_id=? AND c.site_id=? AND c.staff_id=? AND NOT EXISTS(SELECT 1 FROM instruction_sends s WHERE s.request_id=c.id)`,[...scope,session.principal_id]);
-   items.push(...drafts.map(row=>{const content=parse(row.content_json);return {id:row.id,title:content.title||'Untitled instruction',state:'draft',workflowStatus:'draft',composition:true,languages:[],updated_at:row.updated_at,workCounts:{total:0}};}));
-  }
-  const counts={};for(const row of items)counts[row.workflowStatus]=(counts[row.workflowStatus]||0)+1;
-  items=items.filter(row=>(!search||row.title.toLowerCase().includes(search.toLowerCase()))&&(status==='all'||row.workflowStatus===status)&&(language==='all'||row.languages.includes(language))&&(!date||iso(row.updated_at).slice(0,10)===date)).sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at))||a.id.localeCompare(b.id));
-  return {items:items.slice((page-1)*size,page*size),total:items.length,page,pageSize:size,counts};
+  return {items,total,page,pageSize:size,counts};
  }
  if(operation==='composition'){
   if(!staff||!['owner','supervisor'].includes(session.role)||!uuid(input.id))throw Error('Forbidden');

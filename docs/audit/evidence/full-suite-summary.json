@@ -1,0 +1,23 @@
+{
+  "sourceCommit": "270788ddeaf182adde4b45a2b1a6fae84efc5ba3",
+  "command": "node --test --test-timeout=900000 --test-concurrency=2 --test-reporter=tap tests/*.test.mjs",
+  "exitCode": 0,
+  "node": "24.20.0",
+  "npm": "11.19.0",
+  "platform": "Windows",
+  "topLevelTestFiles": 316,
+  "tests": 1770.0,
+  "suites": 0.0,
+  "pass": 1766.0,
+  "fail": 0.0,
+  "cancelled": 0.0,
+  "skipped": 4.0,
+  "todo": 0.0,
+  "duration_ms": 2249497.3438,
+  "skippedTests": [
+    "ok 803 - native pg_dump/pg_restore use synchronized full relational archive and isolated private object readback # SKIP Requires explicitly isolated source/empty-target PostgreSQL databases and installed native tools",
+    "ok 815 - real PostgreSQL public authentication and mixed mail admissions cannot oversubscribe # SKIP",
+    "ok 816 - real PostgreSQL concurrent grant redemption, publication, receipts and assessment commit once # SKIP",
+    "ok 910 - real PostgreSQL migration enforces scope and immutable publication # SKIP"
+  ]
+}

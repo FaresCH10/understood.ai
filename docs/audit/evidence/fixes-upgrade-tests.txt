@@ -1,0 +1,21 @@
+✔ sqlite workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (280.3866ms)
+✔ postgres workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (13975.8655ms)
+✔ expiry-origin upgrade never reconstructs an older erased source or permits retrospective SQL capture (13904.9283ms)
+✔ operational receipt upgrade preserves exact present evidence, never reconstructs expired identities and captures atomically (11552.9377ms)
+✔ operator policy is positive, copied and content-minimized rather than an application profile alias (10.4034ms)
+✔ session observation migration preserves unknown historical dates and timestamps future sessions (7091.6175ms)
+✔ hosted service commands select an exact fixed profile without application fallback (5.1669ms)
+✔ actual operator column role authenticates and runs metadata, control and all three retries without content grants (12528.1506ms)
+✔ operator SQL cannot read private content, forge worker outcomes, change credentials, rewrite a draft or reopen sessions (13136.3802ms)
+✔ operator admission rejects whole-table, hidden/future-column, delegate and PUBLIC grant drift (15934.8815ms)
+✔ three-profile durable fence removes operator column writes as well as API and worker table writes (18390.4304ms)
+✔ operator admission rejects missing or rewritten value guards and a non-generated eligibility column (13208.7123ms)
+✔ dedicated hosted operator startup refuses owner/application authority and serves actual HTTP under its column-only role (13715.6262ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 112237.925

@@ -1,0 +1,17 @@
+✔ late language delivery supports presentation, localized staff evidence and check-back (6137.7364ms)
+✔ production Gemini admission requires explicit models, paid account, complete language scope and approvals (23.8997ms)
+✔ production preparation publishes checked private speech and grades MCQs across reviewed DeepL locales, with no implicit fallback (14471.2402ms)
+✔ production source audio and legacy recorded answers use metered inline transcription and frozen facts (3243.6305ms)
+✔ approved language changes queue private presentation translation in the worker and retain grading IDs (3535.4613ms)
+✔ quota pauses leave queued translations retryable without dispatching or exhausting attempts (3655.6615ms)
+✔ production approval expiry blocks new provider requests even on an already constructed handle (7.3582ms)
+✔ production API keeps provider keys out and queues work without running the synthetic processor (4397.9879ms)
+✔ password-session presentation jobs run under restricted worker grants and refuse revoked sessions (6056.3148ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 36238.729

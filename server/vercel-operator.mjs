@@ -7,7 +7,7 @@ import {handleOperationsRoute} from './postgres/operations-http.mjs';
 import {verifyMigrations,schemaName} from './postgres/migrate.mjs';
 import {verifyRuntimePermissions} from './postgres/runtime-permissions.mjs';
 
-const operatorSecrets=/^(?:DATABASE_URL(?:_|$)|NEON_(?:AUTH|STORAGE|REALTIME|AI)|GEMINI_API_KEY$|UNDERSTOOD_(?:RESEND|EMAIL|PILOT|GMAIL|AUTH_MAIL|NEON_AUTH|NEON_STORAGE|R2|VAPID))/;
+const operatorSecrets=/^(?:DATABASE_URL(?:_|$)|NEON_(?:AUTH|STORAGE|REALTIME|AI)|(?:GEMINI|DEEPL)_API_KEY$|UNDERSTOOD_(?:RESEND|EMAIL|PILOT|GMAIL|AUTH_MAIL|NEON_AUTH|NEON_STORAGE|R2|VAPID))/;
 
 export async function createVercelOperatorHandler({env=process.env,pool,verify=verifyMigrations,verifyPermissions=verifyRuntimePermissions}={}) {
   if(env.UNDERSTOOD_OPERATOR_ACCESS!=='true' || !['preview','production'].includes(env.VERCEL_ENV)

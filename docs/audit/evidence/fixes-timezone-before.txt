@@ -1,0 +1,32 @@
+✔ sqlite workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (98.9248ms)
+✖ postgres workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (4608.3328ms)
+✔ workspace migration refuses anomalous retained rows without deleting them or advancing its ledger (3070.8159ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8285.0611
+
+✖ failing tests:
+
+test at tests\audit-workspace-integrity.test.mjs:10:43
+✖ postgres workspace rejects invalid ownership, JSON, dates and attachment sizes; library is bounded (4608.3328ms)
+  AssertionError [ERR_ASSERTION]: mixed saved/composed instructions sort by UTC instant
+  + actual - expected
+  
+  + 'timezone-brief'
+  - '200be551-2835-4fe0-92b0-a12107b57bfe'
+  
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/audit-workspace-integrity.test.mjs:36:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'timezone-brief',
+    expected: '200be551-2835-4fe0-92b0-a12107b57bfe',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

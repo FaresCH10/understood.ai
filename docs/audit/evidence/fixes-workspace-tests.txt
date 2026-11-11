@@ -1,0 +1,304 @@
+✔ Nemotron Vercel delivery is explicitly gated and advertises its provider mode (5.0131ms)
+✔ Nemotron prepares one grounded English question with four checked choices (51.8914ms)
+✔ spelling corrections and paraphrased facts stay grounded while invented details are rejected (4.9511ms)
+✔ a generic provider answer is rejected and retried, then fails instead of publishing (3.5812ms)
+✔ a transient NVIDIA failure is retried once (1.8119ms)
+✔ provider failures keep a sanitized cause for the send error (1.9685ms)
+✔ a failed provider question fails the send instead of publishing the generic template (7215.537ms)
+✔ re-sending a failed instruction prepares again instead of replaying the stored failure (5595.5955ms)
+✔ an Arabic source is translated to English before Nemotron generates and DeepL translates (15.1562ms)
+✔ DeepL translates instruction text and ordered choices for the worker language (1.2531ms)
+✔ DeepL rejects translated scripts or choices that drift from the source (2.6163ms)
+✔ a Vercel instruction send from an Arabic source publishes after English generation and DeepL translation (5390.829ms)
+✔ a Vercel instruction send publishes supported languages and leaves Sinhala undelivered (5235.3974ms)
+✖ pilot site creation is unavailable before and after approval, with no extra sites created (41.3764ms)
+✔ operator approval starts the pilot clock, accepts its pending request, caps scope and expires read-only (7613.269ms)
+✖ PostgreSQL supports persisted drafts, selected members, attachments and explicit work completion (6490.3936ms)
+✖ resolved assessment follow-up releases work without rewriting its assessment, while fresh help still blocks completion (43.5331ms)
+✖ an old resolved assessment cannot approve a newer failed answer (49.652ms)
+✖ compositions persist incomplete text, appear in drafts and stay private to their author (35.6329ms)
+✖ explicit member audience is validated and never includes other workers (25.1729ms)
+✖ work completion requires understanding, is idempotent, and appears in worker history and library (27.4861ms)
+✖ acknowledging an instruction moves it from sent to in-progress in the worker inbox (25.3194ms)
+✖ work summaries paginate and filter on the server, preserve localized titles and exact worker scope (25.5163ms)
+✖ attachments validate bytes and become available only to the assigned worker after publication (24.972ms)
+✖ workspace HTTP requires current session context for staff and workers (26.9416ms)
+✖ closing follow-up without explicit readiness cannot release failed understanding (31.3344ms)
+✖ work summaries expose the open supervisor reply case on SQLite (23.3523ms)
+✖ withdrawal notifies assigned workers and remains available in instruction history (25.8512ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 14
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24534.7755
+
+✖ failing tests:
+
+test at tests\pilot-policy.test.mjs:18:1
+✖ pilot site creation is unavailable before and after approval, with no extra sites created (41.3764ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/pilot-policy.test.mjs:19:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\postgres-workspace.test.mjs:17:1
+✖ PostgreSQL supports persisted drafts, selected members, attachments and explicit work completion (6490.3936ms)
+  error: operator does not exist: text ->> unknown
+      at pe.Ue (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/node_modules/@electric-sql/pglite/dist/chunk-2BOC2OMW.js:1:17959)
+      at pe.tt (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/node_modules/@electric-sql/pglite/dist/chunk-2BOC2OMW.js:1:15347)
+      at pe.parse (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/node_modules/@electric-sql/pglite/dist/chunk-2BOC2OMW.js:1:14021)
+      at N.qe (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/node_modules/@electric-sql/pglite/dist/index.js:5:1762)
+      at file:///C:/Users/Hussein/Desktop/Understood/understood-crews/node_modules/@electric-sql/pglite/dist/index.js:5:1155
+      at wasm://wasm/0267bb86:wasm-function[10930]:0x5a5ccf
+      at wasm://wasm/0267bb86:wasm-function[3585]:0x27eaeb
+      at wasm://wasm/0267bb86:wasm-function[3627]:0x2869d1
+      at wasm://wasm/0267bb86:wasm-function[3637]:0x286c2d
+      at wasm://wasm/0267bb86:wasm-function[9914]:0x54fd4d {
+    length: 203,
+    severity: 'ERROR',
+    code: '42883',
+    detail: undefined,
+    hint: 'No operator matches the given name and argument types. You might need to add explicit type casts.',
+    position: '5211',
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'parse_oper.c',
+    line: '644',
+    routine: 'op_error',
+    query: "WITH assessed AS (\n   SELECT a.publication_id,(SELECT t.outcome FROM attempts t JOIN submission_receipts sr\n    ON sr.assignment_id=t.assignment_id AND sr.submission_id=t.submission_id\n    WHERE t.assignment_id=a.id ORDER BY sr.sequence DESC LIMIT 1) AS outcome,(SELECT t.received_at FROM attempts t JOIN submission_receipts sr\n    ON sr.assignment_id=t.assignment_id AND sr.submission_id=t.submission_id\n    WHERE t.assignment_id=a.id ORDER BY sr.sequence DESC LIMIT 1) AS attempt_at,(SELECT t.submission_id FROM attempts t JOIN submission_receipts sr\n    ON sr.assignment_id=t.assignment_id AND sr.submission_id=t.submission_id\n    WHERE t.assignment_id=a.id ORDER BY sr.sequence DESC LIMIT 1) AS attempt_submission,(SELECT sr.sequence FROM attempts t JOIN submission_receipts sr\n    ON sr.assignment_id=t.assignment_id AND sr.submission_id=t.submission_id\n    WHERE t.assignment_id=a.id ORDER BY sr.sequence DESC LIMIT 1) AS attempt_order,(SELECT r.id FROM recordings r JOIN submission_receipts sr\n    ON sr.assignment_id=r.assignment_id AND sr.submission_id=r.submission_id\n    WHERE r.assignment_id=a.id AND r.received_at IS NOT NULL ORDER BY sr.sequence DESC LIMIT 1) AS recording_id,(SELECT r.status FROM recordings r JOIN submission_receipts sr\n    ON sr.assignment_id=r.assignment_id AND sr.submission_id=r.submission_id\n    WHERE r.assignment_id=a.id AND r.received_at IS NOT NULL ORDER BY sr.sequence DESC LIMIT 1) AS audio_status,(SELECT r.received_at FROM recordings r JOIN submission_receipts sr\n    ON sr.assignment_id=r.assignment_id AND sr.submission_id=r.submission_id\n    WHERE r.assignment_id=a.id AND r.received_at IS NOT NULL ORDER BY sr.sequence DESC LIMIT 1) AS audio_at,(SELECT r.submission_id FROM recordings r JOIN submission_receipts sr\n    ON sr.assignment_id=r.assignment_id AND sr.submission_id=r.submission_id\n    WHERE r.assignment_id=a.id AND r.received_at IS NOT NULL ORDER BY sr.sequence DESC LIMIT 1) AS audio_submission,(SELECT sr.sequence FROM recordings r JOIN submission_receipts sr\n    ON sr.assignment_id=r.assignment_id AND sr.submission_id=r.submission_id\n    WHERE r.assignment_id=a.id AND r.received_at IS NOT NULL ORDER BY sr.sequence DESC LIMIT 1) AS audio_order,(SELECT ak.received_at FROM acknowledgments ak WHERE ak.assignment_id=a.id AND ak.org_id=a.org_id) AS acknowledged_at,ac.completed_at,\n EXISTS(SELECT 1 FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND (c.status='open' OR (c.notes LIKE '[Understood:blocked]%' OR c.notes LIKE '[Understood:cancelled]%') AND c.id=(SELECT c2.id FROM clarifications c2 WHERE c2.assignment_id=a.id AND c2.org_id=a.org_id ORDER BY c2.created_at DESC,c2.id DESC LIMIT 1))) AS open_case,\n EXISTS(SELECT 1 FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='resolved' AND c.notes LIKE '[Understood:ready]%'\n  AND c.attempt_id=(SELECT t.id FROM attempts t JOIN submission_receipts sr ON sr.assignment_id=t.assignment_id AND sr.submission_id=t.submission_id\n   WHERE t.assignment_id=a.id ORDER BY sr.sequence DESC LIMIT 1)) AS resolved_outcome FROM assignments a\n   LEFT JOIN assignment_completions ac ON ac.assignment_id=a.id AND ac.org_id=a.org_id AND ac.site_id=a.site_id\n   WHERE a.org_id=$1 AND a.site_id=$2\n  ), work AS (SELECT publication_id,CASE WHEN open_case THEN 'follow-up'\n WHEN completed_at IS NOT NULL THEN 'done'\n WHEN acknowledged_at IS NOT NULL OR (outcome='matched' OR resolved_outcome) AND NOT(audio_status IS NOT NULL AND (attempt_submission IS NULL OR audio_submission<>attempt_submission) AND (attempt_order IS NULL OR audio_order>attempt_order)) THEN 'in-progress'\n WHEN outcome IN ('clarification','unassessable') THEN 'follow-up' ELSE 'sent' END AS status FROM assessed),\n  totals AS (SELECT publication_id,COUNT(*) AS total,\n   SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) AS sent,\n   SUM(CASE WHEN status='in-progress' THEN 1 ELSE 0 END) AS in_progress,\n   SUM(CASE WHEN status='follow-up' THEN 1 ELSE 0 END) AS follow_up,\n   SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) AS done FROM work GROUP BY publication_id),\n  history AS (SELECT b.id,b.title,b.state,b.next_version,CAST(b.updated_at AS TEXT) AS updated_at,\n   p.id AS publication_id,p.version AS published_version,p.state AS publication_state,CAST(ar.occurred_at AS TEXT) AS archived_at,\n   CASE WHEN ar.occurred_at IS NOT NULL THEN 'archived' WHEN p.id IS NULL THEN 'draft'\n    WHEN t.follow_up>0 THEN 'follow-up' WHEN t.total>0 AND t.done=t.total THEN 'done'\n    WHEN t.in_progress+t.done>0 THEN 'in-progress' ELSE 'sent' END AS workflow_status,\n   COALESCE(t.total,0) AS total,COALESCE(t.sent,0) AS sent,COALESCE(t.in_progress,0) AS in_progress,\n   COALESCE(t.follow_up,0) AS follow_up,COALESCE(t.done,0) AS done,0 AS composition\n   FROM briefings b LEFT JOIN publications p ON p.id=(SELECT p2.id FROM publications p2\n    WHERE p2.briefing_id=b.id AND p2.org_id=b.org_id AND p2.site_id=b.site_id ORDER BY p2.version DESC LIMIT 1)\n   LEFT JOIN totals t ON t.publication_id=p.id\n   LEFT JOIN briefing_archives ar ON ar.briefing_id=b.id AND ar.org_id=b.org_id AND ar.site_id=b.site_id\n   WHERE b.org_id=$3 AND b.site_id=$4\n   UNION ALL SELECT c.id,COALESCE(NULLIF(c.content_json->>'title',''),'Untitled instruction'),'draft',NULL,c.updated_at,\n    NULL,NULL,NULL,NULL,'draft',0,0,0,0,0,1 FROM instruction_compositions c\n   WHERE c.org_id=$5 AND c.site_id=$6 AND c.staff_id=$7 AND $8=1\n    AND NOT EXISTS(SELECT 1 FROM instruction_sends snd WHERE snd.request_id=c.id)) SELECT workflow_status,COUNT(*) AS n FROM history GROUP BY workflow_status",
+    params: [ 'a', 'a', 'a', 'a', 'a', 'a', 'owner', 1 ],
+    queryOptions: undefined
+  }
+
+test at tests\workspace.test.mjs:21:1
+✖ resolved assessment follow-up releases work without rewriting its assessment, while fresh help still blocks completion (43.5331ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:22:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:38:1
+✖ an old resolved assessment cannot approve a newer failed answer (49.652ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:39:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:48:1
+✖ compositions persist incomplete text, appear in drafts and stay private to their author (35.6329ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:49:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:56:1
+✖ explicit member audience is validated and never includes other workers (25.1729ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:57:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:64:1
+✖ work completion requires understanding, is idempotent, and appears in worker history and library (27.4861ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:65:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:80:1
+✖ acknowledging an instruction moves it from sent to in-progress in the worker inbox (25.3194ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:81:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:95:1
+✖ work summaries paginate and filter on the server, preserve localized titles and exact worker scope (25.5163ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:96:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:119:1
+✖ attachments validate bytes and become available only to the assigned worker after publication (24.972ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:120:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:142:1
+✖ workspace HTTP requires current session context for staff and workers (26.9416ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:143:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:156:1
+✖ closing follow-up without explicit readiness cannot release failed understanding (31.3344ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:157:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:165:1
+✖ work summaries expose the open supervisor reply case on SQLite (23.3523ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:166:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }
+
+test at tests\workspace.test.mjs:178:1
+✖ withdrawal notifies assigned workers and remains available in instruction history (25.8512ms)
+  Error: no such table: instruction_sends
+      at installWorkspaceGuards (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:31:9)
+      at ensureWorkspaceSchema (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/workspace-schema.mjs:23:3)
+      at openDatabase (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/server/db.mjs:363:3)
+      at fixture (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:20:29)
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/workspace.test.mjs:179:11)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12) {
+    code: 'ERR_SQLITE_ERROR',
+    errcode: 1,
+    errstr: 'SQL logic error'
+  }

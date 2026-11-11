@@ -1,0 +1,21 @@
+✔ late language delivery supports presentation, localized staff evidence and check-back (19596.5072ms)
+✔ help has immutable independent text, exact replay and private-note isolation without an answer receipt (294.3456ms)
+✔ case filters page frozen topics, enforce scope and preserve original assessments through ownership/resolution (277.4363ms)
+✔ clarification version context names the live instruction and clears when none is published (264.6853ms)
+✔ audit failure rolls back help, ownership and resolution; legacy open help survives later resolution (252.9288ms)
+✔ clarification HTTP shares paged contract and denies worker/staff/foreign case authority correctly (9787.1952ms)
+✔ presentation input keeps every UI locale selectable while translation stays capability-bound (10.715ms)
+✔ SQLite presentation history is snapshot-first, provenance-bound and deletion-safe (559.8254ms)
+✔ PostgreSQL presentation history matches the SQLite contract and enforces evidence guards (15349.1284ms)
+✔ SQLite read-only entitlements pause new presentation generation while cached and snapshot content stays readable (259.0141ms)
+✔ PostgreSQL read-only entitlements pause new presentation generation while cached and snapshot content stays readable (9322.8298ms)
+✔ SQLite approved-language presentations retain MCQ options and upgrade old caches (295.8912ms)
+✔ PostgreSQL approved-language presentations retain MCQ options and upgrade old caches (8786.1378ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49218.6795

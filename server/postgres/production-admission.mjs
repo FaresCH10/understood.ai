@@ -1,5 +1,5 @@
-import {APPROVED_GEMINI_ADAPTER} from '../ai/provider-policy.mjs';
-import {productionGeminiSettings,productionGeminiAdapters} from '../ai/production-gemini.mjs';
+import {APPROVED_GEMINI_ADAPTER,APPROVED_GEMINI_DEEPL_ADAPTER} from '../ai/provider-policy.mjs';
+import {productionGeminiSettings,productionTranslationSettings,productionGeminiAdapters} from '../ai/production-gemini.mjs';
 import {BlockList,isIP} from 'node:net';
 import {isAbsolute} from 'node:path';
 import {resolveMailConfig} from '../auth-mail.mjs';
@@ -13,8 +13,8 @@ import {resolveRegistrationVerification} from '../registration-verification.mjs'
 
 // Production adapters have a separate implementation. Runtime admission still requires the release and provider approvals.
 export const LIVE_PROVIDER_ADAPTERS=Object.freeze({
-  sourceTranscription:Object.freeze([APPROVED_GEMINI_ADAPTER]),preparation:Object.freeze([APPROVED_GEMINI_ADAPTER]),speech:Object.freeze([APPROVED_GEMINI_ADAPTER]),
-  assessment:Object.freeze([APPROVED_GEMINI_ADAPTER]),recording:Object.freeze([APPROVED_GEMINI_ADAPTER]),followup:Object.freeze([APPROVED_GEMINI_ADAPTER]),
+  sourceTranscription:Object.freeze([APPROVED_GEMINI_ADAPTER]),preparation:Object.freeze([APPROVED_GEMINI_DEEPL_ADAPTER]),speech:Object.freeze([APPROVED_GEMINI_ADAPTER]),
+  assessment:Object.freeze([APPROVED_GEMINI_ADAPTER]),recording:Object.freeze([APPROVED_GEMINI_ADAPTER]),followup:Object.freeze([APPROVED_GEMINI_DEEPL_ADAPTER]),
 });
 
 export const PRODUCTION_RELEASE_GATES=Object.freeze(Array.from({length:19},(_,index)=>`G${index}`));
@@ -39,7 +39,7 @@ const STORAGE_KEYS=Object.freeze(['UNDERSTOOD_NEON_STORAGE_ENDPOINT','UNDERSTOOD
   'UNDERSTOOD_R2_ACCOUNT_ID','UNDERSTOOD_R2_BUCKET','UNDERSTOOD_R2_ACCESS_KEY_ID','UNDERSTOOD_R2_SECRET_ACCESS_KEY']);
 const MAIL_KEYS=Object.freeze(['UNDERSTOOD_EMAIL_MODE','UNDERSTOOD_RESEND_KEY','UNDERSTOOD_EMAIL_FROM','UNDERSTOOD_AUTH_MAIL_KEY','UNDERSTOOD_PILOT_TO','UNDERSTOOD_REGISTRATION_PROVIDER','UNDERSTOOD_NEON_AUTH_URL']);
 const PUSH_KEYS=Object.freeze(['UNDERSTOOD_PUSH_ADAPTER','UNDERSTOOD_PUSH_VAPID_PUBLIC_KEY','UNDERSTOOD_PUSH_VAPID_PRIVATE_KEY','UNDERSTOOD_PUSH_VAPID_SUBJECT']);
-const PROVIDER_KEYS=Object.freeze(['GEMINI_API_KEY','OPENROUTER_API_KEY','NVIDIA_API_KEY']);
+const PROVIDER_KEYS=Object.freeze(['GEMINI_API_KEY','DEEPL_API_KEY','OPENROUTER_API_KEY','NVIDIA_API_KEY']);
 
 const blocker=(list,code,detail)=>list.push(detail?`${code}:${detail}`:code);
 
@@ -282,15 +282,17 @@ function review(env,{service='api',approvalManifest=null,transport='proxy'}={}) 
     if(typeof address!=='string' || !isIP(address) || address.length>45) throw Error('Forbidden transport');
     return address;
   };
-  let geminiSettings;
+  let geminiSettings,translationSettings;
   if(service!=='operator' && Object.values(providers).some(value=>value===APPROVED_GEMINI_ADAPTER)){try{geminiSettings=productionGeminiSettings(env,scope);}catch{blocker(blockers,'production_gemini_configuration_invalid');}if(service==='worker'&&!env.GEMINI_API_KEY)blocker(blockers,'production_gemini_credentials_missing');}
+  if(service!=='operator'){try{translationSettings=productionTranslationSettings(env,scope);}catch{blocker(blockers,'production_translation_configuration_invalid');}
+    if(service==='worker'&&(!env.DEEPL_API_KEY?.trim()||env.DEEPL_API_KEY.trim().endsWith(':fx')))blocker(blockers,'production_translation_credentials_missing');}
   const config={
     service,tier:'production',aiMode:'live',accessMode:'credential',dataClass:'real',integrationMode:'live',
     publicOrigin:origin?.origin,schema:env.UNDERSTOOD_POSTGRES_SCHEMA,port,requestAddress,
     runtimePermissionsRequired:true,operatorAccess:service==='operator',
     runtimeRoleProfile:service==='operator'?'operator':service==='worker'?'worker':'application',
     providerFallback:'disabled',freeTierDispatch:env.UNDERSTOOD_FREE_TIER_DISPATCH,
-    geminiSettings,providerAdapters:providers,storageAdapter:storage?.adapter,storageConfig:storage?Object.freeze(storage.config):undefined,
+    geminiSettings,translationSettings,providerAdapters:providers,storageAdapter:storage?.adapter,storageConfig:storage?Object.freeze(storage.config):undefined,
     storageChecks:service!=='operator',mail,pushAdapter:push,
     releaseScope:scope?Object.freeze({customer:scope.customer,languages:Object.freeze([...scope.languages]),
       workerCapacity:scope.workerCapacity,dataClass:'real',freeTierDispatch:scope.freeTierDispatch}):null,
@@ -314,8 +316,8 @@ export function productionAdmissionConfig(env=process.env,options={}) {
 export function productionServiceConfig(env=process.env,options={},providerOptions={}){
   const config=productionAdmissionConfig(env,options);
   const handles=config.service==='worker'?productionGeminiAdapters(env,config,providerOptions):config.service==='api'?{
-    preparationAdapter:Object.freeze({provenance:Object.freeze({adapter:APPROVED_GEMINI_ADAPTER,dataClass:'real'}),capabilities:Object.freeze({textLanguages:config.geminiSettings.textLanguages,speechLanguages:config.geminiSettings.speechLanguages})}),
-    caseFollowupAdapter:Object.freeze({provenance:Object.freeze({adapter:APPROVED_GEMINI_ADAPTER,dataClass:'real'}),capabilities:Object.freeze({speechLanguages:config.geminiSettings.speechLanguages})}),
+    preparationAdapter:Object.freeze({provenance:Object.freeze({adapter:APPROVED_GEMINI_DEEPL_ADAPTER,dataClass:'real'}),capabilities:Object.freeze({textLanguages:config.translationSettings.languages,speechLanguages:config.geminiSettings.speechLanguages})}),
+    caseFollowupAdapter:Object.freeze({provenance:Object.freeze({adapter:APPROVED_GEMINI_DEEPL_ADAPTER,dataClass:'real'}),capabilities:Object.freeze({speechLanguages:config.geminiSettings.speechLanguages})}),
   }:{};
   const attachmentScanner=config.service==='api'?resolveAttachmentScanner(env):undefined;
   const registrationVerification=config.service==='operator'?undefined:resolveRegistrationVerification(env,config.mail,config.publicOrigin);

@@ -1,0 +1,4 @@
+{"case":"valid_composite_fk_delivery_ledger","before":1,"after":0,"foreignKeyCheck":[]}
+{"case":"adapter_budget_cross_talk","elapsedSinceFirst":26000,"expectedFirstBudgetExpired":true,"translationStillSucceeded":true,"calls":1}
+{"case":"missing_entitlement","summary":{"configured":false,"state":"unmanaged","effectiveState":"unmanaged","writeAllowed":true,"startedAt":null,"endsAt":null,"daysRemaining":null,"workerLimit":null,"plan":null,"termsReference":null,"revision":0}}
+{"case":"improvement_latest_receipt","selected":"clarification","authoritative":"matched"}

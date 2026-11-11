@@ -8,6 +8,6 @@ export async function postgresWorkspace(pool,session,operation,input,{schema='pu
   if(input.content||input.file||input.complete)await requireWritableEntitlement(client,session.org_id);
   // Serialize composition uploads and completions within their tenant.
   if(input.content||input.file||input.complete)await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`${session.org_id}:${session.site_id}:workspace`]);
-  return workspaceOperation(async(sql,values=[])=>{let n=0;return (await client.query(sql.replace(/\?/g,()=>`$${++n}`),values)).rows;},session,operation,input,checked);
+  return workspaceOperation(async(sql,values=[])=>{let n=0;return (await client.query(sql.replace(/\?/g,()=>`$${++n}`),values)).rows;},session,operation,input,{...checked,dialect:'postgres'});
  }));
 }

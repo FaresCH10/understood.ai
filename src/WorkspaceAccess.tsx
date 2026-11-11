@@ -15,7 +15,7 @@ export function WorkspaceAccess({plan,onRecheck,onSignOut,onContact}:{plan:strin
     finally{setBusy(false);}
   }
   return <SessionRecoveryScreen language={language} title={title} kind="pending">
-    {paidPlan?<><p><strong>{PLAN_NAMES[paidPlan]}</strong></p><p>{t('Your workspace opens when Understood activates your plan. Contact us to arrange billing.')}</p></>:<p>{t('Your email is verified. Your 14-day pilot starts once Understood approves it.')}</p>}
+    {paidPlan?<><p><strong>{PLAN_NAMES[paidPlan]}</strong></p><p>{t('Your workspace opens when Understood activates your plan. Contact us to arrange billing.')}</p></>:<p>{t('Your email is verified. Your 30-day pilot starts once Understood approves it.')}</p>}
     {message&&<p role="status">{t(message)}</p>}
     <div className="actions"><button className="button primary" onClick={()=>void recheck()} disabled={busy}><RefreshCw size={17}/>{t('Check access')}</button><button className="button outline" onClick={onContact}><Mail size={17}/>{t('Contact us')}</button><button className="button subtle" onClick={()=>void onSignOut()}><LogOut size={17}/>{t('Sign out')}</button></div>
   </SessionRecoveryScreen>;

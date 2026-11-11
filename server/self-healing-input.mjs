@@ -6,8 +6,8 @@ export const improvementSampleFrom=`FROM assignments a
   JOIN attempts t ON t.assignment_id=a.id AND t.org_id=a.org_id
   WHERE a.publication_id=? AND a.org_id=? AND a.site_id=? AND w.active=true
     AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=w.id AND d.org_id=w.org_id AND d.site_id=w.site_id)
-    AND NOT EXISTS(SELECT 1 FROM attempts newer WHERE newer.assignment_id=a.id AND newer.org_id=a.org_id
-      AND (newer.received_at>t.received_at OR (newer.received_at=t.received_at AND newer.id>t.id)))
+    AND t.submission_id=(SELECT sr.submission_id FROM submission_receipts sr
+      WHERE sr.assignment_id=a.id AND sr.org_id=a.org_id ORDER BY sr.sequence DESC LIMIT 1)
     AND t.outcome IN ('matched','clarification','unassessable')`;
 
 export const improvementSampleQuery=`SELECT a.worker_id,a.language,t.outcome ${improvementSampleFrom}`;

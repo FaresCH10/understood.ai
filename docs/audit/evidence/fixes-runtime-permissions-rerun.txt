@@ -1,0 +1,33 @@
+✔ dedicated runtime role keeps actual accepted-input writes but cannot migrate, truncate, forge restore journals or delegate authority (4192.3758ms)
+✔ permission setup is explicit, atomic and rejects privileged/member/owner/missing roles without altering business rows (3135.0644ms)
+✔ runtime startup inspection rejects privilege drift, future automatic grants and impersonated owner sessions (3244.9687ms)
+✔ source fence persists after commit, blocks real submission acceptance and worker mutation, and never changes business inventory or activates a target (5025.6368ms)
+✔ fence admission checks all roles and shutdown gates atomically; later privileged ACL changes invalidate live fence verification (3621.6601ms)
+✔ application SQL role cannot read operator password/session material or create, revoke or replace operator identities (2936.593ms)
+✔ application role retains required control reads but cannot suspend tenants, pause dispatch, change quotas or forge operator evidence (2929.567ms)
+✔ worker policy is explicit and independent, never granting hidden tables or mutating the application policy (1.904ms)
+✔ worker role rejects billing/operator reads and policy/control/admin DML using actual SQL permissions (3122.1997ms)
+✔ restricted worker inserts only validated improvement findings and cannot alter findings or create corrective drafts (3094.9486ms)
+✔ worker cannot edit customer template or glossary libraries but prepares a real template-derived draft against the frozen glossary (4437.9322ms)
+✔ worker scheduler processes a populated assessment and recovery expiry under its actual worker profile (3264.0663ms)
+✔ worker case workflow policy denies creation, deletion, evidence columns and review sequence authority with unchanged business rows (3520.7577ms)
+✔ case workflow startup rejects broad, delegated, PUBLIC, future-column, sequence and guard drift; reconfiguration removes old grants (7561.9669ms)
+✔ separate API and cleanup worker preserve supervisor receipts through repeated assessment and authorized deletion redaction (3516.7256ms)
+✔ cleanup worker expires retained private review text without changing deadline receipts or original assessment metadata (2913.7641ms)
+✔ identity-lock migration upgrades a populated preceding schema without rewriting identities and is repeatable (3271.4529ms)
+✔ worker identity locks preserve all staff, credentials, revisions and memberships while denying direct business writes (3797.7198ms)
+✔ worker identity permission inspection rejects new-column, broad, delegated, PUBLIC, membership and immutable-guard drift (5098.6358ms)
+✔ separate API and identity-lock worker complete synthetic recovery and invitation delivery without worker identity rewrites (3679.8713ms)
+✔ worker organization/site row-lock grants cannot create, rename, delete or change even unreferenced identities (3017.8111ms)
+✔ worker lock-column admission rejects broad, extra-column, delegated and PUBLIC grants and never receives their sequences (4187.0729ms)
+✔ worker admission and permission setup require the original immutable column-lock function and enabled triggers (3529.5991ms)
+✔ distinct application and lock-restricted worker roles complete actual scheduled publication and populated retention without organization/site changes (4637.4518ms)
+✔ mixed application/worker source fencing validates profiles atomically, then blocks both identities without changing business inventory (7061.3599ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 95784.5365

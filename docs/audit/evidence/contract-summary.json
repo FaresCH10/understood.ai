@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "assessment-evaluation-report-v1",
+  "datasetVersion": "synthetic-assessment-2026-10-10-v1",
+  "mode": "mocked-gemini-contract",
+  "provenance": {
+    "adapter": "gemini-typed-assessment-v1",
+    "dataClass": "synthetic",
+    "model": "gemini-3.5-flash-lite",
+    "promptVersion": "gemini-assessment-v2",
+    "schemaVersion": "gemini-assessment-v2"
+  },
+  "startedAt": "2026-11-11T16:33:08.253Z",
+  "finishedAt": "2026-11-11T16:33:08.29Z",
+  "pilotAcceptance": {
+    "status": "not_evaluated",
+    "toleranceAgreement": "awaiting_agreement",
+    "independentLanguageQa": "not_provided",
+    "realDataAllowed": false
+  },
+  "semanticMetrics": {
+    "total": 34,
+    "completed": 34,
+    "failed": 0,
+    "notRun": 0,
+    "outcomeDisagreements": 0,
+    "falseMatches": {
+      "count": 0,
+      "denominator": 21,
+      "rate": 0
+    },
+    "falseClarifications": {
+      "count": 0,
+      "denominator": 13,
+      "rate": 0
+    },
+    "falseUnassessable": {
+      "count": 0,
+      "denominator": 13,
+      "rate": 0
+    },
+    "unassessable": 4,
+    "unresolvedExpectedMatches": 0,
+    "confusion": {
+      "matched": {
+        "matched": 13,
+        "clarification": 0,
+        "unassessable": 0,
+        "unresolved": 0,
+        "not_run": 0
+      },
+      "clarification": {
+        "matched": 0,
+        "clarification": 17,
+        "unassessable": 0,
+        "unresolved": 0,
+        "not_run": 0
+      },
+      "unassessable": {
+        "matched": 0,
+        "clarification": 0,
+        "unassessable": 4,
+        "unresolved": 0,
+        "not_run": 0
+      }
+    }
+  },
+  "contractChecks": {
+    "total": 43,
+    "passed": 43,
+    "failed": 0
+  }
+}

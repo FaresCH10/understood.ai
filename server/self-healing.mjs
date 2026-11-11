@@ -11,13 +11,14 @@ export function ensureImprovementSchema(db) {
   ensureDeletionSchema(db);
   const scopedCounts=improvementCountQuery.replace('a.publication_id=? AND a.org_id=? AND a.site_id=?',
     'a.publication_id=NEW.publication_id AND a.org_id=NEW.org_id AND a.site_id=NEW.site_id');
-  db.exec(`CREATE TABLE IF NOT EXISTS instruction_improvements (
+  db.exec(`DROP TRIGGER IF EXISTS improvement_scope;
+  CREATE TABLE IF NOT EXISTS instruction_improvements (
     publication_id TEXT PRIMARY KEY REFERENCES publications(id),org_id TEXT NOT NULL,site_id TEXT NOT NULL,
     briefing_id TEXT NOT NULL REFERENCES briefings(id),assessed INTEGER NOT NULL CHECK(assessed>=3),
     matched INTEGER NOT NULL CHECK(matched>=0),clarification INTEGER NOT NULL CHECK(clarification>=2),created_at TEXT NOT NULL,
     CHECK(matched+clarification<=assessed AND clarification*100>=assessed*30)
   ) STRICT;
-  CREATE TRIGGER IF NOT EXISTS improvement_scope BEFORE INSERT ON instruction_improvements
+  CREATE TRIGGER improvement_scope BEFORE INSERT ON instruction_improvements
     WHEN NOT EXISTS(SELECT 1 FROM publications p WHERE p.id=NEW.publication_id AND p.org_id=NEW.org_id
       AND p.site_id=NEW.site_id AND p.briefing_id=NEW.briefing_id AND p.state='published')
       OR NOT EXISTS(SELECT 1 FROM (${scopedCounts}) c WHERE c.assessed=NEW.assessed AND c.matched=NEW.matched AND c.clarification=NEW.clarification)

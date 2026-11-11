@@ -56,14 +56,14 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
-    "@reticlehq/react": "^3.6.0",
-    "@reticlehq/vite-plugin": "^3.6.0",
+    "@reticlehq/react": "3.9.0",
+    "@reticlehq/vite-plugin": "3.9.0",
     "@types/node": "24.19.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
     "typescript": "7.0.2",
-    "vite": "8.3.2"
+    "vite": "8.3.8"
   },
   "engines": {
     "node": "24.x"

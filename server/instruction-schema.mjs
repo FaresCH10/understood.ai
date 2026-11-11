@@ -1,3 +1,4 @@
+const checkedDeliverySchemas=new WeakSet();
 export const INSTRUCTION_RESPONSE_MODES=['question','acknowledge'];
 export const INSTRUCTION_DELIVERY_MODES=['text','voice','both'];
 export const INSTRUCTION_EVIDENCE_MODES=['none','photo'];
@@ -19,12 +20,17 @@ export function instructionModes(db,briefingId,orgId,siteId) {
 }
 
 export function ensureInstructionSchema(db) {
-  const brokenDeliveryFk=!!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='instruction_deliveries'").get()
-    && db.prepare('PRAGMA foreign_key_list(instruction_deliveries)').all()
-      .some((row)=>row.table==='workers' && Number(row.seq)>0);
-  // A composite worker FK cannot be created without a matching unique index;
-  // an empty ledger from such a schema is unusable, so rebuild it in place.
-  if(brokenDeliveryFk) db.exec('DROP TABLE instruction_deliveries');
+  // Composite worker keys are valid. Never discard retained delivery evidence
+  // to repair an unknown legacy schema: refuse safely if its keys are invalid.
+  if(tableExists(db,'instruction_deliveries') && !checkedDeliverySchemas.has(db)) {
+    const columns=new Set(db.prepare('PRAGMA table_info(instruction_deliveries)').all().map(column=>column.name));
+    if(!['request_id','org_id','site_id','worker_id','language','state','reason','attempts','assignment_id','content_json','content_hash','updated_at'].every(name=>columns.has(name)))throw new Error('Instruction delivery schema requires an explicit migration; existing records preserved');
+    let violations;
+    try { violations=db.prepare('PRAGMA foreign_key_check(instruction_deliveries)').all(); }
+    catch(cause) { throw new Error('Instruction delivery schema requires an explicit migration; existing records preserved',{cause}); }
+    if(violations.length)throw new Error('Instruction delivery foreign keys are invalid; existing records preserved');
+    checkedDeliverySchemas.add(db);
+  }
   if(tableExists(db,'instruction_sends') && !instructionEvidenceColumn(db))
     db.exec("ALTER TABLE instruction_sends ADD COLUMN evidence_mode TEXT NOT NULL DEFAULT 'none' CHECK(evidence_mode IN ('none','photo'))");
   db.exec(`CREATE TABLE IF NOT EXISTS instruction_sends (

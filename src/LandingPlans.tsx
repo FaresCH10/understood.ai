@@ -11,8 +11,8 @@ const formatNumber=(value:number)=>new Intl.NumberFormat('en-US',{maximumFractio
 
 const plans:PlanSpec[]=[
   {id:'pilot',name:'Pilot',base:0,seat:0,min:25,copy:{
-    en:{blurb:'For your first crew',description:'Give one crew clear instructions in the languages they work in, and see who has responded.',features:['One site · up to 25 active workers','14 days from approved activation','Written, voice and choice checks','Responses, clarification and reports'],cta:'Request a pilot',note:'Approval required. Scope and start date agreed with you.'},
-    ar:{blurb:'لفريقك الأول',description:'امنح فريقاً واحداً تعليمات واضحة بلغات عمله، واطّلع على من استجاب.',features:['موقع واحد · حتى 25 عاملاً نشطاً','14 يوماً من التفعيل بعد الموافقة','فحوص مكتوبة وصوتية وخيارات متعددة','الردود وطلبات التوضيح والتقارير'],cta:'اطلب برنامجاً تجريبياً',note:'يتطلب الموافقة وتحديد النطاق وتاريخ البدء معك.'}}},
+    en:{blurb:'For your first crew',description:'Give one crew clear instructions in the languages they work in, and see who has responded.',features:['One site · up to 25 active workers','30 days from approved activation','Written, voice and choice checks','Responses, clarification and reports'],cta:'Request a pilot',note:'Approval required. Scope and start date agreed with you.'},
+    ar:{blurb:'لفريقك الأول',description:'امنح فريقاً واحداً تعليمات واضحة بلغات عمله، واطّلع على من استجاب.',features:['موقع واحد · حتى 25 عاملاً نشطاً','30 يوماً من التفعيل بعد الموافقة','فحوص مكتوبة وصوتية وخيارات متعددة','الردود وطلبات التوضيح والتقارير'],cta:'اطلب برنامجاً تجريبياً',note:'يتطلب الموافقة وتحديد النطاق وتاريخ البدء معك.'}}},
   {id:'pro',name:'Pro',base:149,seat:2.4,min:100,featured:true,copy:{
     en:{blurb:'For growing teams',description:'Run everyday instructions across crews, with site workspaces and follow-up in one place.',features:['Core instruction and follow-up tools','Crews and site-scoped workspaces','Supervisor roles and access controls','Publication history and report exports'],cta:'Discuss your team',note:'We’ll arrange billing and activation with you.'},
     ar:{blurb:'للفرق المتنامية',description:'شغّل التعليمات اليومية عبر الأطقم، مع مساحات عمل للمواقع والمتابعة في مكان واحد.',features:['أدوات التعليمات والمتابعة الأساسية','أطقم ومساحات عمل لكل موقع','أدوار المشرفين وصلاحيات الوصول','سجل النشر وتصدير التقارير'],cta:'ناقش احتياجات فريقك',note:'نرتب الفوترة والتفعيل معك.'}}},
@@ -139,7 +139,7 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
           <article {...interactions} className={`plans-card${plan.featured?' plans-card--featured':''}`} aria-labelledby={`plan-${plan.id}-title`}>
             {plan.featured&&<span className="plans-card-badge">{labels.popular}</span>}
             <div className="plans-card-heading"><h3 id={`plan-${plan.id}-title`}>{plan.name}</h3><span>{copy.blurb}</span></div>
-            {plan.id==='pilot'?<div className="plans-card-price"><p className="plans-price-main"><strong>{ar?'برنامج تجريبي موجّه':'Guided pilot'}</strong></p><p className="plans-price-min">{ar?'14 يوماً · موقع واحد · حتى 25 عاملاً':'14 days · one site · up to 25 workers'}</p></div>:<div className="plans-card-price">
+            {plan.id==='pilot'?<div className="plans-card-price"><p className="plans-price-main"><strong>{ar?'برنامج تجريبي موجّه':'Guided pilot'}</strong></p><p className="plans-price-min">{ar?'30 يوماً · موقع واحد · حتى 25 عاملاً':'30 days · one site · up to 25 workers'}</p></div>:<div className="plans-card-price">
               <p className="plans-price-main">
                 {plan.from&&<span className="plans-price-from">{labels.from}</span>}
                 <bdi dir="ltr"><strong>{plan.base?`$${formatNumber(plan.base)}`:`$${plan.seat.toFixed(2)}`}</strong></bdi>

@@ -1,0 +1,101 @@
+✔ pilot site creation is unavailable before and after approval, with no extra sites created (360.6147ms)
+✔ operator approval starts the pilot clock, accepts its pending request, caps scope and expires read-only (16771.0956ms)
+✔ PostgreSQL supports persisted drafts, selected members, attachments and explicit work completion (19950.9789ms)
+✔ production Gemini admission requires explicit models, paid account, complete language scope and approvals (39.8463ms)
+✖ production preparation publishes checked private speech and grades MCQs across all 15 locales (8981.4172ms)
+✔ production source audio and legacy recorded answers use metered inline transcription and frozen facts (11245.8042ms)
+✖ approved language changes queue private presentation translation in the worker and retain grading IDs (10564.4922ms)
+✖ quota pauses leave queued translations retryable without dispatching or exhausting attempts (12336.9372ms)
+✔ production approval expiry blocks new provider requests even on an already constructed handle (23.3023ms)
+✔ production API keeps provider keys out and queues work without running the synthetic processor (18705.7572ms)
+✖ password-session presentation jobs run under restricted worker grants and refuse revoked sessions (6230.6749ms)
+✔ resolved assessment follow-up releases work without rewriting its assessment, while fresh help still blocks completion (413.9041ms)
+✔ an old resolved assessment cannot approve a newer failed answer (182.1634ms)
+✔ compositions persist incomplete text, appear in drafts and stay private to their author (162.8994ms)
+✔ explicit member audience is validated and never includes other workers (169.4541ms)
+✔ work completion requires understanding, is idempotent, and appears in worker history and library (398.8224ms)
+✔ acknowledging an instruction moves it from sent to in-progress in the worker inbox (182.8317ms)
+✔ work summaries paginate and filter on the server, preserve localized titles and exact worker scope (549.1442ms)
+✔ attachments validate bytes and become available only to the assigned worker after publication (530.1076ms)
+✔ workspace HTTP requires current session context for staff and workers (3406.5772ms)
+✔ closing follow-up without explicit readiness cannot release failed understanding (136.3187ms)
+✔ work summaries expose the open supervisor reply case on SQLite (137.0531ms)
+✔ withdrawal notifies assigned workers and remains available in instruction history (383.077ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 19
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 88040.8991
+
+✖ failing tests:
+
+test at tests\production-gemini-integration.test.mjs:69:1
+✖ production preparation publishes checked private speech and grades MCQs across all 15 locales (8981.4172ms)
+  AssertionError [ERR_ASSERTION]: {"state":"failed","error":"Synthetic preparation failed","prepared_json":null}
+  
+  'failed' !== 'ready'
+  
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/production-gemini-integration.test.mjs:75:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\production-gemini-integration.test.mjs:108:1
+✖ approved language changes queue private presentation translation in the worker and retain grading IDs (10564.4922ms)
+  AssertionError [ERR_ASSERTION]: {"assignmentId":"presentation","originalLanguage":"en","approvedLanguage":"hi","items":[{"id":"b38f506b-7187-4b4f-a218-d68a4471ee4d","sourceKind":"instruction","sourceId":"","publicationId":"presentation","publicationVersion":1,"originalLanguage":"en","targetLanguage":"hi","status":"failed","content":null,"provider":null,"live":null,"errorCode":"translation_failed","sourceHash":"1d7377415bac0775ddaae2f8c298b866aeed88d5e228eace9d828fa34d07a4ad","createdAt":"2026-11-11T18:33:03.204Z","readyAt":null}]}
+  
+  'failed' !== 'ready'
+  
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/production-gemini-integration.test.mjs:118:115)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\production-gemini-integration.test.mjs:126:1
+✖ quota pauses leave queued translations retryable without dispatching or exhausting attempts (12336.9372ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'failed' !== 'ready'
+  
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/production-gemini-integration.test.mjs:139:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests\production-gemini-integration.test.mjs:172:1
+✖ password-session presentation jobs run under restricted worker grants and refuse revoked sessions (6230.6749ms)
+  AssertionError [ERR_ASSERTION]: {"errors":[{"message":"new row for relation \"provider_operations\" violates check constraint \"provider_operations_data_class\"","code":"23514","sql":"INSERT INTO provider_operations(id,org_id,kind,reference_id,claim_token,model,data_class,reserved_requests,quota_day,inp"}],"job":[{"id":"41e3cece-e911-471a-bb02-ffaa28f259fe","authority_json":{"grant_id":null,"token_hash":"801fb5bc8a3ab7a159a56c937617add36237fbbf7f4705759fb3114a82ebcee4","access_mode":"credential","credential_revision":1},"state":"failed","attempts":1,"lease_token":null,"lease_until":null,"error_code":"translation_unavailable","retry_at":"2026-11-11T18:33:40.215Z","created_at":"2026-11-11T18:33:40.215Z","updated_at":"2026-11-11T18:33:40.735Z"}],"calls":0}
+  
+  'failed' !== 'ready'
+  
+      at TestContext.<anonymous> (file:///C:/Users/Hussein/Desktop/Understood/understood-crews/tests/production-gemini-integration.test.mjs:190:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'ready',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

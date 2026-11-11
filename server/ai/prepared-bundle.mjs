@@ -95,12 +95,13 @@ export function glossaryContent(value) {
 
 export function providerContent(adapter,dataClass) {
   const value=adapter?.provenance;
-  if(!object(value,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion'])
+  if(!object(value,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion','translationAdapter','translationModel','translationCapabilityHash'])
     || !['adapter','textModel','speechModel','voice','promptVersion','schemaVersion'].every(key=>nonempty(value[key],100))
     || !['synthetic','privacy-approved','real'].includes(dataClass) || value.dataClass!==dataClass || dataClass==='real'&&!providerDataClass(value)
     || !['prepare','checkPreparation','translate','checkTranslation','speech'].every(key=>typeof adapter?.[key]==='function')
     || !['textLanguages','speechLanguages'].every(key=>Array.isArray(adapter.capabilities?.[key]) && adapter.capabilities[key].length<=WORKER_LANGUAGE_CODES.length
       && adapter.capabilities[key].every(isWorkerLanguage))) fail('invalid_provider');
+  if(value.adapter==='gemini-deepl-approved-v1' && (value.translationAdapter!=='deepl-v2'||value.translationModel!=='deepl-v2'||!/^[a-f0-9]{64}$/.test(value.translationCapabilityHash)))fail('invalid_provider');
   return {...value};
 }
 
@@ -321,12 +322,13 @@ export function preparedAudioReferences(manifest) {
       || manifest.checks.choices!=='passed'&&item.choices.find(choice=>choice.id===manifest.rubric.correctChoiceId)?.text!==item.text))fail('invalid_manifest');
   }else if(manifest.rubric.mode!==undefined || manifest.rubric.correctChoiceId!==undefined)fail('invalid_manifest');
   const dependencies=manifest.dependencies,provider=manifest.provenance;
+  if(provider?.adapter==='gemini-deepl-approved-v1' && (provider.translationAdapter!=='deepl-v2'||provider.translationModel!=='deepl-v2'||!/^[a-f0-9]{64}$/.test(provider.translationCapabilityHash)))fail('invalid_dependencies');
   if(dependencies.titleHash!==undefined && !/^[a-f0-9]{64}$/.test(dependencies.titleHash))fail('invalid_dependencies');
   if(!Number.isSafeInteger(dependencies.revision) || dependencies.revision<1 || dependencies.schemaVersion!==PREPARED_BUNDLE_SCHEMA
     || !['sourceHash','reviewHash','glossaryHash'].every(key=>/^[a-f0-9]{64}$/.test(dependencies[key]))
     || dependencies.sourceHash!==hash(manifest.source) || !Number.isSafeInteger(dependencies.glossaryRevision) || dependencies.glossaryRevision<0
     || !Array.isArray(dependencies.languages) || JSON.stringify(dependencies.languages)!==JSON.stringify(['en',...WORKER_LANGUAGE_CODES.filter(language=>language!=='en' && language in manifest.languages)])
-    || !object(provider,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion'])
+    || !object(provider,['adapter','dataClass','textModel','speechModel','voice','promptVersion','schemaVersion','translationAdapter','translationModel','translationCapabilityHash'])
     || !['adapter','textModel','speechModel','voice','promptVersion','schemaVersion'].every(key=>nonempty(provider[key],100))
     || !['synthetic','privacy-approved','real'].includes(provider.dataClass) || provider.dataClass==='real'&&!providerDataClass(provider) || bundleHash(provider)!==bundleHash(dependencies.provider)
     || manifest.dependencyHash!==bundleHash(dependencies)) fail('invalid_dependencies');

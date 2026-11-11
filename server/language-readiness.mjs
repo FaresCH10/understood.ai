@@ -70,7 +70,7 @@ export function languageReadinessModel({ mode = 'synthetic-credential', publicat
     realDataAllowed: pipeline.dataClass==='real'&&pipeline.realDataAllowed===true,
     pipeline:stageVerificationPipeline(pipeline,stageTests),stageTests,
     provider: {
-      adapter: pipeline.dataClass==='real'?'gemini-approved-v1':pipeline.stages.some(stage=>stage.configuration==='configured') ? 'gemini-synthetic-runtime' : synthetic ? 'synthetic-local-v1' : 'unverified',
+      adapter: pipeline.dataClass==='real'?'gemini-deepl-approved-v1':pipeline.stages.some(stage=>stage.configuration==='configured') ? 'gemini-synthetic-runtime' : synthetic ? 'synthetic-local-v1' : 'unverified',
       connection: synthetic ? { state: 'not_tested', evidence: copy.synthetic } : { state: 'unavailable', evidence: 'Provider connection has not been verified.' },
       evidence: pipeline.dataClass==='real'?'Approved production adapter configured. Language quality and deployed connections require separate verification.':synthetic ? 'Synthetic-only environment. Keep real worker data off free-tier providers.' : 'Live provider evidence is required before production data access.',
     },

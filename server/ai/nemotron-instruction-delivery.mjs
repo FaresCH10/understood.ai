@@ -100,7 +100,7 @@ const causeOf=error=>{
 // bounded to a single send request, so the journal contract stays explicit.
 const inlineJournal={async beforeRequest(){return null;},async afterRequest(){}};
 
-export function nemotronInstructionDelivery(env={},fetcher=fetch) {
+export function nemotronInstructionDelivery(env={},fetcher=fetch,sharedLimiter=null) {
   if(env.UNDERSTOOD_INSTRUCTION_TEXT_PROVIDER!=='nemotron')return null;
   if(env.VERCEL_ENV!=='production' || env.UNDERSTOOD_TIER==='production')return null;
   const apiKey=env.NVIDIA_API_KEY?.trim();
@@ -116,11 +116,15 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
   let deadline=0;
   let active=0;const waiting=[];
   const failures=new WeakMap();
-  const acquire=()=>active<MAX_CONCURRENCY?(active++,Promise.resolve()):new Promise(resolve=>waiting.push(resolve)).then(()=>{active++;});
-  const release=()=>{active--;waiting.shift()?.();};
+  const acquire=()=>active<MAX_CONCURRENCY?(active++,Promise.resolve()):new Promise(resolve=>waiting.push(resolve));
+  // Transfer the reserved slot directly to a waiter; a new request cannot
+  // steal it between resolve() and the waiter's next microtask.
+  const release=()=>{const next=waiting.shift();if(next)next();else active--;};
+  const limiter=sharedLimiter ?? {acquire,release};
   const remaining=()=>deadline-Date.now();
 
   return {
+    forRequest:()=>nemotronInstructionDelivery(env,fetcher,limiter),
     mode:'nemotron-text',
     label:'Nemotron 3 Ultra 550B',
     translationLabel:'DeepL',
@@ -166,7 +170,7 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
       return failures.get(briefing) ?? null;
     },
     async translate(language,content) {
-      await acquire();
+      await limiter.acquire();
       try {
         const left=remaining();
         if(left<2000)throw Error('DeepL translation budget exhausted');
@@ -178,7 +182,7 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch) {
         return {title:translated.title,text:translated.text,
           ...(typeof content.question==='string'?{question:translated.question}:{}),
           ...(choices?{questionType:'multiple-choice',choices:content.choices.map((choice,index)=>({id:choice.id,text:translated.answerChoices[index]}))}:{})};
-      } finally { release(); }
+      } finally { limiter.release(); }
     },
   };
 }
