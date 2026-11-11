@@ -209,6 +209,14 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
     ...(leadingMessage?.text?[{id:'leading',caseId,language:data.language,createdAt:leadingMessage.createdAt,author:'worker' as const,authorName:'',text:leadingMessage.text}]:[]),
     ...[...data.items].reverse()
   ]:[];
+  const composerForm=<form id={composerId} className="chat-composer" onSubmit={event=>{event.preventDefault();void send();}}>
+    <div className="chat-pill">
+      <label className="sr-only" htmlFor={composerInputId}>{t.reply}</label>
+      <textarea ref={composer} id={composerInputId} className="chat-input" aria-describedby={overLimit?composerLimitId:undefined} aria-invalid={overLimit} maxLength={composerPolicy.limit} rows={1} value={text} readOnly={!replyAvailable||busy||voiceDirty||recoveryFailed||generationStatus==='queued'||generationStatus==='processing'} onChange={event=>setText(event.target.value)} onKeyDown={chatEnterToSend}/>
+      <button type="submit" className="chat-send" title={pending?t.retry:composerPolicy.kind==='followup'?g.send:t.send} aria-label={pending?t.retry:composerPolicy.kind==='followup'?g.send:t.send} disabled={!replyAvailable||busy||voiceDirty||recoveryFailed||overLimit||generationStatus==='queued'||generationStatus==='processing'||!text.trim()}>{pending?<RefreshCw size={20} aria-hidden="true"/>:<Send size={20} aria-hidden="true"/>}</button>
+    </div>
+    {overLimit&&<p id={composerLimitId} role="alert" className="record-error">{limitCopy[locale]}</p>}
+  </form>;
   if(!current()||!validConversationSession(session))return <section className={`${worker?'worker-card':'panel'}${embedded?' case-conversation-embedded':''}`}><p role="alert">{t.failed}</p></section>;
   return <section className={`${worker?'worker-card':'panel'}${embedded?' case-conversation-embedded chat-conversation':''}`} lang={locale} dir={rtl?'rtl':'ltr'}>
     {embedded?<>
@@ -246,15 +254,9 @@ function ConversationContent({caseId,assignmentId,session,language='en',worker=f
         {!!text&&!replyAvailable&&<p role="status" className="chat-composer-note">{s.draft}</p>}
         {!worker&&data?.canGenerate&&synthetic&&<p className="chat-composer-note">{freeTierCopy[locale]}</p>}
         {!worker&&data?.canGenerate&&data.language==='en'&&<label className="chat-audio-toggle"><input type="checkbox" checked={includeAudio} disabled={busy||!!pending} onChange={event=>setIncludeAudio(event.target.checked)}/>{g.audio}</label>}
-        {worker&&assignmentId&&<CaseVoiceRecorder scope={{kind:'reply',id:caseId,assignmentId}} session={session} language={locale} noticeLanguage={contentLanguage} current={isCurrent} canMutate={canSend} available={!!data?.canVoice&&canWrite} disabled={!replyAvailable||busy||!!text||!!pending||recoveryFailed} onDirtyChange={setVoiceDirty} onSessionLost={onSessionLost} onReceived={()=>{if(isCurrent()){setPage(1);setTick(value=>value+1);}}}/>}
-        <form id={composerId} className="chat-composer" onSubmit={event=>{event.preventDefault();void send();}}>
-          <div className="chat-pill">
-            <label className="sr-only" htmlFor={composerInputId}>{t.reply}</label>
-            <textarea ref={composer} id={composerInputId} className="chat-input" aria-describedby={overLimit?composerLimitId:undefined} aria-invalid={overLimit} maxLength={composerPolicy.limit} rows={1} value={text} readOnly={!replyAvailable||busy||voiceDirty||recoveryFailed||generationStatus==='queued'||generationStatus==='processing'} onChange={event=>setText(event.target.value)} onKeyDown={chatEnterToSend}/>
-            <button type="submit" className="chat-send" title={pending?t.retry:composerPolicy.kind==='followup'?g.send:t.send} aria-label={pending?t.retry:composerPolicy.kind==='followup'?g.send:t.send} disabled={!replyAvailable||busy||voiceDirty||recoveryFailed||overLimit||generationStatus==='queued'||generationStatus==='processing'||!text.trim()}>{pending?<RefreshCw size={20} aria-hidden="true"/>:<Send size={20} aria-hidden="true"/>}</button>
-          </div>
-          {overLimit&&<p id={composerLimitId} role="alert" className="record-error">{limitCopy[locale]}</p>}
-        </form>
+        {worker&&assignmentId
+          ? <CaseVoiceRecorder inline scope={{kind:'reply',id:caseId,assignmentId}} session={session} language={locale} noticeLanguage={contentLanguage} current={isCurrent} canMutate={canSend} available={!!data?.canVoice&&canWrite} disabled={!replyAvailable||busy||!!text||!!pending||recoveryFailed} onDirtyChange={setVoiceDirty} onSessionLost={onSessionLost} onReceived={()=>{if(isCurrent()){setPage(1);setTick(value=>value+1);}}}>{composerForm}</CaseVoiceRecorder>
+          : composerForm}
       </div>}
     </>:<>
     <div className="worker-card-head"><h2 className={embedded?'sr-only':undefined}>{t.title}</h2><button ref={refreshButton} className="icon-button" title={t.refresh} aria-label={t.refresh} disabled={busy||voiceDirty} onClick={()=>{setFailure(null);setTick(value=>value+1);}}><RefreshCw size={18}/></button></div>

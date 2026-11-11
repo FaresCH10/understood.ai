@@ -1,4 +1,4 @@
-import {useEffect,useId,useMemo,useRef,useState} from 'react';
+import {useEffect,useId,useMemo,useRef,useState,type ReactNode} from 'react';
 import {RefreshCw,Trash2} from 'lucide-react';
 import {WorkerRecorderView} from './WorkerRecorderView';
 import type {MessageSession} from './case-message-recovery';
@@ -46,11 +46,11 @@ const clearCopy:Record<WorkerUiLanguage,ClearCopy>={
   'pa-Arab':{action:'مقامی ریکارڈنگ دا پیش نظارہ صاف کرو',title:'ایہ مقامی ریکارڈنگ صاف کرنی اے؟',impact:'ایہ صرف ایس صفحے دا ریکارڈنگ پیش نظارہ ہٹاندا اے۔ زیر التوا اپ لوڈ منسوخ یا بھیجی آڈیو حذف نہیں ہوندی، تے تسیں ایسدی وصولی اجے وی چیک کر سکدے او۔',cancel:'منسوخ کرو',confirm:'مقامی پیش نظارہ صاف کرو'},
   id:{action:'Hapus pratinjau rekaman lokal',title:'Hapus rekaman lokal ini?',impact:'Ini hanya menghapus pratinjau rekaman di halaman ini. Unggahan yang tertunda tidak dibatalkan, audio terkirim tidak dihapus, dan Anda masih dapat memeriksa tanda terimanya.',cancel:'Batal',confirm:'Hapus pratinjau lokal'},
 };
-type Props={scope:VoiceScope;session:MessageSession;language:WorkerUiLanguage;noticeLanguage?:RecordingLanguage;available?:boolean;disabled?:boolean;current?:()=>boolean;canMutate?:()=>boolean;onDirtyChange:(value:boolean)=>void;onReceived:()=>void;onSessionLost?:()=>void};
+type Props={scope:VoiceScope;session:MessageSession;language:WorkerUiLanguage;noticeLanguage?:RecordingLanguage;available?:boolean;disabled?:boolean;current?:()=>boolean;canMutate?:()=>boolean;inline?:boolean;children?:ReactNode;onDirtyChange:(value:boolean)=>void;onReceived:()=>void;onSessionLost?:()=>void};
 export function CaseVoiceRecorder(props:Props){
   return <VoiceContent key={JSON.stringify([props.session.clientContext,props.session.expiresAt,props.scope])} {...props}/>;
 }
-function VoiceContent({scope,session,language,noticeLanguage:selectedNoticeLanguage,available=true,disabled=false,current=()=>true,canMutate=()=>true,onDirtyChange,onReceived,onSessionLost}:Props){
+function VoiceContent({scope,session,language,noticeLanguage:selectedNoticeLanguage,available=true,disabled=false,current=()=>true,canMutate=()=>true,inline=false,children,onDirtyChange,onReceived,onSessionLost}:Props){
   const t=copy[language],clearText=clearCopy[language],dialogId=useId(),noticeLanguage:RecordingLanguage=selectedNoticeLanguage??language;
   const [pending,setPending]=useState<VoicePending|null>(null),[busy,setBusy]=useState(false),[unsaved,setUnsaved]=useState(false),[failure,setFailure]=useState<VoiceFailure|null>(null),[notice,setNotice]=useState<'received'|'failed'|null>(null),[blocked,setBlocked]=useState(false),[generation,setGeneration]=useState(0);
   const mounted=useRef(false),flight=useRef(false),controller=useRef<AbortController|null>(null),callbacks=useRef({current,canMutate,disabled,available,onDirtyChange,onReceived,onSessionLost});callbacks.current={current,canMutate,disabled,available,onDirtyChange,onReceived,onSessionLost};
@@ -99,12 +99,13 @@ function VoiceContent({scope,session,language,noticeLanguage:selectedNoticeLangu
     if(!busy&&!flight.current&&isCurrent()&&unsaved&&pending?.id===clearIntent.current?.id&&generation===clearIntent.current?.generation){setGeneration(value=>value+1);setUnsaved(false);setFailure(null);setNotice(null);}
     dialog.current?.close();
   }
-  if(!current()||!validConversationSession(session))return <p role="alert">{t.unavailable}</p>;
-  if(!available&&!pending&&!unsaved&&!busy&&!notice)return null;
+  if(!current()||!validConversationSession(session))return inline?<div className="case-voice-recorder"><p role="alert">{t.unavailable}</p>{children}</div>:<p role="alert">{t.unavailable}</p>;
+  if(!available&&!pending&&!unsaved&&!busy&&!notice)return inline?<>{children}</>:null;
+  const recorder=<WorkerRecorderView key={generation} language={language} noticeLanguage={noticeLanguage} loadSiteNotice={loadSiteNotice} purpose={scope.kind} compactNotice inline={inline} retryOnly={!!pending} synthetic={false} disabled={!available||disabled||busy||blocked||!canMutate()||(!!pending&&!unsaved)} saveAllowed={false} onSave={async()=>{throw Error(t.unavailable);}} onSend={send} onUnsavedChange={setUnsaved}/>;
   return <div className="case-voice-recorder">
     {pending&&<div className="notice notice-amber"><p role="status">{t.unknown}</p><div className="actions"><button ref={checkButton} className="button outline" disabled={busy||blocked} onClick={()=>void check()}><RefreshCw size={18}/>{t.check}</button>{unsaved&&<button type="button" className="icon-button" title={clearText.action} aria-label={clearText.action} disabled={busy} onClick={askClear}><Trash2 size={18}/></button>}</div></div>}
     {failure&&<p role="alert" className="record-error">{failure==='conflict'?t.unknown:t.unavailable}</p>}{notice&&<p role="status">{t[notice]}</p>}
-    <WorkerRecorderView key={generation} language={language} noticeLanguage={noticeLanguage} loadSiteNotice={loadSiteNotice} purpose={scope.kind} compactNotice retryOnly={!!pending} synthetic={false} disabled={!available||disabled||busy||blocked||!canMutate()||(!!pending&&!unsaved)} saveAllowed={false} onSave={async()=>{throw Error(t.unavailable);}} onSend={send} onUnsavedChange={setUnsaved}/>
+    {inline?<div className="chat-composer-row">{children}{recorder}</div>:recorder}
     <dialog ref={dialog} className="withdraw-dialog" aria-labelledby={`${dialogId}-title`} aria-describedby={`${dialogId}-impact`} onKeyDown={keepDialogFocus} onClose={()=>{clearIntent.current=null;if(clearTrigger.current?.isConnected)clearTrigger.current.focus();else checkButton.current?.focus();}}><h2 id={`${dialogId}-title`}>{clearText.title}</h2><p id={`${dialogId}-impact`}>{clearText.impact}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>dialog.current?.close()}>{clearText.cancel}</button><button className="button danger" onClick={confirmClear}>{clearText.confirm}</button></div></dialog>
   </div>;
 }

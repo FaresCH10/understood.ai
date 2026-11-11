@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Info, Mic, Play, RotateCcw, Send, Square, Trash2,RefreshCw,Save } from 'lucide-react';
+import { Info, Mic, Play, RotateCcw, Send, Square, Trash2, X, RefreshCw, Save } from 'lucide-react';
 import { createRecordingSubmission } from './audio';
 import type { RecordingSubmission } from './audio';
 import { recordingNotice,conversationRecordingNotice,staffCaseRecordingNotice,siteNoticeText,conversationRecorderText,type RecordingLanguage } from './recording-notice';
@@ -53,7 +53,7 @@ export const staffRecorderText={
   ar:{title:'تسجيل توضيح حضوري',preview:'استمع قبل الحفظ',send:'حفظ التسجيل الخاص',received:'تم حفظ التسجيل الخاص',permission:'الميكروفون غير متاح. تحقق من إذن المتصفح أو أضف ملاحظات حل مكتوبة بدلًا من ذلك.',format:'تعذر تجهيز التسجيل. سجّل مجددًا أو أضف ملاحظات مكتوبة.',error:'استلام الحفظ غير مؤكد. احتفظ بهذه المعاينة وتحقق من استلام التسجيل الخاص.'},
   ur:{title:'بالمشافہ وضاحت ریکارڈ کریں',preview:'محفوظ کرنے سے پہلے سنیں',send:'نجی ریکارڈنگ محفوظ کریں',received:'نجی ریکارڈنگ محفوظ ہو گئی',permission:'مائیکروفون دستیاب نہیں۔ براؤزر کی اجازت چیک کریں یا تحریری حل کے نوٹس شامل کریں۔',format:'ریکارڈنگ تیار نہیں ہو سکی۔ دوبارہ ریکارڈ کریں یا تحریری نوٹس شامل کریں۔',error:'محفوظ ہونے کی تصدیق نہیں ہو سکی۔ پیش نظارہ برقرار رکھیں اور نجی ریکارڈنگ کی وصولی چیک کریں۔'},
 };
-export type RecorderProps = { language: WorkerUiLanguage; noticeLanguage?:RecordingLanguage; purpose?:'answer'|'help'|'reply'|'in_person'; compactNotice?:boolean; loadSiteNotice?:(language:RecordingLanguage,signal:AbortSignal)=>Promise<string|null>; retryOnly?:boolean; localOnlyNotice?:OfflineNotice; synthetic: boolean; disabled:boolean; saveAllowed:boolean;onSave:(bytes:Uint8Array,id:string,capturedAt:string)=>Promise<void>; onSend: (bytes: Uint8Array, submissionId: string) => Promise<void>;onUnsavedChange:(unsaved:boolean)=>void };
+export type RecorderProps = { language: WorkerUiLanguage; noticeLanguage?:RecordingLanguage; purpose?:'answer'|'help'|'reply'|'in_person'; compactNotice?:boolean; inline?:boolean; loadSiteNotice?:(language:RecordingLanguage,signal:AbortSignal)=>Promise<string|null>; retryOnly?:boolean; localOnlyNotice?:OfflineNotice; synthetic: boolean; disabled:boolean; saveAllowed:boolean;onSave:(bytes:Uint8Array,id:string,capturedAt:string)=>Promise<void>; onSend: (bytes: Uint8Array, submissionId: string) => Promise<void>;onUnsavedChange:(unsaved:boolean)=>void };
 type Phase = 'idle' | 'requesting' | 'recording' | 'preview' | 'uploading' | 'received';
 
 function stopTracks(live: MediaStream | null) {
@@ -66,7 +66,7 @@ async function decodeRecording(source: Blob): Promise<AudioBuffer> {
   finally { await context.close().catch(() => {}); }
 }
 
-export function WorkerRecorder({ language, noticeLanguage, purpose='answer', compactNotice=false, loadSiteNotice, retryOnly=false, localOnlyNotice, synthetic,disabled,saveAllowed,onSave, onSend,onUnsavedChange }: RecorderProps) {
+export function WorkerRecorder({ language, noticeLanguage, purpose='answer', compactNotice=false, inline=false, loadSiteNotice, retryOnly=false, localOnlyNotice, synthetic,disabled,saveAllowed,onSave, onSend,onUnsavedChange }: RecorderProps) {
   const contentLanguage:RecordingLanguage=noticeLanguage??language;
   const staffLanguage=language==='ar'||language==='ur'?language:'en';
   const t = {...labels[language],...(purpose==='in_person'?staffRecorderText[staffLanguage]:purpose==='help'||purpose==='reply'?conversationRecorderText[language]:{})};
@@ -282,27 +282,52 @@ export function WorkerRecorder({ language, noticeLanguage, purpose='answer', com
     finally {sending.current=false;if(mounted.current)setSaving(false);}
   };
 
+  const timer=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;
   const noticeBody=<><h3>{notice.title}</h3><p>{notice.local}</p><p>{notice.access} {notice.processing}</p><p>{notice.retention}</p>
     {siteNotice && <><h3>{siteText.title}</h3><p className="recording-site-copy" lang={contentLanguage} dir={contentLanguage==='en'?'ltr':'rtl'}>{siteNotice}</p></>}</>;
-
-  return <div className="record-answer">
-    {compactNotice
-      ? <div className={`recording-notice-compact${noticeOpen?' is-open':''}`}
-          onKeyDown={event=>{if(event.key==='Escape'&&noticeOpen){event.stopPropagation();setNoticeOpen(false);}}}
-          onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node | null))setNoticeOpen(false);}}>
+  const noticeNode=compactNotice
+    ? <div className={`recording-notice-compact${noticeOpen?' is-open':''}${noticeError?' has-error':''}`}
+        onKeyDown={event=>{if(event.key==='Escape'&&noticeOpen){event.stopPropagation();setNoticeOpen(false);}}}
+        onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node | null))setNoticeOpen(false);}}>
+        <button type="button" className="recording-notice-info" aria-label={noticeError?`${notice.title}. ${siteText.error}`:notice.title} aria-expanded={noticeOpen} aria-controls={noticeId} onClick={()=>setNoticeOpen(value=>!value)}><Info size={15} aria-hidden="true"/></button>
+        <div id={noticeId} className="recording-notice-pop" role="note">
           {!noticeReady && <p className="recording-notice-status" role={noticeError?'alert':'status'}>{noticeError?siteText.error:siteText.loading}</p>}
-          {noticeError && <button type="button" className="button outline" onClick={()=>setNoticeTick(value=>value+1)}><RefreshCw size={18}/>{siteText.retry}</button>}
-          <button type="button" className="recording-notice-info" aria-label={notice.title} aria-expanded={noticeOpen} aria-controls={noticeId} onClick={()=>setNoticeOpen(value=>!value)}><Info size={15} aria-hidden="true"/></button>
-          <div id={noticeId} className="recording-notice-pop" role="note">{noticeBody}</div>
-        </div>
-      : <aside className="recording-notice" aria-label={notice.title}>
+          {noticeError && <button type="button" className="button outline" onClick={()=>setNoticeTick(value=>value+1)}><RefreshCw size={16} aria-hidden="true"/>{siteText.retry}</button>}
           {noticeBody}
-          {!noticeReady && <p role={noticeError?'alert':'status'}>{noticeError?siteText.error:siteText.loading}</p>}
-          {noticeError && <button className="button outline" onClick={()=>setNoticeTick(value=>value+1)}><RefreshCw size={18}/>{siteText.retry}</button>}
-        </aside>}
+        </div>
+      </div>
+    : <aside className="recording-notice" aria-label={notice.title}>
+        {noticeBody}
+        {!noticeReady && <p role={noticeError?'alert':'status'}>{noticeError?siteText.error:siteText.loading}</p>}
+        {noticeError && <button className="button outline" onClick={()=>setNoticeTick(value=>value+1)}><RefreshCw size={18}/>{siteText.retry}</button>}
+      </aside>;
+  if(inline)return <div className={`record-answer record-answer-inline${phase==='requesting'||phase==='recording'||phase==='preview'||phase==='uploading'?' is-active':''}`}>
+    {noticeNode}
+    {phase==='idle'&&<button type="button" className="chat-record" title={title} aria-label={title} disabled={disabled||retryOnly||!noticeReady} onClick={()=>void start()}><Mic size={20} aria-hidden="true"/></button>}
+    {phase==='requesting'&&<div className="chat-voice-active">
+      <p className="chat-voice-status" role="status">{t.requesting}</p>
+      <button type="button" className="chat-voice-icon" title={t.cancel} aria-label={t.cancel} onClick={cancelRequest}><X size={20} aria-hidden="true"/></button>
+    </div>}
+    {phase==='recording'&&<div className="chat-voice-active">
+      <span className="chat-voice-dot" aria-hidden="true"/>
+      <span className="chat-voice-timer" role="status">{timer}</span>
+      <button type="button" className="chat-voice-icon" title={t.discard} aria-label={t.discard} onClick={discard}><Trash2 size={20} aria-hidden="true"/></button>
+      <button type="button" className="chat-voice-stop" title={t.stop} aria-label={t.stop} onClick={stop}><Square size={18} aria-hidden="true"/></button>
+    </div>}
+    {(phase==='preview'||phase==='uploading')&&<div className="chat-voice-active chat-voice-preview">
+      <label className="chat-voice-audio"><span className="sr-only">{t.preview}</span><audio controls src={url}/></label>
+      <button type="button" className="chat-voice-icon" title={t.discard} aria-label={t.discard} disabled={saving||phase==='uploading'} onClick={discard}><Trash2 size={20} aria-hidden="true"/></button>
+      <button type="button" className="chat-voice-send" title={phase==='uploading'?t.uploading:t.send} aria-label={phase==='uploading'?t.uploading:t.send} disabled={disabled||saving||phase==='uploading'||!noticeReady} onClick={()=>void send()}>{phase==='uploading'?<RefreshCw size={18} aria-hidden="true"/>:<Send size={18} aria-hidden="true"/>}</button>
+    </div>}
+    {phase==='received'&&<button type="button" className="chat-record" title={title} aria-label={title} disabled={disabled||retryOnly||!noticeReady} onClick={()=>{discard();void start();}}><Mic size={20} aria-hidden="true"/></button>}
+    {saveStatus && <p role="status">{saveStatus}</p>}
+    {error && <p role="alert" className="record-error">{error}</p>}
+  </div>;
+  return <div className="record-answer">
+    {noticeNode}
     {phase === 'idle' && <button className="button primary full" disabled={disabled || !noticeReady} onClick={start}><Mic size={20} />{title}</button>}
     {phase === 'requesting' && <><p role="status">{t.requesting}</p><button className="button outline full" onClick={cancelRequest}>{t.cancel}</button></>}
-    {phase === 'recording' && <><div className="record-timer" role="status">{String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')}</div><button className="button primary full" onClick={stop}><Square size={18} />{t.stop}</button>{purpose!=='in_person'&&<button className="button outline full" onClick={discard}><Trash2 size={18} />{t.discard}</button>}</>}
+    {phase === 'recording' && <><div className="record-timer" role="status">{timer}</div><button className="button primary full" onClick={stop}><Square size={18} />{t.stop}</button>{purpose!=='in_person'&&<button className="button outline full" onClick={discard}><Trash2 size={18} />{t.discard}</button>}</>}
     {(phase === 'preview' || phase === 'uploading') && <><label className="field">{t.preview}<audio controls src={url} /></label>{localOnlyNotice===undefined && <button className="button primary full" disabled={disabled || saving || phase === 'uploading' || !noticeReady} onClick={send}><Send size={18} />{phase === 'uploading' ? t.uploading : t.send}</button>}{purpose==='answer' && <button className="button outline full" disabled={disabled || saving || !saveAllowed || phase === 'uploading' || !noticeReady} onClick={()=>void savePreview()}><Save size={18}/>{saveText.save}</button>}<button className="button outline full" disabled={disabled || retryOnly || saving || phase === 'uploading' || !noticeReady} onClick={start}><RotateCcw size={18} />{t.again}</button>{purpose!=='in_person'&&<button className="button subtle full" disabled={retryOnly || saving || phase === 'uploading'} onClick={discard}><Trash2 size={18} />{t.discard}</button>}</>}
     {saveStatus && <p role="status">{saveStatus}</p>}
     {phase === 'received' && <><p className="record-receipt"><Play size={18} />{t.received}</p>{purpose!=='answer' && <button className="button outline full" disabled={disabled||retryOnly||!noticeReady} onClick={()=>{discard();void start();}}><Mic size={18}/>{title}</button>}</>}

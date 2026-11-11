@@ -134,15 +134,16 @@ export function WorkerInstructionChat({requestedCaseId,assignmentId,version,cont
             ?<CaseConversation key={`${selected}:${scopeKey}`} embedded caseId={selected!} assignmentId={assignmentId} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} language={language} timezone={timezone} current={()=>callbacks.current.current()&&validWorkerSession(session)} worker canWrite={canWrite&&selectedCase.status==='open'} initialText={seed} leadingMessage={selectedCase.helpText?{text:selectedCase.helpText,createdAt:selectedCase.createdAt}:null} focusSignal={focusSignal} refreshSignal={conversationRefresh} onDirtyChange={setConversationDirty} onSessionLost={onSessionLost}/>
             :<div className="chat-center"><p>{copy.empty}</p></div>}
           {openCount===0&&canWrite&&!disabled&&<div className="chat-composer-area">
-            <CaseVoiceRecorder scope={{kind:'help',id:assignmentId}} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} language={language} noticeLanguage={contentLanguage} available={canVoiceHelp} disabled={sending||!live||!!draft.trim()} current={()=>callbacks.current.current()&&validWorkerSession(session)} onDirtyChange={setVoiceDirty} onReceived={refreshChat} onSessionLost={onSessionLost}/>
-            <form className="chat-composer" onSubmit={event=>{event.preventDefault();void submit();}}>
-              {sendFailed&&<p role="alert" className="record-error">{copy.sendFailed}</p>}
-              <div className="chat-pill">
-                <label className="sr-only" htmlFor={newComposerId}>{copy.ask}</label>
-                <textarea ref={newComposer} id={newComposerId} className="chat-input" dir="auto" rows={1} maxLength={500} value={draft} placeholder={copy.prompt} disabled={sending||!live||voiceDirty} onChange={event=>{setDraft(event.target.value);setSendFailed(false);setSent(false);}} onKeyDown={chatEnterToSend}/>
-                <button type="submit" className="chat-send" aria-label={sending?copy.sending:copy.send} title={sending?copy.sending:copy.send} disabled={sending||disabled||!live||voiceDirty||draft.trim().length<3}><Send size={20} aria-hidden="true"/></button>
-              </div>
-            </form>
+            <CaseVoiceRecorder inline scope={{kind:'help',id:assignmentId}} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} language={language} noticeLanguage={contentLanguage} available={canVoiceHelp} disabled={sending||!live||!!draft.trim()} current={()=>callbacks.current.current()&&validWorkerSession(session)} onDirtyChange={setVoiceDirty} onReceived={refreshChat} onSessionLost={onSessionLost}>
+              <form className="chat-composer" onSubmit={event=>{event.preventDefault();void submit();}}>
+                {sendFailed&&<p role="alert" className="record-error">{copy.sendFailed}</p>}
+                <div className="chat-pill">
+                  <label className="sr-only" htmlFor={newComposerId}>{copy.ask}</label>
+                  <textarea ref={newComposer} id={newComposerId} className="chat-input" dir="auto" rows={1} maxLength={500} value={draft} placeholder={copy.prompt} disabled={sending||!live||voiceDirty} onChange={event=>{setDraft(event.target.value);setSendFailed(false);setSent(false);}} onKeyDown={chatEnterToSend}/>
+                  <button type="submit" className="chat-send" aria-label={sending?copy.sending:copy.send} title={sending?copy.sending:copy.send} disabled={sending||disabled||!live||voiceDirty||draft.trim().length<3}><Send size={20} aria-hidden="true"/></button>
+                </div>
+              </form>
+            </CaseVoiceRecorder>
           </div>}
         </>}
     </div>}

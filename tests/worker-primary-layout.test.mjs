@@ -32,6 +32,23 @@ test('conversation recorders collapse the recording notice behind an expandable 
   assert.match(chatRecorder,/<WorkerRecorderView[^]*?purpose=\{scope\.kind\} compactNotice/);
 });
 
+test('chat recorders put the mic beside the writing area instead of a full-width button',async()=>{
+  const recorder=await readFile(new URL('../src/WorkerRecorder.tsx',import.meta.url),'utf8');
+  const chatRecorder=await readFile(new URL('../src/CaseVoiceRecorder.tsx',import.meta.url),'utf8');
+  const conversation=await readFile(new URL('../src/CaseConversation.tsx',import.meta.url),'utf8');
+  const help=await readFile(new URL('../src/WorkerInstructionChat.tsx',import.meta.url),'utf8');
+  assert.match(recorder,/inline\?:boolean/);
+  assert.match(recorder,/record-answer-inline/);
+  assert.match(recorder,/className="chat-record"/);
+  assert.match(recorder,/className="chat-voice-active"/);
+  assert.match(recorder,/aria-label=\{title\}/);
+  assert.match(chatRecorder,/chat-composer-row/);
+  assert.match(chatRecorder,/inline=\{inline\}/);
+  assert.match(conversation,/<CaseVoiceRecorder inline/);
+  assert.match(conversation,/>\{composerForm\}<\/CaseVoiceRecorder>/);
+  assert.match(help,/<CaseVoiceRecorder inline/);
+});
+
 test('worker primary flow precedes mounted saved-work tools without a duplicate inline help section',async()=>{
   const source=await readFile(new URL('../src/main.tsx',import.meta.url),'utf8');
   const question=source.indexOf('<section className="worker-card question-card" id="worker-question"');
