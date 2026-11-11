@@ -10,10 +10,10 @@ import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {ClarificationContractError,checkedClarificationPage,checkedClarificationDetail,type ClarificationPage as Cases,type ClarificationDetail as Detail,type ClarificationEvidence} from './clarification-contract';
 import {caseLocale,caseText,caseMessage,caseState,caseLanguage,caseReason,type CaseLocale,type CaseTextKey} from './clarification-locale';
 import {CaseLocalePicker} from './CaseLocalePicker';
-import {CaseTimeline} from './CaseTimeline';
 import {StaffCaseRecordings} from './StaffCaseRecordings';
 import './clarifications-inbox.css';
 import './clarification-detail.css';
+import './instruction-chat.css';
 
 function Status({value,language='en'}:{value:string;language?:CaseLocale}){return <span className={`status status-${value==='resolved'?'green':'amber'}`}><span className="status-dot"/>{caseState(language,value)}</span>;}
 function readError(reason:unknown){return reason instanceof ClarificationContractError?'The case response could not be verified. Refresh to try again.':'Case details are unavailable. Refresh to try again.';}
@@ -98,7 +98,7 @@ function CaseDisclosure({title,description,icon,attention,children,className=''}
 export function ClarificationPage({id,refresh,navigate,canWrite,session,navigationGuard,authority,language='en',onLanguageChange,timezone}:{id:string;refresh:number;navigate:(path:string)=>void;canWrite:boolean;session:MessageSession;navigationGuard:RefObject<((next:string,resume?:()=>void)=>boolean)|null>;authority:StaffRequestAuthority;language?:CaseLocale;onLanguageChange?:(language:CaseLocale)=>void;timezone?:string}){
   const locale=caseLocale(language),t=(key:CaseTextKey)=>caseText(locale,key);
   const api=useStaffRequest(authority),[read,setRead]=useState<{key:string;data:Detail|null;loading:boolean;error:string}>({key:'',data:null,loading:true,error:''});
-  const [reload,setReload]=useState(0),[error,setError]=useState(''),[conversationDirty,setConversationDirty]=useState(false),[repeatDirty,setRepeatDirty]=useState(false),[reviewDirty,setReviewDirty]=useState(false),[actionDirty,setActionDirty]=useState(false),[recordingDirty,setRecordingDirty]=useState(false);
+  const [reload,setReload]=useState(0),[error,setError]=useState(''),[conversationDirty,setConversationDirty]=useState(false),[repeatDirty,setRepeatDirty]=useState(false),[reviewDirty,setReviewDirty]=useState(false),[actionDirty,setActionDirty]=useState(false),[recordingDirty,setRecordingDirty]=useState(false),[chatRefresh,setChatRefresh]=useState(0);
   const retained=useRef<Detail|null>(null),capabilities=useRef({repeat:false,review:false});
   const key=JSON.stringify([id,refresh,reload]);
   useEffect(()=>{
@@ -123,18 +123,19 @@ export function ClarificationPage({id,refresh,navigate,canWrite,session,navigati
   const superseded=data.current_version!==null&&data.current_version>data.version;
   const kind:CaseKind=data.staffCreation?'staff':data.helpRequest?'help':caseKindFromReason(data.reason);
   const reasonText=caseReason(locale,data.reason).trim().toLowerCase(),detailReasons=data.assessmentReasons.filter(reason=>caseReason(locale,reason).trim().toLowerCase()!==reasonText),expectedFacts=data.snapshot.askedFacts.length?data.snapshot.askedFacts:data.snapshot.facts;
-  const openCaseSection=(id:string)=>{const section=document.getElementById(id) as HTMLDetailsElement|null;if(!section)return;section.open=true;section.scrollIntoView({block:'center'});section.querySelector<HTMLElement>('summary')?.focus({preventScroll:true});};
+  const openCaseSection=(id:string)=>{const section=document.getElementById(id) as HTMLDetailsElement|null;if(!section)return;for(let parent=section.parentElement;parent;parent=parent.parentElement)if(parent instanceof HTMLDetailsElement)parent.open=true;section.open=true;section.scrollIntoView({block:'center'});section.querySelector<HTMLElement>('summary')?.focus({preventScroll:true});};
   return <div className="clarification-detail case-workflow cd-workspace" lang={locale} dir={locale==='en'?'ltr':'rtl'}>
     <button className="back-link direction-arrow cd-back" onClick={()=>navigate('clarifications')}><ArrowLeft size={17}/>{t('Back to clarifications')}</button>
     <header className="page-header cd-header"><div className="cd-worker-heading"><span className="cd-worker-avatar" aria-hidden="true"><UserRound size={24}/></span><div><h1><bdi>{data.worker}</bdi></h1><p><bdi>{data.title||t('Retained case')}</bdi><span className="cd-header-version">{caseText(locale,'instruction v{version}',{version:data.version})}</span></p><span className="cd-header-type"><KindChip kind={kind} language={locale}/><Status value={data.status} language={locale}/></span></div></div><div className="actions">{onLanguageChange&&<CaseLocalePicker locale={locale} onChange={onLanguageChange}/>}<button className="icon-button cd-refresh" title={t('Refresh case')} aria-label={t('Refresh case')} disabled={loading} onClick={()=>setReload(n=>n+1)}><RefreshCw size={18}/></button></div></header>
     <dl className="cd-meta"><div><dt>{t('Language')}</dt><dd>{caseLanguage(locale,data.language)}</dd></div><div><dt>{t('Received')}</dt><dd><CaseTime value={data.created_at} language={locale} timezone={timezone}/></dd></div><div className={data.status==='open'&&data.case_due_at&&Date.parse(data.case_due_at)<Date.now()?'cd-overdue':''}><dt>{t('Case deadline')}</dt><dd>{data.case_due_at?<><CaseTime value={data.case_due_at} language={locale} timezone={timezone}/>{data.status==='open'&&Date.parse(data.case_due_at)<Date.now()&&<span className="cd-overdue-label"><TriangleAlert size={13}/>{t('Overdue')}</span>}</>:t('No deadline')}</dd></div></dl>
+    <button type="button" className="cd-chat-jump" onClick={()=>{const input=document.querySelector<HTMLTextAreaElement>('.cd-chat-panel .chat-input');if(input){input.focus();return;}document.querySelector<HTMLElement>('.cd-chat-panel')?.scrollIntoView({block:'start'});}}><MessageCircle size={17} aria-hidden="true"/>{t('Message worker')}</button>
     {superseded&&<p className="cd-notice"><Info size={17}/>{caseText(locale,'This case relates to v{case}. The live instruction is v{current}.',{case:data.version,current:data.current_version!})}</p>}
     {data.escalated_at&&<p className="cd-notice"><TriangleAlert size={17}/><span>{t('Escalated')} · <CaseTime value={data.escalated_at} language={locale} timezone={timezone}/></span></p>}
     {loading&&<p className="cd-notice" data-page-loading role="status">{t('Refreshing case details. Last loaded details are shown below.')}</p>}{read.key===key&&read.error&&<p role="alert" className="cd-notice">{caseMessage(locale,read.error)} {t('Last loaded details are shown below.')}</p>}{error&&<p role="alert" className="cd-notice cd-guard-notice"><Info size={17}/>{caseMessage(locale,error)}</p>}
 
     {(capabilities.current.repeat||data.status==='resolved')&&<CaseRepeats language={locale} caseId={id} worker={data.worker} workerLanguage={data.language} onResolve={canWrite?()=>openCaseSection('cd-resolve-section'):undefined} onDeadline={canWrite&&data.canReview?()=>openCaseSection('cd-deadline-section'):undefined} authority={authority} available={available} timezone={timezone} caseDueAt={data.case_due_at} checkBack={data.outcome==='clarification'} canWrite={writable&&data.canRequestRepeat&&!conversationDirty&&!reviewDirty&&!actionDirty&&!recordingDirty} closed={data.status==='resolved'} onDirtyChange={setRepeatDirty}/>}
 
-    <div className="cd-layout"><div className="cd-primary">
+    <div className="cd-primary">
       <section className="panel cd-original"><div className="cd-section-heading"><h2><MessageCircle size={18}/>{t('Instruction and answer')}</h2></div>
         {data.snapshot.source&&<div className="cd-question cd-instruction"><span className="cd-field-label">{t('Instruction')}</span><p className="cd-instruction-source" lang="" dir="auto">{data.snapshot.source}</p></div>}
         {data.snapshot.question&&<div className="cd-question"><span className="cd-field-label">{t('Question asked')}</span><p lang="en" dir="auto">{data.snapshot.question}</p></div>}
@@ -150,13 +151,22 @@ export function ClarificationPage({id,refresh,navigate,canWrite,session,navigati
         {(detailReasons.length>0||data.assessmentEvidence.length>0)&&<CaseDisclosure title={t('Assessment details')} icon={<ClipboardCheck size={18}/>} className="cd-evidence"><Evidence language={locale} reasons={detailReasons} evidence={data.assessmentEvidence} facts={data.snapshot.askedFacts}/></CaseDisclosure>}
         {data.attempts.length>0&&<CaseDisclosure title={caseText(locale,'Recent responses ({count})',{count:data.attempts.length})} description={t('Earlier answers and their original assessments.')} icon={<History size={18}/>} className="cd-responses"><div className="row-list">{data.attempts.map(attempt=><article className="case-attempt" key={attempt.id}><div className="cd-attempt-heading"><CaseTime value={attempt.received_at} language={locale} timezone={timezone}/><span>{caseState(locale,attempt.outcome)}</span></div><p lang={data.language} dir="auto">{attempt.answer_text}</p><Evidence language={locale} reasons={attempt.assessmentReasons} evidence={attempt.assessmentEvidence} facts={data.snapshot.askedFacts}/>{attempt.recording_id&&<audio controls preload="none" aria-label={t('Original response audio')} src={`/api/recordings/${encodeURIComponent(attempt.recording_id)}/audio`}/>}</article>)}</div></CaseDisclosure>}
       </section>
-      <div className="cd-conversation" tabIndex={-1} role="region" aria-label={t('View follow-up conversation')}><CaseConversation caseId={id} session={session} language={language} timezone={timezone} synthetic={authority.session.mode!=='live-credential'} current={authority.isCurrent} canMutate={()=>available&&data.status==='open'&&authority.canMutate()} onSessionLost={authority.onSessionLost} canWrite={writable&&data.status==='open'&&!repeatDirty&&!reviewDirty&&!actionDirty&&!recordingDirty} onDirtyChange={setConversationDirty}
-      afterComposer={['owner','supervisor'].includes(authority.session.staffRole??'')&&(data.language==='en'||data.language==='ar'||data.language==='ur')?<StaffCaseRecordings scope={{caseId:id,assignmentId:data.assignment_id}} authority={authority} available={available} canWrite={writable&&data.status==='open'&&!data.contentExpired&&!conversationDirty&&!repeatDirty&&!reviewDirty&&!actionDirty} language={locale} onLanguageChange={onLanguageChange} recordingLanguage={data.language} timezone={timezone} refresh={refresh+reload} onDirtyChange={setRecordingDirty} onChanged={()=>setReload(n=>n+1)}/>:undefined}/>
-      </div>
-    </div><aside className="cd-sidebar" aria-label={t('Case management')}>
-      <ClarificationActions language={locale} data={data} authority={authority} available={available} canWrite={canWrite&&!conversationDirty&&!repeatDirty&&!reviewDirty&&!recordingDirty} onDirtyChange={setActionDirty} onChanged={()=>setReload(n=>n+1)}/>
-      {capabilities.current.review&&<CaseReviews language={locale} caseId={id} authority={authority} available={available} timezone={timezone} canWrite={writable&&data.canReview&&!data.contentExpired&&!conversationDirty&&!repeatDirty&&!actionDirty&&!recordingDirty} closed={data.status==='resolved'} onDirtyChange={setReviewDirty} onDeadlineChange={()=>setReload(n=>n+1)}/>}
-      <CaseDisclosure title={t('Timeline')} icon={<Clock3 size={18}/>} className="cd-timeline"><CaseTimeline caseId={id} authority={authority} available={available} refresh={refresh+reload} language={locale} timezone={timezone} resolutionNote={data.status==='resolved'?data.notes:''}/></CaseDisclosure>
-    </aside></div>
+      <CaseDisclosure title={t('Case details')} description={t('Owner, review, and case resolution.')} icon={<SlidersHorizontal size={18}/>} attention={actionDirty||reviewDirty?t('Unsaved changes'):undefined} className="cd-case-details">
+        <ClarificationActions language={locale} data={data} authority={authority} available={available} canWrite={canWrite&&!conversationDirty&&!repeatDirty&&!reviewDirty&&!recordingDirty} onDirtyChange={setActionDirty} onChanged={()=>setReload(n=>n+1)}/>
+        {capabilities.current.review&&<CaseReviews language={locale} caseId={id} authority={authority} available={available} timezone={timezone} canWrite={writable&&data.canReview&&!data.contentExpired&&!conversationDirty&&!repeatDirty&&!actionDirty&&!recordingDirty} closed={data.status==='resolved'} onDirtyChange={setReviewDirty} onDeadlineChange={()=>setReload(n=>n+1)}/>}
+      </CaseDisclosure>
+    </div><aside className="cd-chat-rail" aria-label={t('Follow-up conversation')}>
+      <section className="cd-chat-panel" aria-labelledby="cd-chat-title">
+        <header className="cd-chat-panel-head">
+          <span className="cd-chat-avatar" aria-hidden="true"><MessageCircle size={22}/></span>
+          <div className="cd-chat-identity"><h2 id="cd-chat-title">{t('Follow-up conversation')}</h2><p><bdi>{data.worker}</bdi> · {caseLanguage(locale,data.language)}</p></div>
+          <div className="cd-chat-actions">
+            {['owner','supervisor'].includes(authority.session.staffRole??'')&&(data.language==='en'||data.language==='ar'||data.language==='ur')&&<StaffCaseRecordings compact scope={{caseId:id,assignmentId:data.assignment_id}} authority={authority} available={available} canWrite={writable&&data.status==='open'&&!data.contentExpired&&!conversationDirty&&!repeatDirty&&!reviewDirty&&!actionDirty} language={locale} onLanguageChange={onLanguageChange} recordingLanguage={data.language} timezone={timezone} refresh={refresh+reload} onDirtyChange={setRecordingDirty} onChanged={()=>setReload(n=>n+1)}/>}
+            <button type="button" className="icon-button" title={t('Refresh conversation')} aria-label={t('Refresh conversation')} disabled={conversationDirty} onClick={()=>setChatRefresh(n=>n+1)}><RefreshCw size={18} aria-hidden="true"/></button>
+          </div>
+        </header>
+        <div className="cd-chat-panel-body"><CaseConversation embedded caseId={id} session={session} language={language} timezone={timezone} synthetic={authority.session.mode!=='live-credential'} current={authority.isCurrent} canMutate={()=>available&&data.status==='open'&&authority.canMutate()} onSessionLost={authority.onSessionLost} canWrite={writable&&data.status==='open'&&!repeatDirty&&!reviewDirty&&!actionDirty&&!recordingDirty} onDirtyChange={setConversationDirty} refreshSignal={chatRefresh}/></div>
+      </section>
+    </aside>
   </div>;
 }
