@@ -30,7 +30,9 @@ export async function reportActivity(client,session,publication,filters,timezone
 }
 
 export async function publicationResponses(client,session,publicationId) {
-  const rows=(await client.query(`SELECT a.id AS assignment_id,w.code,a.language,${responseColumns},
+  const rows=(await client.query(`SELECT a.id AS assignment_id,w.code,a.language,
+    (SELECT COUNT(*)::int FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.site_id=a.site_id AND c.status='open') AS open_cases,
+    ${responseColumns},
     (SELECT ae.received_at FROM assignment_evidence ae WHERE ae.assignment_id=a.id AND ae.org_id=a.org_id) AS evidence_at
     FROM assignments a JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
     WHERE a.org_id=$1 AND a.site_id=$2 AND a.publication_id=$3 ORDER BY w.code,a.id LIMIT 5001`,[session.org_id,session.site_id,publicationId])).rows;

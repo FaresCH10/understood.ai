@@ -78,12 +78,13 @@ export function responseRow(row) {
   const receivedAt=audio ? row.audio_at : row.attempt_at || acknowledgedAt;
   return {assignmentId:row.assignment_id,worker:row.code,language:row.language,
     status:outcome || (audio && ['failed','blocked'].includes(row.audio_status) ? 'failed_audio' : acknowledgedAt ? 'acknowledged' : receivedAt ? 'assessment_pending' : 'awaiting_response'),
-    outcome:outcome || null,receivedAt:receivedAt instanceof Date ? receivedAt.toISOString() : receivedAt || null};
+    outcome:outcome || null,receivedAt:receivedAt instanceof Date ? receivedAt.toISOString() : receivedAt || null,
+    openCases:Number(row.open_cases)||0};
 }
 
 export function undeliveredRow(row) {
   return {assignmentId:null,worker:row.code,language:row.language,status:'not_delivered',outcome:null,receivedAt:null,
-    deliveryState:row.state,reason:row.reason || null};
+    deliveryState:row.state,reason:row.reason || null,openCases:0};
 }
 
 export function responsePage(rows,filters,publication,undelivered=[]) {
@@ -262,7 +263,9 @@ export function listPublicationResponses(db,session,publicationId,input={}) {
   const filters=responseRequest(publicationId,null,input);
   return transaction(db,() => {
     authority(db,session);const {publication}=scopedPublication(db,session,publicationId);
-    const rows=db.prepare(`SELECT a.id AS assignment_id,w.code,a.language,${responseColumns}
+    const rows=db.prepare(`SELECT a.id AS assignment_id,w.code,a.language,
+      (SELECT COUNT(*) FROM clarifications c WHERE c.assignment_id=a.id AND c.org_id=a.org_id AND c.status='open') AS open_cases,
+      ${responseColumns}
       FROM assignments a JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
       WHERE a.publication_id=? AND a.org_id=? AND a.site_id=? ORDER BY w.code,a.id LIMIT 5001`).all(publicationId,session.org_id,session.site_id);
     const undelivered=present(db,'instruction_sends') && present(db,'instruction_deliveries')

@@ -111,6 +111,8 @@ import {prepareEvidencePhoto} from './worker-evidence-photo';
 import {WorkerSubmissionReceipt} from './WorkerSubmissionReceipt';
 import { canManageStaff,staffDate,staffGreeting } from './staff-policy';
 import { WorkerHelpHistory, workerStatusText, workerVersionText } from './WorkerHelpHistory';
+import { WorkerInstructionChat } from './WorkerInstructionChat';
+import { WorkerAnswerReview } from './WorkerAnswerReview';
 import {workerFollowupText} from './worker-followup-text';
 import {CaseVoiceRecorder} from './CaseVoiceRecorder';
 import type {RecordingLanguage} from './recording-notice';
@@ -1073,6 +1075,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   useEffect(()=>()=>{window.speechSynthesis?.cancel();speechPlayers.current.body?.pause();speechPlayers.current.question?.pause();},[]);
   const [helpText, setHelpText] = useState('');
   const [conversationUnsent,setConversationUnsent]=useState(false);
+  const [chatUnsent,setChatUnsent]=useState(false);
   const [helpVoiceUnsent,setHelpVoiceUnsent]=useState(false);
   const [receipt, setReceipt] = useState<any>(null);
   const checkedReceipts=useRef<Set<string>>(new Set());
@@ -1091,7 +1094,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const leaveDialog=useRef<HTMLDialogElement>(null),leaveAction=useRef<(()=>void)|null>(null),leaveTrigger=useRef<HTMLElement|null>(null);
   const approvedRoute=useRef<string|null>(null);
   const leaveText=workerLeaveText[language] || workerLeaveText.en;
-  const unsent={answer,help:helpText || (conversationUnsent || helpVoiceUnsent?'unsent':''),audio:audioUnsent};
+  const unsent={answer,help:helpText || (conversationUnsent || helpVoiceUnsent || chatUnsent?'unsent':''),audio:audioUnsent};
   const inputAvailability=workerInputAvailability({answer,help:helpText,audio:audioUnsent,helpVoice:helpVoiceUnsent,conversation:conversationUnsent});
   const hasUnsent=workerLeaveRequired('back',unsent);
   useEffect(()=>{
@@ -1137,7 +1140,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
     try {await work();if(currentView.current==='device')setAudioRefresh(value=>value+1);}
     finally {requestInFlight.current=false;setBusy(false);}
   };
-  useEffect(() => { setReceipt(null); checkedReceipts.current.clear(); setAnswer(''); setHelpText('');setRequestFailure('');setPendingReceipts([]);setReviewingAnswer(false);setAcknowledging(false);setAnswerPresentationId(null);setTranslatedChoices(null);setTranslatedQuestion(null);setTranslatedContent(null);setSpeakError(''); window.speechSynthesis?.cancel(); }, [id]);
+  useEffect(() => { setReceipt(null); checkedReceipts.current.clear(); setAnswer(''); setHelpText('');setChatUnsent(false);setRequestFailure('');setPendingReceipts([]);setReviewingAnswer(false);setAcknowledging(false);setAnswerPresentationId(null);setTranslatedChoices(null);setTranslatedQuestion(null);setTranslatedContent(null);setSpeakError(''); window.speechSynthesis?.cancel(); }, [id]);
   const [briefingTargetFailure,setBriefingTargetFailure]=useState(false);
   const briefingTargetRunning=useRef(false);
   useEffect(()=>{
@@ -1274,16 +1277,23 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
       setAudioDraftRefresh(value=>value+1);
     }finally {requestInFlight.current=false;setBusy(false);}
   };
-  const help = async () => {
-    if (!id || helpVoiceUnsent || inputAvailability.helpBlocked || helpText.trim().length < 3 || requestInFlight.current || detailUnavailable) return;
+  const submitHelpText = async (text:string): Promise<string|null> => {
+    const body=text.trim();
+    if (!id || helpVoiceUnsent || inputAvailability.helpBlocked || body.length < 3 || requestInFlight.current || detailUnavailable) return null;
     requestInFlight.current = true;
     setBusy(true);setRequestFailure('');
     try {
-      const requestId = await requestIdFor('help', id, helpText);
+      const requestId = await requestIdFor('help', id, body);
       trackReceipt('help',id,requestId);
-      const result = await act(`/worker/briefings/${id}/help`, { text: helpText, requestId });
-      if (result && currentAssignment.current === id) { clearTrackedReceipt('help');setHelpText('');setHelpSent(true); setAudioRefresh((value) => value + 1); }
-    } catch(error){requestError(error);} finally { requestInFlight.current = false; setBusy(false); }
+      const result = await act(`/worker/briefings/${id}/help`, { text: body, requestId });
+      if (result && currentAssignment.current === id) { clearTrackedReceipt('help');setAudioRefresh((value) => value + 1);return String(result.id||requestId); }
+      return null;
+    } catch(error){requestError(error);return null;}
+    finally { requestInFlight.current = false; setBusy(false); }
+  };
+  const help = async () => {
+    const caseId = await submitHelpText(helpText);
+    if (caseId) { setHelpText(''); setHelpSent(true); }
   };
   const chooseEvidence=async(file:File|undefined)=>{
     if(!file)return;
@@ -1493,6 +1503,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                       )}
                     </>
                   )}
+                  {!detail.data.repeatRequest&&detail.data.answerText&&<WorkerAnswerReview language={language} questionType={detail.data.content?.questionType} choices={translatedChoices||detail.data.content?.choices} answerText={detail.data.answerText} contentLanguage={translatedChoices?session.language:detail.data.language}/>}
                   {responseState?.pending && <button className="icon-button" aria-label={statusText.check} title={statusText.check} disabled={busy} onClick={() => setAudioRefresh((value) => value + 1)}><RefreshCw size={20} /></button>}
                   </>}
                 </section>
@@ -1509,6 +1520,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
               </>
             )}
 
+            {!detail.data.contentExpired&&<WorkerInstructionChat key={`chat:${id}`} requestedCaseId={view.split('/')[2]} assignmentId={id} version={detail.data.version} contentLanguage={detail.data.language} language={language} session={session} refresh={refresh+audioRefresh} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} disabled={busy||detailUnavailable||inputAvailability.helpBlocked} canWrite={!!responseState?.canHelp} onSendHelp={submitHelpText} onDirtyChange={setChatUnsent} onSessionLost={onSessionLost} timezone={session.timezone}/>}
             {!detail.data.contentExpired&&<WorkerWorkProgress key={`work:${id}`} disabled={busy||detailUnavailable} confirmationLabel={responseMode==='acknowledge'?t.ackAction:undefined} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} refresh={refresh+audioRefresh} language={language} timezone={session.timezone} onWorkChange={setWorkStatus} onCompleted={()=>setAudioRefresh(value=>value+1)}/>}
             <details className="worker-detail-disclosure" open={hasUnsent||pendingReceipts.length>0}><summary>{journeyText.resources}<ChevronDown size={18} aria-hidden="true"/></summary><div>
             <WorkerOfflineSaveView key={`offline:${id}:${detail.data.publicationId}:${detail.data.version}`} session={session} language={language} scope={{assignmentId:id,publicationId:detail.data.publicationId,version:detail.data.version,language:detail.data.language}} disabled={busy || detailUnavailable} current={()=>!sessionInvalid() && validWorkerSession(session) && currentAssignment.current===id && !detailUnavailable} onOperation={outboxOperation}/>

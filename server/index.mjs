@@ -1219,7 +1219,11 @@ export function createAppHandler(db, options = {}) {
         }
         const row = db
           .prepare(
-            `SELECT a.id,a.publication_id,a.due_at,a.language,p.version,p.state,p.snapshot_json,${responseColumns}
+            `SELECT a.id,a.publication_id,a.due_at,a.language,p.version,p.state,p.snapshot_json,
+          (SELECT t.answer_text FROM attempts t JOIN submission_receipts sr
+            ON sr.assignment_id=t.assignment_id AND sr.submission_id=t.submission_id
+            WHERE t.assignment_id=a.id ORDER BY sr.sequence DESC LIMIT 1) AS answer_text,
+          ${responseColumns}
           FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id
           WHERE a.id=? AND a.org_id=? AND a.site_id=? AND a.worker_id=?`,
           )
@@ -1254,6 +1258,7 @@ export function createAppHandler(db, options = {}) {
               speech: deliveryMode!=='text' && content.speech === 'device-synthesis-demo' ? 'device-synthesis-demo' : null,
             },
             outcome: responseMode==='acknowledge' ? null : currentAudio ? null : row.outcome,
+            ...(responseMode==='question'&&!currentAudio&&typeof row.answer_text==='string'?{answerText:row.answer_text}:{}),
             acknowledgedAt,
             assessmentStatus: responseMode==='acknowledge' ? acknowledgedAt ? 'complete' : null
               : currentAudio ? 'pending' : row.outcome ? 'complete' : null,

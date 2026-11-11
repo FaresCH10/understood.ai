@@ -1,7 +1,8 @@
 import {WORKER_LOCALES,languageDirection} from '../server/languages.mjs';
 import {useEffect,useRef,useState} from 'react';
-import {ChevronLeft,ChevronRight,RefreshCw,Search,X} from 'lucide-react';
+import {ChevronLeft,ChevronRight,MessageCircle,RefreshCw,Search,X} from 'lucide-react';
 import {PublicationPicker} from './PublicationHistory';
+import {StaffInstructionChat} from './StaffInstructionChat';
 import type {PublicationSummary} from './publication-history';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {SelfHealingLoop} from './SelfHealingLoop';
@@ -10,7 +11,7 @@ import type {StaffUiKey} from './staff-ui-locale';
 import {caseReason} from './clarification-locale';
 
 type Publication={id:string;version:number;state:string};
-type Row={assignmentId:string|null;worker:string;language:string;status:string;receivedAt:string|null;deliveryState?:string;reason?:string|null};
+type Row={assignmentId:string|null;worker:string;language:string;status:string;receivedAt:string|null;deliveryState?:string;reason?:string|null;openCases?:number};
 type DeliveryReason={reason:string;language:string|null;count:number};
 type Page={publication:Publication;items:Row[];total:number;page:number;pageSize:number;delivery?:{undelivered:number;reasons:DeliveryReason[]}};
 type Receipt={sequence:string;kind:string;receivedAt:string;isLatest:boolean;answerText:string|null;outcome:string|null;reasons:string[];recordingId:string|null;audioStatus:string|null;evidence:{factIndex:number;quote:string}[]};
@@ -74,7 +75,7 @@ export function PublicationResponses({briefingId,publication,onSelect,context,re
     <div className={`responses-layout ${assignmentId?'has-selection':''}`}><section className="panel" aria-label={ui.t('Publication recipients')}><h2>{ui.t('Responses')} {publication&&`· ${ui.t('Version {version}',{version:ui.number(publication.version)})}`}</h2>
       {loading?<p data-page-loading role="status">{ui.t('Loading responses...')}</p>:error?<p role="alert">{ui.error(error,'Response unavailable')}</p>:data&&<>
         {data.delivery&&data.delivery.undelivered>0&&<p className="notice notice-amber" role="status"><strong>{ui.t('{count} recipients did not receive this instruction.',{count:ui.number(data.delivery.undelivered)})}</strong>{' '}{data.delivery.reasons.map(reason=>`${reason.language?`${ui.language(reason.language)}: `:''}${deliveryReasonText(ui,reason.reason)} (${ui.number(reason.count)})`).join(' · ')}</p>}
-        {data.items.length?<div className="table-wrap" tabIndex={0} aria-label={ui.t('Recipient response table')}><table><thead><tr>{(['Worker','Assigned language','Latest response','Received'] as const).map(key=><th key={key}>{ui.t(key)}</th>)}</tr></thead><tbody>{data.items.map(row=>{const id=row.assignmentId;return <tr key={id||`missing:${row.worker}:${row.language}:${row.deliveryState||''}:${row.reason||''}`} className={id&&assignmentId===id?'selected-response':''}><td>{id?<button ref={node=>{recipientButtons.current[id]=node;}} className="text-link" aria-pressed={assignmentId===id} onClick={()=>setAssignmentId(id)}><bdi>{row.worker}</bdi><ChevronRight className="directional-icon" size={16}/></button>:<strong><bdi>{row.worker}</bdi></strong>}</td><td data-label={ui.t("Assigned language")}>{ui.language(row.language)}</td><td data-label={ui.t("Latest response")}><Assessment value={row.status}/>{row.status==='not_delivered'&&<div><small>{deliveryReasonText(ui,row.reason||row.deliveryState)}</small></div>}</td><td data-label={ui.t("Received")}>{ui.date(row.receivedAt)}</td></tr>;})}</tbody></table></div>:<p>{ui.t('No recipients match these filters.')}</p>}
+        {data.items.length?<div className="table-wrap" tabIndex={0} aria-label={ui.t('Recipient response table')}><table><thead><tr>{(['Worker','Assigned language','Latest response','Received'] as const).map(key=><th key={key}>{ui.t(key)}</th>)}</tr></thead><tbody>{data.items.map(row=>{const id=row.assignmentId;return <tr key={id||`missing:${row.worker}:${row.language}:${row.deliveryState||''}:${row.reason||''}`} className={id&&assignmentId===id?'selected-response':''}><td>{id?<button ref={node=>{recipientButtons.current[id]=node;}} className="text-link" aria-pressed={assignmentId===id} onClick={()=>setAssignmentId(id)}><bdi>{row.worker}</bdi><ChevronRight className="directional-icon" size={16}/></button>:<strong><bdi>{row.worker}</bdi></strong>}</td><td data-label={ui.t("Assigned language")}>{ui.language(row.language)}</td><td data-label={ui.t("Latest response")}><Assessment value={row.status}/>{row.status==='not_delivered'&&<div><small>{deliveryReasonText(ui,row.reason||row.deliveryState)}</small></div>}{!!row.openCases&&id&&<div><button type="button" className="open-case-chip" onClick={()=>setAssignmentId(id)}><MessageCircle size={13} aria-hidden="true"/>{ui.t('{count} open chats',{count:ui.number(row.openCases)})}</button></div>}</td><td data-label={ui.t("Received")}>{ui.date(row.receivedAt)}</td></tr>;})}</tbody></table></div>:<p>{ui.t('No recipients match these filters.')}</p>}
         <Paging page={page} total={data.total} size={pageSize} onChange={setPage} label="recipients"/>
       </>}
     </section>{assignmentId&&<ResponseDetail authority={authority} key={`${publicationId}:${assignmentId}`} publicationId={publicationId} assignmentId={assignmentId} refresh={refresh+tick} onClose={()=>{recipientButtons.current[assignmentId]?.focus();setAssignmentId(null);}} navigate={navigate} canPlayAudio={canPlayAudio}/>}</div>
@@ -95,7 +96,7 @@ export function ResponseDetail({publicationId,assignmentId,refresh,onClose,navig
   const ui=useStaffUi(authority.session.timezone),[page,setPage]=useState(1),heading=useRef<HTMLHeadingElement>(null);
   const {data,error,loading}=useResponse<Detail>(`/publications/${encodeURIComponent(publicationId)}/responses/${encodeURIComponent(assignmentId)}?page=${page}&pageSize=10`,refresh,authority);
   useEffect(()=>{heading.current?.focus();},[assignmentId]);
-  return <section lang={ui.locale} dir={ui.dir} className="panel response-detail" aria-label={ui.t('Accepted submission history')}><div className="response-detail-heading"><h2 ref={heading} tabIndex={-1}><bdi>{data?data.assignment.worker:ui.t('Submission history')}</bdi></h2><button className="icon-button" aria-label={ui.t('Close response history')} title={ui.t('Close response history')} onClick={onClose}><X size={18}/></button></div>
+  return <><section lang={ui.locale} dir={ui.dir} className="panel response-detail" aria-label={ui.t('Accepted submission history')}><div className="response-detail-heading"><h2 ref={heading} tabIndex={-1}><bdi>{data?data.assignment.worker:ui.t('Submission history')}</bdi></h2><button className="icon-button" aria-label={ui.t('Close response history')} title={ui.t('Close response history')} onClick={onClose}><X size={18}/></button></div>
     {loading?<p data-page-loading role="status">{ui.t('Loading submission history...')}</p>:error?<p role="alert">{ui.error(error,'Response unavailable')}</p>:data&&<>
       <p>{ui.t('Version {version}',{version:ui.number(data.publication.version)})} · {ui.state(data.publication.state)} · {ui.language(data.assignment.language)}</p>
       {data.assignment.dueAt&&<p>{ui.t('Due {date}',{date:ui.date(data.assignment.dueAt)})}</p>}
@@ -114,5 +115,5 @@ export function ResponseDetail({publicationId,assignmentId,refresh,onClose,navig
         </article>)}<Paging page={page} total={data.total} size={10} onChange={setPage} label="submissions"/></>}
       {data.cases.length>0&&<><h3>{ui.t('Clarification records')}</h3><div className="row-list">{data.cases.map(item=><button className="item-row" key={item.id} onClick={()=>navigate(`clarifications/${item.id}`)}><span className="item-main"><strong>{ui.reason(caseReason(ui.locale,item.reason))}</strong><small>{ui.state(item.status)}</small></span><ChevronRight className="directional-icon" size={18}/></button>)}</div></>}
     </>}
-  </section>;
+  </section><StaffInstructionChat assignmentId={assignmentId} cases={data?.cases??[]} navigate={navigate} authority={authority}/></>;
 }

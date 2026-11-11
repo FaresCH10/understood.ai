@@ -151,4 +151,12 @@
 .worker-receipt-compact .worker-receipt-actions{margin-block:.75rem 0}
 
 .worker-choice-number{flex:none;font-variant-numeric:tabular-nums;color:var(--ink-muted,#50635a)}
+.worker-answer-record{margin-top:14px;padding:16px;border:1px solid #dfe7e2;border-radius:9px;background:#f7faf8}
+.worker-answer-record h3{margin:0 0 10px;font-size:15px;line-height:1.4;color:#2c443d}
+.worker-answer-record-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.worker-answer-record-list li{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid #e2e9e6;border-radius:7px;background:#fff;line-height:1.5;overflow-wrap:anywhere}
+.worker-answer-record-list li.is-chosen{border-color:#a9c9b8;background:#edf5ef}
+.worker-answer-tag{display:inline-flex;align-items:center;gap:4px;flex:none;margin-inline-start:auto;padding:3px 9px;border-radius:999px;background:#e0ece3;color:#1d5c40;font-size:12px;font-weight:700;white-space:nowrap}
+.worker-answer-record .briefing-text{margin:0;padding:11px 13px;border:1px solid #e2e9e6;border-radius:7px;background:#fff;white-space:pre-wrap;overflow-wrap:anywhere}
+.worker-answer-record>p.muted{margin:10px 0 0;font-size:13px;line-height:1.5}
 [data-worker-swipe-tabs] { touch-action:pan-y pinch-zoom; overflow-x:clip; }

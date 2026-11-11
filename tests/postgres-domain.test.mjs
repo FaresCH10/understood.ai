@@ -396,6 +396,40 @@ test('PostgreSQL response drilldown isolates exact publication and paged receipt
   } finally {await db.close();}
 });
 
+test('PostgreSQL instruction chats expose open case counts and gate the worker answer text by response mode',async()=>{
+  const f=await fixture(),{db,pool}=f;
+  try{
+    const pub=await publish(pool,owner,'brief',request(),options),assignment=await f.assignment(pub.id),other=await f.assignment(pub.id,'w2');
+    let list=await listPublicationResponses(pool,owner,pub.id,{},options);
+    assert.ok(list.items.every(row=>row.openCases===0));
+    let brief=await workerBriefing(pool,worker,assignment,options);
+    assert.equal(brief.responseMode,'question');assert.equal(Object.hasOwn(brief,'answerText'),false);
+    await submitAnswer(pool,worker,assignment,randomUUID(),answer,options);
+    brief=await workerBriefing(pool,worker,assignment,options);
+    assert.equal(brief.answerText,answer);assert.equal(brief.assessmentStatus,'pending');
+    const help=await requestHelp(pool,worker,assignment,{requestId:randomUUID(),text:'Which shelf should wet paint go on?'},options);
+    await requestHelp(pool,worker,assignment,{requestId:randomUUID(),text:'And where do the brushes go?'},options);
+    await requestHelp(pool,{...worker,principal_id:'w2'},other,{requestId:randomUUID(),text:'Question on another instruction'},options);
+    list=await listPublicationResponses(pool,owner,pub.id,{},options);
+    assert.deepEqual(list.items.map(row=>[row.assignmentId,row.openCases]),[[assignment,1],[other,1]]);
+    assert.ok(!/answerText/.test(JSON.stringify(list)));
+    assert.deepEqual((await getPublicationResponse(pool,owner,pub.id,assignment,{},options)).cases.map(item=>({id:item.id,status:item.status})),[{id:help.id,status:'open'}]);
+    await resolveClarification(pool,owner,help.id,{notes:'Use the blue shelf for wet paint'},options);
+    list=await listPublicationResponses(pool,owner,pub.id,{},options);
+    assert.deepEqual(list.items.map(row=>[row.assignmentId,row.openCases]),[[assignment,0],[other,1]]);
+
+    await db.query(`INSERT INTO briefings(id,org_id,site_id,title,source,state,prepared_json) VALUES('ack','a','a','Shelf',$1,'ready',$2)`,[CANONICAL_SOURCE,JSON.stringify(syntheticPrepare(CANONICAL_SOURCE))]);
+    const ack=await publish(pool,owner,'ack',{requestId:randomUUID(),revision:1,nextVersion:1,workerIds:['w1']},{...options,modes:{responseMode:'acknowledge',deliveryMode:'both',evidenceMode:'none'}});
+    const ackAssignment=await f.assignment(ack.id);
+    await db.query(`INSERT INTO attempts(id,org_id,site_id,assignment_id,submission_id,answer_text,outcome,reasons_json,received_at,assessment_status)
+      VALUES($1,'a','a',$2,'legacy-ack-answer','Legacy acknowledge answer','matched','[]',clock_timestamp(),'complete')`,[randomUUID(),ackAssignment]);
+    await db.query("INSERT INTO submission_receipts(org_id,assignment_id,submission_id,kind,received_at) VALUES('a',$1,'legacy-ack-answer','typed',clock_timestamp())",[ackAssignment]);
+    brief=await workerBriefing(pool,worker,ackAssignment,options);
+    assert.equal(brief.responseMode,'acknowledge');assert.equal(Object.hasOwn(brief,'answerText'),false);
+    assert.ok(!/answerText/.test(JSON.stringify(await workerBriefings(pool,worker,options,{pageSize:50}))));
+  } finally {await db.close();}
+});
+
 test('PostgreSQL library returns bounded scoped pages and separates ready drafts from latest publication state',async () => {
   const f=await fixture(),{db,pool}=f;
   try {

@@ -190,3 +190,40 @@ test('SQLite response history is scoped, receipt-ordered, paged and read-only ac
     assert.deepEqual(db.prepare("SELECT * FROM assignments WHERE worker_id='worker-30' ORDER BY id").all(),frozen);
   } finally {await new Promise((resolve) => server.close(resolve));db.close();await rm(root,{recursive:true,force:true});}
 });
+
+test('SQLite instruction chats count open cases per assignment and expose only the current worker answer text',async()=>{
+  const db=openDatabase(':memory:'),root=await mkdtemp(join(tmpdir(),'understood-instruction-chat-'));
+  const server=sqliteApp(db,{audioRoot:root});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const base=`http://127.0.0.1:${server.address().port}/api`;
+  const login=async principal=>(await loginPrincipal(base,principal)).headers.get('set-cookie').split(';')[0];
+  try{
+    const cookie=await login('worker-30'),cookie29=await login('worker-29');
+    const detail=(member='assignment-30',header=cookie)=>fetch(`${base}/worker/briefings/${member}`,{headers:{cookie:header}}).then(response=>response.json());
+    const listed=(n='30')=>listPublicationResponses(db,staff,'shelf-v3',{search:n.padStart(3,'0')}).items.find(row=>row.assignmentId===`assignment-${n}`);
+    let value=await detail();
+    assert.equal(value.responseMode,'question');assert.equal(Object.hasOwn(value,'answerText'),false);
+    assert.equal(listed().openCases,0);
+
+    submitAnswer(db,worker,'assignment-30',randomUUID(),'Finished blue; unfinished yellow.');
+    value=await detail();
+    assert.equal(value.answerText,'Finished blue; unfinished yellow.');assert.equal(value.assessmentStatus,'complete');
+    assert.equal(listed().status,'matched');
+    assert.equal(Object.hasOwn(listed(),'answerText'),false);
+    assert.ok(!/answerText/.test(JSON.stringify(listPublicationResponses(db,staff,'shelf-v3',{search:'030'}))));
+
+    const helpId=randomUUID(),help=requestHelp(db,worker,'assignment-30',{requestId:helpId,text:'Which shelf should wet paint go on?'});
+    assert.deepEqual({id:help.id,status:help.status},{id:helpId,status:'open'});
+    requestHelp(db,worker,'assignment-30',{requestId:randomUUID(),text:'And where do the brushes go?'});
+    requestHelp(db,{...worker,principal_id:'worker-29'},'assignment-29',{requestId:randomUUID(),text:'Question on another instruction'});
+    assert.equal(listed().openCases,1);assert.equal(listed('29').openCases,1);
+    assert.deepEqual(getPublicationResponse(db,staff,'shelf-v3','assignment-30').cases.map(item=>({id:item.id,status:item.status})),[{id:helpId,status:'open'}]);
+    db.prepare("UPDATE clarifications SET status='resolved' WHERE id=?").run(helpId);
+    assert.equal(listed().openCases,0);assert.equal(listed('29').openCases,1);
+
+    const audio=await receiveRecording(db,{...worker,principal_id:'worker-29'},'assignment-29',randomUUID(),wav(),root);
+    value=await detail('assignment-29',cookie29);
+    assert.equal(value.recordingId,audio.id);assert.equal(value.audioStatus,'received');
+    assert.equal(Object.hasOwn(value,'answerText'),false);assert.equal(value.outcome,null);
+  } finally {await new Promise(resolve=>server.close(resolve));db.close();await rm(root,{recursive:true,force:true});}
+});

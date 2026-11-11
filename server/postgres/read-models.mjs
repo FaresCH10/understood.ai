@@ -239,6 +239,7 @@ function workerContent(row,detail=false) {
     dueAt:iso(row.due_at),...(row.repeat_request?{repeatRequest:row.repeat_request}:{}),responseMode,deliveryMode,evidenceMode,evidence,
     ...(detail && evidence ? {evidenceUrl:`/api/worker/briefings/${encodeURIComponent(row.id)}/evidence`} : {}),
     outcome:responseMode==='acknowledge' ? null : currentAudio ? null : row.outcome,
+    ...(detail && !expired && responseMode==='question' && !currentAudio && typeof row.answer_text==='string' ? {answerText:row.answer_text} : {}),
     assessmentStatus:responseMode==='acknowledge' ? acknowledgedAt ? 'complete' : null
       : !currentAudio && !row.outcome && ['failed','blocked'].includes(row.assessment_job_status) ? 'failed' : currentAudio || (row.attempt_at && !row.outcome) ? 'pending' : row.outcome ? 'complete' : null,
     ...(acknowledgedAt?{acknowledgedAt}:{}),
@@ -287,6 +288,9 @@ export async function workerBriefing(pool,session,assignmentId,{schema='public'}
       p.snapshot_json->>'responseMode' AS response_mode,p.snapshot_json->>'deliveryMode' AS delivery_mode,p.snapshot_json->>'evidenceMode' AS evidence_mode,
       d.content_json AS delivery_content_json,
       ae.mime AS evidence_mime,ae.bytes AS evidence_bytes,ae.sha256 AS evidence_sha256,ae.received_at AS evidence_at,
+      (SELECT t.answer_text FROM attempts t JOIN submission_receipts sr
+        ON sr.assignment_id=t.assignment_id AND sr.org_id=t.org_id AND sr.submission_id=t.submission_id
+        WHERE t.assignment_id=a.id ORDER BY sr.sequence DESC LIMIT 1) AS answer_text,
       (gb.state='attached') AS speech_active,${pendingRepeatColumns({message:true})},${responseColumns}
       FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
       JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
