@@ -46,7 +46,7 @@ export function FirstRunOnboarding({authority,refresh,onCompleted,onNavigate,onR
   const {request,current}=useStaffRequest(authority);
   let state:FirstRunState|null=null,readError=read.error;
   if(read.data){try{state=checkedFirstRunState(read.data);}catch(caught){readError=(caught as Error).message;}}
-  const [language,setLanguage]=useState<FirstRunLanguage>('en'),[siteName,setSiteName]=useState(''),[timezone,setTimezone]=useState('UTC'),[confirmed,setConfirmed]=useState(false);
+  const [language,setLanguage]=useState<FirstRunLanguage>(staffT.locale==='ar'?'ar':'en'),[siteName,setSiteName]=useState(''),[timezone,setTimezone]=useState('UTC'),[confirmed,setConfirmed]=useState(false);
   const t=copy[language];
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[conflict,setConflict]=useState(false),[saved,setSaved]=useState<FirstRunLanguage|null>(null);
   useEffect(()=>{
@@ -54,10 +54,10 @@ export function FirstRunOnboarding({authority,refresh,onCompleted,onNavigate,onR
     const key=state.site.id;
     if(initialized.current===key) return;
     initialized.current=key;
-    setLanguage(state.staffInterfaceLanguage);
+    setLanguage(staffT.locale==='ar'?'ar':state.staffInterfaceLanguage);
     if(state.completed) return;
     setSiteName(state.site.name);setTimezone(suggestedTimezone(state.site.timezone));
-  },[state]);
+  },[state,staffT.locale]);
   useEffect(()=>{heading.current?.focus();},[read.loading]);
   const touch=()=>{draft.current=null;setConfirmed(false);setError('');setConflict(false);};
   async function save(event:FormEvent) {

@@ -64,7 +64,8 @@ The product is **not production-ready**. The remaining blockers are unresolved p
 - `npm run typecheck`: passed.
 - `npm run build`: passed.
 - Browser fixtures: staff stabilization, round 2, update flow, Help, worker wrong/work, Arabic sweep — all passed.
-- Full suite: **1,794 tests, 1,790 passed, 0 failed, 4 skipped, 0 cancelled, exit 0, 2,154,714.9932 ms (35m 54.7s)**. Log: `.verify-live/full-suite-audit.log`.
+- Exhaustive UI audit: 201 page checks across staff/public/Arabic/worker/operator surfaces; no overflow, duplicate IDs, missing image alt, or page/console/HTTP errors after fixes. See `11-UI-AUDIT.md`.
+- Full suite: **1,794 tests, 1,790 passed, 0 failed, 4 skipped, 0 cancelled, exit 0, 1,941,975.2883 ms (32m 22.0s)**. Log: `.verify-live/full-suite-ui-audit.log`.
 - Not executed: native PostgreSQL, live providers, real email/push, physical devices, independent security/privacy/accessibility/native-language review, load/SLO/DR.
 
 ## Remaining unresolved issues
@@ -80,6 +81,7 @@ The product is **not production-ready**. The remaining blockers are unresolved p
 - R3-18 remaining content-authority readers.
 - R3-19 test-suite quality.
 - R3-20 observability/DR/load.
+- R3-21 protected public footer brand link has no accessible name (landing page protected; not changed).
 
 ## Recommended next actions
 

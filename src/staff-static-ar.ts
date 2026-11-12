@@ -2553,4 +2553,7 @@ export const staffStaticArabic={
   "Open draft preparation": "فتح تجهيز المسودة",
   "Draft recipients": "مستلمو المسودة",
   "Continue to review": "المتابعة إلى المراجعة",
+  "Page not available": "الصفحة غير متاحة",
+  "Workspace setup": "إعداد مساحة العمل",
+  "Platform operations": "عمليات المنصة",
 } as const;

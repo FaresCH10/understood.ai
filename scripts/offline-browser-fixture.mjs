@@ -46,7 +46,7 @@ const ui=createServer(async(req,res)=>{
       }
       handler(req,res);return;
     }
-    if(path.startsWith('/tests/') || path.startsWith('/src/') || path.startsWith('/@') || path.startsWith('/node_modules/') || path==='/server/recording-notice-input.mjs'){vite.middlewares(req,res,()=>{res.writeHead(404);res.end();});return;}
+    if(path.startsWith('/tests/') || path.startsWith('/src/') || path.startsWith('/@') || path.startsWith('/node_modules/') || path==='/server/recording-notice-input.mjs' || path==='/server/languages.mjs'){vite.middlewares(req,res,()=>{res.writeHead(404);res.end();});return;}
     const file=path==='/'?'index.html':path.slice(1),target=resolve('dist',file),root=resolve('dist');
     if(!target.startsWith(root+'\\') && target!==resolve(root,'index.html')){res.writeHead(404);res.end();return;}
     const bytes=await readFile(target),type={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'}[extname(file)] || 'application/octet-stream';

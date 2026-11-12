@@ -53,3 +53,8 @@ Status vocabulary: **verified** (reproducible test/evidence), **working with lim
 - Independent security/privacy/accessibility review.
 - Load, soak, SLO, monitoring/alerting, and disaster-recovery drills.
 - Native-speaker review of all 15 worker locales and Arabic staff copy.
+
+
+## Exhaustive UI audit (2026-11-12)
+
+A full route/locale UI sweep was added after the initial feature audit: 37 staff routes at desktop and phone, 20 public routes, 37 Arabic staff routes, 15 worker locales × 4 core worker surfaces, and 10 operator tabs (201 page checks). It found and fixed missing staff/worker route titles, the English-only first-run page under Arabic, a missing landing texture on the Node static server, and untranslated Filipino Help/Device copy. No horizontal overflow, duplicate IDs, missing image alt text, or page/console/HTTP errors remain in the audited surfaces. The one remaining real UI accessibility finding is the protected public footer brand link, which has no accessible name; it was not changed because the landing page is protected. See `11-UI-AUDIT.md` and `evidence/ui-audit/`.

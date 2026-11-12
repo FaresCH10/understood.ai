@@ -3,7 +3,7 @@ import {join,resolve,relative,isAbsolute} from 'node:path';
 import {createHash} from 'node:crypto';
 
 const types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',svg:'image/svg+xml',png:'image/png',jpg:'image/jpeg',webmanifest:'application/manifest+json; charset=utf-8',csv:'text/csv; charset=utf-8'};
-const publicFiles=['index.html','sw.js','manifest.webmanifest','favicon.svg','icon-192.png','icon-512.png','product-workspace.jpg','worker-import-template.csv','auth/gulf-workplace.jpg','auth/worker-tablet.png','landing/gulf-site.jpg','landing/site-worker.png','landing/journey/retail.png','landing/journey/retail-place.jpg','landing/journey/site.png','landing/journey/site-place.jpg','landing/journey/hospitality.png','landing/journey/hospitality-place.jpg','landing/journey/food.png','landing/journey/food-place.jpg'];
+const publicFiles=['index.html','sw.js','manifest.webmanifest','favicon.svg','icon-192.png','icon-512.png','product-workspace.jpg','worker-import-template.csv','hero/journey-paper.svg','auth/gulf-workplace.jpg','auth/worker-tablet.png','landing/gulf-site.jpg','landing/site-worker.png','landing/journey/retail.png','landing/journey/retail-place.jpg','landing/journey/site.png','landing/journey/site-place.jpg','landing/journey/hospitality.png','landing/journey/hospitality-place.jpg','landing/journey/food.png','landing/journey/food-place.jpg'];
 import {CONTENT_SECURITY_POLICY as csp} from './content-security-policy.mjs';
 export async function operatorFiles(root) {
   const manifestPath=join(root,'.vite','manifest.json'),actual=await realpath(manifestPath),inside=relative(root,actual);

@@ -306,6 +306,10 @@ function staffRouteAvailable(view:string) {
   return view==='overview'||view==='calendar'||view==='send'||view.startsWith('send/')||view==='briefings'||view==='briefings/new'||view.startsWith('briefings/')||view==='source-audio'||view==='settings/onboarding'||view==='onboarding/first-run'||view==='notifications'||view==='glossary'||view.startsWith('glossary/')||view==='clarifications'||view==='clarifications/new'||view.startsWith('clarifications/')||view==='search'||view.startsWith('search/')||view==='language-requests'||view==='translation-feedback'||view.startsWith('people/crew/')||view==='people/new-crew'||view==='people/crews'||view==='people'||view==='people/new'||view.startsWith('people/worker/')||view.startsWith('people/import')||view==='processing'||view.startsWith('processing/')||view==='language-readiness'||view==='reports'||view.startsWith('reports/crew/')||view==='settings'||view==='settings/usage'||view==='settings/retention'||view==='settings/staff'||view==='settings/invitations'||view==='settings/invoices'||view.startsWith('settings/invoices/');
 }
 function staffRouteTitle(view:string,shell:Record<string,string>,t:(text:string)=>string) {
+  if(view==='operations')return t('Platform operations');
+  if(!staffRouteAvailable(view))return t('Page not available');
+  if(view==='translation-feedback')return t('Translation feedback');
+  if(view==='onboarding/first-run')return t('Workspace setup');
   if(view==='overview')return shell.today;
   if(view==='briefings'||view.startsWith('briefings/'))return view==='briefings/new'?t('New instruction'):shell.instructions;
   if(view==='send'||view.startsWith('send/'))return t('New instruction');
@@ -452,7 +456,7 @@ export default function App() {
   const navigate = (next: string) => {if(navigationGuard.current && !navigationGuard.current(next))return;location.hash = next; setView(next); window.scrollTo(0, 0); };
   const lastStaffRoute=useRef<string|null>(null);
   useEffect(()=>{
-    if(!session || session.role!=='staff')return;
+    if(!session || session.role!=='staff' || isPublicLandingView(view) || ['verify-registration','walkthrough','pilot','worker-access','accept-invitation','account-recovery','reset-password','register'].includes(view) || view.startsWith('register/'))return;
     const label=staffRouteTitle(view,staffUi,staffT);
     document.title=label?`${label} · Understood`:'Understood';
     if(lastStaffRoute.current===null){lastStaffRoute.current=view;return;}
@@ -729,7 +733,7 @@ return <StaffLanguageContext.Provider value={staffUiLanguage}><StaffTimezoneCont
     {view.startsWith('clarifications/') && view !== 'clarifications/new' && <BriefingView key={`${view.split('/')[1]}:${staffRequestBinding(session)}`} label={staffT("Clarification")} language={caseUiLanguage}><ClarificationPage id={view.split('/')[1]} refresh={refresh} navigate={navigate} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} authority={staffAuthority} language={caseUiLanguage}  timezone={session.timezone} navigationGuard={navigationGuard} canWrite={canWrite && ['owner','supervisor'].includes(session.staffRole || '')} /></BriefingView>}
     {canSearch && (view==='search' || view.startsWith('search/')) && <BriefingView label={staffT("Search")}><StaffSearch key={`${view}:${session.clientContext}:${session.siteState}`} route={view} context={session.clientContext!} canPeople={canWrite} navigate={navigate}/></BriefingView>}
 {view==='language-requests' && <LanguageRequestsPage authority={staffAuthority} refresh={refresh} canManage={canWrite} locale={directoryLanguage}/>}
-{view==='translation-feedback' && <Notice>{staffT('Translation feedback is managed by the platform administrator.')}</Notice>}
+{view==='translation-feedback' && <><div className="page-header"><h1>{staffT('Translation feedback')}</h1></div><Notice>{staffT('Translation feedback is managed by the platform administrator.')}</Notice></>}
 {view.startsWith('people/crew/')&&!view.endsWith('/workers') && (canWrite?<CrewDetail key={`${view}:${session.clientContext}`} id={view.split('/')[2]} authority={staffAuthority} locale={directoryLanguage} navigate={navigate}/>:<Notice>{staffT("Your role cannot manage site crews.")}</Notice>)}
 {view==='people/new-crew' && <CreateCrewPage authority={staffAuthority} canManage={canWrite} locale={directoryLanguage} navigate={navigate}/>}
 {view==='people/crews'  && (canWrite?<SiteCrews key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} locale={directoryLanguage} onLocaleChange={changeSiteLanguage} navigate={navigate} name={session.name} greeting={staffGreeting(session.timezone,clock)} canManageContacts={session.staffRole==='owner'}/>:<p lang="en" dir="ltr" role="status">{staffT("Your role cannot manage site crews.")}</p>)}
@@ -1265,6 +1269,10 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
     return () => window.clearInterval(timer);
   },[id,view]);
   const detail = useApi<any>(id ? `/worker/briefings/${id}` : null, refresh + audioRefresh,session.clientContext);
+  useEffect(()=>{
+    const title=view==='inbox'?t.mine:view==='help'?navText.help:view==='device'?t.thisDevice:view==='notifications'?notices.title:view==='crew'?workerCrewText(language).title:view.startsWith('worker/')?(detail.data?.title||navText.version):t.mine;
+    document.title=`${title} · Understood`;
+  },[view,language,detail.data?.title]);
   useEffect(()=>{setAnswerPresentationId(null);setTranslatedChoices(null);},[id,detail.data?.publicationId,detail.data?.version]);
   useEffect(()=>{
     if(!pendingHelpAssignment.current)return;

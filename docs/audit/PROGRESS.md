@@ -25,6 +25,7 @@ Fixes applied; full regression suite completed. Final report/readiness verdict r
 - Preserved current pilot/provider policy decisions rather than silently changing them.
 - Ran focused tests: late delivery, recorded late delivery, workspace integrity, safety regressions, migration inventories, typecheck, build.
 - Re-ran the stabilization browser scripts (staff, round 2) on the final build.
+- Completed the exhaustive UI audit: 201 page checks across staff/public/Arabic/worker/operator surfaces; fixed route titles, first-run Arabic, landing texture, worker titles, and Filipino copy. See `11-UI-AUDIT.md`.
 
 ## Remaining
 
@@ -32,6 +33,7 @@ Fixes applied; full regression suite completed. Final report/readiness verdict r
 - `08-TEST-REPORT.md`, `09-PRODUCTION-READINESS.md`, `10-FINAL-REPORT.md` written.
 - Commit the audit fixes and docs (if authorized).
 - External acceptance: native PostgreSQL/roles/TLS/backup/restore, live providers, real email/push, physical devices, independent security/privacy/accessibility/native-language review, load/SLO/monitoring/DR.
+- Protected public footer brand link lacks an accessible name; landing page was not changed.
 
 ## Issues discovered
 
@@ -67,7 +69,7 @@ Fixes applied; full regression suite completed. Final report/readiness verdict r
 - `npm run build` — passed.
 - `node .verify-live/staff-stabilization-verify.mjs` — exit 0.
 - `node .verify-live/stabilization-round2-verify.mjs` — exit 0.
-- `npm test` — 1,794 tests, 1,790 passed, 0 failed, 4 skipped, exit 0, 2,154,714.9932 ms (35m 54.7s).
+- `npm test` — 1,794 tests, 1,790 passed, 0 failed, 4 skipped, exit 0, 1,941,975.2883 ms (32m 22.0s).
 
 ## Blockers and decisions
 

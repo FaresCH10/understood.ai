@@ -28,7 +28,7 @@ Candidate: `main` at `bd3e1ec` plus the local audit fixes. Environment: Windows 
 
 ## Full suite
 
-`npm test` was run on the audit candidate. **Result: 1,794 tests, 1,790 passed, 0 failed, 4 skipped, 0 cancelled, exit 0, 2,154,714.9932 ms (35m 54.7s).** Log: `.verify-live/full-suite-audit.log`.
+`npm test` was run on the audit candidate. **Result: 1,794 tests, 1,790 passed, 0 failed, 4 skipped, 0 cancelled, exit 0, 1,941,975.2883 ms (32m 22.0s).** Log: `.verify-live/full-suite-ui-audit.log`.
 
 The four skips are native-only tests that require a real PostgreSQL service; they are not counted as passes. The suite includes SQLite, PGlite, HTTP, migration, authorization, recovery, retention, and browser-fixture checks.
 
@@ -49,3 +49,8 @@ The four skips are native-only tests that require a real PostgreSQL service; the
 - Browser viewport checks do not replace physical-device acceptance.
 - An automated accessibility scan alone does not prove WCAG compliance.
 - The full suite passing does not prove production readiness.
+
+
+## Exhaustive UI audit
+
+`node .verify-live/ui-full-audit.mjs` — 201 page checks: 37 staff routes × desktop/phone, 20 public routes, 37 Arabic staff routes, 15 worker locales × inbox/detail/device/help, and 10 operator tabs. Result: no horizontal overflow, no duplicate IDs, no images without alt, no page/console/HTTP errors after fixes; staff/worker/operator titles and headings present; Arabic first-run localized; worker titles localized. Raw results and screenshots: `docs/audit/evidence/ui-audit/`. Remaining: protected public footer brand link has no accessible name; physical-device/AT/native-language acceptance not performed.
