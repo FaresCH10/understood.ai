@@ -19,18 +19,30 @@ function validateField(value,language,max,label){
   return value.trim();
 }
 
-export function createDeepLTranslateAdapter({apiKey,fetchImpl=fetch,timeoutMs=8000}={}) {
+async function translationResponse(response){
+  const limit=128*1024,declared=response.headers?.get?.('content-length');
+  if(declared && /^\d+$/.test(declared) && Number(declared)>limit){await response.body?.cancel();throw Error('DeepL response too large');}
+  let raw='';
+  if(response.body?.getReader){
+    const reader=response.body.getReader(),decoder=new TextDecoder('utf-8',{fatal:true});let size=0;
+    try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>limit)throw Error('DeepL response too large');raw+=decoder.decode(value,{stream:true});}raw+=decoder.decode();}
+    catch(error){await reader.cancel().catch(()=>{});throw error;}finally{reader.releaseLock();}
+  }else{raw=await response.text();if(Buffer.byteLength(raw)>limit)throw Error('DeepL response too large');}
+  try{return JSON.parse(raw);}catch{throw Error('DeepL response was malformed');}
+}
+
+export function createDeepLTranslateAdapter({apiKey,fetchImpl=fetch,timeoutMs=8000,sourceLanguage='EN'}={}) {
   if(!apiKey || typeof apiKey!=='string' || apiKey.length>300 || /[\s\x00-\x1f\x7f]/.test(apiKey))
     throw Error('DeepL credentials are required');
   if(!Number.isInteger(timeoutMs) || timeoutMs<1000 || timeoutMs>30000) throw Error('Invalid translation timeout');
   const endpoint=apiKey.endsWith(':fx')?FREE_ENDPOINT:PRO_ENDPOINT;
 
-  async function request(target,segments,sourceLanguage='EN') {
+  async function request(target,segments,detectedSource=sourceLanguage) {
     const response=await fetchImpl(endpoint,{method:'POST',redirect:'error',signal:AbortSignal.timeout(timeoutMs),
       headers:{authorization:`DeepL-Auth-Key ${apiKey}`,'content-type':'application/json',accept:'application/json'},
-      body:JSON.stringify({text:segments,...(sourceLanguage?{source_lang:sourceLanguage}:{}),target_lang:target})});
-    if(!response.ok) throw Error(`DeepL request failed (${response.status})`);
-    const value=await response.json();
+      body:JSON.stringify({text:segments,...(detectedSource?{source_lang:detectedSource}:{}),target_lang:target})});
+    if(!response.ok){await response.body?.cancel();throw Error(`DeepL request failed (${response.status})`);}
+    const value=await translationResponse(response);
     const translations=value?.translations;
     if(!Array.isArray(translations) || translations.length!==segments.length
       || !translations.every(item=>typeof item?.text==='string'))
@@ -61,7 +73,8 @@ export function createDeepLTranslateAdapter({apiKey,fetchImpl=fetch,timeoutMs=80
       if(content.answerChoices!==undefined && !choices) throw Error('Invalid translation input');
       const segments=[content.title,content.text,...(question?[content.question]:[]),...(choices??[])];
       const translated=await request(target,segments);
-      const [title,text,translatedQuestion,...translatedChoices]=translated;
+      const [title,text]=translated;
+      const translatedQuestion=question?translated[2]:undefined,translatedChoices=translated.slice(question?3:2);
       const value={
         title:validateField(title,language,120,'title'),
         text:validateField(text,language,5000,'text'),

@@ -44,7 +44,7 @@ function feedbackAudit(db,session,action,id) {
   db.prepare('INSERT INTO audit VALUES(?,?,?,?,?,?,?,?)').run(randomUUID(),session.org_id,session.site_id,'staff',session.principal_id,action,id,NOW());
 }
 function translationText(snapshot,language,field) {
-  const value=snapshot?.languages?.[language];
+  const value=snapshot?.languages?.[language] ?? snapshot?.deliveredTranslation;
   if(!value || typeof value!=='object') return '';
   const text=field==='title'?value.title:field==='question'?value.question:field==='audio'?(value.speech || value.text):field==='glossary'?'':value.text;
   return typeof text==='string' ? text.slice(0,2000) : '';
@@ -56,7 +56,7 @@ function feedbackRow(row) {
     resolvedBy:row.resolver_name || '',resolvedById:row.resolved_by || null,resolvedAt:row.resolved_at || null,
     resolutionNote:row.resolution_note || '',translation:translationText(row.snapshot_json ? JSON.parse(row.snapshot_json) : null,row.language,row.field)};
 }
-const queueQuery=`SELECT f.*,b.title AS briefing_title,p.state AS publication_state,p.version AS publication_version,p.snapshot_json,
+const queueQuery=`SELECT f.*,b.title AS briefing_title,p.state AS publication_state,p.version AS publication_version,json_set(p.snapshot_json,'$.deliveredTranslation',json((SELECT d.content_json FROM instruction_deliveries d JOIN instruction_sends snd ON snd.request_id=d.request_id AND snd.org_id=d.org_id AND snd.site_id=d.site_id WHERE snd.publication_id=f.publication_id AND d.org_id=f.org_id AND d.site_id=f.site_id AND d.language=f.language AND d.state='available' ORDER BY d.assignment_id LIMIT 1))) AS snapshot_json,
   reporter.name AS reporter_name,resolver.name AS resolver_name
   FROM translation_feedback f JOIN briefings b ON b.id=f.briefing_id AND b.org_id=f.org_id AND b.site_id=f.site_id
   JOIN publications p ON p.id=f.publication_id AND p.org_id=f.org_id AND p.site_id=f.site_id
@@ -81,7 +81,7 @@ export function reportTranslationFeedback(db,session,input) {
       WHERE p.id=? AND p.org_id=? AND p.site_id=?`).get(value.publicationId,session.org_id,session.site_id);
     if(!publication) throw new Error('Publication unavailable');
     const languages=JSON.parse(publication.snapshot_json)?.languages;
-    if(!languages || !Object.hasOwn(languages,value.language)) throw new Error('Translation language unavailable');
+    if(!languages?.[value.language] && !db.prepare(`SELECT 1 FROM instruction_deliveries d JOIN instruction_sends s ON s.request_id=d.request_id AND s.org_id=d.org_id AND s.site_id=d.site_id WHERE s.publication_id=? AND d.org_id=? AND d.site_id=? AND d.language=? AND d.state='available'`).get(value.publicationId,session.org_id,session.site_id,value.language))throw new Error('Translation language unavailable');
     if(db.prepare("SELECT 1 FROM translation_feedback WHERE org_id=? AND site_id=? AND publication_id=? AND language=? AND field=? AND status='open'")
       .get(session.org_id,session.site_id,value.publicationId,value.language,value.field)) throw new Error('Translation feedback already open');
     const now=NOW();

@@ -14,6 +14,7 @@ import {currentRecordingClaim} from './recording-claim.mjs';
 import {currentPreparationOperation} from './preparation-authority.mjs';
 import {currentAssessmentClaim,assessmentInput} from './assessment-claim.mjs';
 import {assessmentInputHash} from '../ai/assessment-config.mjs';
+import {assignmentContent} from './delivered-content.mjs';
 import {sourceTranscriptionInputHash,recordingTranscriptionInputHash} from '../ai/audio-provenance.mjs';
 import {caseFollowupInputHash,checkedFollowupProvenance} from '../ai/case-followup-bundle.mjs';
 
@@ -27,11 +28,12 @@ async function currentRecording(client,referenceId,claimToken,orgId,kind,inputHa
   const scope=(await client.query('SELECT site_id FROM recordings WHERE id=$1 AND org_id=$2',[referenceId,orgId])).rows[0];
   const row=scope && await currentRecordingClaim(client,{id:referenceId,org_id:orgId,site_id:scope.site_id,token:claimToken});
   if(!row)throw Error('Provider recording authority changed');
-  const input=(await client.query(`SELECT p.snapshot_json,a.language,a.publication_id,p.version
+  const input=(await client.query(`SELECT p.snapshot_json,a.id AS assignment_id,a.worker_id,a.language,a.publication_id,p.version
     FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
     WHERE a.id=$1 AND a.org_id=$2 AND a.site_id=$3`,[row.assignment_id,row.org_id,row.site_id])).rows[0];
   if(!input)throw Error('Provider recording input unavailable');
-  const evaluation={answer:row.transcript,question:input.snapshot_json.languages?.[input.language]?.question || input.snapshot_json.question,
+  const delivered=await assignmentContent(client,{id:input.assignment_id,org_id:row.org_id,site_id:row.site_id,worker_id:input.worker_id,language:input.language,publication_id:input.publication_id},input.snapshot_json);
+  const evaluation={answer:row.transcript,question:delivered?.question || input.snapshot_json.languages?.[input.language]?.question || input.snapshot_json.question,
     askedFacts:input.snapshot_json.rubric?.askedFacts,language:input.language,publicationId:input.publication_id,version:input.version};
   if((kind==='recording-transcription'?recordingTranscriptionInputHash(row,evaluation):assessmentInputHash(evaluation))!==inputHash)
     throw Error('Provider recording input changed');

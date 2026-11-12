@@ -7,6 +7,7 @@ import {routeNewCase} from './case-routing.mjs';
 import {dispatchAllowed,dispatchPredicate} from './operations-gates.mjs';
 import {currentRecordingClaim} from './recording-claim.mjs';
 import {recordPresentationBinding} from './presentations.mjs';
+import {assignmentContent} from './delivered-content.mjs';
 import {reserveProviderOperation,providerRequestJournal} from './provider-budget.mjs';
 import {recordingTranscriptionInputHash} from '../ai/audio-provenance.mjs';
 import {assessmentInputHash} from '../ai/assessment-config.mjs';
@@ -41,10 +42,14 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
     return adapter.withJournal(providerRequestJournal(pool,operation,{schema}));
   };
   try {
-    const input = await domainTransaction(pool,schema,async (client) => (await client.query(`SELECT p.snapshot_json,a.language,a.publication_id,p.version,w.active
+    const input = await domainTransaction(pool,schema,async (client) => {
+      const row=(await client.query(`SELECT p.snapshot_json,a.id AS assignment_id,a.worker_id,a.language,a.publication_id,p.version,w.active
       FROM assignments a JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
       JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
-      WHERE a.id=$1 AND a.org_id=$2 AND a.site_id=$3`,[job.assignment_id,job.org_id,job.site_id])).rows[0]);
+      WHERE a.id=$1 AND a.org_id=$2 AND a.site_id=$3`,[job.assignment_id,job.org_id,job.site_id])).rows[0];
+      if(!row)return null;
+      return {...row,delivered:await assignmentContent(client,{id:row.assignment_id,org_id:job.org_id,site_id:job.site_id,worker_id:row.worker_id,language:row.language,publication_id:row.publication_id},row.snapshot_json)};
+    });
     if (!input?.active) {
       await domainTransaction(pool,schema,async (client) => client.query(`UPDATE recordings SET status='blocked',lease_token=NULL,lease_until=NULL,error='Assignment unavailable'
         WHERE id=$1 AND status='processing' AND lease_token=$2 AND lease_until>clock_timestamp()`,[job.id,job.token]));
@@ -56,7 +61,7 @@ export async function processOneRecording(pool,adapter,storage,{schema='public'}
       return true;
     }
     const snapshot = input.snapshot_json, facts = snapshot.rubric?.askedFacts;
-    const question = job.presented_question || snapshot.languages?.[input.language]?.question || snapshot.question;
+    const question = job.presented_question || input.delivered?.question || snapshot.languages?.[input.language]?.question || snapshot.question;
     const frozenInput={question,askedFacts:facts,language:input.language,publicationId:input.publication_id,version:input.version};
     if (typeof question!=='string' || !question.trim() || question.length>500 || !Array.isArray(facts)
       || !facts.length || facts.length>6 || !facts.every((fact) => typeof fact==='string' && fact.trim() && fact.length<=500)) throw new Error('Published rubric unavailable');

@@ -115,6 +115,8 @@ export function getClarification(db,session,id) {
   authority(db,session);
   const row=scopedCase(db,session,id);
   const snapshot=JSON.parse(db.prepare('SELECT snapshot_json FROM publications WHERE id=? AND org_id=? AND site_id=?').get(row.publication_id,session.org_id,session.site_id).snapshot_json);
+  const delivery=db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='instruction_deliveries'").get()?db.prepare(`SELECT d.content_json FROM instruction_deliveries d JOIN assignments a ON a.id=d.assignment_id AND a.worker_id=d.worker_id AND a.org_id=d.org_id AND a.site_id=d.site_id WHERE d.assignment_id=? AND d.org_id=? AND d.site_id=? AND a.publication_id=? AND d.language=? AND d.state='available'`).get(row.assignment_id,session.org_id,session.site_id,row.publication_id,row.language):null;
+  const deliveredContent=snapshot.languages?.[row.language] || (delivery?.content_json?JSON.parse(delivery.content_json):null);
   const original=row.attempt_id ? db.prepare(`SELECT t.answer_text,t.outcome,t.reasons_json,r.id AS recording_id FROM attempts t
     LEFT JOIN recordings r ON r.assignment_id=t.assignment_id AND r.org_id=t.org_id AND r.submission_id=t.submission_id AND r.received_at IS NOT NULL
     WHERE t.id=? AND t.assignment_id=? AND t.org_id=?`).get(row.attempt_id,row.assignment_id,session.org_id) : null;
@@ -125,7 +127,7 @@ export function getClarification(db,session,id) {
   const owners=db.prepare("SELECT id,name FROM staff WHERE org_id=? AND site_id=? AND active=1 AND role IN ('owner','supervisor') ORDER BY name,id LIMIT 5001").all(session.org_id,session.site_id);
   if(owners.length>5000)throw Error('Clarification owners exceed limit');
   const creation=db.prepare(`SELECT cr.actor_id AS actorId,s.name AS actorName,cr.created_at AS createdAt FROM clarification_creations cr JOIN staff s ON s.id=cr.actor_id AND s.org_id=cr.org_id AND s.site_id=cr.site_id WHERE cr.case_id=? AND cr.org_id=? AND cr.site_id=?`).get(id,session.org_id,session.site_id);
-  return {...row,...original,...(creation?{staffCreation:creation}:{}),notes:help && row.status==='open' && row.notes===help.text ? '' : row.notes,snapshot,attempts,owners,helpRequest:help ? {text:help.text,createdAt:help.created_at} : null};
+  return {...row,...original,...(creation?{staffCreation:creation}:{}),notes:help && row.status==='open' && row.notes===help.text ? '' : row.notes,snapshot,deliveredContent,attempts,owners,helpRequest:help ? {text:help.text,createdAt:help.created_at} : null};
 }
 
 export function requestHelp(db,session,assignmentId,input) {

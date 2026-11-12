@@ -1,3 +1,4 @@
+import {assignmentContent} from './delivered-content.mjs';
 import {createHash} from 'node:crypto';
 import { domainTransaction,requirePrincipal,domainAudit } from './domain.mjs';
 import { helpInput,clarificationFilters,resolutionInput,ownerInput,workerHelpHistoryInput } from '../clarification-input.mjs';
@@ -12,7 +13,7 @@ const roles=['owner','supervisor','auditor'];
 const iso=(value) => value instanceof Date ? value.toISOString() : value;
 const id=(value) => typeof value==='string' && value.length>0 && value.length<=100;
 const caseQuery=`SELECT c.id,c.reason,c.status,c.notes,c.created_at,c.owner_staff_id,c.assignment_id,c.attempt_id,
-  w.code AS worker,a.language,a.due_at,COALESCE(${caseDeadlineOverride},r.due_at) AS case_due_at,r.escalated_at,p.id AS publication_id,p.version,
+  w.code AS worker,w.id AS worker_id,a.language,a.due_at,COALESCE(${caseDeadlineOverride},r.due_at) AS case_due_at,r.escalated_at,p.id AS publication_id,p.version,
   (SELECT p2.version FROM publications p2 WHERE p2.briefing_id=p.briefing_id AND p2.org_id=p.org_id
     AND p2.site_id=p.site_id AND p2.state='published' ORDER BY p2.version DESC LIMIT 1) AS current_version,
   p.snapshot_json->>'title' AS title,
@@ -89,6 +90,7 @@ export async function getClarification(pool,session,caseId,{schema='public'}={})
     const row=(await client.query(`${caseQuery} WHERE c.id=$1 AND c.org_id=$2 AND c.site_id=$3`,[caseId,session.org_id,session.site_id])).rows[0];
     if (!row) throw new Error('Clarification unavailable');
     const snapshot=(await client.query('SELECT snapshot_json FROM publications WHERE id=$1 AND org_id=$2 AND site_id=$3',[row.publication_id,session.org_id,session.site_id])).rows[0].snapshot_json;
+    const deliveredContent=await assignmentContent(client,{id:row.assignment_id,worker_id:row.worker_id,publication_id:row.publication_id,language:row.language,org_id:session.org_id,site_id:session.site_id},snapshot);
     const attempts=(await client.query(`SELECT t.id,t.answer_text,t.outcome,t.assessment_status,t.reasons_json,t.evidence_json,t.received_at,
       r.id AS recording_id FROM attempts t LEFT JOIN recordings r ON r.assignment_id=t.assignment_id AND r.org_id=t.org_id
       AND r.site_id=t.site_id AND r.submission_id=t.submission_id AND r.received_at IS NOT NULL
@@ -102,7 +104,7 @@ export async function getClarification(pool,session,caseId,{schema='public'}={})
     if(owners.length>5000)throw Error('Clarification owners exceed limit');
     const contentExpired=(await client.query('SELECT 1 FROM case_content_purges WHERE case_id=$1 AND org_id=$2 AND site_id=$3',[caseId,session.org_id,session.site_id])).rows.length>0;
     const creation=(await client.query(`SELECT cr.actor_id,s.name AS actor_name,cr.created_at FROM clarification_creations cr JOIN staff s ON s.id=cr.actor_id AND s.org_id=cr.org_id AND s.site_id=cr.site_id WHERE cr.case_id=$1 AND cr.org_id=$2 AND cr.site_id=$3`,[caseId,session.org_id,session.site_id])).rows[0];
-    return {...caseRow(row),...original,...(creation?{staffCreation:{actorId:creation.actor_id,actorName:creation.actor_name,createdAt:iso(creation.created_at)}}:{}),snapshot,attempts,owners,contentExpired,canRequestRepeat:true,canReview:true,helpRequest:help ? {text:help.text,createdAt:iso(help.created_at)} : null};
+    return {...caseRow(row),...original,...(creation?{staffCreation:{actorId:creation.actor_id,actorName:creation.actor_name,createdAt:iso(creation.created_at)}}:{}),snapshot,deliveredContent,attempts,owners,contentExpired,canRequestRepeat:true,canReview:true,helpRequest:help ? {text:help.text,createdAt:iso(help.created_at)} : null};
   });
 }
 

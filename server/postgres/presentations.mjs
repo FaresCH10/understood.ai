@@ -1,3 +1,4 @@
+import {assignmentContent} from './delivered-content.mjs';
 import {entitlementSummary} from '../entitlement-model.mjs';
 import {queuePresentationJob} from './presentation-jobs.mjs';
 import {checkedPresentationChoices} from '../presentation-choice-input.mjs';
@@ -37,7 +38,7 @@ async function sourceFor(client,session,assignment,input){
   if(!await contentAvailable(client,assignment))return {state:'unavailable',reason:'content_expired',originalLanguage,approvedLanguage};
   if(input.sourceKind==='instruction'){
     const snapshot=assignment.snapshot_json;
-    const original=snapshot?.languages?.[originalLanguage];
+    const original=await assignmentContent(client,assignment,snapshot);
     let sourceContent;
     try{sourceContent=presentationInstructionContent(original);}catch{return {state:'unavailable',reason:'content_unavailable',originalLanguage,approvedLanguage};}
     let snapshotContent=null;
@@ -60,7 +61,8 @@ async function sourceFor(client,session,assignment,input){
   let sourceContent,answerLanguage=attempt.original_language;
   try{
     const snapshot=assignment.snapshot_json;
-    const choice=snapshot?.rubric?.mode==='multiple-choice'?snapshot.languages?.[assignment.language]?.choices?.find(item=>item.id===attempt.answer_text):null;
+    const delivered=await assignmentContent(client,assignment,snapshot);
+    const choice=snapshot?.rubric?.mode==='multiple-choice'?delivered?.choices?.find(item=>item.id===attempt.answer_text):null;
     if(choice)answerLanguage=assignment.language;
     sourceContent=presentationAnswerContent({text:choice?.text??attempt.answer_text});
   }catch{return {state:'unavailable',reason:'content_unavailable',originalLanguage,approvedLanguage};}

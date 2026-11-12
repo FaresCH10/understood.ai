@@ -228,7 +228,9 @@ test('worker role rejects billing/operator reads and policy/control/admin DML us
       if(!policy.readable)await assert.rejects(f.db.query(`SELECT * FROM "${policy.table}"`),error=>error.code==='42501',policy.table);
       if(policy.writable)continue;
       const column=columns.find(row=>row.table_name===policy.table).column_name;
-      if(policy.insertable)await assert.rejects(f.db.query(`INSERT INTO "${policy.table}" DEFAULT VALUES`),policy.table==='assignment_completions'?error=>error.code==='23502':policy.table==='worker_competencies'?/Competency award is invalid/:/Improvement scope or evidence mismatch/);
+      // The completion scope trigger may reject DEFAULT VALUES before NOT NULL.
+      // Accept only that exact guard error or the original null constraint.
+      if(policy.insertable)await assert.rejects(f.db.query(`INSERT INTO "${policy.table}" DEFAULT VALUES`),policy.table==='assignment_completions'?error=>error.code==='23502'||error.code==='P0001'&&error.message==='Completion assignment scope mismatch':policy.table==='worker_competencies'?/Competency award is invalid/:/Improvement scope or evidence mismatch/);
       for(const sql of [`DELETE FROM "${policy.table}" WHERE false`,...(!policy.insertable?[`INSERT INTO "${policy.table}" DEFAULT VALUES`]:[]),
         `UPDATE "${policy.table}" SET "${column}"="${column}" WHERE false`])await assert.rejects(f.db.query(sql),error=>error.code==='42501',sql);
     }

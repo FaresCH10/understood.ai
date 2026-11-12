@@ -79,7 +79,7 @@ function sourceFor(db,session,assignment,input){
   let sourceContent,answerLanguage=attempt.original_language;
   try{
     const snapshot=JSON.parse(assignment.snapshot_json);
-    const choice=snapshot?.rubric?.mode==='multiple-choice'?snapshot.languages?.[assignment.language]?.choices?.find(item=>item.id===attempt.answer_text):null;
+    const choice=snapshot?.rubric?.mode==='multiple-choice'?(snapshot.languages?.[assignment.language] || deliveredContent(db,assignment))?.choices?.find(item=>item.id===attempt.answer_text):null;
     if(choice)answerLanguage=assignment.language;
     sourceContent=presentationAnswerContent({text:choice?.text??attempt.answer_text});
   }catch{return {state:'unavailable',reason:'content_unavailable',originalLanguage,approvedLanguage};}

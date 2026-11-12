@@ -1,3 +1,4 @@
+import {assignmentContent} from './delivered-content.mjs';
 import {createHash} from 'node:crypto';
 import {domainTransaction,requirePrincipal,domainAudit} from './domain.mjs';
 import {requireSiteOperational} from './site-lifecycle.mjs';
@@ -72,7 +73,8 @@ export async function requestCaseRepeat(pool,session,caseId,input,{schema='publi
     if(thread.status!=='open' || !thread.active || publication?.state!=='published' || !publication.content_available)throw Error('Repeat request unavailable');
     if(!(await client.query("SELECT $1::timestamptz>clock_timestamp() AND $1::timestamptz<=clock_timestamp()+interval '30 days' AS valid",[input.dueAt])).rows[0].valid)throw Error('Invalid repeat deadline');
     if(!(await client.query('SELECT 1 FROM submission_receipts WHERE assignment_id=$1 AND org_id=$2 LIMIT 1',[thread.assignment_id,session.org_id])).rows.length)throw Error('Repeat requires an earlier answer');
-    const message=withQuestion?checkBackMessage(publication.snapshot_json,thread.language):null;
+    const localized=withQuestion?await assignmentContent(client,{id:thread.assignment_id,publication_id:thread.publication_id,worker_id:thread.worker_id,language:thread.language,org_id:session.org_id,site_id:session.site_id},publication.snapshot_json):null;
+    const message=withQuestion?checkBackMessage({...publication.snapshot_json,languages:{[thread.language]:localized}},thread.language):null;
     await client.query(`UPDATE case_repeats cr SET status=CASE WHEN cr.due_at<=clock_timestamp() THEN 'expired' ELSE 'cancelled' END
       WHERE cr.assignment_id=$1 AND cr.status='pending' AND (cr.due_at<=clock_timestamp() OR EXISTS(SELECT 1 FROM clarifications cc WHERE cc.id=cr.case_id AND cc.status='resolved'))`,[thread.assignment_id]);
     if((await client.query("SELECT 1 FROM case_repeats WHERE assignment_id=$1 AND status='pending'",[thread.assignment_id])).rows.length)throw Error('Repeat already requested');

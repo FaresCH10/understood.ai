@@ -11,8 +11,8 @@ function localPort(value: string | undefined, fallback: number) {
   return port;
 }
 
-export default defineConfig({
-  plugins: [reticle({ port: 4400 }), react(),publicShellPlugin()],
+export default defineConfig(({command})=>({
+  plugins: [command==='serve'?reticle({ port: 4400 }):null, react(),publicShellPlugin()],
   build: {manifest:true,rolldownOptions:{input:{customer:'index.html',operator:'operator.html'}}},
   server: {
     host: '127.0.0.1',
@@ -20,4 +20,4 @@ export default defineConfig({
     strictPort: true,
     proxy: { '/api': `http://127.0.0.1:${localPort(process.env.UNDERSTOOD_API_PORT, 3021)}` },
   },
-});
+}));
