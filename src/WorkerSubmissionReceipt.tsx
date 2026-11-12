@@ -7,8 +7,8 @@ import {workerSubmissionState,WorkerSubmissionsError} from './worker-submissions
 import {validWorkerSession,type PageSession} from './session-state';
 import {type WorkerUiLanguage,workerUiDirection} from './worker-ui-language';
 
-type Props={resolvedLabel?:string;choices?:{id:string;text:string}[];session:PageSession;selection:ReceiptSelection;acknowledgedContext:string;language:WorkerUiLanguage;timezone?:string;disabled:boolean;canHelp:boolean;current:()=>boolean;onSessionLost:()=>void;onBack:()=>void;onHelp:()=>void;onChecked?:()=>void};
-export function WorkerSubmissionReceipt({resolvedLabel,choices,session,selection,acknowledgedContext,language,timezone,disabled,canHelp,current,onSessionLost,onBack,onHelp,onChecked}:Props){
+type Props={choices?:{id:string;text:string}[];session:PageSession;selection:ReceiptSelection;acknowledgedContext:string;language:WorkerUiLanguage;timezone?:string;disabled:boolean;canHelp:boolean;current:()=>boolean;onSessionLost:()=>void;onBack:()=>void;onHelp:()=>void;onChecked?:()=>void};
+export function WorkerSubmissionReceipt({choices,session,selection,acknowledgedContext,language,timezone,disabled,canHelp,current,onSessionLost,onBack,onHelp,onChecked}:Props){
   const t=workerReceiptText[language],key=JSON.stringify([session.clientContext,session.expiresAt,selection.assignmentId,selection.version,selection.language,selection.requestId,selection.kind]);
   const selected=useRef(key);selected.current=key;
   const [retry,setRetry]=useState(0),[read,setRead]=useState<{key:string;data:WorkerReceiptSnapshot|null;failed:boolean;loading:boolean}>({key:'',data:null,failed:false,loading:true});
@@ -46,7 +46,7 @@ export function WorkerSubmissionReceipt({resolvedLabel,choices,session,selection
     <h2 id="worker-receipt-title" className="receipt-title">{t.title}</h2><p className="receipt-copy">{t.followup}</p>
     <ol className="worker-card worker-receipt-steps">
       <li><CheckCircle2 size={32} aria-hidden="true"/><div><strong>{t.received}</strong><span>{t.submitted}</span></div></li>
-      <li data-state={state??'unknown'}>{state==='matched'?<CheckCircle2 size={32} aria-hidden="true"/>:state==='pending'||state==='paused'||!state?<Clock3 size={32} aria-hidden="true"/>:<TriangleAlert size={32} aria-hidden="true"/>}<div><strong>{state?resolvedLabel&&['clarification','unassessable','paused'].includes(state)?resolvedLabel:t[state]:failed?workerReceiptUnknownText[language]:t.loading}</strong>{state==='pending'&&<span>{t.checking}</span>}</div></li>
+      <li data-state={state??'unknown'}>{state==='matched'?<CheckCircle2 size={32} aria-hidden="true"/>:state==='pending'||state==='paused'||!state?<Clock3 size={32} aria-hidden="true"/>:<TriangleAlert size={32} aria-hidden="true"/>}<div><strong>{state?t[state]:failed?workerReceiptUnknownText[language]:t.loading}</strong>{state==='pending'&&<span>{t.checking}</span>}</div></li>
     </ol>
     {state==='clarification'&&<p role="alert" className="notice notice-amber">{t.wrongBody}</p>}
     {failed&&<p role="alert" className="notice notice-amber">{t.failed}</p>}

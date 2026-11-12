@@ -157,6 +157,15 @@ export const caseTranslations={
   'The worker selected a choice that does not match the instruction.':['اختار العامل إجابة لا تطابق التعليمات.','کارکن نے ایسا انتخاب کیا جو ہدایت سے مماثل نہیں۔'],
   'Important information is missing or incomplete.':['معلومات مهمة ناقصة أو غير مكتملة.','اہم معلومات موجود نہیں یا نامکمل ہیں۔'],
   'Unclear audio':['صوت غير واضح','غیر واضح آڈیو'],
+  'Placement is unclear':['المكان المقصود غير واضح','مقام واضح نہیں'],
+  'Placement contradicts the instruction':['المكان المذكور يخالف التعليمات','مقام ہدایات کے خلاف ہے'],
+  'This wording could not be assessed':['تعذّر تقييم هذه الصياغة','یہ الفاظ جانچے نہیں جا سکے'],
+  'Empty answer':['إجابة فارغة','خالی جواب'],
+  'The answer contains instructions rather than the requested facts':['تتضمن الإجابة تعليمات بدلاً من الحقائق المطلوبة','جواب میں مطلوبہ حقائق کے بجائے ہدایات ہیں'],
+  'Assessment input could not be verified':['تعذّر التحقق من مدخلات التقييم','جانچ کے ان پٹ کی تصدیق نہیں ہو سکی'],
+  'Assessment evidence could not be verified':['تعذّر التحقق من أدلة التقييم','جانچ کے شواہد کی تصدیق نہیں ہو سکی'],
+  'Assessment evidence is incomplete':['أدلة التقييم غير مكتملة','جانچ کے شواہد نامکمل ہیں'],
+  'Reason unavailable':['التفسير غير متاح','وجہ دستیاب نہیں'],
   'Audio is unclear and needs confirmation.':['الصوت غير واضح ويحتاج إلى تأكيد.','آڈیو واضح نہیں اور تصدیق درکار ہے۔'],
   'Help requested':['طُلبت المساعدة','مدد کی درخواست'],
   'Assessment reasons':['أسباب التقييم','جانچ کی وجوہات'],
@@ -415,8 +424,9 @@ export function caseLanguage(locale:CaseLocale,value:WorkerLocaleCode){
   return workerLocale(value)?.name||value;
 }
 export function caseReason(locale:CaseLocale,value:string){
-  const codes:Record<string,CaseTextKey>={missing_asked_fact:'Missing fact',missing_fact:'Missing fact','Missing fact':'Missing fact',incorrect_choice:'Incorrect choice','Incorrect choice':'Incorrect choice',asked_facts_present:'Key facts were present',unclear_audio:'Unclear audio','Unclear audio':'Unclear audio','Help requested':'Help requested','Voice help requested':'Help requested','[Deleted]':'Deleted','[Expired]':'Expired'};
+  const codes:Record<string,CaseTextKey>={missing_asked_fact:'Missing fact',missing_fact:'Missing fact','Missing fact':'Missing fact',incorrect_choice:'Incorrect choice','Incorrect choice':'Incorrect choice',asked_facts_present:'Key facts were present',unclear_audio:'Unclear audio','Unclear audio':'Unclear audio','Help requested':'Help requested','Voice help requested':'Help requested','[Deleted]':'Deleted','[Expired]':'Expired',uncertain_placement:'Placement is unclear',contradictory_placement:'Placement contradicts the instruction',unsupported_wording:'This wording could not be assessed',empty_answer:'Empty answer',instruction_like_answer:'The answer contains instructions rather than the requested facts',invalid_input:'Assessment input could not be verified',invalid_evidence:'Assessment evidence could not be verified',missing_evidence:'Assessment evidence is incomplete'};
   if(codes[value])return caseText(locale,codes[value]);
+  if(/^[a-z0-9_]+$/.test(value))return caseText(locale,'Reason unavailable');
   return value.startsWith('Staff follow-up: ')?`${caseText(locale,'Staff follow-up')}: ${value.slice(17)}`:value;
 }
 export function caseTimeError(locale:CaseLocale,message:string,timezone:string){

@@ -1,5 +1,5 @@
 import {useStaffText as useStaffStaticText} from './staff-language';
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {RefreshCw,Sparkles} from 'lucide-react';
 import {checkedArtifactScope} from './artifact-request';
 import {useArtifactRead} from './useArtifactRead';
@@ -7,8 +7,8 @@ import {useArtifactMutation} from './useArtifactMutation';
 import type {ArtifactDefinition} from './useArtifactRequest';
 import type {StaffRequestAuthority} from './useStaffRequest';
 import {readPendingPreparation,savePendingPreparation,clearPendingPreparation,checkedPreparationContext,checkedPreparationRequestResult,checkedPreparationRequestReceipt,type PendingPreparation,type PreparationContext} from './preparation-request-recovery';
-export function PreparationRequest({authority,briefingId,revision,jobId,refresh=0,disabled=false,canStart=true,onChanged,onActiveChange}:{
-  authority:StaffRequestAuthority;briefingId:string;revision:number;jobId?:string;refresh?:number;disabled?:boolean;canStart?:boolean;onChanged:()=>void;onActiveChange?:(active:boolean)=>void}) {
+export function PreparationRequest({authority,briefingId,revision,jobId,refresh=0,disabled=false,canStart=true,autoStart=false,onChanged,onActiveChange}:{
+  authority:StaffRequestAuthority;briefingId:string;revision:number;jobId?:string;refresh?:number;disabled?:boolean;canStart?:boolean;autoStart?:boolean;onChanged:()=>void;onActiveChange?:(active:boolean)=>void}) {
   const staffT=useStaffStaticText();
   const scope=authority.session.staffScope;
   const [recovery]=useState(()=>{try{return {pending:readPendingPreparation(sessionStorage,checkedArtifactScope(scope,authority.session),briefingId),error:''};}catch(reason){return {pending:null,error:(reason as Error).message};}});
@@ -24,11 +24,17 @@ export function PreparationRequest({authority,briefingId,revision,jobId,refresh=
     if(!recovery.pending)return;const controller=new AbortController();
     queueMicrotask(()=>{if(!controller.signal.aborted)void operation.check(controller.signal);});return()=>controller.abort();
   },[operation.api]);
-  if(recovery.error)return <p role="alert" className="record-error">{staffT.error(recovery.error)}</p>;
+  const autoStarted=useRef(false);
   let context:PreparationContext|null=null,error=readError;
   if(data && !operation.uncertain)try{context=checkedPreparationContext(data,briefingId,revision);}catch(reason){error=(reason as Error).message;}
   const available=context && ['draft','failed'].includes(context.state) && (!context.job || context.job.status==='failed') && (!jobId || context.job?.id===jobId);
   const pending=operation.pending.current;
+  useEffect(()=>{
+    if(!autoStart || autoStarted.current || disabled || loading || !available || !context || !operation.api.current())return;
+    autoStarted.current=true;
+    void submit();
+  },[autoStart,disabled,loading,available,context,operation.api]);
+  if(recovery.error)return <p role="alert" className="record-error">{staffT.error(recovery.error)}</p>;
   if(!canStart && !pending)return null;
   async function submit() {
     if(disabled || loading || !available || !context || !operation.api.current())return;

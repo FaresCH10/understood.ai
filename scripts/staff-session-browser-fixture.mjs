@@ -3,6 +3,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {openDatabase} from '../server/db.mjs';
 import {seed} from '../server/seed.mjs';
 import {createAppServer} from '../server/index.mjs';
+import {processOne} from '../server/worker.mjs';
 import {provisionStaffCredential,createSession,sessionCookie,revokeSession,requireLocalRequest} from '../server/auth.mjs';
 import {loadPublicBuild} from '../server/public-build.mjs';
 
@@ -20,7 +21,7 @@ function issue(principal='maya',seconds=3600){
   db.prepare('UPDATE staff SET active=1 WHERE id=?').run(principal);
   return createSession(db,db.prepare('SELECT * FROM staff WHERE id=?').get(principal),'staff','credential',null,seconds);
 }
-const controlPage=`<!doctype html><html lang="en"><meta charset="utf-8"><title>Disposable Session QA</title><h1>Disposable Session QA</h1><p id="result" role="status">Synthetic memory-only controls.</p>${['interrupt','restore','malformed','revoke','disable','rotate','archive','notify','hold','release'].map(action=>`<button type="button" data-action="${action}">${action}</button>`).join(' ')}<script>document.querySelectorAll('button').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;try{const response=await fetch('/api/qa-control/'+button.dataset.action,{method:'POST',headers:{'content-type':'application/json'},body:'{}'});if(!response.ok)throw Error();document.getElementById('result').textContent='Completed: '+button.dataset.action;if(!['hold','release'].includes(button.dataset.action)){const channel=new BroadcastChannel('understood:session-signal');channel.postMessage('changed');channel.close();}}catch{document.getElementById('result').textContent='Control unavailable.';}finally{button.disabled=false;}}));</script></html>`;
+const controlPage=`<!doctype html><html lang="en"><meta charset="utf-8"><title>Disposable Session QA</title><h1>Disposable Session QA</h1><p id="result" role="status">Synthetic memory-only controls.</p>${['interrupt','restore','malformed','revoke','disable','rotate','archive','notify','hold','release','process'].map(action=>`<button type="button" data-action="${action}">${action}</button>`).join(' ')}<script>document.querySelectorAll('button').forEach(button=>button.addEventListener('click',async()=>{button.disabled=true;try{const response=await fetch('/api/qa-control/'+button.dataset.action,{method:'POST',headers:{'content-type':'application/json'},body:'{}'});if(!response.ok)throw Error();document.getElementById('result').textContent='Completed: '+button.dataset.action;if(!['hold','release'].includes(button.dataset.action)){const channel=new BroadcastChannel('understood:session-signal');channel.postMessage('changed');channel.close();}}catch{document.getElementById('result').textContent='Control unavailable.';}finally{button.disabled=false;}}));</script></html>`;
 const server=createServer((req,res)=>{
   const url=new URL(req.url,origin);
   if(url.pathname==='/__qa/stop' && req.method==='POST'){requireLocalRequest(req);res.writeHead(200);res.end('Stopping disposable session fixture');setImmediate(stop);return;}
@@ -31,10 +32,11 @@ const server=createServer((req,res)=>{
     res.writeHead(302,{'set-cookie':sessionCookie(session.token,session.maxSeconds),location:'/#briefings/shelf','cache-control':'no-store'});return res.end();
   }
   if(url.pathname==='/qa-controls' && req.method==='GET') {requireLocalRequest(req);res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store'});return res.end(controlPage);}
-  const control=url.pathname.match(/^\/api\/qa-control\/(interrupt|restore|malformed|revoke|disable|rotate|archive|notify|hold|release)$/);
+  const control=url.pathname.match(/^\/api\/qa-control\/(interrupt|restore|malformed|revoke|disable|rotate|archive|notify|hold|release|process)$/);
   if(control && req.method==='POST') {
     requireLocalRequest(req);if(req.headers.origin!==origin){res.writeHead(403);return res.end();}controls++;
     const action=control[1];let cookie;
+    if(action==='process'){for(let i=0;i<20&&processOne(db);i++){} }
     if(action==='hold')held=true;
     if(action==='release'){held=false;for(const entry of pending){pending.delete(entry);if(!entry.res.destroyed){releasedReads++;handler(entry.req,entry.res);}}}
     if(action==='interrupt' || action==='malformed')failure=action;

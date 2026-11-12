@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {artifactReviewTabs,nextArtifactTab,copyArtifactText,artifactGlossaryDependency} from '../src/artifact-review.ts';
+import {artifactReviewTabs,artifactTabsFor,nextArtifactTab,copyArtifactText,artifactGlossaryDependency} from '../src/artifact-review.ts';
 import {checkedArtifactGlossary} from '../src/artifact-glossary.ts';
 
 const context='a'.repeat(64),now=Date.parse('2026-10-12T12:00:00.000Z');
@@ -14,6 +14,27 @@ test('artifact tabs use a stable four-view order and support wrapping arrows, Ho
     assert.equal(nextArtifactTab(artifactReviewTabs[n],'Home'),'text');assert.equal(nextArtifactTab(artifactReviewTabs[n],'End'),'glossary');
     assert.equal(nextArtifactTab(artifactReviewTabs[n],'Enter'),null);
   }
+});
+
+test('tab keyboard navigation wraps within the tabs a version actually shows',()=>{
+  const visible=['text','question','glossary'];
+  assert.equal(nextArtifactTab('text','ArrowRight',visible),'question');
+  assert.equal(nextArtifactTab('question','ArrowRight',visible),'glossary');
+  assert.equal(nextArtifactTab('glossary','ArrowRight',visible),'text');
+  assert.equal(nextArtifactTab('text','ArrowLeft',visible),'glossary');
+  assert.equal(nextArtifactTab('glossary','Home',visible),'text');
+  assert.equal(nextArtifactTab('text','End',visible),'glossary');
+  assert.equal(nextArtifactTab('text','Enter',visible),null);
+});
+
+test('artifact tabs follow the delivery and response modes workers actually received',()=>{
+  assert.deepEqual(artifactTabsFor({deliveryMode:'text',responseMode:'question'}),['text','question','glossary']);
+  assert.deepEqual(artifactTabsFor({deliveryMode:'both',responseMode:'question'}),['text','audio','question','glossary']);
+  assert.deepEqual(artifactTabsFor({deliveryMode:'both',responseMode:'acknowledge'}),['text','audio','glossary']);
+  assert.deepEqual(artifactTabsFor({deliveryMode:'text',responseMode:'acknowledge'}),['text','glossary']);
+  assert.deepEqual(artifactTabsFor({deliveryMode:'text'}),['text','question','glossary']);
+  assert.deepEqual(artifactTabsFor(null),['text','audio','question','glossary']);
+  assert.deepEqual(artifactTabsFor(undefined),['text','audio','question','glossary']);
 });
 
 test('artifact copy writes only the exact selected value after a current scoped staff session read',async()=>{

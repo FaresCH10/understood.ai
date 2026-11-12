@@ -9,9 +9,9 @@ const copy={
   ur:{title:'Understood سے سائن آؤٹ کریں؟',body:'کیا آپ واقعی اپنے اکاؤنٹ سے سائن آؤٹ کرنا چاہتے ہیں؟',cancel:'منسوخ کریں',confirm:'سائن آؤٹ'},
 };
 const workerCopy={
-  en:{title:'End this work session?',body:'You will be signed out on this device. You can sign in again with your worker ID and password.',cancel:'Cancel',confirm:'End session'},
-  ar:{title:'إنهاء جلسة العمل؟',body:'سيتم تسجيل خروجك على هذا الجهاز. يمكنك تسجيل الدخول مجدداً برقم العامل وكلمة المرور.',cancel:'إلغاء',confirm:'إنهاء الجلسة'},
-  ur:{title:'کام سیشن ختم کریں؟',body:'اس آلے پر آپ سائن آؤٹ ہو جائیں گے۔ آپ اپنے ورکر آئی ڈی اور پاس ورڈ سے دوبارہ سائن ان کر سکتے ہیں۔',cancel:'منسوخ کریں',confirm:'سیشن ختم کریں'},
+  en:{title:'End this work session?',body:'You will be signed out on this device. Saved text, instructions and recordings will be removed. Work that was not sent will be lost. You can sign in again with your worker ID and password.',cancel:'Cancel',confirm:'End session'},
+  ar:{title:'إنهاء جلسة العمل؟',body:'سيتم تسجيل خروجك على هذا الجهاز وستُزال النصوص والتعليمات والتسجيلات المحفوظة. سيُفقد العمل غير المرسل. يمكنك تسجيل الدخول مجدداً برقم العامل وكلمة المرور.',cancel:'إلغاء',confirm:'إنهاء الجلسة'},
+  ur:{title:'کام سیشن ختم کریں؟',body:'اس آلے پر آپ سائن آؤٹ ہو جائیں گے۔ محفوظ متن، ہدایات اور ریکارڈنگز ہٹا دی جائیں گی۔ نہ بھیجا گیا کام ضائع ہو جائے گا۔ آپ اپنے ورکر آئی ڈی اور پاس ورڈ سے دوبارہ سائن ان کر سکتے ہیں۔',cancel:'منسوخ کریں',confirm:'سیشن ختم کریں'},
 };
 const ConfirmationContext=createContext<(language?:string,worker?:boolean)=>Promise<boolean>>(async()=>false);
 export const useSignOutConfirmation=()=>useContext(ConfirmationContext);

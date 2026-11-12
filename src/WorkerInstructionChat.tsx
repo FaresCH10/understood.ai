@@ -33,9 +33,8 @@ export function WorkerInstructionChat({requestedCaseId,assignmentId,version,cont
   const dirty=!!draft.trim()||conversationDirty||voiceDirty||sending;
   const dirtyRef=useRef(dirty);dirtyRef.current=dirty;
   const markerKey=`u:instruction-chat:${session.clientContext}:${assignmentId}`;
-  const readMarker=()=>{try{return sessionStorage.getItem(markerKey);}catch{return null;}};
   const writeMarker=(id:string)=>{try{sessionStorage.setItem(markerKey,id);}catch{/* storage may be unavailable */}};
-  const requestedUsed=useRef(false),seenOpen=useRef<string|null>(null);
+  const requestedUsed=useRef(false);
   const newComposer=useRef<HTMLTextAreaElement>(null),newFocusPending=useRef(false);
 
   useEffect(()=>{
@@ -85,15 +84,10 @@ export function WorkerInstructionChat({requestedCaseId,assignmentId,version,cont
     if(!data)return;
     const newest=data.cases.find(item=>item.status==='open');
     if(requestedCaseId&&!requestedUsed.current&&data.cases.some(item=>item.id===requestedCaseId)){
-      requestedUsed.current=true;writeMarker(requestedCaseId);setOpen(true);setSelected(requestedCaseId);seenOpen.current=newest?.id??null;return;
+      requestedUsed.current=true;setOpen(true);setSelected(requestedCaseId);return;
     }
     setSelected(value=>value&&data.cases.some(item=>item.id===value)?value:(newest?.id??data.cases[0]?.id??null));
-    if(!newest||sending||dirtyRef.current)return;
-    if(seenOpen.current===newest.id)return;
-    seenOpen.current=newest.id;
-    if(readMarker()===newest.id)return;
-    writeMarker(newest.id);setOpen(true);setSelected(newest.id);
-  },[data,requestedCaseId,sending]);
+  },[data,requestedCaseId]);
 
   useEffect(()=>{callbacks.current.onDirtyChange(dirty);},[dirty]);
   useEffect(()=>()=>{callbacks.current.onDirtyChange(false);},[]);
@@ -110,7 +104,7 @@ export function WorkerInstructionChat({requestedCaseId,assignmentId,version,cont
     setSending(true);setSendFailed(false);setSent(false);
     try{
       const caseId=await callbacks.current.onSendHelp(text);
-      if(caseId){setDraft('');setSeed('');setSent(true);setSelected(caseId);seenOpen.current=caseId;writeMarker(caseId);setRetry(value=>value+1);setConversationRefresh(value=>value+1);}
+      if(caseId){setDraft('');setSeed('');setSent(true);setSelected(caseId);writeMarker(caseId);setRetry(value=>value+1);setConversationRefresh(value=>value+1);}
       else setSendFailed(true);
     }catch{setSendFailed(true);}finally{setSending(false);}
   }

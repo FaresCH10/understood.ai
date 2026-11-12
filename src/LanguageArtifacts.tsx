@@ -7,7 +7,7 @@ import {DraftReview} from './DraftReview';
 import {RegenerationControl} from './Regeneration';
 import {ArtifactCopy} from './ArtifactCopy';
 import {ArtifactGlossary} from './ArtifactGlossary';
-import {artifactReviewTabs,nextArtifactTab,type ArtifactReviewTab} from './artifact-review';
+import {artifactTabsFor,nextArtifactTab,type ArtifactReviewTab} from './artifact-review';
 import {PublicationPicker,usePublicationDetail} from './PublicationHistory';
 import {TranslationFeedbackReport} from './TranslationFeedback';
 import type {PublicationSummary} from './publication-history';
@@ -37,6 +37,10 @@ export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric
   const voice=voices.find((item) => artifactVoiceLanguage(item.lang,target));
   const sourceQuestion=artifactField(prepared?.question,500);
   const savedTranslation=isWorkerLanguage(target) && target!=='en' ? draft.review?.translations?.[target] : null;
+  const delivery=prepared?.deliveryMode;
+  const recipientTextOnly=delivery==='text';
+  const visibleTabs=artifactTabsFor(prepared);
+  const activeTab=visibleTabs.includes(tab)?tab:visibleTabs[0];
   useEffect(() => {
     if(!('speechSynthesis' in window)) return;
     const load=() => setVoices(window.speechSynthesis.getVoices());
@@ -58,7 +62,7 @@ export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric
     utterance.onerror=(event) => {if(currentPreview.current!==utterance) return;currentPreview.current=null;setPlaying('');if(!['canceled','interrupted'].includes(event.error)) setError('Device speech could not play. No generated audio file is available.');};
     currentPreview.current=utterance;setPlaying(kind);window.speechSynthesis.speak(utterance);
   };
-  const renderAudio=(kinds:('body'|'question')[]) => <div className="artifact-audio"><h3>{staffT("Audio evidence")}</h3>
+  const renderAudio=(kinds:('body'|'question')[]) => recipientTextOnly?null:<div className="artifact-audio"><h3>{staffT("Audio evidence")}</h3>
     {speech ? kinds.map(kind=><div key={[selection,draft.revision,target,kind].join(':')}>
       <div className="artifact-field-heading"><h4>{kind==='body'?staffT("Instruction audio"):staffT("Question audio")}</h4><ArtifactCopy value={location.origin+speech[kind]} label={kind==='body'?staffT("Copy private instruction audio link"):staffT("Copy private question audio link")} context={clientContext} disabled={editing}/></div>
       <audio ref={kind==='body'?bodyPlayer:questionPlayer} controls preload="none" src={speech[kind]} aria-label={staffT("{language} {track} audio",{language:staffT.language(language.code),track:staffT(kind==='body'?'Instruction':'Question')})}
@@ -78,23 +82,28 @@ export function LanguageArtifacts({draft,selected,onSelect,refresh,canViewRubric
     {pickerMode!=='draft'&&<PublicationPicker briefingId={draft.id} selected={publication || selected} onSelect={onSelect} context={clientContext} refresh={refresh} disabled={editing} allowDraft={pickerMode==='all'} draftLabel={staffT("Draft version {version} · revision {revision}",{version:draft.next_version,revision:draft.revision})}/>}
     {selected && published.loading && <p data-page-loading role="status">{staffT("Loading selected version...")}</p>}
     {selected && published.error && <><p role="alert">{staffT.error(published.error)}</p><button className="icon-button" title={staffT("Reload selected version")} aria-label={staffT("Reload selected version")} disabled={editing} onClick={()=>setDetailTick(n=>n+1)}><RotateCcw size={18}/></button></>}
-    <div className="artifact-tabs" role="tablist" aria-label={staffT("Artifact views")}>{artifactReviewTabs.map(item=><button type="button" role="tab" key={item} id={tabId+'-'+item+'-tab'} aria-controls={tabId+'-'+item+'-panel'} aria-selected={tab===item} tabIndex={tab===item?0:-1} disabled={editing} ref={element=>{tabRefs.current[item]=element;}} onClick={()=>setTab(item)} onKeyDown={event=>{const next=nextArtifactTab(item,event.key);if(next){event.preventDefault();setTab(next);tabRefs.current[next]?.focus();}}}>{staffT(item[0].toUpperCase()+item.slice(1))}</button>)}</div>
-    {artifactReviewTabs.filter(item=>item!==tab).map(item=><div key={item} hidden id={tabId+'-'+item+'-panel'} role="tabpanel" aria-labelledby={tabId+'-'+item+'-tab'}/>)}
-    <div key={[selection,target,draft.revision,tab,clientContext].join(':')} id={tabId+'-'+tab+'-panel'} className="artifact-tab-panel" role="tabpanel" aria-labelledby={tabId+'-'+tab+'-tab'} tabIndex={0}>
-      {!prepared?<p role="status">{selected && published.loading?staffT("Loading selected version..."):selected && published.error?staffT("Selected version evidence is unavailable."):selection==='draft' && draft.state==='processing'?staffT("Draft preparation is processing. Language outputs are not available yet."):staffT("No prepared language outputs are stored for this version.")}</p>:tab==='glossary'?<ArtifactGlossary key={target} target={target} context={clientContext} prepared={prepared} disabled={editing}/>:<>
+    <div className="artifact-tabs" role="tablist" aria-label={staffT("Artifact views")}>{visibleTabs.map(item=><button type="button" role="tab" key={item} id={tabId+'-'+item+'-tab'} aria-controls={tabId+'-'+item+'-panel'} aria-selected={activeTab===item} tabIndex={activeTab===item?0:-1} disabled={editing} ref={element=>{tabRefs.current[item]=element;}} onClick={()=>setTab(item)} onKeyDown={event=>{const next=nextArtifactTab(activeTab,event.key,visibleTabs);if(next){event.preventDefault();setTab(next);tabRefs.current[next]?.focus();}}}>{staffT(item[0].toUpperCase()+item.slice(1))}</button>)}</div>
+    {visibleTabs.filter(item=>item!==activeTab).map(item=><div key={item} hidden id={tabId+'-'+item+'-panel'} role="tabpanel" aria-labelledby={tabId+'-'+item+'-tab'}/>)}
+    <div key={[selection,target,draft.revision,activeTab,clientContext].join(':')} id={tabId+'-'+activeTab+'-panel'} className="artifact-tab-panel" role="tabpanel" aria-labelledby={tabId+'-'+activeTab+'-tab'} tabIndex={0}>
+      {!prepared?<p role="status">{selected && published.loading?staffT("Loading selected version..."):selected && published.error?staffT("Selected version evidence is unavailable."):selection==='draft' && draft.state==='processing'?staffT("Draft preparation is processing. Language outputs are not available yet."):staffT("No prepared language outputs are stored for this version.")}</p>:activeTab==='glossary'?<ArtifactGlossary key={target} target={target} context={clientContext} prepared={prepared} disabled={editing}/>:<>
         {!view.sourceMatches && <div className="notice notice-amber" role="status"><TriangleAlert size={22}/><span>{staffT("Stored outputs do not match this source. They cannot be previewed as the current draft.")}</span></div>}
-        <div className="artifact-comparison">
+        {target==='en'?<div className="artifact-comparison artifact-comparison-single">
           <section className="artifact-column" aria-label={staffT("English source")}><h2>{staffT("English source")}</h2>
-            {tab==='question'?<>{field('Question',sourceQuestion.value,'en','ltr')}{rubric}</>:<>{field('Instruction',source,'en','ltr')}{tab==='text' && <>{Array.isArray(prepared.facts) && <><h3>{staffT("Key facts")}</h3><ul>{prepared.facts.map((value,index)=><li key={index}>{(artifactField(value,500).value||staffT("Invalid stored fact"))}</li>)}</ul></>}{rubric}</>}{tab==='audio' && field('Question',sourceQuestion.value,'en','ltr')}</>}
+            {activeTab==='question'?<>{field('Question',sourceQuestion.value,'en','ltr')}{rubric}</>:<>{field('Title',view.title.value,'en','ltr')}{field('Instruction',source,'en','ltr')}{activeTab==='text' && <>{Array.isArray(prepared.facts) && <><h3>{staffT("Key facts")}</h3><ul>{prepared.facts.map((value,index)=><li key={index}>{(artifactField(value,500).value||staffT("Invalid stored fact"))}</li>)}</ul></>}{rubric}</>}{activeTab==='audio' && field('Question',sourceQuestion.value,'en','ltr')}</>}
+            {activeTab==='text'&&renderAudio(['body'])}{activeTab==='question'&&renderAudio(['question'])}{activeTab==='audio'&&renderAudio(['body','question'])}
+          </section>
+        </div>:<div className="artifact-comparison">
+          <section className="artifact-column" aria-label={staffT("English source")}><h2>{staffT("English source")}</h2>
+            {activeTab==='question'?<>{field('Question',sourceQuestion.value,'en','ltr')}{rubric}</>:<>{field('Instruction',source,'en','ltr')}{activeTab==='text' && <>{Array.isArray(prepared.facts) && <><h3>{staffT("Key facts")}</h3><ul>{prepared.facts.map((value,index)=><li key={index}>{(artifactField(value,500).value||staffT("Invalid stored fact"))}</li>)}</ul></>}{rubric}</>}{activeTab==='audio' && field('Question',sourceQuestion.value,'en','ltr')}</>}
           </section>
           <section className="artifact-column" aria-label={staffT("{language} artifacts",{language:staffT.language(language.code)})}><h2>{staffT.language(language.code)}</h2>
-            {tab==='text'?<>{field('Title',view.title.value,target,language.dir)}{field('Instruction',view.text.value,target,language.dir)}{renderAudio(['body'])}</>:tab==='question'?<>{field('Question',view.question.value,target,language.dir)}{renderAudio(['question'])}</>:<>{field('Instruction',view.text.value,target,language.dir)}{field('Question',view.question.value,target,language.dir)}{renderAudio(['body','question'])}</>}
+            {activeTab==='text'?<>{field('Title',view.title.value,target,language.dir)}{field('Instruction',view.text.value,target,language.dir)}{renderAudio(['body'])}</>:activeTab==='question'?<>{field('Question',view.question.value,target,language.dir)}{renderAudio(['question'])}</>:<>{field('Instruction',view.text.value,target,language.dir)}{field('Question',view.question.value,target,language.dir)}{renderAudio(['body','question'])}</>}
           </section>
-        </div>
+        </div>}
         <div className="artifact-check"><CheckCircle2 size={20}/><span>{staffT("Field presence is a technical check, not a correctness assessment or proof of safe work.")}</span></div>
       </>}
     </div>
-    {selection!=='draft' && selected && target!=='en' && <TranslationFeedbackReport key={`${selected.id}:${target}:${tab}`} authority={authority} publicationId={selected.id} language={target} field={tab==='question'?'question':tab==='audio'?'audio':tab==='glossary'?'glossary':'text'} disabled={editing}/>}
+    {selection!=='draft' && selected && target!=='en' && <TranslationFeedbackReport key={`${selected.id}:${target}:${activeTab}`} authority={authority} publicationId={selected.id} language={target} field={activeTab==='question'?'question':activeTab==='audio'?'audio':activeTab==='glossary'?'glossary':'text'} disabled={editing}/>}
     {selection==='draft' && canViewRubric && !draft.archive && draft.targetRegeneration?.language===target && ['queued','processing','failed'].includes(draft.targetRegeneration.status) && <p role="status">{staffT.language(language.code)} {staffT.state(draft.targetRegeneration.kind)} {staffT("regeneration:")} {staffT.state(draft.targetRegeneration.status)}. <a className="text-link" href={`#processing/${encodeURIComponent(draft.targetRegeneration.jobId)}`}>{staffT("View processing job")}</a></p>}
     {selection==='draft' && canViewRubric && !draft.archive && draft.id && !reviewEditing && (regenerating || draft.regenerationLanguages?.includes(target)) && isWorkerLanguage(target) && <RegenerationControl authority={authority} key={`regeneration-${draft.revision}-${target}`} id={draft.id} revision={draft.revision} language={target} scope={scope} disabled={draft.state==='processing'} onChanged={onChanged} onEditingChange={value=>{setRegenerating(value);onEditingChange(value);}}/>}
     {selection==='draft' && canViewRubric && !draft.archive && draft.id && !regenerating && (speech || savedTranslation && draft.review?.revision===draft.revision) && isWorkerLanguage(target) && target!=='en' && <DraftReview authority={authority} key={`${draft.revision}-${target}`} id={draft.id} revision={draft.revision} review={draft.review || null} prepared={null} canWrite scope={scope} disabled={draft.state==='processing'} failed={draft.state==='failed'} target={{code:target,name:language.name,dir:language.dir,title:view.title.value,text:view.text.value,question:view.question.value}} onChanged={onChanged} onEditingChange={value=>{setReviewEditing(value);onEditingChange(value);}}/>}

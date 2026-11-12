@@ -50,6 +50,7 @@
 .send-composer .send-source-toolbar .send-counter{margin:0;margin-inline-start:auto;line-height:1.5;font-size:13px;font-variant-numeric:tabular-nums}
 .send-draft-status{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
 .send-composer .send-audience-languages{margin:0 0 16px}
+.send-composer .send-review-preview-note{margin:0 0 16px;font-size:13px;line-height:1.5}
 .send-composer .instruction-attachments{margin:24px 0;padding:20px 0}
 .send-composer .instruction-attachments .field{margin-bottom:10px}
 
@@ -102,3 +103,5 @@
 .site-crews-directory{min-width:0;width:100%}
 .crew-directory-row{cursor:pointer}
 .crew-directory-row:hover{background:#f0f6f2}
+
+.artifact-comparison-single{grid-template-columns:minmax(0,1fr)}

@@ -10,6 +10,9 @@ import {keepDialogFocus} from './dialog-focus';
 type FileRow={id:string;name:string;mime:string;bytes:number;captions?:Record<string,string>};
 type AttachmentPolicy={maxBytes:number;scanRequired:boolean;uploadAllowed:boolean};
 const photo=(mime:string)=>mime==='image/png'||mime==='image/jpeg';
+const attachmentMimes={'pdf':'application/pdf','png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','txt':'text/plain','csv':'text/csv','docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','pptx':'application/vnd.openxmlformats-officedocument.presentationml.presentation'} as Record<string,string>;
+const supportedAttachmentMimes=new Set(Object.values(attachmentMimes));
+function attachmentMime(file:File){return attachmentMimes[file.name.split('.').pop()?.toLowerCase()||'']||file.type;}
 const direction=(code:string)=>['ar','ur','fa','he','pa-Arab'].includes(code)?'rtl':'ltr';
 const captionFor=(captions:Record<string,string>|undefined,language:string)=>{
  const values=captions||{};
@@ -57,13 +60,15 @@ export function AttachmentComposer({authority,requestId,disabled,ready,saveDraft
  useEffect(()=>{const controller=new AbortController();request<AttachmentPolicy>('/api/workspace/attachment-policy',undefined,controller.signal).then(value=>{if(current())setPolicy(value);}).catch(()=>{});return()=>controller.abort();},[request,current]);
  useEffect(()=>{if(!ready){setItems([]);return;}const controller=new AbortController();request<{items:FileRow[]}>(`/api/workspace/attachments/${requestId}`,undefined,controller.signal).then(value=>{if(current())setItems(value.items);}).catch(()=>{});return()=>controller.abort();},[requestId,request,current,ready]);
  async function upload(file:File){
-  if(busy||disabled)return;setBusy(true);onBusy(true);setError('');
+  if(busy||disabled)return;
+  const mime=attachmentMime(file);
+  if(!supportedAttachmentMimes.has(mime)){setError('Use a photo, PDF, Office document, CSV or text file up to 3 MB');return;}
+  setBusy(true);onBusy(true);setError('');
   try{
    if(policy?.uploadAllowed===false)throw Error('Attachments are unavailable until file safety scanning is configured');
    if(file.size>(policy?.maxBytes??3*1024*1024))throw Error('Choose a file up to 3 MB.');
    await saveDraft();
    const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('File could not be read'));reader.readAsDataURL(file);});
-   const mime={'pdf':'application/pdf','png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','txt':'text/plain','csv':'text/csv','docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','pptx':'application/vnd.openxmlformats-officedocument.presentationml.presentation'}[file.name.split('.').pop()?.toLowerCase()||'']||file.type;
    const captions=photo(mime)?Object.fromEntries(Object.entries(captionDraft).map(([code,text])=>[code,text.trim()]).filter(([,text])=>!!text)):undefined;
    const result=await request<{items:FileRow[]}>(`/api/workspace/attachments/${requestId}`,{id:crypto.randomUUID(),name:file.name,mime,data,...(captions&&Object.keys(captions).length?{captions}:{})});
    if(current()){setItems(result.items);if(captions)setCaptionDraft({});}

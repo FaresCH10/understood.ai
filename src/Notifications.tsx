@@ -4,6 +4,7 @@ import {gsap,useGSAP} from './gsap';
 import './notifications-workspace.css';
 import {ArrowLeft,Bell,BellRing,Check,CheckCheck,ChevronDown,ChevronLeft,ChevronRight,ArrowUpRight,FileText,MessageCircle,Languages,Download,RefreshCw,Trash2} from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
+import {StaffRequestError} from './staff-request';
 import {usePushNotifications} from './usePushNotifications';
 import {useArtifactMutation} from './useArtifactMutation';
 import type {ArtifactDefinition} from './useArtifactRequest';
@@ -22,8 +23,8 @@ export function Notifications({refresh,navigate,timezone,authority}:{refresh:num
   const [recovery]=useState(()=>{try{return {pending:readPendingNotification(sessionStorage,checkedArtifactScope(scope,authority.session,notificationRoles)),error:''};}catch(reason){return {pending:null,error:(reason as Error).message};}});
   const [status,setStatus]=useState('all'),[page,setPage]=useState(1),[tick,setTick]=useState(0);
   const [data,setData]=useState<NotificationPage|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState('');
-  const operation=useArtifactMutation(authority,scope,definition,savePendingNotification,notificationRoles.includes(authority.session.staffRole || ''),result=>{
-    window.dispatchEvent(new Event('understood:notifications-changed'));setMessage(`Read status verified: ${result.label}.`);setTick(value=>value+1);
+  const operation=useArtifactMutation(authority,scope,definition,savePendingNotification,notificationRoles.includes(authority.session.staffRole || ''),()=>{
+    window.dispatchEvent(new Event('understood:notifications-changed'));setMessage('Marked as read.');setTick(value=>value+1);
   },recovery.pending);
   const {busy}=operation,blocked=busy || bulkBusy || !!operation.pending.current || !!recovery.error;
   useEffect(()=>{
@@ -31,12 +32,15 @@ export function Notifications({refresh,navigate,timezone,authority}:{refresh:num
     const controller=new AbortController();queueMicrotask(()=>{if(!controller.signal.aborted)void operation.check(controller.signal);});
     return()=>controller.abort();
   },[operation.api,recovery.pending]);
+  const queryKey=useRef('');
   useEffect(()=>{
-    const controller=new AbortController();setLoading(true);setData(null);setError('');
+    const controller=new AbortController();setLoading(true);setError('');
+    const key=`${status}:${page}`;
+    if(queryKey.current!==key){queryKey.current=key;setData(null);}
     const live=()=>current() && !controller.signal.aborted;
     void request(`/api/notifications?${new URLSearchParams({status,page:String(page),pageSize:'20'})}`,undefined,controller.signal)
       .then(value=>{const verified=checkedNotificationPage(value,page,status);if(live())setData(verified);})
-      .catch(reason=>{if(live())setError(reason.message);}).finally(()=>{if(live())setLoading(false);});
+      .catch(reason=>{if(live())setError(reason instanceof StaffRequestError && reason.uncertain ? reason.message : 'Notifications could not be loaded. Check your connection and try again.');}).finally(()=>{if(live())setLoading(false);});
     return()=>controller.abort();
   },[status,page,tick,refresh,request,current]);
   const markRead=async(item:NotificationItem)=>{
@@ -79,14 +83,14 @@ export function Notifications({refresh,navigate,timezone,authority}:{refresh:num
     <div className="notifications-toolbar"><div className="notifications-tabs" role="group" aria-label={staffT("Filter notifications")}>
       {['all','unread'].map(value=><button className="notifications-tab" key={value} type="button" aria-pressed={status===value} disabled={!!busy || bulkBusy} onClick={()=>{setStatus(value);setPage(1);setMessage('');}}>{staffT(value==='all'?'All activity':'Unread')}</button>)}<span className="notifications-tab-indicator" aria-hidden="true"/>
     </div><span className="notifications-history-label">{staffT("Last 90 days")}</span></div>
-    {error && <p role="alert" className="record-error">{staffT.error(error)}</p>}
+    {error && <div className="actions"><p role="alert" className="record-error">{data?staffT("Notifications could not be refreshed. The list below may be out of date."):staffT.error(error)}</p><button type="button" className="button outline" disabled={loading} onClick={()=>setTick(value=>value+1)}>{staffT("Try again")}</button></div>}
     {bulkError && <p role="alert" className="record-error">{staffT.error(bulkError)}</p>}
     {recovery.error && <p role="alert" className="record-error">{staffT.error(recovery.error)}</p>}
     {operation.error && <p role="alert" className="record-error">{staffT.error(operation.error)}</p>}
     {message && <p className="notifications-feedback" role="status"><CheckCheck size={17}/>{staffT.message(message)}</p>}
     {operation.pending.current && <section className="notification-recovery" aria-label={staffT("Saved notification read")}><h2>{staffT("Recover read status")}</h2><p>{staffT(operation.pending.current.item.label)}</p><p><time dateTime={operation.pending.current.item.occurredAt}>{date(operation.pending.current.item.occurredAt)}</time></p><div className="actions"><button className="button outline" disabled={busy} onClick={()=>void operation.check()}><RefreshCw size={18}/>{staffT("Check read status")}</button>{operation.checked && <button className="button primary" disabled={busy} onClick={()=>void operation.write(operation.pending.current!)}><Check size={18}/>{staffT("Retry original mark read")}</button>}</div></section>}
     <section className="notifications-inbox" aria-label={staffT("Site notifications")} aria-busy={loading}>
-      {loading ? <p data-page-loading role="status">{staffT("Loading notifications...")}</p> : data?.items.length ? [...groups].map(([day,items])=><section className="notifications-day" key={day} aria-label={day}>
+      {loading && !data ? <p data-page-loading role="status">{staffT("Loading notifications...")}</p> : data?.items.length ? [...groups].map(([day,items])=><section className="notifications-day" key={day} aria-label={day}>
         <h2>{day}</h2><div className="notifications-day-list">{items.map(item=>{
           const Icon=item.destination==='clarifications'?MessageCircle:item.destination==='reports'?Download:item.destination==='people'?Languages:FileText;
           const category=item.destination==='clarifications'?'Follow-up':item.destination==='reports'?'Reports':item.destination==='people'?'Team':'Instructions';

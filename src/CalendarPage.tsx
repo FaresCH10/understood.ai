@@ -288,12 +288,18 @@ export function CalendarPage({authority,refresh,language,navigate}:CalendarPageP
       </div>
       <button type="button" className="button outline calendar-today-button" onClick={()=>{setMonth(today.slice(0,7));setFocusDate(today);focusPending.current=true;}}>{t('Today')}</button>
       <button type="button" className="icon-button calendar-refresh" aria-label={t('Refresh calendar')} title={t('Refresh calendar')} disabled={read.loading} onClick={()=>setTick(value=>value+1)}><RefreshCw size={18} className={read.loading?'calendar-spin':''}/></button>
-      <div className="calendar-summary">
+      {data&&<div className="calendar-summary">
         <span className="calendar-chip"><Send size={15}/>{publishedCount} {t('sent')}</span>
         <span className="calendar-chip is-scheduled"><Clock3 size={15}/>{scheduledCount} {t('scheduled')}</span>
         <span className="calendar-chip is-activity"><Sparkles size={15}/>{updateCount} {t('updates')}</span>
-      </div>
+      </div>}
     </div>
+    {!data
+      ? error
+        ? <div className="calendar-error calendar-main-error" role="alert"><TriangleAlert size={22}/><div><strong>{t('Calendar unavailable')}</strong><p>{t('The instruction calendar could not be loaded.')}</p><button type="button" className="button outline" onClick={()=>setTick(value=>value+1)} disabled={read.loading}>{t('Try again')}</button></div></div>
+        : <p className="calendar-loading calendar-main-loading" role="status"><RefreshCw className="calendar-spin" size={16}/>{t('Loading calendar...')}</p>
+      : <>
+    {!publishedCount&&!scheduledCount&&!updateCount&&<p className="calendar-empty-month" role="status">{t('No instructions or activity were recorded this month.')}</p>}
     <div className="calendar-mobile-view"><button className="button outline" aria-pressed={!mobileMonth} onClick={()=>setMobileMonth(false)}>{rtl?'الأجندة':'Agenda'}</button><button className="button outline" aria-pressed={mobileMonth} onClick={()=>setMobileMonth(true)}>{rtl?'الشهر':'Month'}</button></div><section className="calendar-mobile-agenda" hidden={mobileMonth}>{grid.filter((date):date is string=>!!date).filter(date=>date===today||(instructionsByDate.get(date)?.length||0)>0||(eventsByDate.get(date)?.length||0)>0).map(date=><button className="calendar-agenda-day" key={date} onClick={()=>{setOpenGroups(new Set());setSelected(date);}}><strong>{calendarDayHeading(date,language)}</strong><span>{dayPair(instructionsByDate.get(date)?.length||0,eventsByDate.get(date)?.length||0)||t('Today')}</span>{(instructionsByDate.get(date)||[]).slice(0,2).map(item=><span key={item.id}>{item.title}</span>)}</button>)}{!grid.some(date=>date&&(date===today||(instructionsByDate.get(date)?.length||0)>0||(eventsByDate.get(date)?.length||0)>0))&&<p>{rtl?'لا يوجد نشاط هذا الشهر':'No activity this month.'}</p>}</section><section data-mobile-month={mobileMonth} className="calendar-month-panel" aria-label={`${t('Calendar month')} ${monthLabel}`}>
       <div className="calendar-weekdays" aria-hidden="true">{weekdays.map((day,index)=><span key={day} data-narrow={narrowWeekdays[index]}>{day}</span>)}</div>
       <div className="calendar-grid" ref={gridRef} role="group" aria-label={monthLabel}>
@@ -340,6 +346,7 @@ export function CalendarPage({authority,refresh,language,navigate}:CalendarPageP
         </details>
       </footer>
     </section>
+    </>}
     {selected&&createPortal(<div className="calendar-day-overlay" ref={overlayRef} onClick={event=>{if(event.target===event.currentTarget)closeDay();}}>
       <div className="calendar-day-modal" ref={detailRef} role="dialog" aria-modal="true" aria-labelledby="calendar-day-heading" dir={rtl?'rtl':'ltr'} lang={language}>
         <div className="calendar-day-head">
@@ -353,10 +360,10 @@ export function CalendarPage({authority,refresh,language,navigate}:CalendarPageP
             <span className="calendar-day-badge" aria-hidden="true">{calendarDayNumber(selected)}</span>
           </div>
         </div>
-        {error?<div className="calendar-error" role="alert"><TriangleAlert size={20}/><div><strong>{t('Calendar unavailable')}</strong><p>{t('The instruction calendar could not be loaded.')}</p><button type="button" className="text-link" onClick={()=>setTick(value=>value+1)}>{t('Try again')}</button></div></div>:<>
+        <>
           <section className="calendar-day-section" aria-labelledby="calendar-instructions-heading">
             <h3 id="calendar-instructions-heading">{t('Instructions')}<span>{dayGroups.length}</span></h3>
-            {read.loading&&!data?<p className="calendar-loading" role="status"><RefreshCw className="calendar-spin" size={15}/>{t('Loading calendar...')}</p>:!dayGroups.length?<p className="calendar-empty">{t('No instructions on this day.')}</p>:dayGroups.map((group,index)=>{
+            {!dayGroups.length?<p className="calendar-empty">{t('No instructions on this day.')}</p>:dayGroups.map((group,index)=>{
               const item=group.instruction,briefingId=group.briefingId;
               const percent=item?(item.kind==='scheduled'?0:Math.min(100,Math.max(0,item.metrics.completion))):0;
               const expandable=group.events.length>0,open=expandable&&openGroups.has(group.key);
@@ -393,7 +400,7 @@ export function CalendarPage({authority,refresh,language,navigate}:CalendarPageP
               </article>;
             })}
           </section>
-        </>}
+        </>
       </div>
     </div>,document.body)}
   </div>;

@@ -7,7 +7,7 @@ import type {PageSession} from './session-state';
 import type {WorkerUiLanguage} from './worker-ui-language';
 import {WorkerDeviceDisclosure} from './WorkerDeviceDisclosure';
 
-export type AudioOutboxProps={session:PageSession;language:WorkerUiLanguage;disabled:boolean;current:()=>boolean;onOperation:(work:()=>Promise<void>)=>Promise<void>;onSessionLost:()=>void;learnMore?:string};
+export type AudioOutboxProps={session:PageSession;language:WorkerUiLanguage;disabled:boolean;current:()=>boolean;onOperation:(work:()=>Promise<void>)=>Promise<void>;onSessionLost:()=>void;learnMore?:string;removeWarning?:string;removeAllWarning?:string};
 const copy={
   en:{title:'Saved recordings',scope:'Instruction',version:'Version',expires:'Expires',limits:'Up to 10 recordings and 25 MiB on this device. Saved copies remain until removed or expired.',removeAll:'Remove all saved recordings'},
   ar:{title:'التسجيلات المحفوظة',scope:'التعليمات',version:'الإصدار',expires:'تنتهي الصلاحية',limits:'حتى 10 تسجيلات و25 ميبيبايت على هذا الجهاز. تبقى النسخ المحفوظة حتى حذفها أو انتهاء صلاحيتها.',removeAll:'حذف جميع التسجيلات المحفوظة'},
@@ -30,7 +30,7 @@ function Preview({item,label}:{item:AudioOutboxItem;label:string}){
   useEffect(()=>{const next=URL.createObjectURL(new Blob([new Uint8Array(item.draft.bytes)],{type:'audio/wav'}));setUrl(next);return()=>URL.revokeObjectURL(next);},[item]);
   return <audio controls preload="none" src={url || undefined} aria-label={label}/>;
 }
-export function WorkerAudioOutbox({session,language,disabled,current,onOperation,onSessionLost,learnMore}:AudioOutboxProps){
+export function WorkerAudioOutbox({session,language,disabled,current,onOperation,onSessionLost,learnMore,removeWarning,removeAllWarning}:AudioOutboxProps){
   const t=copy[language],a=audioDraftCopy[language],r=workerReceiptCheckText[language];
   const [items,setItems]=useState<AudioOutboxItem[]>([]),[loading,setLoading]=useState(true),[tick,setTick]=useState(0),[working,setWorking]=useState(false),[notice,setNotice]=useState(''),[statuses,setStatuses]=useState<Record<string,string>>({});
   const live=useRef(false),revision=useRef(0),inFlight=useRef(false),allowed=useRef(current);allowed.current=current;
@@ -53,6 +53,8 @@ export function WorkerAudioOutbox({session,language,disabled,current,onOperation
   }
   async function run(action:'send'|'check'|'remove'|'all',item?:AudioOutboxItem){
     if(disabled || inFlight.current || !allowed.current())return;
+    const warning=action==='all'?removeAllWarning:action==='remove'?removeWarning:undefined;
+    if(warning && !window.confirm(warning))return;
     inFlight.current=true;setWorking(true);setNotice('');
     const guard=()=>live.current && allowed.current();
     try {await onOperation(async()=>{

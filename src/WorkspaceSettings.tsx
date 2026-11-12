@@ -1,6 +1,6 @@
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {GENERATION_LANGUAGE_CODES,WORKER_LOCALES} from '../server/languages.mjs';
-import {useEffect,useMemo,useRef,useState,type FormEvent} from 'react';
+import {useEffect,useMemo,useRef,useState,type FormEvent,type RefObject} from 'react';
 import {Building2,Globe,RefreshCw,Save,TriangleAlert,Pencil,ChevronLeft,ChevronRight,Search} from 'lucide-react';
 import {OrganizationSites} from './OrganizationSites';
 import {useSettingsReveal} from './SettingsLayout';
@@ -58,7 +58,7 @@ function SettingsForm({authority,kind,context,onSaved,onLocked,disabled}:{author
       {pending && <p role="status">{staffT("The original settings save is unconfirmed. Check its receipt before explicitly retrying.")}</p>}
       <label className="billing-confirm"><input type="checkbox" checked={confirmed} disabled={busy || loading || !changed || !pending && (contactInvalid || kind==='site' && !contactsReady)} onChange={event=>setConfirmed(event.target.checked)}/><span>{kind==='organization'?staffT("I confirm these organization details."):staffT("I confirm these site settings.")}</span></label>
       {error && <p role="alert" className="record-error">{staffT.error(error)}</p>}<div className="actions">{pending && <button type="button" className="button outline" disabled={busy} onClick={checkReceipt}><RefreshCw size={18}/>{staffT("Check settings receipt")}</button>}<button type="button" className="button outline" disabled={locked} onClick={()=>{setEditing(false);onLocked(false);}}>{staffT("Cancel")}</button><button className="button primary" disabled={disabled || busy || loading || !confirmed || !changed || !pending && (contactInvalid || kind==='site' && !contactsReady)}><Save size={18}/>{busy?staffT("Saving..."):pending?staffT("Retry unchanged request"):staffT("Save settings")}</button></div>
-    </form> : <div className="workspace-settings-columns"><div>{kind==='organization' ? <dl className="billing-details"><dt>{staffT("Name")}</dt><dd>{current.name}</dd><dt>{authority.session.staffRole==='owner'?staffT("Owner"):staffT("Signed in as")}</dt><dd className="workspace-owner"><span className="staff-avatar">{initials(authority.session.name || '')}</span><span><strong dir="auto">{(authority.session.name||staffT("Signed-in account"))}</strong><small>{staffT(roleLabel(authority.session.staffRole))}{authority.session.email ? ` · ${authority.session.email}` : ''}</small></span></dd><dt>{staffT("Workspace status")}</dt><dd><span className={`status status-${authority.session.siteState==='active' ? 'green' : 'amber'}`}>{authority.session.siteState==='active'?staffT("Active"):staffT("Archived")}</span></dd><dt>{staffT("Support contact")}</dt><dd>{(second||staffT("Not configured"))}</dd><dt>{staffT("Revision")}</dt><dd>{staffT.number(current.revision)}</dd></dl> : <dl className="billing-details"><dt>{staffT("Name")}</dt><dd>{current.name}</dd><dt>{staffT("Timezone")}</dt><dd>{(second||staffT("Not configured"))}</dd><dt>{staffT("Languages")}</dt><dd>{loadedContext.site.generationLanguages.map(code=><span className="language-tag" key={code}>{code.toUpperCase()}</span>)}</dd>{[['Primary contact',loadedContext.site.primaryContact],['Deputy contact',loadedContext.site.deputyContact]].map(([label,contact])=><ContactDetail key={label as string} label={label as string} contact={contact as SiteContact|null}/>)}<dt>{staffT("Revision")}</dt><dd>{staffT.number(current.revision)}</dd></dl>}{error && <p role="alert">{staffT.error(error)}</p>}{(kind==='organization' ? loadedContext.canWrite : loadedContext.canWriteSite) && <button className="button outline" disabled={disabled || loading} onClick={()=>{setName(current.name);setValue(second);setLanguages(loadedContext.site.generationLanguages);setPrimary(loadedContext.site.primaryContact);setDeputy(loadedContext.site.deputyContact);setContactsReady(false);setConfirmed(false);setEditing(true);onLocked(true);}}><Pencil size={18}/>{staffT("Edit")} {kind==='organization'?staffT("organization"):staffT("site")}</button>}</div></div>}
+    </form> : <div className="workspace-settings-columns"><div>{kind==='organization' ? <dl className="billing-details"><dt>{staffT("Name")}</dt><dd>{current.name}</dd><dt>{authority.session.staffRole==='owner'?staffT("Owner"):staffT("Signed in as")}</dt><dd className="workspace-owner"><span className="staff-avatar">{initials(authority.session.name || '')}</span><span><strong dir="auto">{(authority.session.name||staffT("Signed-in account"))}</strong><small>{staffT(roleLabel(authority.session.staffRole))}{authority.session.email ? ` · ${authority.session.email}` : ''}</small></span></dd><dt>{staffT("Workspace status")}</dt><dd><span className={`status status-${authority.session.siteState==='active' ? 'green' : 'amber'}`}>{authority.session.siteState==='active'?staffT("Active"):staffT("Archived")}</span></dd><dt>{staffT("Support contact")}</dt><dd>{(second||staffT("Not configured"))}</dd></dl> : <dl className="billing-details"><dt>{staffT("Name")}</dt><dd>{current.name}</dd><dt>{staffT("Timezone")}</dt><dd>{(second||staffT("Not configured"))}</dd><dt>{staffT("Languages")}</dt><dd>{loadedContext.site.generationLanguages.map(code=><span className="language-tag" key={code}>{code.toUpperCase()}</span>)}</dd>{[['Primary contact',loadedContext.site.primaryContact],['Deputy contact',loadedContext.site.deputyContact]].map(([label,contact])=><ContactDetail key={label as string} label={label as string} contact={contact as SiteContact|null}/>)}</dl>}{error && <p role="alert">{staffT.error(error)}</p>}{(kind==='organization' ? loadedContext.canWrite : loadedContext.canWriteSite) && <button className="button outline" disabled={disabled || loading} onClick={()=>{setName(current.name);setValue(second);setLanguages(loadedContext.site.generationLanguages);setPrimary(loadedContext.site.primaryContact);setDeputy(loadedContext.site.deputyContact);setContactsReady(false);setConfirmed(false);setEditing(true);onLocked(true);}}><Pencil size={18}/>{staffT("Edit")} {kind==='organization'?staffT("organization"):staffT("site")}</button>}</div></div>}
   </section>;
 }
 function ContactDetail({label,contact}:{label:string;contact:SiteContact|null}) {
@@ -88,12 +88,33 @@ function SiteContacts({authority,primary,deputy,disabled,onReady,onChange}:{auth
     {(!primary && deputy || primary && deputy && primary.id===deputy.id || primary && !primary.available || deputy && !deputy.available) && <p role="alert">{staffT("Choose an available primary contact and a different deputy, or clear unavailable contacts.")}</p>}
   </fieldset>;
 }
-export function WorkspaceSettings({authority,onContextChanged,onLifecycleChanged,session}:{authority:StaffRequestAuthority;onContextChanged:(value:WorkspaceContext)=>void;onLifecycleChanged:()=>void;session:{clientContext:string;expiresAt:string;siteState?:'active'|'archived'}}) {
+export function WorkspaceSettings({authority,onContextChanged,onLifecycleChanged,session,navigationGuard,navigate}:{authority:StaffRequestAuthority;onContextChanged:(value:WorkspaceContext)=>void;onLifecycleChanged:()=>void;session:{clientContext:string;expiresAt:string;siteState?:'active'|'archived'};navigationGuard:RefObject<((next:string,resume?:()=>void)=>boolean)|null>;navigate:(path:string)=>void}) {
   const staffT=useStaffStaticText();
   const {request,current}=useStaffRequest(authority);
   const [data,setData]=useState<WorkspaceContext|null>(null),[refresh,setRefresh]=useState(0),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState('');
   const [locks,setLocks]=useState({organization:false,site:false,creation:false}),heading=useRef<HTMLHeadingElement>(null);
+  const leaveDialog=useRef<HTMLDialogElement>(null),leaveAction=useRef<(()=>void)|null>(null),approvedNext=useRef<string|null>(null);
   useEffect(()=>{heading.current?.focus();},[]);
+  const dirty=locks.organization||locks.site||locks.creation;
+  useEffect(()=>{
+    if(!dirty)return;
+    const guard=(next:string,resume?:()=>void)=>{
+      if(approvedNext.current===next){approvedNext.current=null;return true;}
+      leaveAction.current=()=>{approvedNext.current=next;if(resume)resume();else navigate(next);};
+      if(leaveDialog.current?.open)return false;
+      leaveDialog.current?.showModal();
+      return false;
+    };
+    navigationGuard.current=guard;
+    return()=>{if(navigationGuard.current===guard)navigationGuard.current=null;};
+  },[dirty,navigationGuard,navigate]);
+  useEffect(()=>{
+    if(!dirty)return;
+    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
+    window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);
+  },[dirty]);
+  const closeLeave=()=>{leaveAction.current=null;leaveDialog.current?.close();};
+  const discardLeave=()=>{const action=leaveAction.current;leaveAction.current=null;leaveDialog.current?.close();action?.();};
   const contextCallback=useRef(onContextChanged);contextCallback.current=onContextChanged;
   useEffect(()=>{const controller=new AbortController(),live=()=>current() && !controller.signal.aborted;setLoading(true);setError('');
     request<WorkspaceContext>('/api/settings',undefined,controller.signal)
@@ -104,5 +125,6 @@ export function WorkspaceSettings({authority,onContextChanged,onLifecycleChanged
   const lock=(kind:keyof typeof locks,value:boolean)=>{if(!current())return;if(value)setMessage('');setLocks(old=>old[kind]===value?old:{...old,[kind]:value});};
   return <><div className="page-header"><div><h1 ref={heading} tabIndex={-1}>{staffT("Organization & site")}</h1><p>{(data?.site.name||staffT("Workspace settings"))}</p></div><button className="icon-button" title={staffT("Refresh workspace settings")} aria-label={staffT("Refresh workspace settings")} disabled={locks.organization || locks.site || locks.creation} onClick={()=>{setMessage('');setRefresh(value=>value+1);}}><RefreshCw size={20}/></button></div>
     {message && <p role="status">{staffT.message(message)}</p>}{loading ? <p data-page-loading role="status">{staffT("Loading workspace settings...")}</p> : error ? <p role="alert" className="record-error">{staffT.error(error)}</p> : data && <><div className="workspace-settings-grid"><SettingsForm authority={authority} key="organization" kind="organization" context={data} disabled={locks.site || locks.creation || session.siteState==='archived'} onSaved={saved} onLocked={value=>lock('organization',value)}/><SettingsForm authority={authority} key="site" kind="site" context={data} disabled={locks.organization || locks.creation || session.siteState==='archived'} onSaved={saved} onLocked={value=>lock('site',value)}/></div>{data.canWrite && <OrganizationSites authority={authority} key={session.clientContext} session={session} timezone={data.site.timezone} disabled={locks.organization || locks.site} onLifecycleChanged={onLifecycleChanged} onLocked={value=>lock('creation',value)}/>}</>}
+    <dialog ref={leaveDialog} className="withdraw-dialog" aria-labelledby="settings-leave-title" onCancel={event=>{event.preventDefault();closeLeave();}}><h2 id="settings-leave-title">{staffT("Discard unsaved settings changes?")}</h2><p>{staffT("Your edits have not been saved. Keep editing to save them, or discard them and continue.")}</p><div className="actions"><button type="button" className="button outline" onClick={closeLeave}>{staffT("Keep editing")}</button><button type="button" className="button danger" onClick={discardLeave}>{staffT("Discard and continue")}</button></div></dialog>
   </>;
 }

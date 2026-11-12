@@ -5,7 +5,7 @@ import {gsap,useGSAP} from './gsap';
 import './today-dashboard.css';
 
 export type TodayQueueGroup='cases'|'waiting'|'delivery';
-const groups=[{key:'cases',label:'Needs attention',icon:MessageCircle},{key:'waiting',label:'Waiting for replies',icon:Clock3},{key:'delivery',label:'Delivery problems',icon:TriangleAlert}] as const;
+const groups=[{key:'delivery',label:'Delivery problems',icon:TriangleAlert},{key:'cases',label:'Help & follow-ups',icon:MessageCircle},{key:'waiting',label:'Waiting for workers',icon:Clock3}] as const;
 
 export function TodayQueue({group,onGroup,counts,motionKey,children}:{group:TodayQueueGroup;onGroup:(value:TodayQueueGroup)=>void;counts:Record<TodayQueueGroup,number>;motionKey:string;children:ReactNode}){
   const t=useStaffText(),root=useRef<HTMLDivElement>(null),marker=useRef<HTMLSpanElement>(null),interacted=useRef(false);

@@ -67,11 +67,11 @@ function CrewRecipients({disabled,onSelected,onLoading,authority}:{disabled:bool
   </div>;
 }
 
-export default function PublishForm({id,revision,version,timezone:siteTimezone,scope,onPending,onChanged,authority}:{id:string;revision:number;version:number;timezone:string;scope?:string|null;onPending:(value:PendingPublication)=>void;onChanged:(outcome?:'publish'|'schedule')=>void;authority:StaffRequestAuthority}) {
+export default function PublishForm({id,revision,version,timezone:siteTimezone,scope,onPending,onChanged,authority,initialWorkers,hideRecipients=false}:{id:string;revision:number;version:number;timezone:string;scope?:string|null;onPending:(value:PendingPublication)=>void;onChanged:(outcome?:'publish'|'schedule')=>void;authority:StaffRequestAuthority;initialWorkers?:Worker[];hideRecipients?:boolean}) {
   const staffT=useStaffStaticText();
   const {request,current:sessionCurrent,complete}=useBriefingRequest(authority),sending=useRef(false);
   const [search,setSearch]=useState(''),[language,setLanguage]=useState('all'),[page,setPage]=useState(1);
-  const [data,setData]=useState<WorkerPage|null>(null),[selected,setSelected]=useState<Map<string,Worker>>(new Map());
+  const [data,setData]=useState<WorkerPage|null>(null),[selected,setSelected]=useState<Map<string,Worker>>(()=>new Map((initialWorkers??[]).map(worker=>[worker.id,worker])));
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[confirmed,setConfirmed]=useState(false);
   const [stale,setStale]=useState(false);
   const [readingCrew,setReadingCrew]=useState(false);
@@ -86,11 +86,12 @@ export default function PublishForm({id,revision,version,timezone:siteTimezone,s
   const timingChanged=()=>{setConfirmed(false);setError('');};
   const query=new URLSearchParams({search,language,status:'active',page:String(page),pageSize:'50'}).toString();
   useEffect(() => {
+    if(hideRecipients){setLoading(false);setData(null);setError('');return;}
     let current=true;setLoading(true);setData(null);setError('');
     request<WorkerPage>(`/people/workers?${query}`).then((value) => {if(current && sessionCurrent()) setData(value);})
       .catch((err:Error) => {if(current && sessionCurrent()) setError(err.message);}).finally(() => {if(current && sessionCurrent()) setLoading(false);});
     return () => {current=false;};
-  },[query,request,sessionCurrent]);
+  },[query,request,sessionCurrent,hideRecipients]);
   useEffect(() => {
     const controller=new AbortController();setVerifyLoading(true);setVerifyCandidates(null);setVerifyError('');
     const query=new URLSearchParams({window:verifyWindow,outcome:verifyOutcome});
@@ -153,14 +154,14 @@ export default function PublishForm({id,revision,version,timezone:siteTimezone,s
       setError(`${message}${submitted && mode==='schedule'?' Refresh publication schedules to check the saved outcome.':''}`);
     } finally {sending.current=false;if(sessionCurrent())setBusy(false);}
   }
-  return <section className="panel"><h2>{staffT("Publish v")}{version}</h2><form onSubmit={(event) => void publish(event)}>
-    <CrewRecipients authority={authority} disabled={busy || stale} onLoading={value=>{if(!sessionCurrent())return;setReadingCrew(value);if(value)setConfirmed(false);}} onSelected={workers=>{
+  return <section className="panel"><h2>{hideRecipients?staffT("Review and send"):staffT("Publish v")}{hideRecipients?'':version}</h2><form onSubmit={(event) => void publish(event)}>
+    {!hideRecipients&&<CrewRecipients authority={authority} disabled={busy || stale} onLoading={value=>{if(!sessionCurrent())return;setReadingCrew(value);if(value)setConfirmed(false);}} onSelected={workers=>{
       if(!sessionCurrent())return false;
       const next=new Map(selected);for(const worker of workers)next.set(worker.id,worker);
       if(next.size>5000)return false;
       setSelected(next);setConfirmed(false);return true;
-    }}/>
-    <section className="publish-reverify" aria-labelledby={`reverify-title-${id}`}>
+    }}/>}
+    <details className="publish-reverify publish-more-options"><summary>{staffT("Re-verify previous responders")}</summary><section className="publish-reverify" aria-labelledby={`reverify-title-${id}`}>
       <div className="publish-reverify-head">
         <div>
           <h3 id={`reverify-title-${id}`}>{staffT("Re-verify previous responders")}</h3>
@@ -180,21 +181,23 @@ export default function PublishForm({id,revision,version,timezone:siteTimezone,s
       {!verifyError && verifyItems.length>0 && <details className="publish-reverify-preview"><summary>{staffT("Review eligible workers, oldest first")}</summary><ul>{verifyItems.slice(0,20).map((candidate)=><li key={candidate.id}><strong>{candidate.code}</strong><span>v{staffT.number(candidate.version)} · {outcomeLabel(candidate.outcome)} {staffT("· last response")} {ageLabel(candidate.lastRespondedAt)}</span>{reverified.has(candidate.id)&&<small>{staffT("Re-verification")}</small>}</li>)}</ul>{verifyItems.length>20&&<p>{staffT("Showing the 20 oldest of")} {countLabel(verifyCandidates?.total || 0)} {staffT("eligible workers. Add them all, then remove any individuals from the selection.")}</p>}</details>}
       {reverifyAdded>0 && <p role="status" className="publish-reverify-note">{countLabel(reverifyAdded)} {reverifyAdded===1?staffT("worker"):staffT("workers")} {staffT("added for re-verification. Publish v")}{version} {staffT("to request fresh proof.")}</p>}
       {reverifiedSelected>0 && <div className="publish-reverify-actions"><span>{countLabel(reverifiedSelected)} {staffT("selected for re-verification")}</span><button type="button" className="button subtle" disabled={busy || stale} onClick={removeReverifiers}>{staffT("Remove")} {countLabel(reverifiedSelected)} re-verifiers</button></div>}
-    </section>
+    </section></details>
     <fieldset className="recipient-controls" disabled={busy || readingCrew || stale}><legend className="sr-only">{staffT("Review selected recipients and deadline")}</legend>
-    <div className="filters audit-filters"><label className="search-box"><Search size={18} /><span className="sr-only">{staffT("Search recipients")}</span><input value={search} disabled={busy} maxLength={80} placeholder={staffT("Search recipients")} onChange={(event) => {setSearch(event.target.value);setPage(1);}} /></label><label className="select-label">{staffT("Language")}<select value={language} disabled={busy} onChange={(event) => {setLanguage(event.target.value);setPage(1);}}><option value="all">{staffT("All languages")}</option>{WORKER_LOCALES.map(item=><option key={item.code} value={item.code}>{staffT.language(item.code)}</option>)}</select></label></div>
+    {!hideRecipients&&<><div className="filters audit-filters"><label className="search-box"><Search size={18} /><span className="sr-only">{staffT("Search recipients")}</span><input value={search} disabled={busy} maxLength={80} placeholder={staffT("Search recipients")} onChange={(event) => {setSearch(event.target.value);setPage(1);}} /></label><label className="select-label">{staffT("Language")}<select value={language} disabled={busy} onChange={(event) => {setLanguage(event.target.value);setPage(1);}}><option value="all">{staffT("All languages")}</option>{WORKER_LOCALES.map(item=><option key={item.code} value={item.code}>{staffT.language(item.code)}</option>)}</select></label></div>
     {loading ? <p data-page-loading role="status">{staffT("Loading recipients...")}</p> : data?.items.length ? <div className="recipient-list"><label className="recipient-row"><input type="checkbox" checked={allPage} disabled={busy} onChange={(event) => toggle(data.items,event.target.checked)} /><strong>{staffT("Select this page (")}{data.items.length})</strong></label>{data.items.map((worker) => <label key={worker.id} className="recipient-row"><input type="checkbox" checked={selected.has(worker.id)} disabled={busy} onChange={(event) => toggle([worker],event.target.checked)} /><span>{worker.code}<small>{worker.language.toUpperCase()} · {(worker.crew_name||staffT("No crew"))}</small></span></label>)}</div> : !error && <p>{staffT("No active workers in this filter.")}</p>}
-    {data && !loading && <div className="audit-pagination"><span>{staffT("Page")} {staffT.number(page)} {staffT("of")} {staffT.number(pages)} · {staffT.number(data.total)} {staffT("available")}</span><div className="actions"><button type="button" className="icon-button" aria-label={staffT("Previous recipient page")} title={staffT("Previous recipient page")} disabled={page<=1 || busy} onClick={() => setPage((n) => n-1)}><ChevronLeft size={18} /></button><button type="button" className="icon-button" aria-label={staffT("Next recipient page")} title={staffT("Next recipient page")} disabled={page>=pages || busy} onClick={() => setPage((n) => n+1)}><ChevronRight size={18} /></button></div></div>}
-    <details className="selected-recipients"><summary>{selected.size} {staffT("selected recipients")}{reverifiedSelected?staffT(" · {p0} re-verifying",{p0:reverifiedSelected}):''}</summary>{[...selected.values()].map((worker) => <div className="recipient-row" key={worker.id}><span>{worker.code}{reverified.has(worker.id)&&<small>{staffT("Re-verification")}</small>}</span><button className="icon-button" type="button" aria-label={staffT("Remove recipient {p0}",{p0:worker.code})} title={staffT("Remove recipient")} disabled={busy} onClick={() => toggle([worker],false)}><X size={18} /></button></div>)}</details>
+    {data && !loading && <div className="audit-pagination"><span>{staffT("Page")} {staffT.number(page)} {staffT("of")} {staffT.number(pages)} · {staffT.number(data.total)} {staffT("available")}</span><div className="actions"><button type="button" className="icon-button" aria-label={staffT("Previous recipient page")} title={staffT("Previous recipient page")} disabled={page<=1 || busy} onClick={() => setPage((n) => n-1)}><ChevronLeft size={18} /></button><button type="button" className="icon-button" aria-label={staffT("Next recipient page")} title={staffT("Next recipient page")} disabled={page>=pages || busy} onClick={() => setPage((n) => n+1)}><ChevronRight size={18} /></button></div></div>}</>}
+    <details className="selected-recipients"><summary>{selected.size} {staffT("selected recipients")}{reverifiedSelected?staffT(" · {p0} re-verifying",{p0:reverifiedSelected}):''}</summary>{[...selected.values()].map((worker) => <div className="recipient-row" key={worker.id}><span>{worker.code}{reverified.has(worker.id)&&<small>{staffT("Re-verification")}</small>}</span>{!hideRecipients&&<button className="icon-button" type="button" aria-label={staffT("Remove recipient {p0}",{p0:worker.code})} title={staffT("Remove recipient")} disabled={busy} onClick={() => toggle([worker],false)}><X size={18} /></button>}</div>)}</details>
+    <details className="publish-more-options"><summary>{staffT("Deadline and schedule")}</summary>
     <label className="field">{staffT("Time zone")}<select name="timezone" value={timezone} onChange={event=>{setTimezone(event.target.value);setTimingReset(value=>value+1);timingChanged();}}><option value={siteTimezone}>{staffT("Site time")}</option>{siteTimezone!=='UTC' && <option value="UTC">UTC</option>}</select></label>
     <CivilTimeField key={`deadline:${timezone}:${timingReset}`} name="deadline" label={staffT("Response deadline")} timezone={timezone} onChanged={timingChanged}/>
     <label className="field">{staffT("In-app deadline reminder")}<select name="reminderMinutes" defaultValue="0" onChange={()=>setConfirmed(false)}><option value="0">{staffT("Off")}</option><option value="60">{staffT("Up to 1 hour before")}</option><option value="1440">{staffT("Up to 24 hours before")}</option></select></label>
     <div className="publication-mode" role="group" aria-label={staffT("Publication timing")}><label><input type="radio" name="publication-mode" value="now" checked={mode==='now'} onChange={()=>{setMode('now');setConfirmed(false);}}/>{staffT("Publish now")}</label><label><input type="radio" name="publication-mode" value="schedule" checked={mode==='schedule'} onChange={()=>{setMode('schedule');setConfirmed(false);}}/>{staffT("Schedule")}</label></div>
     {mode==='schedule' && <CivilTimeField key={`publishAt:${timezone}:${timingReset}`} name="publishAt" label={staffT("Publication time")} timezone={timezone} required onChanged={timingChanged}/>}
-    <label className="recipient-row publish-confirm"><input type="checkbox" checked={confirmed} disabled={busy || readingCrew || selected.size===0} onChange={(event) => setConfirmed(event.target.checked)} /><span>{mode==='schedule'?staffT("Schedule"):staffT("Publish")} v{version} {staffT("to")} {selected.size} {staffT("selected workers")}</span></label>
+    </details>
+    <label className="recipient-row publish-confirm"><input type="checkbox" checked={confirmed} disabled={busy || readingCrew || selected.size===0} onChange={(event) => setConfirmed(event.target.checked)} /><span>{mode==='schedule'?staffT("Schedule"):hideRecipients?staffT("Send update"):staffT("Publish")} {hideRecipients?'':`v${version}`} {staffT("to")} {selected.size} {staffT("selected workers")}</span></label>
     {error && <p role="alert" className="record-error">{staffT.error(error)}</p>}
     </fieldset>
-    <button type="submit" className="button primary" disabled={busy || readingCrew || stale || !confirmed || selected.size===0 || selected.size>5000}>{mode==='schedule'?<CalendarClock size={18}/>:<Send size={18}/>}{busy?staffT("Saving..."):mode==='schedule'?staffT("Schedule version"):staffT("Publish version")}</button>
+    <button type="submit" className="button primary" disabled={busy || readingCrew || stale || !confirmed || selected.size===0 || selected.size>5000}>{mode==='schedule'?<CalendarClock size={18}/>:<Send size={18}/>}{busy?staffT("Saving..."):mode==='schedule'?staffT("Schedule version"):hideRecipients?staffT("Send update"):staffT("Publish version")}</button>
     {stale && <button type="button" className="button outline" onClick={()=>onChanged()}><RefreshCw size={18}/>{staffT("Refresh draft")}</button>}
   </form></section>;
 }

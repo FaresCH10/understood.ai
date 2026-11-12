@@ -2,11 +2,11 @@ import {keepDialogFocus} from './dialog-focus';
 import {MobileDisclosure} from './MobileDisclosure';
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useStaffText} from './staff-language';
-import RecipientMembers from './RecipientMembers';
+import {InstructionAudienceFields} from './InstructionAudienceFields';
 import VoiceTranscript from './VoiceTranscript';
 import {AttachmentComposer} from './InstructionFiles';
 import {useEffect,useRef,useState,type RefObject} from 'react';
-import {AlertTriangle,ArrowLeft,CheckCircle2,ChevronRight,Circle,Mic,RefreshCw,Send,Users} from 'lucide-react';
+import {AlertTriangle,ArrowLeft,CheckCircle2,ChevronRight,Circle,Mic,RefreshCw,Send,Upload,Users} from 'lucide-react';
 import type {StaffRequestAuthority} from './useStaffRequest';
 import {useStaffRequest} from './useStaffRequest';
 import {StaffRequestError} from './staff-request';
@@ -137,10 +137,10 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const trimmedSource=source.trim();
   const effectiveTitle=title.trim().slice(0,titleMax);
   const audienceChoice:AudienceChoice=audienceType==='crew'?{type:'crew',crewId}:audienceType==='members'?{type:'members',workerIds:[...workerIds].sort()}:{type:'all'};
-  const selectedCrew=audienceType==='crew'?audience?.crews.find(crew=>crew.id===crewId):null;
+  const selectedCrew=audienceType==='crew'?(audience?.crews.find(crew=>crew.id===crewId)??null):null;
   const selectedMembers=audience?.members?.filter(member=>workerIds.includes(member.id))||[];
   const singleMember=audienceType==='members'&&selectedMembers.length===1?selectedMembers[0]:null;
-  const selectedAudience=audienceType==='members'?{total:selectedMembers.filter(member=>!member.language_selection_required).length,notSelected:selectedMembers.filter(member=>member.language_selection_required).length,byLanguage:selectedMembers.reduce<Record<string,number>>((counts,member)=>{counts[member.language]=(counts[member.language]||0)+1;return counts;},{})}:audienceType==='all'?audience?.workers:selectedCrew?{total:selectedCrew.members,byLanguage:selectedCrew.byLanguage,notSelected:selectedCrew.notSelected}:null;
+  const selectedAudience=audienceType==='members'?{total:selectedMembers.filter(member=>!member.language_selection_required).length,notSelected:selectedMembers.filter(member=>member.language_selection_required).length,byLanguage:selectedMembers.reduce<Record<string,number>>((counts,member)=>{counts[member.language]=(counts[member.language]||0)+1;return counts;},{})}:audienceType==='all'?(audience?.workers?{...audience.workers,notSelected:audience.workers.notSelected??0}:null):selectedCrew?{total:selectedCrew.members,byLanguage:selectedCrew.byLanguage,notSelected:selectedCrew.notSelected}:null;
   const audienceLanguages=Object.entries(selectedAudience?.byLanguage??{}).filter(([,count])=>count>0);
   const unavailableLanguages=audienceLanguages.filter(([code])=>!readiness?.textLanguages.includes(code)
     || (deliveryMode!=='text'&&!readiness.speechLanguages.includes(code))).map(([code])=>code);
@@ -156,9 +156,12 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const deliveryHint=canSwitchToText
     ? staffT.locale==='ar'?'الصوت غير متاح للمستلمين المحددين. اختر النص فقط للإرسال إلى المستلمين الجاهزين.':'Voice is unavailable for the selected recipients. Choose Text only to send to recipients who can receive it.'
     : staffT.locale==='ar'?'لا تتوفر ترجمة لهذه التعليمات بلغات المستلمين المحددين.':'Translation is unavailable for this instruction in the selected recipients’ languages.';
-  const audienceHint=audienceType==='crew'&&!selectedCrew?staffT("Select a crew to continue."):selectedAudience?.notSelected?staffT("Select a language for every worker in this audience."):selectedAudience?staffT("Choose at least one worker with a selected language."):staffT("Loading recipients...");
+  const audienceHint=audienceType==='crew'&&!selectedCrew?staffT("Select a crew to continue."):audienceType==='crew'&&selectedCrew?.members===0?staffT("This crew has no workers yet."):selectedAudience?.notSelected?staffT("Select a language for every worker in this audience."):selectedAudience?staffT("Choose at least one worker with a selected language."):staffT("Loading recipients...");
 
-  const voiceDialog=useRef<HTMLDialogElement>(null),[voiceOpen,setVoiceOpen]=useState(false);
+  const voiceDialog=useRef<HTMLDialogElement>(null),[voiceOpen,setVoiceOpen]=useState(false),[voiceMode,setVoiceMode]=useState<'record'|'upload'>('record');
+  const processingNote=readiness?.mode==='synthetic'
+    ?staffT("This test workspace uses a local transcription stub. No AI provider is contacted.")
+    :staffT("Your audio is processed by the workspace transcription service.");
   const [draftLoaded,setDraftLoaded]=useState(!draftId),[draftReady,setDraftReady]=useState(!!restoredPending),[draftNotice,setDraftNotice]=useState('');
   const showRequirements=!canSubmit && draftLoaded && !busy && !pending && !recovery.error;
   const saveQueue=useRef(Promise.resolve()),approvedNext=useRef<string|null>(null),hasSavedDraft=useRef(false);
@@ -350,11 +353,12 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   if(result) {
     const partial=result.state==='published' && result.undelivered>0;
     const heading=result.state==='preparing'?'Preparing instruction':result.state==='failed'?'Instruction not sent':partial?'Instruction partly sent':'Instruction sent';
-    return <><div className="page-header"><div aria-live="polite"><h1>{staffT(heading)}</h1><p>{result.state==='preparing'?staffT("Preparation is still running. This page checks again automatically."):result.state==='failed'?staffT("No instruction was delivered."):partial?staffT("The ready language versions were delivered. Not every selected worker could receive this instruction."):staffT("The send is recorded. Recipient status is available in the instruction.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
+    return <><div className="page-header"><div aria-live="polite"><h1>{staffT(heading)}</h1><p>{result.state==='preparing'?staffT("Delivery is still in progress. This page checks again automatically."):result.state==='failed'?staffT("No instruction was delivered."):partial?staffT("The ready language versions were delivered. Not every selected worker could receive this instruction."):staffT("The instruction was sent. Open it to see who received it and any answers or follow-ups.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
       {error && <div className="notice notice-amber" role="alert" ref={errorRef} tabIndex={-1}>{staffT.error(error)}</div>}
       {result.state==='published' && <section className="panel send-result" aria-labelledby="send-result-title">
         <div className={`receipt-mark${partial?' receipt-mark-partial':''}`} aria-hidden="true">{partial?<AlertTriangle size={42}/>:<CheckCircle2 size={42}/>}</div>
-        <h2 id="send-result-title">{partial?staffT("Partly sent"):result.duplicate?staffT("Send already recorded"):staffT("Send recorded")}</h2>
+        <h2 id="send-result-title">{partial?staffT("Partly sent"):staffT("Sent")}</h2>
+        {result.duplicate && <p role="status">{staffT("This request was already sent. Nothing was sent twice.")}</p>}
         <dl className="worker-receipt-meta">
           <div><dt>{staffT("Delivery")}</dt><dd>{result.responseMode==='acknowledge'?staffT("Acknowledge receipt"):staffT("Question and answer")}</dd></div>
           <div><dt>{staffT("Format")}</dt><dd>{result.deliveryMode==='both'?staffT("Text and voice"):result.deliveryMode==='voice'?staffT("Voice"):staffT("Text")}</dd></div>
@@ -380,7 +384,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   return <>
     <div className="page-header"><div><h1 id="send-composer-title">{tr("Send an instruction")}</h1><p>{tr("Write or record your instruction, choose recipients, and send.")}</p></div><button className="button outline" onClick={()=>navigate('briefings')}><ArrowLeft size={19}/>{tr("Instructions")}</button></div>
     <dialog ref={leaveDialog} className="withdraw-dialog" aria-labelledby="composer-leave-title" onKeyDown={keepDialogFocus} onCancel={()=>setLeaveOpen(false)}><h2 id="composer-leave-title">{staffT.locale==='ar'?'تعذّر حفظ المسودة':'Draft could not be saved'}</h2><p>{staffT.locale==='ar'?'يمكنك البقاء وإعادة المحاولة، أو المغادرة دون حفظ التغييرات الأخيرة.':'Stay and retry saving, or leave without saving the latest changes. Previously saved drafts are retained.'}</p><div className="actions"><button className="button outline" autoFocus onClick={()=>setLeaveOpen(false)}>{staffT.locale==='ar'?'البقاء':'Keep working'}</button><button className="button primary" onClick={()=>{const target=leaveRequest.current;if(!target)return;try{sessionStorage.removeItem(localKey);}catch{}approvedNext.current=target.next;setLeaveOpen(false);if(target.resume)target.resume();else navigate(target.next);}}>{staffT.locale==='ar'?'المغادرة دون حفظ':'Discard and leave'}</button></div></dialog>
-    <dialog ref={voiceDialog} className="worker-form-dialog" aria-label={tr("Record instruction")} onCancel={event=>{event.preventDefault();closeVoice();}}>{voiceOpen&&<VoiceTranscript authority={authority} title={title} onClose={closeVoice} replacing={!!source.trim()} onApproved={text=>{setSource(text);closeVoice();}}/>}</dialog>
+    <dialog ref={voiceDialog} className="worker-form-dialog" aria-label={voiceMode==='upload'?tr("Upload audio"):tr("Record instruction")} onCancel={event=>{event.preventDefault();closeVoice();}}>{voiceOpen&&<VoiceTranscript authority={authority} title={title} mode={voiceMode} processingNote={processingNote} onClose={closeVoice} replacing={!!source.trim()} onApproved={text=>{setSource(text);closeVoice();}}/>}</dialog>
     <dialog ref={coverageDialog} className="worker-form-dialog" aria-labelledby="coverage-warning-title" onCancel={event=>{event.preventDefault();closeCoverage();}}>
       {coverageWarning&&(()=>{const blocked=coverageWarning.preparation==='provider'||coverageWarning.ready===0;return <div>
         <h2 id="coverage-warning-title">{staffT("Some recipients cannot receive this instruction")}</h2>
@@ -422,30 +426,39 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
         <textarea id="send-source" aria-describedby="send-source-count" rows={7} maxLength={sourceMax} value={source} disabled={busy || !!pending || !draftLoaded} onChange={event=>setSource(event.target.value)} placeholder={staffT("Example: Move the red ladder to the north bay before the night shift. Keep the walkway clear.")} />
       </label>
       <div className="send-source-toolbar">
-        <div className="send-record-actions"><button type="button" className="button outline" disabled={busy||!!pending||!draftLoaded} onClick={()=>setVoiceOpen(true)}><Mic size={18}/>{tr("Record")}</button>{draftNotice&&<span className="muted send-draft-status" role="status">{draftNotice}</span>}</div>
+        <div className="send-record-actions"><button type="button" className="button outline" disabled={busy||!!pending||!draftLoaded} onClick={()=>{setVoiceMode('record');setVoiceOpen(true);}}><Mic size={18}/>{tr("Record")}</button><button type="button" className="button outline" disabled={busy||!!pending||!draftLoaded} onClick={()=>{setVoiceMode('upload');setVoiceOpen(true);}}><Upload size={18}/>{tr("Upload audio")}</button>{draftNotice&&<span className="muted send-draft-status" role="status">{draftNotice}</span>}</div>
         <p id="send-source-count" className="muted send-counter">{trimmedSource.length < sourceMin ? tr('At least 10 characters.') : <><bdi>{trimmedSource.length} / {sourceMax}</bdi> {tr('characters')}</>}</p>
       </div>
       {audience?.gemma4TestSource&&<Gemma4TestPanel authority={authority} source={audience.gemma4TestSource}/>}
       </div><div className="send-step-recipients">
       {stepHeading(1)}
-      <label className="field">{tr("Who should receive it?")}
-        <select value={audienceType} disabled={busy || !!pending || !draftLoaded} onChange={event=>setAudienceType(event.target.value as 'all'|'crew'|'members')}>
-          <option value="all">{tr("All active workers")}</option><option value="crew">{tr("Crews")}</option><option value="members">{tr("Members")}</option>
-        </select>
-      </label>
-      {audienceType==='crew'&&<label className="field">{tr("Choose crew")}<select aria-label={tr("Choose crew")} value={crewId} disabled={busy||!!pending} onChange={event=>setCrewId(event.target.value)}><option value="">{tr("Select crew")}</option>{audience?.crews.map(crew=><option key={crew.id} value={crew.id}>{crew.name} ({crew.members})</option>)}</select></label>}
-      {audienceType==='members'&&<RecipientMembers members={audience?.members||[]} selected={workerIds} onChange={setWorkerIds} disabled={busy||!!pending}/>}
-
-      <button type="button" className="text-link send-refresh-recipients" disabled={busy||audienceLoading} onClick={()=>setAudienceRevision(value=>value+1)}><RefreshCw size={16}/>{staffT.locale==='ar'?'تحديث المستلمين':'Refresh recipients'}</button>
-      {selectedAudience && <div className="language-chips send-audience-languages" aria-label={staffT("Worker languages")}>{Object.entries(selectedAudience.byLanguage || {}).filter(([,count])=>count>0).map(([code,count])=><i key={code}>{code.toUpperCase()} {count}</i>)}</div>}
-      {!!selectedAudience?.notSelected && <p className="notice notice-amber" role="status">{selectedAudience.notSelected} {staffT("active workers in this audience still need a language selected in Team before sending.")}</p>}
+      <InstructionAudienceFields
+        audience={audience}
+        audienceType={audienceType}
+        crewId={crewId}
+        workerIds={workerIds}
+        selectedAudience={selectedAudience}
+        selectedCrew={selectedCrew}
+        audienceLoading={audienceLoading}
+        audienceError={audienceError}
+        audienceErrorRef={audienceErrorRef}
+        disabled={busy||!!pending||!draftLoaded}
+        readiness={readiness}
+        readinessError={readinessError}
+        unavailableLanguages={unavailableLanguages}
+        deliveryBlocked={deliveryBlocked}
+        deliveryHint={deliveryHint}
+        canSwitchToText={canSwitchToText}
+        onAudienceType={setAudienceType}
+        onCrewId={setCrewId}
+        onWorkerIds={setWorkerIds}
+        onRefresh={()=>setAudienceRevision(value=>value+1)}
+        onSwitchToText={()=>setDeliveryMode('text')}
+      />
       {readiness?.mode==='synthetic'&&<p className="notice notice-amber" role="status">{(readiness.textLanguages.length>1?staffT.locale==='ar'?'وضع تجريبي: المثال المحفوظ مترجم إلى كل لغة عامل ويستخدم صوت الجهاز. التعليمات الأخرى تدعم النص الإنجليزي فقط حتى يتم تفعيل مساحة عمل حية.':'Demo mode: the seeded shelf example is translated into every worker language and uses device speech. Other instructions support English text only until a live workspace is configured.':staffT.locale==='ar'?'وضع تجريبي: تدعم التعليمات العامة النص الإنجليزي فقط. الترجمة متعددة اللغات والصوت المُولّد يتطلبان تفعيل خدمات الذكاء الاصطناعي.':'Test mode: general instructions support English text only. Multilingual translation and generated audio require a configured live workspace.')}</p>}
       {readiness?.providerLabel&&readiness.mode.endsWith('-text')&&<p className="muted" role="status">{staffT.locale==='ar'
         ?readiness.translationProviderLabel?`${readiness.providerLabel} يكتب سؤال التحقق. ${readiness.translationProviderLabel} يترجم نص التعليمات. يعتمد توفر الصوت على لغة العامل.`:`${readiness.providerLabel} يمكنه ترجمة التعليمات الإنجليزية للتسليم النصي. يعتمد توفر الصوت على لغة العامل.`
         :readiness.translationProviderLabel?`${readiness.providerLabel} writes the check question. ${readiness.translationProviderLabel} translates the instruction text. Voice availability depends on the worker’s language.`:`${readiness.providerLabel} can translate English instructions for text delivery. Voice availability depends on the worker’s language.`}</p>}
-      {audienceError && <p className="notice notice-amber" role="alert" ref={audienceErrorRef} tabIndex={-1}>{staffT.error(audienceError)} <button type="button" className="text-link" onClick={()=>setAudienceRevision(value=>value+1)}>{staffT("Try again")}</button></p>}
-      {selectedAudience && selectedAudience.total===0 && <p className="notice notice-amber" role="status">{staffT("There are no workers with a selected language in this audience.")}</p>}
-
       </div><div className="send-step-review">
       {stepHeading(2)}
       {effectiveTitle&&<div className="send-mobile-review"><strong dir="auto">{effectiveTitle}</strong>
@@ -456,12 +469,12 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
           {singleMember?<>{singleMember.name&&<><bdi>{singleMember.name}</bdi>{' '}</>}<bdi dir="ltr">{singleMember.name?`(${singleMember.code})`:singleMember.code}</bdi></>:selectedCrew?<bdi>{selectedCrew.name}</bdi>:audienceType==='all'?tr("All active workers"):staffT("Selected members")}
         </p></div>
         <button type="button" className="text-link send-edit-recipients" disabled={busy} onClick={()=>goToMobileStep(1)}>{staffT("Edit recipients")}</button>
-        {audienceLanguages.length>0&&<ul className="send-review-languages" aria-label={staffT("Worker languages")}>{audienceLanguages.map(([code,count])=><li key={code}>{staffT.language(code)} <bdi>{staffT.number(count)}</bdi></li>)}</ul>}
         {audienceReady&&<p className="send-review-readiness" role="status">
           {readiness?<>{staffT("Workers ready for this format")} <bdi>{staffT.number(readyWorkers)} / {staffT.number(selectedAudience.total)}</bdi></>:readinessError?staffT(readinessError):staffT("Checking delivery availability…")}
         </p>}
         {readinessError&&<button type="button" className="text-link" disabled={busy||audienceLoading} onClick={()=>setAudienceRevision(value=>value+1)}>{staffT("Try again")}</button>}
       </div>}
+      <p className="muted send-review-preview-note">{responseMode==='question'?staffT("This review shows the instruction text and recipients. The check question is generated when you send and then appears in the instruction."):staffT("This review shows the instruction text and recipients. Workers will only confirm receipt.")}</p>
       <MobileDisclosure title={staffT.locale==='ar'?'المرفقات (اختياري)':'Attachments (optional)'}><AttachmentComposer key={requestId.current} authority={authority} requestId={requestId.current} disabled={busy||!!pending||!draftLoaded} ready={draftReady} saveDraft={saveDraft} onBusy={setAttachmentBusy} languages={Object.keys(selectedAudience?.byLanguage||{}).sort()}/></MobileDisclosure>
       <div className="send-option-grid">
         <div className="send-mode-stack">
@@ -488,25 +501,26 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       {!!readiness&&unavailableLanguages.length>0&&<p className="notice notice-amber" role="status">
         {staffT.locale==='ar'?'اللغات غير الجاهزة للصيغة المحددة:':'Not ready for the selected delivery format:'} {unavailableLanguages.map(code=>staffT.language(code)).join(staffT.locale==='ar'?'، ':', ')}. {deliveryBlocked?deliveryHint:readyWorkers>0&&(staffT.locale==='ar'?'يمكنك الإرسال إلى العاملين الجاهزين ومراجعة المستبعدين قبل الإرسال، أو تعديل المستلمين أولاً.':'You can send to the ready workers and review exclusions before sending, or adjust recipients first.')}
       </p>}
-      <div className="send-submit">
-        <span className="muted"><Users size={17}/> {audience?staffT("Recipients are resolved when you send; later joiners are not added automatically."):staffT("Loading recipients...")}</span>
-        <button className="button primary" disabled={!canSubmit||!draftLoaded} onClick={()=>void submit()}>{busy?staffT("Sending..."):<><Send size={20}/>{tr("Send instruction")}</>}</button>
-      </div>
       {showRequirements&&<div className="send-requirements" role="group" aria-label={staffT("Before you can send")}>
         <strong>{staffT("Before you can send")}</strong>
         <ul>
-          <li className={titleValid?'met':undefined}>{titleValid?<CheckCircle2 size={16} aria-hidden="true"/>:<Circle size={16} aria-hidden="true"/>}<span>{staffT("Title (at least 3 characters)")}</span></li>
-          <li className={!sourceIssue?'met':undefined}>{sourceIssue?<Circle size={16} aria-hidden="true"/>:<CheckCircle2 size={16} aria-hidden="true"/>}<span>{staffT("Instruction length (10–{p0} characters)",{p0:sourceMax})}</span></li>
-          <li className={audienceReady?'met':undefined}>{audienceReady?<CheckCircle2 size={16} aria-hidden="true"/>:<Circle size={16} aria-hidden="true"/>}<span>{staffT("Audience (workers with a selected language)")}{!audienceReady&&<small>{audienceHint}</small>}</span></li>
+          <li className={titleValid?'met':undefined}>{titleValid?<CheckCircle2 size={16} aria-hidden="true"/>:<Circle size={16} aria-hidden="true"/>}<span>{staffT("Title (at least 3 characters)")}</span><span className="sr-only">{titleValid?staffT("Requirement met"):staffT("Requirement not met")}</span></li>
+          <li className={!sourceIssue?'met':undefined}>{sourceIssue?<Circle size={16} aria-hidden="true"/>:<CheckCircle2 size={16} aria-hidden="true"/>}<span>{staffT("Instruction length (10–{p0} characters)",{p0:sourceMax})}</span><span className="sr-only">{sourceIssue?staffT("Requirement not met"):staffT("Requirement met")}</span></li>
+          <li className={audienceReady?'met':undefined}>{audienceReady?<CheckCircle2 size={16} aria-hidden="true"/>:<Circle size={16} aria-hidden="true"/>}<span>{staffT("Audience (workers with a selected language)")}{!audienceReady&&<small>{audienceHint}</small>}</span><span className="sr-only">{audienceReady?staffT("Requirement met"):staffT("Requirement not met")}</span></li>
           {audienceReady&&<li className={readiness&&readyWorkers>0?'met':undefined}>
             {readiness&&readyWorkers>0?<CheckCircle2 size={16} aria-hidden="true"/>:<Circle size={16} aria-hidden="true"/>}
             <span>{staffT.locale==='ar'?'صيغة الإرسال':'Delivery format'}
               {deliveryBlocked&&<small>{deliveryHint} {canSwitchToText&&<button type="button" className="text-link" onClick={()=>setDeliveryMode('text')}>{tr("Text only")}</button>}</small>}
             </span>
+            <span className="sr-only">{readiness&&readyWorkers>0?staffT("Requirement met"):staffT("Requirement not met")}</span>
           </li>}
-          {attachmentBusy&&<li><Circle size={16} aria-hidden="true"/><span>{staffT("Wait for the attachment to finish uploading.")}</span></li>}
+          {attachmentBusy&&<li><Circle size={16} aria-hidden="true"/><span>{staffT("Wait for the attachment to finish uploading.")}</span><span className="sr-only">{staffT("Requirement not met")}</span></li>}
         </ul>
       </div>}
+      <div className="send-submit">
+        <span className="muted"><Users size={17}/> {audience?staffT("Recipients are resolved when you send; later joiners are not added automatically."):staffT("Loading recipients...")}</span>
+        <button className="button primary" disabled={!canSubmit||!draftLoaded} onClick={()=>void submit()}>{busy?staffT("Sending..."):<><Send size={20}/>{tr("Send instruction")}</>}</button>
+      </div>
       </div><div className="send-mobile-footer"><button className="button outline" disabled={mobileStep===0||busy} onClick={()=>goToMobileStep(mobileStep-1)}>{staffT("Back")}</button>{mobileStep<2&&<button className="button primary" disabled={busy||(mobileStep===0?(!titleValid||!!sourceIssue):!audienceReady)} onClick={()=>goToMobileStep(mobileStep+1)}>{staffT("Continue")}</button>}</div></section>
   </>;
 }

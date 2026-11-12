@@ -1,10 +1,16 @@
 export const artifactReviewTabs=['text','audio','question','glossary'] as const;
 export type ArtifactReviewTab=typeof artifactReviewTabs[number];
-export function nextArtifactTab(current:ArtifactReviewTab,key:string):ArtifactReviewTab|null {
-  const index=artifactReviewTabs.indexOf(current);
-  if(key==='Home')return artifactReviewTabs[0];
-  if(key==='End')return artifactReviewTabs.at(-1)!;
-  if(key==='ArrowRight' || key==='ArrowLeft')return artifactReviewTabs[(index+(key==='ArrowRight'?1:3))%4];
+export function artifactTabsFor(prepared:{deliveryMode?:unknown;responseMode?:unknown}|null|undefined):readonly ArtifactReviewTab[] {
+  const delivery=prepared?.deliveryMode;
+  const questionIncluded=prepared?.responseMode!=='acknowledge';
+  return artifactReviewTabs.filter(item=>(item!=='audio'||delivery!=='text')&&(item!=='question'||questionIncluded));
+}
+export function nextArtifactTab(current:ArtifactReviewTab,key:string,tabs:readonly ArtifactReviewTab[]=artifactReviewTabs):ArtifactReviewTab|null {
+  const index=tabs.indexOf(current),length=tabs.length;
+  if(!length)return null;
+  if(key==='Home')return tabs[0];
+  if(key==='End')return tabs.at(-1)!;
+  if(key==='ArrowRight' || key==='ArrowLeft')return tabs[(index+(key==='ArrowRight'?1:length-1))%length];
   return null;
 }
 export async function copyArtifactText(value:string,context:string,readSession:()=>Promise<unknown>,writeText:(value:string)=>Promise<void>,current:()=>boolean,now=Date.now) {

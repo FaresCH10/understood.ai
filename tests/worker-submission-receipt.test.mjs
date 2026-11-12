@@ -59,6 +59,19 @@ test('all immediate receipt states, safety limits and direct Help are localized 
   assert.match(main,/requestKind:'audio',publicationVersion:receiptScope.version,contentLanguage:receiptScope.language/);
   assert.match(main,/onHelp=\{\(\)=>\{pendingHelpAssignment.current=id;setReceipt\(null\);\}\}/);
 });
+test('worker results never claim a supervisor was notified and keep a direct next action beside the outcome',async()=>{
+  assert.doesNotMatch(workerReceiptText.en.wrongBody,/notified/i);
+  assert.doesNotMatch(workerReceiptText.ar.wrongBody,/أخطار/);
+  assert.equal(workerReceiptText.en.clarification,'Answer did not match');
+  const main=await readFile(new URL('../src/main.tsx',import.meta.url),'utf8');
+  assert.doesNotMatch(main,/has been notified/i);
+  assert.match(main,/detail\.data\.outcome==='clarification'[\s\S]{0,400}revealHelp/);
+  const chat=await readFile(new URL('../src/WorkerInstructionChat.tsx',import.meta.url),'utf8');
+  assert.match(chat,/requestedCaseId&&!requestedUsed\.current[\s\S]{0,160}setOpen\(true\)/);
+  const discovery=chat.slice(chat.indexOf('if(!data)return;'),chat.indexOf('[data,requestedCaseId]'));
+  assert.doesNotMatch(discovery,/readMarker|seenOpen/);
+  assert.doesNotMatch(discovery.slice(discovery.indexOf('setSelected(value=>')),/setOpen\(true\)/);
+});
 test('SQLite exact receipt stays original after later answer, returns server metadata and denies foreign/staff/staging/invalid reads',async()=>{
   const db=openDatabase(':memory:'),root=await mkdtemp(join(tmpdir(),'understood-exact-receipt-'));
   const server=sqliteApp(db,{audioRoot:root});

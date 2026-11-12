@@ -69,6 +69,7 @@ import { listPublicationResponses,getPublicationResponse,workerSubmissions,worke
 import { receiveRecording,getRecording,getRecordingAudio } from './recordings.mjs';
 import { createPresentation,listPresentations } from './presentations.mjs';
 import { readPublicationReport,listReportPublications } from './reports.mjs';
+import { listCalendar } from './calendar.mjs';
 import { listWorkers,createWorker,updateWorker,disableWorker,reenableWorker,listCrews,getCrew,listCrewRecipients,createCrew,moveWorkerToCrew,moveWorkersToCrew,renameCrew,archiveCrew,restoreCrew,
   workerLanguageState,workerLanguageHistory,selectWorkerLanguage,requestWorkerLanguage,staffWorkerLanguageHistory,listLanguageRequests,decideWorkerLanguageRequest,
   readWorkerIdSettings,updateWorkerIdPrefix } from './people.mjs';
@@ -212,6 +213,9 @@ for(const message of ['Invalid language selection','Invalid language request','I
 for(const message of ['Invalid text retention request','Invalid text retention policy'])badInput.add(message);
 badInput.add('Invalid draft languages request');
 badInput.add('Invalid usage change request');
+for(const message of ['Use a photo, PDF, Office document, CSV or text file up to 3 MB','Maximum five attachments and 10 MB per instruction','Captions are only available for photos','Save this draft before adding an attachment','Invalid attachment','This file failed the safety check. Choose another file'])badInput.add(message);
+conflicts.add('Sent attachments cannot be changed');
+conflicts.add('Attachment request conflict');
 badInput.add('Invalid activation request');
 badInput.add('Invalid voice request');
 for(const message of ['Invalid push request','Invalid push subscription','Push service unavailable'])badInput.add(message);
@@ -976,6 +980,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         if (action==='withdraw' && req.method==='POST') return send(res,200,await withdrawPublication(pool,session,id,await readJson(req),repository));
         if (action==='archive' && req.method==='POST') return send(res,200,await archiveBriefing(pool,session,id,await readJson(req),repository));
       }
+      if(path==='/api/calendar' && req.method==='GET')return send(res,200,await listCalendar(pool,session,Object.fromEntries(url.searchParams),repository));
       if(path==='/api/reports/publications' && req.method==='GET')return send(res,200,await listReportPublications(pool,session,Object.fromEntries(url.searchParams),repository));
       if (path==='/api/reports' && req.method==='GET') {
         const {publicationId,...filters}=Object.fromEntries(url.searchParams);
@@ -1118,6 +1123,8 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         const verificationFailure=registrationVerificationHttpError(error);
         if(verificationFailure){const {status,...body}=verificationFailure;return send(res,status,body);}
         if(message==='Email delivery unavailable') return send(res,503,{error:message});
+      if(['Attachments are unavailable until file safety scanning is configured','Attachment safety check unavailable'].includes(message))return send(res,503,{error:message});
+      if(message==='This attachment exceeds the current download limit. Ask your supervisor to attach a smaller file')return send(res,413,{error:message});
         if(['Invalid registration input','Registration verification unavailable'].includes(message)) return send(res,400,{error:message});
         return send(res,503,{error:'Registration unavailable. Check the service before retrying.'});
       }
@@ -1126,6 +1133,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if (['Sign in required','Invalid credentials','Invalid or expired setup code','Sign in to accept this invitation','Sign out before creating an account'].includes(message)) return send(res,401,{error:message});
       if (message==='Forbidden' || message==='Forbidden origin' || message==='Forbidden transport' || message==='Workspace access paused' || message==='Workspace is read-only') return send(res,403,{error:message});
       if(['Invalid publication history request','Invalid report publication filter','Invalid report publication date','Report publication history exceeds limit; narrow the search or dates'].includes(message))return send(res,400,{error:message});
+      if(['Invalid calendar month','Invalid calendar request'].includes(message)||/^Calendar .* exceeds the monthly limit/.test(message))return send(res,400,{error:message});
       if(message==='Invalid attention filter')return send(res,400,{error:message});
       if (message==='Email delivery unavailable') return send(res,503,{error:message});
       if(['Follow-up translation unavailable','Follow-up generation unavailable','Follow-up language unavailable'].includes(message))return send(res,503,{error:message});

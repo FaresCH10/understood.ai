@@ -26,6 +26,7 @@ export const calendarTranslations={
   'Hide activity':['إخفاء النشاط','سرگرمی چھپائیں'],
   'No instructions on this day.':['لا تعليمات في هذا اليوم.','اس دن کوئی ہدایت نہیں۔'],
   'No instructions or activity on this day.':['لا تعليمات أو نشاط في هذا اليوم.','اس دن کوئی ہدایت یا سرگرمی نہیں۔'],
+  'No instructions or activity were recorded this month.':['لم تُسجَّل أي تعليمات أو نشاط هذا الشهر.','اس مہینے کوئی ہدایت یا سرگرمی درج نہیں ہوئی۔'],
   '{instructions} instructions, {events} updates':['التعليمات: {instructions}. التحديثات: {events}.','ہدایات: {instructions}۔ اپ ڈیٹس: {events}۔'],
   'Open':['مفتوح','کھلا'],
   'Resolved':['محلول','حل شدہ'],
