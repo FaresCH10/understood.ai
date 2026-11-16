@@ -23,6 +23,7 @@ import {siteHttpError} from './site-input.mjs';
 import { openDatabase, NOW, transaction } from "./db.mjs";
 import { tokenHash } from "./auth-crypto.mjs";
 import { metrics, publish, submitAnswer,withdrawPublication } from "./domain.mjs";
+import {listClarificationFlow,readClarificationFlow,saveClarificationExchange,pendingFlowRepeat,processOneClarificationExchange} from './clarification-flow.mjs';
 import { handleRecordingRoute } from "./recording-http.mjs";
 import {handleSourceAudioRoute} from './source-audio-http.mjs';
 import {receiveSourceAudio,getSourceAudioReceipt,getSourceAudio,listSourceAudio} from './source-audio.mjs';
@@ -79,7 +80,9 @@ import {staffRecoveryScope} from './staff-input.mjs';
 import {staffSiteScope} from './account-input.mjs';
 import {resolveMailConfig} from './auth-mail.mjs';
 import {ensureRecoverySchema,requestRecovery,resetPassword} from './account-recovery.mjs';
-import {ensureRegistrationSchema,requestRegistration,resendRegistration,verifyRegistration,verifyRegistrationCode} from './registration.mjs';
+import {ensureRegistrationSchema,requestRegistration,resendRegistration,verifyRegistration,verifyRegistrationCode,registrationAvailability} from './registration.mjs';
+import {registrationAvailabilityError} from './registration-input.mjs';
+import {workspaceAccessState} from './entitlements.mjs';
 import {listAccountSites,switchAccountSite} from './accounts.mjs';
 import {siteCrewOverview} from './site-crews.mjs';
 import {crewOverviewHttpError} from './crew-overview.mjs';
@@ -384,6 +387,11 @@ export function createAppHandler(db, options = {}) {
       }
       if(path==='/api/neon/status'&&req.method==='GET')return send(res,200,await neonFunctionStatus());
       if(path==='/api/auth/registrations/options' && req.method==='GET')return send(res,200,{available:registrationVerification.available===true,verification:registrationVerification.provider==='neon'?'neon-code':'link'});
+      if(path==='/api/auth/registrations/availability'&&req.method==='POST'){
+        if(config.accessMode!=='credential')return send(res,404,{error:'Not found'});
+        if(url.search)throw Error('Invalid registration input');
+        return send(res,200,registrationAvailability(db,await readJson(req),req.socket.remoteAddress));
+      }
       if(path==='/api/auth/registrations/verify-code' && req.method==='POST'){
         if(config.accessMode!=='credential')return send(res,404,{error:'Not found'});
         if(url.search)throw Error('Invalid registration input');
@@ -448,7 +456,7 @@ export function createAppHandler(db, options = {}) {
             siteState:siteLifecycleState(db,session.org_id,session.site_id).state,
             timezone:site?.timezone,
             staffInterfaceLanguage: session.principal_type==='staff' ? siteSettings?.staff_interface_language ?? 'en' : null,
-            ...(session.principal_type==='staff'?{workspacePlan:entitlementState(db,session.org_id).plan}:{}),
+            ...(session.principal_type==='staff'?{workspacePlan:entitlementState(db,session.org_id).plan,workspaceAccessState:workspaceAccessState(db,session.org_id)}:{}),
             firstRunRequired: session.principal_type==='staff' && session.role==='owner' && !!siteSettings && siteSettings.first_run_completed_at===null,
             language: session.language || "en",
             languageSelectionRequired: session.principal_type === "worker" ? !!session.language_selection_required : false,
@@ -1186,6 +1194,15 @@ export function createAppHandler(db, options = {}) {
         const [,assignmentId,kind,requestId]=workerReceiptMatch;
         return send(res,200,{...workerRequestReceipt(db,session,assignmentId,kind,requestId),assignmentId,requestId,clientContext:clientSessionContext(session).clientContext});
       }
+      if(path==='/api/clarification-flow'&&req.method==='GET')return send(res,200,{...listClarificationFlow(db,session,Number(url.searchParams.get('page')??1)),clientContext:clientSessionContext(session).clientContext});
+      const flow=path.match(/^\/api\/(worker\/briefings|clarifications)\/([^/]+)\/clarification-flow$/);
+      if(flow){
+        const settings={worker:flow[1]==='worker/briefings'};
+        const result=req.method==='GET'?readClarificationFlow(db,session,flow[2],settings):req.method==='POST'?saveClarificationExchange(db,session,flow[2],await readJson(req),settings):null;
+        if(!result)throw Error('Invalid clarification request');
+        if(req.method==='POST')await processOneClarificationExchange(db,caseFollowupAdapter);
+        return send(res,req.method==='POST'?202:200,{...result,clientContext:clientSessionContext(session).clientContext});
+      }
       const helpHistory=path.match(/^\/api\/worker\/briefings\/([^/]+)\/help-history$/);
       if(helpHistory&&req.method==='GET')return send(res,200,{...workerHelpHistory(db,session,helpHistory[1],Object.fromEntries(url.searchParams)),clientContext:clientSessionContext(session).clientContext});
       const exactSubmission=path.match(/^\/api\/worker\/briefings\/([^/]+)\/submissions\/([^/]+)$/);
@@ -1243,6 +1260,7 @@ export function createAppHandler(db, options = {}) {
           return send(res, 200, {
             id,
             publicationId: row.publication_id,
+            ...(pendingFlowRepeat(db,id)?{repeatRequest:pendingFlowRepeat(db,id)}:{}),
             version: row.version,
             state: row.state,
             dueAt: row.due_at,
@@ -1341,6 +1359,8 @@ export function createAppHandler(db, options = {}) {
         return send(res,503,{error:'Onboarding unavailable. Refresh before retrying.'});
       }
       if(path.startsWith('/api/auth/registrations')) {
+        const availabilityFailure=registrationAvailabilityError(error);
+        if(availabilityFailure){const {status,...body}=availabilityFailure;return send(res,status,body);}
         const verificationFailure=registrationVerificationHttpError(error);
         if(verificationFailure){const {status,...body}=verificationFailure;return send(res,status,body);}
         if(message==='Email delivery unavailable') return send(res,503,{error:message});

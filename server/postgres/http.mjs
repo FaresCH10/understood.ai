@@ -39,7 +39,8 @@ import { authenticateStaff,redeemWorkerGrant,requireSession,revokeSession,issueW
 import {workerCompanyContext,workerCredentialStatus,authenticateWorker,assignWorkerPassword} from './worker-credentials.mjs';
 import { grantIssueInput } from '../auth.mjs';
 import {requestRecovery,resetPassword} from './account-recovery.mjs';
-import {requestRegistration,resendRegistration,verifyRegistration,verifyRegistrationCode} from './registration.mjs';
+import {requestRegistration,resendRegistration,verifyRegistration,verifyRegistrationCode,registrationAvailability} from './registration.mjs';
+import {registrationAvailabilityError} from '../registration-input.mjs';
 import {listAccountSites,switchAccountSite} from './accounts.mjs';
 import {issueInvitation,changeInvitation,listInvitations,invitationReceipt,previewInvitation,acceptInvitation} from './invitations.mjs';
 import { sessionContext,listBriefings,getBriefing,workerBriefings,workerBriefing,staffOverview,attentionPage,listProcessing,getProcessing } from './read-models.mjs';
@@ -58,6 +59,7 @@ import {handleImprovementRoute} from '../self-healing-http.mjs';
 import {improvementHttpError} from '../self-healing-input.mjs';
 import {readInstructionImprovement,analyzeInstructionImprovement,createImprovementDraft} from './self-healing.mjs';
 import { publish,submitAnswer,withdrawPublication,domainTransaction } from './domain.mjs';
+import {listClarificationFlow,readClarificationFlow,saveClarificationExchange} from './clarification-flow.mjs';
 import {createSchedule,listSchedules,cancelSchedule} from './schedules.mjs';
 import {listReverificationCandidates} from './reverification.mjs';
 import {scheduleHttpError} from '../schedule-input.mjs';
@@ -325,6 +327,10 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
           {'set-cookie':clearSessionCookie(cookieOptions)});
       }
       if(path==='/api/auth/registrations/options' && req.method==='GET')return send(res,200,{available:registrationVerification.available===true,verification:registrationVerification.provider==='neon'?'neon-code':'link'});
+      if(path==='/api/auth/registrations/availability'&&req.method==='POST'){
+        if(url.search)throw Error('Invalid registration input');
+        return send(res,200,await registrationAvailability(pool,await readJson(req),address,repository));
+      }
       if(path==='/api/auth/registrations/verify-code' && req.method==='POST'){
         if(url.search)throw Error('Invalid registration input');
         return send(res,200,await verifyRegistrationCode(pool,await readJson(req),address,registrationVerification,repository));
@@ -744,6 +750,15 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         if(!requestId && req.method==='GET'){if(!url.search)return send(res,200,await listCaseReviews(pool,session,id,repository));if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid case workflow page');return send(res,200,{...await caseReviewPage(pool,session,id,Object.fromEntries(url.searchParams),repository),clientContext:context});}
         if(!requestId && req.method==='POST'){if(url.search)throw Error('Invalid case review');return send(res,200,{...await saveCaseReview(pool,session,id,await readJson(req),repository),clientContext:context});}
       }
+      if(path==='/api/clarification-flow'&&req.method==='GET')return send(res,200,{...await listClarificationFlow(pool,session,Number(url.searchParams.get('page')??1),repository),clientContext:clientSessionContext(session).clientContext});
+      const simpleClarification=path.match(/^\/api\/(worker\/briefings|clarifications)\/([^/]+)\/clarification-flow$/);
+      if(simpleClarification){
+        if(url.search)throw Error('Invalid clarification request');
+        const worker=simpleClarification[1]==='worker/briefings',id=simpleClarification[2],settings={...repository,worker};
+        const result=req.method==='GET'?await readClarificationFlow(pool,session,id,settings):req.method==='POST'?await saveClarificationExchange(pool,session,id,await readJson(req),settings):null;
+        if(!result)throw Error('Invalid clarification request');
+        return send(res,req.method==='POST'?202:200,{...result,clientContext:clientSessionContext(session).clientContext});
+      }
       const questionRepeat=path.match(/^\/api\/clarifications\/([^/]+)\/question-repeat$/);
       if(questionRepeat) {
         if(req.method!=='POST')throw Error('Invalid repeat request');
@@ -1120,6 +1135,8 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         if(message==='Onboarding unavailable') return send(res,404,{error:message});
       }
       if(requestPath.startsWith('/api/auth/registrations')) {
+        const availabilityFailure=registrationAvailabilityError(error);
+        if(availabilityFailure){const {status,...body}=availabilityFailure;return send(res,status,body);}
         const verificationFailure=registrationVerificationHttpError(error);
         if(verificationFailure){const {status,...body}=verificationFailure;return send(res,status,body);}
         if(message==='Email delivery unavailable') return send(res,503,{error:message});
@@ -1135,6 +1152,8 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(['Invalid publication history request','Invalid report publication filter','Invalid report publication date','Report publication history exceeds limit; narrow the search or dates'].includes(message))return send(res,400,{error:message});
       if(['Invalid calendar month','Invalid calendar request'].includes(message)||/^Calendar .* exceeds the monthly limit/.test(message))return send(res,400,{error:message});
       if(message==='Invalid attention filter')return send(res,400,{error:message});
+      if(message==='Describe the part of the instruction that needs clarification')return send(res,400,{error:message});
+      if(['A clarification has already been sent for this answer','Wait for the worker clarification request'].includes(message))return send(res,409,{error:message});
       if (message==='Email delivery unavailable') return send(res,503,{error:message});
       if(['Follow-up translation unavailable','Follow-up generation unavailable','Follow-up language unavailable'].includes(message))return send(res,503,{error:message});
       if (unavailable.has(message)) return send(res,404,{error:message});

@@ -8,6 +8,7 @@ import {authenticateStaff,provisionStaffCredential} from '../server/postgres/aut
 import {entitlementState} from '../server/postgres/entitlements.mjs';
 import {createWorker} from '../server/postgres/people.mjs';
 import {requestRegistration,resendRegistration,verifyRegistration,expireRegistrations,processOneRegistration} from '../server/postgres/registration.mjs';
+import {registrationAvailability} from '../server/postgres/registration.mjs';
 import {configureRuntimePermissions,verifyRuntimePermissions} from '../server/postgres/runtime-permissions.mjs';
 import {openMail} from '../server/auth-mail.mjs';
 import {createServer,request as httpRequest} from 'node:http';
@@ -46,6 +47,19 @@ async function fixture({failAudit=null}={}) {
   const verify=token=>verifyRegistration(pool,{token},'127.0.0.1',mail,options);
   return {db,pool,q,request,dispatch,verify};
 }
+
+test('PostgreSQL email availability reserves active registrations and rejects duplicate submissions without queuing mail',async()=>{
+  const f=await fixture();try{
+    assert.deepEqual(await registrationAvailability(f.pool,{email:' NEW-OWNER@EXAMPLE.TEST '},'availability',options),{email,available:true});
+    const input=value();await f.request(input);
+    assert.equal((await registrationAvailability(f.pool,{email},'availability',options)).available,false);
+    await assert.rejects(f.request({...input,requestId:randomUUID()}),/Registration email unavailable/);
+    assert.equal((await f.q('SELECT count(*)::int AS n FROM registration_mail'))[0].n,1);
+    await f.q("UPDATE organization_registrations SET expires_at='2000-01-01' WHERE id=$1",[input.requestId]);
+    assert.equal((await registrationAvailability(f.pool,{email},'availability',options)).available,true);
+    await assert.rejects(registrationAvailability(f.pool,{email:'bad'},'availability',options),/Invalid registration input/);
+  }finally{await f.db.close();}
+});
 
 test('Vercel Neon registration dispatches before responding and survives handler replacement through sign-in',async(t)=>{
   const f=await fixture();let server;
@@ -215,18 +229,18 @@ test('PostgreSQL resend rotates one-use links under the request and email bindin
   }finally{await f.db.close();}
 });
 
-test('PostgreSQL existing credentials and duplicate email requests stay generic without mail',async()=>{
+test('PostgreSQL existing credentials and duplicate email requests are rejected without mail',async()=>{
   const f=await fixture();try{
     await f.q("INSERT INTO organizations(id,name) VALUES('a','A')");
     await f.q("INSERT INTO sites(id,org_id,name,timezone) VALUES('a','a','A','UTC')");
     await f.q("INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','a','a','Owner','owner')");
     await provisionStaffCredential(f.pool,{staffId:'owner',orgId:'a',siteId:'a',email,password},options);
-    assert.deepEqual(await f.request(),{accepted:true,delivery:'queued'});
+    await assert.rejects(f.request(),/Registration email unavailable/);
     assert.equal((await f.q('SELECT count(*)::int n FROM organization_registrations'))[0].n,0);
     assert.equal((await f.q('SELECT count(*)::int n FROM registration_mail'))[0].n,0);
 
     const input=value({email:'unique-owner@example.test'});await f.request(input);
-    await f.request({...input,requestId:randomUUID(),companyName:'Another Company'});
+    await assert.rejects(f.request({...input,requestId:randomUUID(),companyName:'Another Company'}),/Registration email unavailable/);
     await f.request({...input,requestId:randomUUID(),email:'different-owner@example.test'});
     assert.equal((await f.q('SELECT count(*)::int n FROM organization_registrations'))[0].n,2);
     assert.equal((await f.q('SELECT count(*)::int n FROM registration_mail'))[0].n,2);

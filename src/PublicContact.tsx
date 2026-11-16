@@ -23,7 +23,7 @@ export function LandingContact({locale}:{locale:LandingLocale}){
   return <section ref={root} className="landing-contact" aria-labelledby="landing-contact-title"><div className="landing-container landing-contact-inner"><div><h2 id="landing-contact-title">{t.sectionTitle}</h2><p>{t.sectionBody}</p></div><a className="landing-button landing-button--light" href="#contact">{t.contact}<ArrowRight size={18} className="landing-forward" aria-hidden="true"/></a></div></section>;
 }
 
-export function ContactPage({locale}:{locale:LandingLocale}){
+export function ContactPage({locale,embedded=false}:{locale:LandingLocale;embedded?:boolean}){
   const root=useRef<HTMLDivElement>(null),heading=useRef<HTMLHeadingElement>(null),t=copy[locale];
   useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});heading.current?.focus({preventScroll:true});},[]);
   useGSAP(()=>{
@@ -35,7 +35,7 @@ export function ContactPage({locale}:{locale:LandingLocale}){
   },{scope:root,dependencies:[locale],revertOnUpdate:true});
   const mailto=`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t.subject)}`;
   return <div ref={root} className="contact-page landing-container">
-    <a className="landing-text-link contact-back" href="#home"><ArrowLeft size={17} className="landing-forward" aria-hidden="true"/>{t.back}</a>
+    <a className="landing-text-link contact-back" href={embedded?'#overview':'#home'}><ArrowLeft size={17} className="landing-forward" aria-hidden="true"/>{embedded?(locale==='ar'?'العودة إلى مساحة العمل':'Return to workspace'):t.back}</a>
     <header className="contact-intro"><h1 ref={heading} tabIndex={-1}>{t.title}</h1><p>{t.body}</p></header>
     <div className="contact-layout"><section className="contact-email-panel" aria-labelledby="contact-email-title"><Mail size={28} aria-hidden="true"/><h2 id="contact-email-title">{t.email}</h2><p>{t.note}</p><a className="contact-address" href={mailto} aria-label={`${t.address}: ${CONTACT_EMAIL}`}><bdi>{CONTACT_EMAIL}</bdi></a><a className="landing-button landing-button--primary" href={mailto}>{t.email}<ArrowUpRight size={18} aria-hidden="true"/></a></section><aside className="contact-context"><h2>{t.prompt}</h2><p>{t.details}</p></aside></div>
   </div>;

@@ -14,6 +14,7 @@ import {StaffLanguageContext,StaffTimezoneContext} from './staff-language';
 import InstructionLibrary from './InstructionLibrary';
 import {InstructionFiles,StaffInstructionFiles} from './InstructionFiles';
 import {WorkerWorkProgress} from './WorkProgress';
+import {WorkerClarificationFlow} from './WorkerClarificationFlow';
 import {WorkerInbox} from './WorkerInbox';
 import {WorkerAccountMenu} from './WorkerAccountMenu';
 import {WorkerHeader} from './WorkerHeader';
@@ -38,7 +39,7 @@ import {
   BarChart3, CalendarClock, CalendarDays, Download, Play, RefreshCw, Repeat2, ShieldCheck,KeyRound,Smartphone,QrCode,
 } from 'lucide-react';
 import './styles.css';
-import {isPublicLandingView} from './public-navigation';
+import {isPublicLandingView,isDashboardHelpView} from './public-navigation';
 import { WorkerRecorderView } from './WorkerRecorderView';
 import { WorkerPresentationView } from './WorkerPresentationView';
 import {WorkerDeviceView} from './WorkerDeviceView';
@@ -82,9 +83,9 @@ const StaffSearch=lazy(()=>import('./StaffSearch'));
 const BillingPage=lazy(()=>import('./Billing').then(module=>({default:module.BillingPage})));
 import {WorkspaceSettings} from './WorkspaceSettings';
 import { WorkerImportPage } from './WorkerImport';
-const ClarificationsPage=lazy(()=>import('./Clarifications').then(module=>({default:module.ClarificationsPage})));
-const ClarificationPage=lazy(()=>import('./Clarifications').then(module=>({default:module.ClarificationPage})));
-const ClarificationCreate=lazy(()=>import('./ClarificationCreate'));
+const ClarificationsPage=lazy(()=>import('./SimpleClarifications').then(module=>({default:module.ClarificationsPage})));
+const ClarificationPage=lazy(()=>import('./SimpleClarifications').then(module=>({default:module.ClarificationPage})));
+
 import {DraftEditor,CopyDraftControl,ArchiveBriefingControl,useBriefingRequest} from './BriefingControls';
 import {PreparationRequest} from './PreparationRequest';
 import type {StaffRequestAuthority} from './useStaffRequest';
@@ -94,6 +95,7 @@ import {appStaffAction,checkedPreparationAcknowledgement} from './app-staff-acti
 const SendInstruction=lazy(()=>import('./SendInstruction'));
 const NewBriefing=lazy(()=>import('./NewBriefing'));
 const PublicProduct=lazy(()=>import('./PublicProduct'));
+const DashboardHelp=lazy(()=>import('./DashboardHelp'));
 const Onboarding=lazy(()=>import('./Onboarding'));
 const Operations=lazy(()=>import('./Operations'));
 const SourceAudioUploads=lazy(()=>import('./SourceAudioUploads'));
@@ -292,8 +294,6 @@ const staffPrimaryNavigation = [
   { key: 'clarifications', label: 'clarifications', icon: FileText },
   { key: 'language-requests', label: 'languageRequests', icon: Languages },
   { key: 'reports', label: 'reports', icon: BarChart3 },
-  { key: 'notifications', label: 'notifications', icon: Bell },
-  { key: 'settings', label: 'settings', icon: Settings },
 ];
 function staffNavigationActive(key:string,view:string) {
   if(key==='overview')return view==='overview';
@@ -305,9 +305,11 @@ function staffNavigationActive(key:string,view:string) {
   return view===key||view.startsWith(`${key}/`);
 }
 function staffRouteAvailable(view:string) {
+  if(isDashboardHelpView(view))return true;
   return view==='overview'||view==='calendar'||view==='send'||view.startsWith('send/')||view==='briefings'||view==='briefings/new'||view.startsWith('briefings/')||view==='source-audio'||view==='settings/onboarding'||view==='onboarding/first-run'||view==='notifications'||view==='glossary'||view.startsWith('glossary/')||view==='clarifications'||view==='clarifications/new'||view.startsWith('clarifications/')||view==='search'||view.startsWith('search/')||view==='language-requests'||view==='translation-feedback'||view.startsWith('people/crew/')||view==='people/new-crew'||view==='people/crews'||view==='people'||view==='people/new'||view.startsWith('people/worker/')||view.startsWith('people/import')||view==='processing'||view.startsWith('processing/')||view==='language-readiness'||view==='reports'||view.startsWith('reports/crew/')||view==='settings'||view==='settings/usage'||view==='settings/retention'||view==='settings/staff'||view==='settings/invitations'||view==='settings/invoices'||view.startsWith('settings/invoices/');
 }
 function staffRouteTitle(view:string,shell:Record<string,string>,t:(text:string)=>string) {
+  if(isDashboardHelpView(view))return view==='contact'?t('Contact support'):view==='walkthrough'?t('Interactive walkthrough'):t('Help center');
   if(view==='operations')return t('Platform operations');
   if(!staffRouteAvailable(view))return t('Page not available');
   if(view==='translation-feedback')return t('Translation feedback');
@@ -457,9 +459,10 @@ export default function App() {
   },[sessionRetry]);
   const navigate = (next: string) => {if(navigationGuard.current && !navigationGuard.current(next))return;location.hash = next; setView(next); window.scrollTo(0, 0); };
   const lastStaffRoute=useRef<string|null>(null);
+  const signedInHelp=!!session?.authenticated&&session.role==='staff'&&!isPendingWorkspacePlan(session.workspacePlan)&&isDashboardHelpView(view);
   useEffect(()=>{
-    if(!session || session.role!=='staff' || isPublicLandingView(view) || ['verify-registration','walkthrough','pilot','worker-access','accept-invitation','account-recovery','reset-password','register'].includes(view) || view.startsWith('register/'))return;
-    const label=staffRouteTitle(view,staffUi,staffT);
+    if(!session || session.role!=='staff' || !signedInHelp&&(isPublicLandingView(view) || ['verify-registration','walkthrough','pilot','worker-access','accept-invitation','account-recovery','reset-password','register'].includes(view) || view.startsWith('register/')))return;
+    const label=isPendingWorkspacePlan(session.workspacePlan)?staffT(session.workspaceAccessState==='declined'?'Workspace request declined':'Workspace access'):staffRouteTitle(view,staffUi,staffT);
     document.title=label?`${label} · Understood`:'Understood';
     if(lastStaffRoute.current===null){lastStaffRoute.current=view;return;}
     if(lastStaffRoute.current===view)return;
@@ -469,7 +472,7 @@ export default function App() {
   const pendingWorkspace=session?.authenticated&&session.role==='staff'&&isPendingWorkspacePlan(session.workspacePlan);
   const registerView=view==='register'||/^register\/(pro|business|enterprise)$/.test(view);
   const signInDestination=authBusy||workerEntryRecovery.pending||workerEntryRecovery.error||sessionGuard.isLocked()?null:signedInDestination(session,view);
-  const staffDocumentActive=!!session?.authenticated&&session.role==='staff'&&!signInDestination&&!workerEntryRecovery.pending&&!workerEntryRecovery.error&&!registerView&&!isPublicLandingView(view)&&!['operations','verify-registration','walkthrough','pilot','worker-access','accept-invitation','account-recovery','reset-password'].includes(view);
+  const staffDocumentActive=!!session?.authenticated&&session.role==='staff'&&!signInDestination&&!workerEntryRecovery.pending&&!workerEntryRecovery.error&&!registerView&&(signedInHelp||!isPublicLandingView(view)&&!['operations','verify-registration','walkthrough','pilot','worker-access','accept-invitation','account-recovery','reset-password'].includes(view));
   useEffect(()=>{
     if(!staffDocumentActive)return;
     const root=document.documentElement,lang=root.lang,dir=root.dir;
@@ -639,7 +642,8 @@ export default function App() {
   if(view==='operations')return <BriefingView label="Platform operations"><Operations/></BriefingView>;
   if(registerView && !sessionLoadError)return <AuthLayout variant="register"><RegistrationPage key={view} initialPlan={view.split('/')[1]} language={registrationLanguage} onLanguage={setRegistrationLanguage} authenticated={!!session?.authenticated} available={session?isCredentialMode(session.mode):null} onBack={()=>navigate('home')} onSignIn={()=>navigate('sign-in')} onOpenWorkspace={()=>navigate('overview')}/></AuthLayout>;
   if(view==='verify-registration')return <main className="entry-page"><Brand/><VerifyRegistration key={registrationToken} token={registrationToken} language={registrationLanguage} onLanguage={setRegistrationLanguage} onRegister={()=>navigate('register')} onSignIn={()=>navigate('sign-in')}/></main>;
-  if(isPublicLandingView(view) || ['walkthrough','pilot'].includes(view) || (session?.authenticated===false && view==='overview'))return <BriefingView label="public site"><PublicProduct view={view} registrationAvailable={isCredentialMode(session?.mode)}/></BriefingView>;
+  if(isDashboardHelpView(view)&&!session&&!sessionLoadError)return <div className="loading-page" role="status">{staffT('Loading')}</div>;
+  if(!signedInHelp&&(isPublicLandingView(view) || ['walkthrough','pilot'].includes(view) || (session?.authenticated===false && view==='overview')))return <BriefingView label="public site"><PublicProduct view={view} registrationAvailable={isCredentialMode(session?.mode)}/></BriefingView>;
   if (!session) {
     const language=workerBrowserLanguage();
     const text=sessionLoadText[language];
@@ -696,11 +700,11 @@ export default function App() {
   );
 
   if (session.role === 'worker') return <>{sessionGuard.suspended&&<SessionConnectionNotice language={workerUiFallbackLanguage(session)} onRetry={sessionGuard.retry} busy={sessionGuard.retrying}/>}<div hidden={sessionGuard.suspended} style={sessionGuard.suspended?{display:'none'}:undefined}><WorkerApp key={session.clientContext} session={session} view={view} navigate={navigate} refresh={refresh} act={act} logout={logout} message={message} onSessionLost={sessionGuard.invalidate} sessionInvalid={sessionGuard.isLocked} navigationGuard={navigationGuard} onSessionRefresh={refreshSession} scanSignal={workerBriefingSignal} /></div></>;
-  if(pendingWorkspace)return <StaffLanguageContext.Provider value={staffUiLanguage}><WorkspaceAccess key={session.clientContext} plan={session.workspacePlan!} onRecheck={refreshSession} onSignOut={logout} onContact={()=>navigate('contact')}/></StaffLanguageContext.Provider>;
+  if(pendingWorkspace)return <StaffLanguageContext.Provider value={staffUiLanguage}><WorkspaceAccess key={session.clientContext} plan={session.workspacePlan!} state={session.workspaceAccessState} onRecheck={refreshSession} onSignOut={logout} onContact={()=>navigate('contact')}/></StaffLanguageContext.Provider>;
   const planName=Object.entries(PLAN_NAMES).find(([id])=>id===session.workspacePlan)?.[1] ?? session.workspacePlan;
   const canWrite=canManageStaff(session.staffRole) && session.siteState!=='archived';
   const canSearch=['owner','supervisor','auditor'].includes(session.staffRole || '');
-  if(session.staffRole==='administrator' && !view.startsWith('settings')) return <div className="loading-page">Loading site settings...</div>;
+  if(session.staffRole==='administrator' && !view.startsWith('settings')&&!signedInHelp) return <div className="loading-page">Loading site settings...</div>;
   const blockStaffInput=(event:React.SyntheticEvent)=>{if(sessionGuard.isLocked()){event.preventDefault();event.stopPropagation();}};
   const staffAuthority:StaffRequestAuthority={session,isCurrent:()=>sameStaffSession(session,activeSession.current) && !sessionGuard.isInvalidated() && !selectingSite.current && !authInFlight.current,canMutate:()=>!sessionGuard.isLocked(),onSessionLost:sessionGuard.invalidate};
   const staffNavigation=staffPrimaryNavigation
@@ -723,6 +727,7 @@ return <StaffLanguageContext.Provider value={staffUiLanguage}><StaffTimezoneCont
     {siteInterfaceLanguage==='ur'&&!clarificationRoute(view)&&<Notice>Supervisor workspace is currently available in English and Arabic. English is shown.</Notice>}
     <SettingsLayout active={view==='settings'||view.startsWith('settings/')} view={view} role={session.staffRole||''} credential={isCredentialMode(session.mode)&&!!session.staffScope} organization={session.organization} site={session.site} navigate={navigate}>
 {session.siteState==='archived' && <Notice tone="blue">{staffUi.archived}</Notice>}
+{signedInHelp&&<BriefingView label={staffT('Help & support')}><DashboardHelp view={view} language={staffUiLanguage==='ar'?'ar':'en'}/></BriefingView>}
 {view === 'overview' && <Overview key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} name={session.name} greeting={staffGreeting(session.timezone,clock)} />}
     {view==='calendar' && (['owner','supervisor','auditor'].includes(session.staffRole || '') ? <BriefingView key={staffRequestBinding(session)} label={staffT("calendar")}><CalendarPage authority={staffAuthority} refresh={refresh} language={staffUiLanguage} navigate={navigate}/></BriefingView> : <Notice tone="blue">{staffT("Your role cannot access the instruction calendar.")}</Notice>)}{(view==='send'||view.startsWith('send/')) && (canWrite ? <Suspense fallback={<p data-page-loading role="status">{staffT("Loading the send form...")}</p>}><SendInstruction draftId={view.startsWith('send/crew/')?undefined:view.split('/')[1]} initialCrewId={view.startsWith('send/crew/')?view.split('/')[2]:undefined} navigationGuard={navigationGuard} key={`${view}:${session.clientContext}:${session.templateRecoveryScope}`} authority={staffAuthority} scope={session.templateRecoveryScope || session.clientContext || null} navigate={navigate} onSent={reload}/></Suspense> : <Notice tone="blue">{staffT("Your role cannot send instructions.")}</Notice>)}{view === 'briefings' && <Briefings key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} canWrite={canWrite} />}{view === 'briefings/new' && (canWrite ? <Suspense fallback={<p data-page-loading role="status">{staffT("Loading the send form...")}</p>}><SendInstruction key={`new:${session.clientContext}`} authority={staffAuthority} scope={session.templateRecoveryScope||session.clientContext||null} navigate={navigate} onSent={reload} navigationGuard={navigationGuard}/></Suspense> : <Notice tone="blue">{staffT("Your role cannot create instructions.")}</Notice>)}{view.startsWith('briefings/') && view !== 'briefings/new' && <BriefingDetail key={`${view.split('/')[1]}:${session.clientContext}:${session.templateRecoveryScope}`} authority={staffAuthority} id={view.split('/')[1]} scope={session.templateRecoveryScope} languageSession={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} refresh={refresh} act={act} navigate={navigate} onChanged={reload} canWrite={canWrite} timezone={session.timezone} organization={session.organization} site={session.site} />}
     {view==='source-audio' && (canWrite ? <BriefingView label={staffT("Source audio uploads")}><SourceAudioUploads key={session.clientContext} authority={staffAuthority} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} navigate={navigate}/></BriefingView> : <Notice>{staffT("Your role cannot access source audio uploads.")}</Notice>)}
@@ -731,7 +736,7 @@ return <StaffLanguageContext.Provider value={staffUiLanguage}><StaffTimezoneCont
     {view==='notifications' && (['owner','supervisor','auditor'].includes(session.staffRole || '') ? <BriefingView key={staffRequestBinding(session)} label={staffT("Notifications")}><Notifications authority={staffAuthority} refresh={refresh} navigate={navigate} timezone={session.timezone}/></BriefingView> : <Notice>{staffT("Your role cannot access site notifications.")}</Notice>)}
     {(view==='glossary' || view.startsWith('glossary/')) && <Glossary authority={staffAuthority} key={`${view}:${staffRequestBinding(session)}`} id={view.split('/')[1]==='new' ? undefined : view.split('/')[1]} newTerm={view==='glossary/new'} canWrite={canWrite} scope={session.templateRecoveryScope} navigate={navigate}/>}
     {view === 'clarifications' && <BriefingView label={staffT("Clarifications")} language={caseUiLanguage}><ClarificationsPage key={staffRequestBinding(session)} authority={staffAuthority} refresh={refresh} navigate={navigate} timezone={session.timezone} language={caseUiLanguage}  canWrite={canWrite && ['owner','supervisor'].includes(session.staffRole || '')} /></BriefingView>}
-    {view === 'clarifications/new' && <BriefingView label={staffT("New clarification")} language={caseUiLanguage}>{['owner','supervisor'].includes(session.staffRole || '')?<ClarificationCreate key={staffRequestBinding(session)} authority={staffAuthority} canWrite={canWrite} navigate={navigate} navigationGuard={navigationGuard} timezone={session.timezone} language={caseUiLanguage} />:<p role="alert">{caseText(caseUiLanguage,'Your role cannot create clarifications.')}</p>}</BriefingView>}
+    {view === 'clarifications/new' && <ClarificationsPage authority={staffAuthority} refresh={refresh} navigate={navigate} language={caseUiLanguage}/>}
     {view.startsWith('clarifications/') && view !== 'clarifications/new' && <BriefingView key={`${view.split('/')[1]}:${staffRequestBinding(session)}`} label={staffT("Clarification")} language={caseUiLanguage}><ClarificationPage id={view.split('/')[1]} refresh={refresh} navigate={navigate} session={{clientContext:session.clientContext!,expiresAt:session.expiresAt!}} authority={staffAuthority} language={caseUiLanguage}  timezone={session.timezone} navigationGuard={navigationGuard} canWrite={canWrite && ['owner','supervisor'].includes(session.staffRole || '')} /></BriefingView>}
     {canSearch && (view==='search' || view.startsWith('search/')) && <BriefingView label={staffT("Search")}><StaffSearch key={`${view}:${session.clientContext}:${session.siteState}`} route={view} context={session.clientContext!} canPeople={canWrite} navigate={navigate}/></BriefingView>}
 {view==='language-requests' && <LanguageRequestsPage authority={staffAuthority} refresh={refresh} canManage={canWrite} locale={directoryLanguage}/>}
@@ -1502,7 +1507,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
             {<><h1 lang={detail.data.language} dir={workerUiDirection(detail.data.language)}>{detail.data.contentExpired?detail.data.title:detail.data.content.title}</h1>
             <p className="worker-subtitle">{t.version} v{detail.data.version}</p></>}
             {receipt?.assignmentId === id ? (
-              <><section className="worker-card"><h2>{t.readInstruction}</h2><p className="briefing-text" lang={detail.data.language} dir={workerUiDirection(detail.data.language)}>{receipt.presentation?.text||detail.data.content?.text}</p></section><WorkerSubmissionReceipt choices={receipt.presentation?.choices||detail.data.content?.choices} key={receipt.requestId} session={session} selection={{assignmentId:id,version:receipt.publicationVersion,language:receipt.contentLanguage,requestId:receipt.requestId,kind:receipt.requestKind}} acknowledgedContext={receipt.clientContext} language={language} timezone={session.timezone} disabled={busy||detailUnavailable} canHelp={!!responseState?.canHelp} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost} onBack={goBack} onHelp={()=>{pendingHelpAssignment.current=id;setReceipt(null);}} onChecked={()=>{const requestId=receipt.requestId;if(!requestId||checkedReceipts.current.has(requestId))return;checkedReceipts.current.add(requestId);setAudioRefresh(value=>value+1);}}/></>
+              <><section className="worker-card"><h2>{t.readInstruction}</h2><p className="briefing-text" lang={detail.data.language} dir={workerUiDirection(detail.data.language)}>{receipt.presentation?.text||detail.data.content?.text}</p></section><WorkerSubmissionReceipt clarification={detail.data.content?.questionType==="multiple-choice"?<WorkerClarificationFlow assignmentId={id} session={session} language={language} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost} onReturn={()=>{setReceipt(null);setAudioRefresh(n=>n+1);}} onDirtyChange={setChatUnsent}/>:undefined} choices={receipt.presentation?.choices||detail.data.content?.choices} key={receipt.requestId} session={session} selection={{assignmentId:id,version:receipt.publicationVersion,language:receipt.contentLanguage,requestId:receipt.requestId,kind:receipt.requestKind}} acknowledgedContext={receipt.clientContext} language={language} timezone={session.timezone} disabled={busy||detailUnavailable} canHelp={!!responseState?.canHelp} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost} onBack={goBack} onHelp={()=>{pendingHelpAssignment.current=id;setReceipt(null);}} onChecked={()=>{const requestId=receipt.requestId;if(!requestId||checkedReceipts.current.has(requestId))return;checkedReceipts.current.add(requestId);setAudioRefresh(value=>value+1);}}/></>
             ) : detail.data.contentExpired ? (
               <Notice tone="blue">{t.expired}</Notice>
             ) : (
@@ -1523,7 +1528,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   <WorkerPresentationView key={`presentation:${id}:${detail.data.publicationId}:${detail.data.version}`} assignmentId={id} version={detail.data.version} sourceKind="instruction" originalLanguage={detail.data.language} approvedLanguage={session.language || ''} uiLanguage={language} session={session} disabled={busy||detailUnavailable} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} onActive={setAnswerPresentationId} onChoices={setTranslatedChoices} onQuestion={setTranslatedQuestion} onContent={setTranslatedContent} requiresChoices={detail.data.content.questionType==='multiple-choice'}/>
                   {(responseState?.canHelp||responseState?.canRespond&&!detail.data.repeatRequest)&&<div className="worker-assignment-actions">
                     {responseState.canRespond&&!detail.data.repeatRequest&&<button type="button" className="button outline" onClick={()=>document.getElementById('worker-question')?.focus()}>{responseMode==='acknowledge'?<><CheckCircle2 size={18} aria-hidden="true"/>{t.ackTitle}</>:<><HelpCircle size={18} aria-hidden="true"/>{t.question}</>}</button>}
-                    {responseState.canHelp&&<button type="button" className="button outline" onClick={revealHelp}><MessageCircle size={18} aria-hidden="true"/>{t.help}</button>}
+                    {responseState.canHelp&&detail.data.content.questionType!=="multiple-choice"&&<button type="button" className="button outline" onClick={revealHelp}><MessageCircle size={18} aria-hidden="true"/>{t.help}</button>}
                   </div>}
                 </section>
                   <InstructionFiles language={language} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost}/>
@@ -1533,6 +1538,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                     <div><h2 id="worker-followup-title">{detail.data.repeatRequest.message?followup.checkTitle:followup.manualTitle}</h2>
                     <p className="muted">{detail.data.repeatRequest.message?followup.checkBody:followup.manualBody}</p></div>
                   </div>
+                  {detail.data.content?.questionType==="multiple-choice"&&<WorkerClarificationFlow assignmentId={id} session={session} language={language} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost}/>}
                   <div className="worker-followup-foot">
                     <p className="worker-followup-due"><Clock3 size={17} aria-hidden="true"/><span>{followup.due} <time dateTime={detail.data.repeatRequest.dueAt}>{new Date(detail.data.repeatRequest.dueAt).toLocaleString(language,{timeZone:session.timezone,dateStyle:'medium',timeStyle:'short'})}</time></span></p>
                     {responseState?.canRespond&&<button type="button" className="button primary" onClick={()=>document.getElementById('worker-question')?.focus()}>{followup.answerAgain}</button>}
@@ -1561,7 +1567,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
                   {!detail.data.repeatRequest && detail.data.audioStatus && !['failed','blocked'].includes(detail.data.audioStatus) ? (
                     <><Notice tone="blue">{audioMessage}</Notice><audio controls preload="none" src={'/api/recordings/' + detail.data.recordingId + '/audio'} /></>
                   ) : !detail.data.repeatRequest && detail.data.outcome ? (
-                    <>{!workCleared&&detail.data.outcome==='clarification'&&<div role="alert" className="notice notice-amber worker-answer-outcome"><p>{a.wrongBody}</p>{responseState?.canHelp&&<button type="button" className="button outline" onClick={revealHelp}><MessageCircle size={18} aria-hidden="true"/>{t.help}</button>}</div>}<Status value={a[detail.data.outcome as 'matched' | 'clarification' | 'unassessable'] || detail.data.outcome} /></>
+                    <>{!workCleared&&detail.data.content.questionType!=='multiple-choice'&&detail.data.outcome==='clarification'&&<div role="alert" className="notice notice-amber worker-answer-outcome"><p>{a.wrongBody}</p>{responseState?.canHelp&&detail.data.content.questionType!=="multiple-choice"&&<button type="button" className="button outline" onClick={revealHelp}><MessageCircle size={18} aria-hidden="true"/>{t.help}</button>}</div>}<Status value={a[detail.data.outcome as 'matched' | 'clarification' | 'unassessable'] || detail.data.outcome} /></>
                   ) : responseState?.pending ? (
                     <Notice tone="blue">{statusText.pending}</Notice>
                   ) : responseState?.closed ? null : detail.data.content.questionType==='multiple-choice' ? (
@@ -1604,7 +1610,8 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
               </>
             )}
 
-            {!detail.data.contentExpired&&<WorkerInstructionChat key={`chat:${id}`} requestedCaseId={view.split('/')[2]} assignmentId={id} version={detail.data.version} contentLanguage={detail.data.language} language={language} session={session} refresh={refresh+audioRefresh} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} disabled={busy||detailUnavailable||inputAvailability.helpBlocked} canWrite={!!responseState?.canHelp} onSendHelp={submitHelpText} onDirtyChange={setChatUnsent} onSessionLost={onSessionLost} timezone={session.timezone} openSignal={chatOpenSignal} focusSignal={chatFocusSignal} seedText={chatSeed} canVoiceHelp={!!detail.data.canVoiceHelp}/>}
+            {!detail.data.contentExpired&&detail.data.content?.questionType!=="multiple-choice"&&<WorkerInstructionChat key={`chat:${id}`} requestedCaseId={view.split('/')[2]} assignmentId={id} version={detail.data.version} contentLanguage={detail.data.language} language={language} session={session} refresh={refresh+audioRefresh} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} disabled={busy||detailUnavailable||inputAvailability.helpBlocked} canWrite={!!responseState?.canHelp} onSendHelp={submitHelpText} onDirtyChange={setChatUnsent} onSessionLost={onSessionLost} timezone={session.timezone} openSignal={chatOpenSignal} focusSignal={chatFocusSignal} seedText={chatSeed} canVoiceHelp={!!detail.data.canVoiceHelp}/>}
+            {!detail.data.contentExpired&&detail.data.content?.questionType==="multiple-choice"&&!receipt&&(detail.data.outcome==="clarification"&&!detail.data.repeatRequest)&&<WorkerClarificationFlow key={`simple:${id}`} assignmentId={id} session={session} language={language} current={()=>!sessionInvalid()&&currentAssignment.current===id} onSessionLost={onSessionLost} onDirtyChange={setChatUnsent}/>}
             {!detail.data.contentExpired&&<WorkerWorkProgress key={`work:${id}`} disabled={busy||detailUnavailable} confirmationLabel={responseMode==='acknowledge'?t.ackAction:undefined} assignmentId={id} clientContext={session.clientContext!} current={()=>!sessionInvalid()&&validWorkerSession(session)&&currentAssignment.current===id} onSessionLost={onSessionLost} refresh={refresh+audioRefresh} language={language} timezone={session.timezone} onWorkChange={setWorkStatus} onCompleted={()=>setAudioRefresh(value=>value+1)}/>}
             <details className="worker-detail-disclosure" open={hasUnsent||pendingReceipts.length>0}><summary>{journeyText.resources}<ChevronDown size={18} aria-hidden="true"/></summary><div>
             <WorkerOfflineSaveView key={`offline:${id}:${detail.data.publicationId}:${detail.data.version}`} session={session} language={language} scope={{assignmentId:id,publicationId:detail.data.publicationId,version:detail.data.version,language:detail.data.language}} disabled={busy || detailUnavailable} current={()=>!sessionInvalid() && validWorkerSession(session) && currentAssignment.current===id && !detailUnavailable} onOperation={outboxOperation}/>

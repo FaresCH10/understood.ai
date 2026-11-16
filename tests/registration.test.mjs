@@ -6,6 +6,7 @@ import {openDatabase,NOW} from '../server/db.mjs';
 import {seed} from '../server/seed.mjs';
 import {provisionStaffCredential,authenticateStaff} from '../server/auth.mjs';
 import {requestRegistration,resendRegistration,processOneRegistration,verifyRegistration,expireRegistrations} from '../server/registration.mjs';
+import {registrationAvailability} from '../server/registration.mjs';
 import {REGISTRATION_TRIAL_HOURS,REGISTRATION_TRIAL_WORKER_LIMIT} from '../server/registration-input.mjs';
 import {resolveMailConfig} from '../server/auth-mail.mjs';
 import {createAppServer} from '../server/index.mjs';
@@ -32,7 +33,7 @@ async function dispatch(db,send) {
 }
 const count=(db,table)=>db.prepare(`SELECT COUNT(*) n FROM ${table}`).get().n;
 
-test('registration validates owner input, blocks existing accounts and returns one generic response for duplicates',async()=>{
+test('registration validates input, replays the same request and rejects duplicate-email signups',async()=>{
   const db=dbFixture();try {
     for(const override of [{acceptTerms:false},{acceptPrivacy:undefined},{country:'ZZ'},{phone:'call me'},{password:'short'},
       {email:'not-an-email'},{ownerName:' A '},{companyName:' '},{requestId:'not-a-uuid'},{role:'owner'},{plan:'business_pending'}])
@@ -46,16 +47,15 @@ test('registration validates owner input, blocks existing accounts and returns o
     const rows=JSON.stringify(db.prepare('SELECT * FROM organization_registrations').all())+JSON.stringify(db.prepare('SELECT * FROM registration_mail').all());
     assert(!rows.includes(email));assert(!rows.includes(password));
     assert.deepEqual(await requestRegistration(db,request,'127.0.0.1',config),{accepted:true,delivery:'queued'});
-    assert.deepEqual(await requestRegistration(db,value({email:email.toUpperCase()}),'127.0.0.1',config),{accepted:true,delivery:'queued'});
+    await assert.rejects(requestRegistration(db,value({email:email.toUpperCase()}),'127.0.0.1',config),/Registration email unavailable/);
     assert.equal(count(db,'organization_registrations'),1);assert.equal(count(db,'registration_mail'),1);
   }finally {db.close();}
 });
 
-test('registration treats an existing staff email exactly like an unknown email and never queues mail',async()=>{
+test('registration rejects an existing staff email without queuing verification mail',async()=>{
   const db=dbFixture();try {
     seed(db);provisionStaffCredential(db,'maya','maya@example.test',password);
-    const response=await requestRegistration(db,value({email:'maya@example.test',companyName:'Another Company'}),'127.0.0.1',config);
-    assert.deepEqual(response,{accepted:true,delivery:'queued'});
+    await assert.rejects(requestRegistration(db,value({email:'maya@example.test',companyName:'Another Company'}),'127.0.0.1',config),/Registration email unavailable/);
     assert.equal(count(db,'organization_registrations'),0);assert.equal(count(db,'registration_mail'),0);
     assert(count(db,'organizations')>0);
   }finally {db.close();}
@@ -161,7 +161,7 @@ test('verified activation creates exactly one workspace, owner account, pending 
     const exact=entitlementState(db,organization.id,{now:Date.now()+100*86400000});
     assert.equal(exact.effectiveState,'read_only');assert.equal(exact.writeAllowed,false);
     const before=db.prepare('SELECT started_at,ends_at FROM organization_entitlements').get();
-    assert.deepEqual(await requestRegistration(db,value({email:request.email}),'127.0.0.1',config),{accepted:true,delivery:'queued'});
+    await assert.rejects(requestRegistration(db,value({email:request.email}),'127.0.0.1',config),/Registration email unavailable/);
     assert.deepEqual(db.prepare('SELECT started_at,ends_at FROM organization_entitlements').get(),before);
     assert.equal(count(db,'organizations'),1);assert.equal(count(db,'registration_mail'),1);
   }finally {db.close();}
@@ -257,7 +257,7 @@ test('pending registrations expire irreversibly but an unverified email may star
     assert.equal(verifyRegistration(db,{token:again.token},'127.0.0.1',config).completed,true);
     assert.equal(count(db,'organization_entitlements'),1);
     const started=db.prepare('SELECT started_at FROM organization_entitlements').get().started_at;
-    assert.deepEqual(await requestRegistration(db,value({email:request.email}),'127.0.0.1',config),{accepted:true,delivery:'queued'});
+    await assert.rejects(requestRegistration(db,value({email:request.email}),'127.0.0.1',config),/Registration email unavailable/);
     assert.equal(db.prepare('SELECT started_at FROM organization_entitlements').get().started_at,started);
   }finally {db.close();}
 });
@@ -268,11 +268,15 @@ test('registration HTTP is credential-only, origin-bound, query-free and never s
   try {
     const call=(path,body,origin=mailOptions.publicOrigin)=>fetch(base+path,{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify(body)});
     const request=value();
+    const available=await call('/api/auth/registrations/availability',{email:request.email});assert.equal(available.status,200);assert.equal((await available.json()).available,true);
+    assert.equal((await call('/api/auth/registrations/availability',{email:request.email},'https://other.test')).status,403);
+    assert.equal((await call('/api/auth/registrations/availability',{email:'invalid'})).status,400);
     assert.equal((await call('/api/auth/registrations',request,'https://other.test')).status,403);
     assert.equal((await call('/api/auth/registrations?role=owner',request)).status,400);
     assert.equal((await fetch(base+'/api/auth/registrations')).status,401);
     const response=await call('/api/auth/registrations',request);assert.equal(response.status,202);
     assert.deepEqual(await response.json(),{accepted:true,delivery:'queued'});assert.equal(response.headers.get('set-cookie'),null);
+    const taken=await call('/api/auth/registrations',{...request,requestId:randomUUID()});assert.equal(taken.status,409);assert.equal((await taken.json()).code,'REGISTRATION_EMAIL_TAKEN');
     assert.equal((await call('/api/auth/registrations/resend',{requestId:request.requestId,email:request.email})).status,202);
     const delivery=await dispatch(db);assert(delivery.token);
     const verified=await call('/api/auth/registrations/verify',{token:delivery.token});assert.equal(verified.status,200);
@@ -282,6 +286,25 @@ test('registration HTTP is credential-only, origin-bound, query-free and never s
     assert.equal((await call('/api/auth/registrations',{...request,acceptTerms:false})).status,400);
     assert.equal((await call('/api/auth/registrations/verify?token=x',{token:delivery.token})).status,400);
   }finally {await new Promise(resolve=>server.close(resolve));db.close();}
+});
+
+test('email availability normalizes addresses, reserves pending signups, releases expired ones and rate-limits checks',async()=>{
+  const db=dbFixture();try{
+    seed(db);provisionStaffCredential(db,'maya','maya@example.test',password);
+    assert.deepEqual(registrationAvailability(db,{email:' MAYA@EXAMPLE.TEST '},'availability'),{email:'maya@example.test',available:false});
+    assert.equal(registrationAvailability(db,{email},'availability').available,true);
+    const request=value();await requestRegistration(db,request,'signup-availability',config);
+    assert.equal(registrationAvailability(db,{email},'availability').available,false);
+    const mailCount=count(db,'registration_mail');
+    await assert.rejects(requestRegistration(db,value(),'signup-duplicate',config),/Registration email unavailable/);
+    assert.equal(count(db,'registration_mail'),mailCount);
+    db.prepare("UPDATE organization_registrations SET expires_at='2000-01-01T00:00:00.000Z' WHERE id=?").run(request.requestId);
+    assert.equal(registrationAvailability(db,{email},'availability').available,true);
+    for(let n=0;n<60;n++)registrationAvailability(db,{email:'available@example.test'},'availability-budget');
+    assert.throws(()=>registrationAvailability(db,{email:'available@example.test'},'availability-budget'),/rate limit/);
+    assert.throws(()=>registrationAvailability(db,{email,role:'owner'},'availability'),/Invalid registration input/);
+    assert.equal(count(db,'registration_mail'),mailCount);
+  }finally{db.close();}
 });
 
 test('Neon registration checks proof before activation, dispatches no legacy token, and activates once',async()=>{

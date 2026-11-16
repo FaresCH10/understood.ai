@@ -4,7 +4,7 @@
 .session-recovery-brand .brand-logo{width:174px}
 .session-recovery-card{padding:36px;border:1px solid #dfe7e0;border-radius:18px;background:#fff;overflow-wrap:anywhere}
 .session-recovery-symbol{width:62px;height:62px;display:grid;place-items:center;background:#f2f5f1;border:1px solid #e3e9e2;border-radius:17px;color:#587566;margin-bottom:24px}
-.session-recovery-card--locked .session-recovery-symbol{background:#faf5e9;border-color:#eee4cd;color:#947128}
+.session-recovery-card--locked .session-recovery-symbol,.session-recovery-card--declined .session-recovery-symbol{background:#faf5e9;border-color:#eee4cd;color:#947128}
 .session-recovery-card h1{font-size:27px;line-height:1.3;font-weight:650;margin:0 0 14px;text-wrap:balance;color:#20362b}
 .session-recovery-content>p{font-size:14px;line-height:1.85;color:#627469;margin:0 0 24px;text-wrap:pretty}
 .session-recovery-content>p.muted{font-size:12px;border-inline-start:2px solid #dce6dd;padding-inline-start:12px;margin-top:-8px}

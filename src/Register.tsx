@@ -5,12 +5,14 @@ import {countryOptions} from './country-options';
 import {AuthLanguagePicker} from './AuthLanguagePicker';
 import {staffSignInLanguages,staffSignInText} from './staff-signin-text';
 import {acceptedRegistrationReceipt,clearRegistrationReceipt,checkedVerification,readRegistrationReceipt,requestAccount,resendAccount,RegistrationError,saveRegistrationReceipt,verifyAccount,verifyAccountCode,normalizeVerificationCode,registrationOptions,type RegistrationReceipt} from './registration';
+import {checkRegistrationEmail} from './registration';
 
 export type RegistrationLanguage='en'|'ar';
 type AccountBody=Parameters<typeof requestAccount>[0];
 type RegistrationPlan=keyof typeof PLAN_NAMES;
 
 const en={
+  emailChecking:'Checking email availability…',emailAvailable:'This email is available.',emailTaken:'This email is already registered or has a signup awaiting verification. Sign in or use another email.',emailCheckFailed:'Email availability could not be checked. Try again before continuing.',emailLimited:'Too many signup checks. Wait a few minutes and try again.',
   verifyIntro:'Enter the six-digit verification code for',verifyHint:'Use the code from the most recent email.',verifyDifferent:'Use a different email',verifyMissing:'Didn’t receive an email?',
   preparingEmail:'Preparing email verification',preparingEmailBody:'This may take a few seconds. Keep this tab open.',
   codeExpired:'This code has expired. Request a new code below.',codeLimited:'Too many attempts. Wait a few minutes before trying again.',codeService:'The verification service is temporarily unavailable. Please try again shortly.',
@@ -26,7 +28,7 @@ const en={
   deliveryNote:'We’ll send a verification email to finish setting up your account.',
   signedInTitle:'You are already signed in',signedInBody:'Registration creates a separate workspace. Sign out first if you need another account.',continue:'Continue to my workspace',
   unavailableEnvironment:'Online account creation is unavailable',unavailableEnvironmentBody:'This environment does not accept online registrations. Use an existing account, or open the public site for a pilot inquiry.',
-  sentTitle:'Check your email',sentBody:'If these details can start a new workspace, we sent a verification link to',sentPrivacy:'For privacy, we show this message whether or not an account already exists.',
+  sentTitle:'Check your email',sentBody:'A verification email has been requested for',sentPrivacy:'Use the latest verification email to finish creating your account.',
   sentNote:'The verification link expires in 24 hours.',resend:'Resend verification email',resending:'Sending...',
   resent:'If this registration is still waiting for verification, a new link has been sent. Earlier links may stop working.',
   unconfirmed:'The result could not be confirmed. Retry the same registration before starting over.',retry:'Retry the same registration',
@@ -38,6 +40,7 @@ const en={
   uncertainTitle:'Verification not confirmed',uncertainBody:'The result could not be confirmed. Retry this same link before signing in.',retryVerify:'Retry verification',signInShort:'Sign in',
 };
 const ar={
+  emailChecking:'جارٍ التحقق من توفر البريد…',emailAvailable:'هذا البريد متاح.',emailTaken:'هذا البريد مسجل بالفعل أو بانتظار التحقق. سجّل الدخول أو استخدم بريداً آخر.',emailCheckFailed:'تعذّر التحقق من توفر البريد. حاول مجدداً قبل المتابعة.',emailLimited:'محاولات تحقق كثيرة. انتظر بضع دقائق وحاول مجدداً.',
   verifyIntro:'أدخل رمز التحقق المكوّن من ستة أرقام للبريد',verifyHint:'استخدم الرمز من أحدث رسالة وصلتك.',verifyDifferent:'استخدام بريد مختلف',verifyMissing:'لم تصلك رسالة؟',
   preparingEmail:'جارٍ تجهيز التحقق من البريد',preparingEmailBody:'قد يستغرق ذلك بضع ثوانٍ. أبقِ هذه النافذة مفتوحة.',
   codeExpired:'انتهت صلاحية هذا الرمز. اطلب رمزاً جديداً أدناه.',codeLimited:'محاولات كثيرة. انتظر بضع دقائق قبل المحاولة مجدداً.',codeService:'خدمة التحقق غير متاحة مؤقتاً. حاول مجدداً بعد قليل.',
@@ -53,7 +56,7 @@ const ar={
   deliveryNote:'سنرسل رسالة تحقق لإكمال إعداد حسابك.',
   signedInTitle:'أنت مسجّل الدخول بالفعل',signedInBody:'ينشئ التسجيل مساحة عمل منفصلة. سجّل الخروج أولاً إذا كنت تحتاج إلى حساب آخر.',continue:'المتابعة إلى مساحة عملي',
   unavailableEnvironment:'التسجيل عبر الإنترنت غير متاح',unavailableEnvironmentBody:'لا تقبل هذه البيئة التسجيلات عبر الإنترنت. استخدم حساباً موجوداً، أو افتح الموقع العام لتقديم طلب تجريبي.',
-  sentTitle:'تحقق من بريدك',sentBody:'إذا كانت هذه البيانات صالحة لبدء مساحة عمل جديدة، فقد أرسلنا رابط تحقق إلى',sentPrivacy:'حفاظاً على الخصوصية، تظهر هذه الرسالة سواء كان الحساب موجوداً أم لا.',
+  sentTitle:'تحقق من بريدك',sentBody:'طُلب إرسال رسالة تحقق إلى',sentPrivacy:'استخدم أحدث رسالة تحقق لإكمال إنشاء حسابك.',
   sentNote:'تنتهي صلاحية رابط التحقق خلال 24 ساعة.',resend:'إعادة إرسال رسالة التحقق',resending:'جارٍ الإرسال...',
   resent:'إذا كان هذا التسجيل ما زال بانتظار التحقق، فقد أُرسل رابط جديد. قد تتوقف الروابط السابقة عن العمل.',
   unconfirmed:'تعذّر تأكيد النتيجة. أعد محاولة التسجيل نفسه قبل البدء من جديد.',retry:'إعادة محاولة التسجيل نفسه',
@@ -98,11 +101,26 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   const [receipt,setReceipt]=useState<RegistrationReceipt|null>(null),[pending,setPending]=useState<{receipt:RegistrationReceipt;body:AccountBody}|null>(null);
   const [ownerName,setOwnerName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');
   const [company,setCompany]=useState(''),[country,setCountry]=useState(''),[phone,setPhone]=useState(''),[terms,setTerms]=useState(false);
-  const [operation,setOperation]=useState<'register'|'resend'|'verify'|null>(null);
+  const [operation,setOperation]=useState<'check'|'register'|'resend'|'verify'|null>(null);
+  const emailInput=useRef<HTMLInputElement>(null);
+  const normalizedEmail=email.trim().toLowerCase();
+  const [emailCheck,setEmailCheck]=useState<{email:string;state:'checking'|'available'|'taken'|'error'}|null>(null);
+  const emailState=emailCheck?.email===normalizedEmail?emailCheck.state:null;
   const busy=operation!==null;
   const [error,setError]=useState(''),[notice,setNotice]=useState(''),[storageError,setStorageError]=useState(false);
   const [verificationCheck,setVerificationCheck]=useState(0);
   const [method,setMethod]=useState<'link'|'neon-code'>('link'),[verificationReady,setVerificationReady]=useState<boolean|null>(null),[code,setCode]=useState(''),[codeComplete,setCodeComplete]=useState(false);
+  useEffect(()=>{
+    if(authenticated||receipt||busy||!normalizedEmail||normalizedEmail.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail))return;
+    const controller=new AbortController();
+    const timer=window.setTimeout(()=>{
+      setEmailCheck({email:normalizedEmail,state:'checking'});
+      void checkRegistrationEmail(normalizedEmail,controller.signal).then(value=>{
+        if(!controller.signal.aborted)setEmailCheck({email:normalizedEmail,state:value.available?'available':'taken'});
+      }).catch(()=>{if(!controller.signal.aborted)setEmailCheck({email:normalizedEmail,state:'error'});});
+    },450);
+    return()=>{window.clearTimeout(timer);controller.abort();};
+  },[normalizedEmail,authenticated,receipt,busy]);
   useEffect(()=>{setVerificationReady(null);const controller=new AbortController();void registrationOptions(controller.signal).then(value=>{setMethod(value.verification);setVerificationReady(value.available);}).catch(()=>{if(!controller.signal.aborted)setVerificationReady(false);});return()=>controller.abort();},[verificationCheck]);
   useEffect(()=>{try{const saved=readRegistrationReceipt(sessionStorage);if(saved)setReceipt(saved);else if(!isPaidPlan(initialPlan))setChoosingPlan(true);}catch{setStorageError(true);}},[initialPlan]);
   const preparing=available===null || operation==='register';
@@ -119,27 +137,38 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
     } catch(caught) {
       const failure=caught as Error;
       const status=caught instanceof RegistrationError?caught.status:null;
-      if(status===400 || status===403 || status===404) {
+      if(status===400 || status===403 || status===404 || status===409 || status===429) {
         try {clearRegistrationReceipt(sessionStorage);} catch {setStorageError(true);}
         setReceipt(null);setPending(null);
       }
-      setError(failure.message);
+      if(caught instanceof RegistrationError&&caught.code==='REGISTRATION_EMAIL_TAKEN'){
+        setEmailCheck({email:body.email,state:'taken'});setError(t.emailTaken);
+        requestAnimationFrame(()=>emailInput.current?.focus());
+      }else if(caught instanceof RegistrationError&&caught.code==='REGISTRATION_RATE_LIMITED')setError(t.emailLimited);
+      else {setError(failure.message);if(status!==400&&status!==403&&status!==404&&status!==409&&status!==429)setReceipt(value);}
     } finally {
       sending.current=false;setOperation(null);
     }
   }
-  function submit(event:FormEvent) {
+  async function submit(event:FormEvent) {
     event.preventDefault();
     if(sending.current || busy) return;
     if(!plan){setChoosingPlan(true);return;}
     if(password!==confirmPassword) {setError(t.passwordMismatch);return;}
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {setError(language==='ar'?'أدخل بريد عمل صالحاً.':'Enter a valid work email.');return;}
+    sending.current=true;setOperation('check');setError('');
+    try{
+      const result=await checkRegistrationEmail(normalizedEmail,new AbortController().signal);
+      setEmailCheck({email:normalizedEmail,state:result.available?'available':'taken'});
+      if(!result.available){setError(t.emailTaken);requestAnimationFrame(()=>emailInput.current?.focus());return;}
+    }catch(caught){setError(caught instanceof RegistrationError&&caught.code==='REGISTRATION_RATE_LIMITED'?t.emailLimited:t.emailCheckFailed);return;}
+    finally{sending.current=false;setOperation(null);}
     const requestId=crypto.randomUUID(),normalized=email.trim().toLowerCase();
     const body:AccountBody={requestId,ownerName:ownerName.trim(),email:normalized,password,companyName:company.trim(),country,plan,
       ...(phone.trim()?{phone:phone.trim()}:{}),acceptTerms:true,acceptPrivacy:true};
     const value:RegistrationReceipt={requestId,email:normalized,createdAt:new Date().toISOString(),state:'pending'};
-    setReceipt(value);setPending({receipt:value,body});
-    void send(body,value);
+    setPending({receipt:value,body});
+    await send(body,value);
   }
   async function resend() {
     if(!receipt || sending.current) return;
@@ -223,7 +252,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
           <legend>{t.accountDetails}</legend>
           <div className="registration-fields">
             <label className="field">{t.ownerName}<input name="name" required minLength={2} maxLength={100} autoComplete="name" dir="auto" value={ownerName} disabled={busy} onChange={event=>setOwnerName(event.target.value)}/></label>
-            <label className="field">{t.email}<input name="email" required type="email" maxLength={254} autoComplete="email" dir="ltr" value={email} disabled={busy} onChange={event=>setEmail(event.target.value)}/></label>
+            <div className="registration-field-with-hint"><label className="field">{t.email}<input ref={emailInput} name="email" required type="email" maxLength={254} autoComplete="email" dir="ltr" value={email} disabled={busy} aria-invalid={emailState==='taken'} aria-describedby="registration-email-status" onChange={event=>{setEmail(event.target.value);setError('');}}/></label><p id="registration-email-status" role="status" className={emailState==='taken'?'field-hint public-error':'field-hint'}>{emailState==='checking'?t.emailChecking:emailState==='taken'?t.emailTaken:emailState==='available'?t.emailAvailable:emailState==='error'?t.emailCheckFailed:''}</p></div>
             <div className="registration-field-with-hint">
               <label className="field">{t.password}<input name="password" required type="password" minLength={12} maxLength={256} autoComplete="new-password" aria-describedby="registration-password-hint" dir="ltr" value={password} disabled={busy} onChange={event=>setPassword(event.target.value)}/></label>
               <p id="registration-password-hint" className="field-hint">{t.passwordHint}</p>

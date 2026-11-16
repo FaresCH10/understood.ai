@@ -49,6 +49,8 @@ async function post(path:string,body:unknown) {
     value=await response.json();
   } catch {throw new RegistrationError('The result could not be confirmed. Retry the same request before starting over.',null,true);}
   if(!response.ok) {
+    if(value.code==='REGISTRATION_EMAIL_TAKEN'||value.code==='REGISTRATION_RATE_LIMITED')
+      throw new RegistrationError(typeof value.error==='string'?value.error:'Signup is unavailable.',response.status,false,value.code);
     if(typeof value.code==='string' && ['REGISTRATION_CODE_REJECTED','REGISTRATION_CODE_EXPIRED','REGISTRATION_CODE_RATE_LIMITED','REGISTRATION_PROVIDER_UNAVAILABLE'].includes(value.code))
       throw new RegistrationError('Email verification could not be completed.',response.status,response.status>=500,value.code);
     if(response.status===404) throw new RegistrationError('Online account creation is not available in this environment.',404);
@@ -61,6 +63,13 @@ async function post(path:string,body:unknown) {
 }
 export function requestAccount(body:{requestId:string;ownerName:string;email:string;password:string;companyName:string;country:string;phone?:string;acceptTerms:boolean;acceptPrivacy:boolean;plan?:string}) {
   return post('/auth/registrations',body);
+}
+export async function checkRegistrationEmail(email:string,signal:AbortSignal){
+  const response=await fetch('/api/auth/registrations/availability',{method:'POST',credentials:'include',cache:'no-store',signal:AbortSignal.any([signal,AbortSignal.timeout(10000)]),headers:{'content-type':'application/json'},body:JSON.stringify({email})});
+  const value=await response.json();
+  if(!response.ok)throw new RegistrationError('Email availability could not be checked. Try again.',response.status,false,typeof value.code==='string'?value.code:null);
+  if(value?.email!==email.trim().toLowerCase()||typeof value?.available!=='boolean')throw new RegistrationError('Email availability could not be confirmed.');
+  return value as {email:string;available:boolean};
 }
 export function resendAccount(body:{requestId:string;email:string}) {
   return post('/auth/registrations/resend',body);

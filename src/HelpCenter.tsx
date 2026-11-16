@@ -8,7 +8,7 @@ const copy={
   ar:{title:'مساعدة لكل يوم عمل.',intro:'أدلة عملية لمن يرسل التعليمات وينفّذ العمل ويدير الفريق.',home:'مركز المساعدة',search:'ابحث في أدلة المساعدة',placeholder:'جرّب «رابط الوصول» أو «الصوت» أو «الفواتير»',all:'كل الأدلة',worker:'للعمال',supervisor:'للمشرفين',owner:'للمالكين',one:'دليل',clear:'مسح البحث',results:'أدلة',empty:'لم نعثر على أدلة',emptyBody:'جرّب عبارة أخرى أو اختر كل الأدلة.',reset:'مسح التصفية',contact:'تواصل مع الدعم',contactBody:'اذكر مساحة العمل والموقع والشاشة والخطأ ووقت حدوثه. لا ترفق كلمات المرور أو الروابط الخاصة أو التسجيلات أو بيانات العمال الشخصية.',still:'هل تحتاج إلى مساعدة إضافية؟',demo:'جرّب الجولة التفاعلية',back:'العودة إلى مساحة العمل',contents:'في هذا الدليل',related:'اكتشف المزيد',notFound:'تعذّر العثور على هذا الدليل.',read:'اقرأ الدليل',support:'للأسئلة العاجلة المتعلقة بالعمل، تواصل مباشرة مع مشرف الموقع. لا يرسل مركز المساعدة طلب متابعة تشغيلياً.'},
 };
 
-export function HelpCenter({view,locale}:{view:string;locale:HelpLocale}){
+export function HelpCenter({view,locale,workspaceHref='#sign-in'}:{view:string;locale:HelpLocale;workspaceHref?:string}){
   const t=copy[locale],heading=useRef<HTMLHeadingElement>(null);
   const [query,setQuery]=useState(''),[role,setRole]=useState<HelpRole>('all');
   const slug=view==='support'?'':view.slice('support/'.length),guide=helpGuides.find(item=>item.id===slug);
@@ -16,7 +16,7 @@ export function HelpCenter({view,locale}:{view:string;locale:HelpLocale}){
   useEffect(()=>{heading.current?.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});},[view]);
   function goToSection(index:number){const section=document.getElementById(`help-section-${index}`);section?.focus({preventScroll:true});section?.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
   return <div className="help-center landing-container">
-    <nav className="help-breadcrumb" aria-label={t.home}><a href="#support"><LifeBuoy size={17} aria-hidden="true"/>{t.home}</a>{article&&<><ChevronRight size={14} aria-hidden="true"/><span>{article.title}</span></>}<a className="help-workspace" href="#sign-in">{t.back}<ArrowRight size={15} aria-hidden="true"/></a></nav>
+    <nav className="help-breadcrumb" aria-label={t.home}><a href="#support"><LifeBuoy size={17} aria-hidden="true"/>{t.home}</a>{article&&<><ChevronRight size={14} aria-hidden="true"/><span>{article.title}</span></>}<a className="help-workspace" href={workspaceHref}>{t.back}<ArrowRight size={15} aria-hidden="true"/></a></nav>
     {!slug?<>
       <header className="help-heading"><h1 ref={heading} tabIndex={-1}>{t.title}</h1><p>{t.intro}</p></header>
       <div className="help-search-area"><label className="help-search"><Search size={22} aria-hidden="true"/><span className="sr-only">{t.search}</span><input type="search" value={query} maxLength={160} placeholder={t.placeholder} onChange={event=>setQuery(event.target.value)}/>{query&&<button type="button" onClick={()=>setQuery('')}>{t.clear}</button>}</label>

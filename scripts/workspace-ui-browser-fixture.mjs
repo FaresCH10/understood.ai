@@ -5,7 +5,7 @@ import {openDatabase} from '../server/db.mjs';
 import {sqliteApp} from '../tests/helpers/sqlite-app.mjs';
 
 const db=openDatabase(':memory:');
-const server=sqliteApp(db,{publicOrigin:'http://127.0.0.1:3036'});
+const server=sqliteApp(db,{publicOrigin:'http://127.0.0.1:3036',registrationVerification:{available:true,key:Buffer.alloc(32,7),publicOrigin:'http://127.0.0.1:3036'}});
 await new Promise(resolve=>server.listen(3037,'127.0.0.1',resolve));
 const vite=spawn(process.execPath,['node_modules/vite/bin/vite.js'],{
   stdio:'inherit',

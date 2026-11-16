@@ -97,8 +97,10 @@ export async function processOneAssessment(pool,adapter,{schema='public',orgId=n
         WHERE id=$1 AND org_id=$5 AND site_id=$6 AND assignment_id=$7 AND assessment_status='pending' RETURNING id`,
       [job.attempt_id,result.outcome,JSON.stringify(result.reasons),JSON.stringify(result.evidence),job.org_id,job.site_id,job.assignment_id])).rows.length;
       if (changed) {
-        const repeat=(await client.query(`SELECT cr.case_id FROM case_repeats cr JOIN attempts t ON t.assignment_id=cr.assignment_id AND t.submission_id=cr.submission_id
+        const repeat=(await client.query(`SELECT cr.case_id,cr.id FROM case_repeats cr JOIN attempts t ON t.assignment_id=cr.assignment_id AND t.submission_id=cr.submission_id
           AND t.org_id=cr.org_id AND t.site_id=cr.site_id WHERE t.id=$1 AND cr.status='submitted'`,[job.attempt_id])).rows[0];
+        if(result.outcome==='matched'&&repeat&&(await client.query("SELECT 1 FROM clarification_exchanges WHERE id=$1 AND kind='explanation' AND state='delivered'",[repeat.id])).rows.length)
+          await client.query("UPDATE clarifications SET status='resolved',notes='[Understood:ready]Correct answer after clarification' WHERE id=$1 AND org_id=$2 AND site_id=$3 AND status='open'",[repeat.case_id,job.org_id,job.site_id]);
         if (result.outcome!=='matched') {
           if (!repeat) {
             const caseId=randomUUID();await client.query(`INSERT INTO clarifications(id,org_id,site_id,assignment_id,attempt_id,reason,status)

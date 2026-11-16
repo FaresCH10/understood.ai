@@ -9,6 +9,9 @@ export const PLAN_NAMES=Object.freeze({pilot:'Pilot',pro:'Pro',business:'Busines
 export const isPaidPlan=plan=>PAID_PLANS.some(value=>value===plan);
 export const pendingPaidPlan=plan=>PAID_PLANS.find(value=>`${value}_pending`===plan);
 export const isPendingWorkspacePlan=plan=>plan===PENDING_PILOT_PLAN||!!pendingPaidPlan(plan);
+export function pendingWorkspaceState(plan,decision){
+  return isPendingWorkspacePlan(plan)?decision==='declined'?'declined':'pending':null;
+}
 export function higherPaidPlans(plan) {
   const current=typeof plan==='string'?plan.trim().toLowerCase():null;
   if(current && current!=='pilot' && current!=='trial' && !isPaidPlan(current))return [];

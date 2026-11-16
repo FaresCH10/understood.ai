@@ -1,4 +1,5 @@
 import {registrationEntitlement} from '../pilot-policy.mjs';
+import {registrationAvailabilityInput} from '../registration-input.mjs';
 import {registrationAcceptance,sendRegistrationVerification,checkRegistrationCode} from '../registration-verification.mjs';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {inSchema} from './auth.mjs';
@@ -52,18 +53,22 @@ export async function requestRegistration(pool,input,remoteAddress,config,{schem
   const value=registrationRequestInput(input,remoteAddress),generic=registrationAcceptance(config);
   if(!config.available) throw new Error('Email delivery unavailable');
   const record=await passwordRecord(value.password);
-  return inSchema(pool,schema,async client=>{
-    if(!await consumeAuthBudget(client,[tokenHash(`registration-email:${value.email}`),tokenHash(`registration-ip:${remoteAddress}`)],5)) return generic;
+  const result=await inSchema(pool,schema,async client=>{
+    if(!await consumeAuthBudget(client,[tokenHash(`registration-email:${value.email}`),tokenHash(`registration-ip:${remoteAddress}`)],5)) return {limited:true};
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`registration-create:${value.email}`]);
     await expire(client);
     const emailHash=tokenHash(registrationEmailHash(value.email));
-    if((await client.query('SELECT 1 FROM staff_credentials WHERE email=$1',[value.email])).rows[0]) return generic;
+    if((await client.query('SELECT 1 FROM staff_credentials WHERE lower(email)=$1',[value.email])).rows[0]) return {emailTaken:true};
     const existing=(await client.query('SELECT * FROM organization_registrations WHERE email_hash=$1 FOR UPDATE',[emailHash])).rows[0];
-    if(existing && (existing.state==='verified' || existing.state==='pending'))
-      return config.provider==='neon' && existing.state==='pending' && existing.id!==value.requestId?{...generic,requestId:existing.id}:generic;
+    if(existing && (existing.state==='verified' || existing.state==='pending')){
+      const sameRequest=existing.state==='pending'&&(existing.id===value.requestId||openMail(config,existing.id,existing.payload)?.requestId===value.requestId);
+      if(!sameRequest)return {emailTaken:true};
+      return config.provider==='neon'&&existing.id!==value.requestId?{...generic,requestId:existing.id}:generic;
+    }
     if(!existing && (await client.query('SELECT 1 FROM organization_registrations WHERE id=$1',[value.requestId])).rows[0]) return generic;
     const now=(await client.query('SELECT clock_timestamp() AS now')).rows[0].now;
     const id=existing?.id ?? value.requestId;
-    const envelope=sealMail(config,id,{email:value.email,ownerName:value.ownerName,companyName:value.companyName,country:value.country,
+    const envelope=sealMail(config,id,{requestId:value.requestId,email:value.email,ownerName:value.ownerName,companyName:value.companyName,country:value.country,
       phone:value.phone,plan:value.plan,passwordSalt:record.salt,passwordHash:record.derived,termsVersion:REGISTRATION_TERMS_VERSION,
       privacyVersion:REGISTRATION_PRIVACY_VERSION,acknowledgedAt:now.toISOString()});
     let expiresAt;
@@ -86,6 +91,20 @@ export async function requestRegistration(pool,input,remoteAddress,config,{schem
     await queueMail(client,config,id,value.email,expiresAt,now);
     return config.provider==='neon' && id!==value.requestId?{...generic,requestId:id}:generic;
   });
+  if(result.emailTaken)throw Error('Registration email unavailable');
+  if(result.limited)throw Error('Registration rate limit exceeded');
+  return result;
+}
+export async function registrationAvailability(pool,input,remoteAddress,{schema='public'}={}){
+  const {email}=registrationAvailabilityInput(input,remoteAddress);
+  const result=await inSchema(pool,schema,async client=>{
+    if(!await consumeAuthBudget(client,[tokenHash(`registration-availability-ip:${remoteAddress}`)],60))return null;
+    const taken=(await client.query(`SELECT EXISTS(SELECT 1 FROM staff_credentials WHERE lower(email)=$1) OR EXISTS(
+      SELECT 1 FROM organization_registrations WHERE email_hash=$2 AND (state='verified' OR state='pending' AND expires_at>clock_timestamp())) AS taken`,[email,tokenHash(registrationEmailHash(email))])).rows[0].taken;
+    return {email,available:!taken};
+  });
+  if(!result)throw Error('Registration rate limit exceeded');
+  return result;
 }
 export function resendRegistration(pool,input,remoteAddress,config,{schema='public'}={}) {
   const value=registrationResendInput(input,remoteAddress),generic=registrationAcceptance(config);

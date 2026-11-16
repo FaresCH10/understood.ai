@@ -1,0 +1,11 @@
+.staff-shell .dashboard-help { min-height:0; background:transparent; }
+.staff-shell .dashboard-help .landing-container { width:100%; max-width:100%; padding-inline:0; }
+.staff-shell .dashboard-help .help-center { padding-block:0 24px; }
+.staff-shell .dashboard-help .contact-page { padding-block:0 24px; }
+.staff-shell .dashboard-help .help-heading h1 { font-size:clamp(28px,3vw,42px); }
+.staff-shell .dashboard-help .contact-intro h1 { font-size:clamp(28px,3vw,42px); }
+.staff-shell .dashboard-help .help-breadcrumb { flex-wrap:wrap; }
+.staff-shell .dashboard-help .help-workspace { margin-inline-start:auto; }
+.dashboard-walkthrough > .landing-text-link { margin-bottom:24px; }
+.staff-shell .dashboard-help .landing-demo { width:100%; max-width:640px; }
+.staff-shell .dashboard-walkthrough > .page-header { min-height:0; height:auto; }

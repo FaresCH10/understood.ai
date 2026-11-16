@@ -1,0 +1,7 @@
+.simple-clarifications{max-width:880px;margin-inline:auto;display:grid;gap:20px}
+.simple-clarifications .panel{padding:24px;display:grid;gap:14px}
+.simple-clarifications .page-header{margin:0}
+.simple-clarifications h2,.simple-clarifications h3,.simple-clarifications p{margin:0}
+.simple-clarification-row{display:grid;grid-template-columns:minmax(100px,1fr) minmax(100px,2fr) auto;gap:16px;align-items:center;text-align:start;padding:18px 0;background:none;border:0;border-bottom:1px solid var(--line,#e0e6e2);color:inherit;font:inherit;cursor:pointer}
+.clarification-flow form{display:grid;gap:16px}
+@media(max-width:640px){.simple-clarifications .panel{padding:18px}.simple-clarification-row{grid-template-columns:1fr}.simple-clarifications .button{white-space:normal}}

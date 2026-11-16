@@ -1,4 +1,5 @@
 import {registrationEntitlement} from './pilot-policy.mjs';
+import {registrationAvailabilityInput} from './registration-input.mjs';
 import {registrationAcceptance,sendRegistrationVerification,checkRegistrationCode} from './registration-verification.mjs';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {NOW,transaction} from './db.mjs';
@@ -120,18 +121,21 @@ export async function requestRegistration(db,input,remoteAddress,config) {
   if(!config.available) throw new Error('Email delivery unavailable');
   ensureRegistrationSchema(db);
   const record=await passwordRecord(value.password);
-  return transaction(db,()=>{
+  const result=transaction(db,()=>{
     const now=NOW();
-    if(!consumeAuthBudget(db,[tokenHash(`registration-email:${value.email}`),tokenHash(`registration-ip:${remoteAddress}`)],5,{now})) return generic;
+    if(!consumeAuthBudget(db,[tokenHash(`registration-email:${value.email}`),tokenHash(`registration-ip:${remoteAddress}`)],5,{now})) return {limited:true};
     expire(db,now);
     const emailHash=tokenHash(registrationEmailHash(value.email));
-    if(db.prepare('SELECT 1 FROM staff_credentials WHERE lower(email)=?').get(value.email)) return generic;
+    if(db.prepare('SELECT 1 FROM staff_credentials WHERE lower(email)=?').get(value.email)) return {emailTaken:true};
     const existing=db.prepare('SELECT * FROM organization_registrations WHERE email_hash=?').get(emailHash);
-    if(existing && (existing.state==='verified' || existing.state==='pending'))
-      return config.provider==='neon' && existing.state==='pending' && existing.id!==value.requestId?{...generic,requestId:existing.id}:generic;
+    if(existing && (existing.state==='verified' || existing.state==='pending')){
+      const sameRequest=existing.state==='pending'&&(existing.id===value.requestId||openMail(config,existing.id,existing.payload)?.requestId===value.requestId);
+      if(!sameRequest)return {emailTaken:true};
+      return config.provider==='neon'&&existing.id!==value.requestId?{...generic,requestId:existing.id}:generic;
+    }
     if(!existing && db.prepare('SELECT 1 FROM organization_registrations WHERE id=?').get(value.requestId)) return generic;
     const id=existing?.id ?? value.requestId,expiresAt=date(registrationLifetime);
-    const envelope=sealMail(config,id,{email:value.email,ownerName:value.ownerName,companyName:value.companyName,country:value.country,
+    const envelope=sealMail(config,id,{requestId:value.requestId,email:value.email,ownerName:value.ownerName,companyName:value.companyName,country:value.country,
       phone:value.phone,plan:value.plan,passwordSalt:record.salt,passwordHash:record.derived,termsVersion:REGISTRATION_TERMS_VERSION,
       privacyVersion:REGISTRATION_PRIVACY_VERSION,acknowledgedAt:now});
     if(existing) {
@@ -148,6 +152,20 @@ export async function requestRegistration(db,input,remoteAddress,config) {
     queueMail(db,config,id,value.email,expiresAt,now);
     return config.provider==='neon' && id!==value.requestId?{...generic,requestId:id}:generic;
   });
+  if(result.emailTaken)throw Error('Registration email unavailable');
+  if(result.limited)throw Error('Registration rate limit exceeded');
+  return result;
+}
+export function registrationAvailability(db,input,remoteAddress){
+  const {email}=registrationAvailabilityInput(input,remoteAddress);ensureRegistrationSchema(db);
+  const result=transaction(db,()=>{
+    if(!consumeAuthBudget(db,[tokenHash(`registration-availability-ip:${remoteAddress}`)],60))return null;
+    const taken=db.prepare('SELECT 1 FROM staff_credentials WHERE lower(email)=?').get(email)
+      ||db.prepare("SELECT 1 FROM organization_registrations WHERE email_hash=? AND (state='verified' OR state='pending' AND expires_at>?)").get(tokenHash(registrationEmailHash(email)),NOW());
+    return {email,available:!taken};
+  });
+  if(!result)throw Error('Registration rate limit exceeded');
+  return result;
 }
 export function resendRegistration(db,input,remoteAddress,config) {
   const value=registrationResendInput(input,remoteAddress),generic=registrationAcceptance(config);

@@ -1,4 +1,5 @@
 export function isHelpView(view:string){return view==='support'||view.startsWith('support/');}
+export function isDashboardHelpView(view:string){return isHelpView(view)||view==='walkthrough'||view==='contact';}
 
 export const PUBLIC_SECTIONS=[
   {id:'platform',en:'Platform',ar:'المنصة'},

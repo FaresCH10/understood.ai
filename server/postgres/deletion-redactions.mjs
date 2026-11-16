@@ -29,6 +29,7 @@ export async function processOneDeletionRedaction(pool,{schema='public'}={}){
       WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)`,[row.worker_id]);
     await client.query("UPDATE help_requests SET text='[Deleted]' WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)",[row.worker_id]);
     await client.query("UPDATE case_messages SET text='[Deleted]' WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)",[row.worker_id]);
+    await client.query("UPDATE clarification_exchanges SET source_text='[Deleted]',translated_text=NULL,state='failed',lease_token=NULL,lease_until=NULL,error_code='worker_deleted' WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)",[row.worker_id]);
     await client.query("UPDATE case_reviews SET reason='[Deleted]' WHERE kind='disagree' AND assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)",[row.worker_id]);
     await client.query("UPDATE case_repeats SET status='cancelled' WHERE status='pending' AND assignment_id IN (SELECT id FROM assignments WHERE worker_id=$1)",[row.worker_id]);
     await client.query(`UPDATE case_followups SET source_text='[Deleted]',glossary_json='{}',manifest_json=NULL,

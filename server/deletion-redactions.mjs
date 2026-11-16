@@ -76,6 +76,7 @@ export function processOneDeletionRedaction(db){
       WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=?)`).run(row.worker_id);
     db.prepare("UPDATE help_requests SET text='[Deleted]' WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=?)").run(row.worker_id);
     db.prepare("UPDATE case_messages SET text='[Deleted]' WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=?)").run(row.worker_id);
+    db.prepare("UPDATE clarification_exchanges SET source_text='[Deleted]',translated_text=NULL,state='failed' WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=?)").run(row.worker_id);
     db.prepare("UPDATE clarifications SET reason='[Deleted]',notes='' WHERE assignment_id IN (SELECT id FROM assignments WHERE worker_id=?)").run(row.worker_id);
     db.prepare("UPDATE worker_language_requests SET reason='[Deleted]' WHERE worker_id=? AND reason<>'[Deleted]'").run(row.worker_id);
     db.prepare(`UPDATE presentation_artifacts SET title=CASE WHEN title IS NULL THEN NULL ELSE '[Deleted]' END,text='[Deleted]',

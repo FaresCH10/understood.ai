@@ -54,6 +54,18 @@ export function registrationVerifyInput(input) {
   return {token:input.token};
 }
 export const registrationEmailHash=email=>`registration-email:${email}`;
+export function registrationAvailabilityInput(input,remoteAddress){
+  keys(input,['email']);address(remoteAddress);
+  if(typeof input.email!=='string'||input.email.length>254)throw invalid();
+  const email=normalizeEmail(input.email);
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw invalid();
+  return {email};
+}
+export function registrationAvailabilityError(error){
+  if(error?.message==='Registration email unavailable')return {status:409,error:'This email is already registered or has a signup awaiting verification. Sign in or use another email.',code:'REGISTRATION_EMAIL_TAKEN'};
+  if(error?.message==='Registration rate limit exceeded')return {status:429,error:'Too many signup checks. Wait a few minutes before trying again.',code:'REGISTRATION_RATE_LIMITED'};
+  return null;
+}
 
 export function registrationCodeInput(input,remoteAddress){
   keys(input,['requestId','email','code']);

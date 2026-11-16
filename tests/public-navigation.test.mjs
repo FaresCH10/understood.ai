@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PUBLIC_SECTIONS,isPublicLandingView,publicLandingTarget} from '../src/public-navigation.ts';
+import {PUBLIC_SECTIONS,isPublicLandingView,publicLandingTarget,isDashboardHelpView} from '../src/public-navigation.ts';
 
 test('all five marketing destinations and product aliases stay public on a direct visit',()=>{
   assert.equal(PUBLIC_SECTIONS.length,5);
@@ -15,4 +15,8 @@ test('all five marketing destinations and product aliases stay public on a direc
 
 test('marketing route matching does not swallow authentication or private application routes',()=>{
   for(const view of ['overview','instructions','people','settings','device','worker','register','sign-in','pilot','walkthrough','platform/unknown','companies/private',''])assert.equal(isPublicLandingView(view),false,view);
+});
+test('supervisor help includes articles, contact and walkthrough without capturing marketing or private work',()=>{
+  for(const view of ['support','support/getting-started','contact','walkthrough'])assert.equal(isDashboardHelpView(view),true,view);
+  for(const view of ['home','plans','pricing','overview','settings','notifications','pilot','sign-in'])assert.equal(isDashboardHelpView(view),false,view);
 });

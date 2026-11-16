@@ -22,7 +22,7 @@ export const pendingRepeatPredicate=`EXISTS(SELECT 1 FROM case_repeats cr JOIN c
   WHERE cr.assignment_id=a.id AND cr.org_id=a.org_id AND cr.site_id=a.site_id AND cr.status='pending' AND cr.due_at>clock_timestamp() AND cc.status='open')`;
 // A check-back repeat shares its id with the frozen worker-language message, so the worker page can show it verbatim.
 export function pendingRepeatColumns({message=false}={}) {
-  return `(SELECT jsonb_strip_nulls(jsonb_build_object('id',cr.id,'caseId',cr.case_id,'dueAt',cr.due_at${message?",'message',(SELECT m.text FROM case_messages m WHERE m.id=cr.id AND m.case_id=cr.case_id AND m.org_id=cr.org_id AND m.site_id=cr.site_id)":''})) FROM case_repeats cr
+  return `(SELECT jsonb_strip_nulls(jsonb_build_object('id',cr.id,'caseId',cr.case_id,'dueAt',cr.due_at${message?",'message',COALESCE((SELECT e.translated_text FROM clarification_exchanges e WHERE e.id=cr.id AND e.case_id=cr.case_id AND e.org_id=cr.org_id AND e.site_id=cr.site_id AND e.state='delivered'),(SELECT m.text FROM case_messages m WHERE m.id=cr.id AND m.case_id=cr.case_id AND m.org_id=cr.org_id AND m.site_id=cr.site_id))":''})) FROM case_repeats cr
   JOIN clarifications cc ON cc.id=cr.case_id AND cc.org_id=cr.org_id AND cc.site_id=cr.site_id
   WHERE cr.assignment_id=a.id AND cr.org_id=a.org_id AND cr.site_id=a.site_id AND cr.status='pending' AND cr.due_at>clock_timestamp()
     AND cc.status='open' AND p.state='published') AS repeat_request`;

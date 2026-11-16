@@ -44,6 +44,7 @@ export const caseContentRetentionDue=`c.status='resolved' AND c.resolved_at<=clo
   AND NOT EXISTS(SELECT 1 FROM case_content_purges d WHERE d.case_id=c.id)
   AND NOT EXISTS(SELECT 1 FROM case_messages m WHERE m.case_id=c.id AND m.created_at>clock_timestamp()-p.days*interval '1 day')
   AND NOT EXISTS(SELECT 1 FROM case_followups f WHERE f.case_id=c.id AND GREATEST(f.created_at,f.delivered_at)>clock_timestamp()-p.days*interval '1 day')
+  AND NOT EXISTS(SELECT 1 FROM clarification_exchanges e WHERE e.case_id=c.id AND GREATEST(e.created_at,e.delivered_at)>clock_timestamp()-p.days*interval '1 day')
   AND NOT EXISTS(SELECT 1 FROM case_reviews r WHERE r.case_id=c.id AND r.created_at>clock_timestamp()-p.days*interval '1 day')
   AND NOT EXISTS(SELECT 1 FROM case_voice v WHERE v.requested_case_id=c.id AND GREATEST(v.created_at,v.received_at)>clock_timestamp()-p.days*interval '1 day')`;
 const due=caseContentRetentionDue;
@@ -53,6 +54,7 @@ export async function redactExpiredCase(client,caseId) {
   await client.query("UPDATE clarifications SET reason=$2,notes='' WHERE id=$1",[caseId,marker]);
   await client.query('UPDATE help_requests SET text=$2 WHERE case_id=$1',[caseId,marker]);
   await client.query('UPDATE case_messages SET text=$2 WHERE case_id=$1',[caseId,marker]);
+  await client.query("UPDATE clarification_exchanges SET source_text=$2,translated_text=NULL,state='failed',lease_token=NULL,lease_until=NULL,error_code='content_expired' WHERE case_id=$1",[caseId,marker]);
   await client.query("UPDATE case_reviews SET reason=$2 WHERE case_id=$1 AND kind='disagree'",[caseId,marker]);
   await client.query(`UPDATE case_followups SET source_text=$2,glossary_json='{}',manifest_json=NULL,status='failed',
     lease_token=NULL,lease_until=NULL,error_code='content_expired' WHERE case_id=$1`,[caseId,marker]);

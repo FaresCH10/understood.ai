@@ -1,4 +1,5 @@
 import { entitlementSummary, activationRequestSummary } from './entitlement-model.mjs';
+import {pendingWorkspaceState} from './pilot-policy.mjs';
 
 export { ensureEntitlementSchema } from './entitlement-schema.mjs';
 
@@ -9,6 +10,12 @@ const scope = (orgId) => {
 
 export function readEntitlement(db, orgId) {
   return db.prepare('SELECT * FROM organization_entitlements WHERE org_id=?').get(scope(orgId)) ?? null;
+}
+export function workspaceAccessState(db,orgId){
+  const row=db.prepare(`SELECT e.plan,(SELECT a.state FROM organization_activation_requests a
+    WHERE a.org_id=e.org_id AND a.entitlement_revision=e.revision ORDER BY a.created_at DESC,a.request_id DESC LIMIT 1) AS decision
+    FROM organization_entitlements e WHERE e.org_id=?`).get(scope(orgId));
+  return pendingWorkspaceState(row?.plan,row?.decision);
 }
 
 export function entitlementState(db, orgId, { now = Date.now() } = {}) {

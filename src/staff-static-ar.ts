@@ -2556,4 +2556,12 @@ export const staffStaticArabic={
   "Page not available": "الصفحة غير متاحة",
   "Workspace setup": "إعداد مساحة العمل",
   "Platform operations": "عمليات المنصة",
+  "Your pilot request was declined.": "لم تتم الموافقة على طلبك للبرنامج التجريبي.",
+  "Your plan activation request was declined.": "لم تتم الموافقة على طلب تفعيل خطتك.",
+  "Your workspace has not been activated. Contact us if you would like us to review your request.": "لم تُفعّل مساحة عملك. تواصل معنا إذا كنت ترغب في مراجعة طلبك.",
+  "Access status checked.": "تم التحقق من حالة الوصول.",
+  "Workspace request declined": "لم تتم الموافقة على طلب مساحة العمل",
+  "Workspace access": "الوصول إلى مساحة العمل",
+  "Contact us": "تواصل معنا",
+  "Sign out": "تسجيل الخروج",
 } as const;

@@ -43,6 +43,7 @@ import {processOneCaseEscalation} from './case-routing.mjs';
 import {expirePushSubscriptions,processOnePushDelivery,sweepOverdueAssignments} from './notification-events.mjs';
 import {resolvePushAdapter} from '../push-adapter.mjs';
 import {processOneCaseFollowup,processOneCaseFollowupPurge} from './case-followups.mjs';
+import {processOneClarificationExchange} from './clarification-flow.mjs';
 import {resolveCaseFollowup} from '../ai/case-followup-config.mjs';
 import {processOneCaseVoicePurge} from './case-voice.mjs';
 import {resolveRecordingAdapter} from '../ai/recording-config.mjs';
@@ -92,6 +93,7 @@ export function rehearsalTasks(pool,storage,config,{verificationSignal}={}) {
     instructionImprovement:() => processOneInstructionImprovement(pool,options),
     pushDelivery:() => processOnePushDelivery(pool,config.pushAdapter ?? resolvePushAdapter(),options),
     caseEscalation:() => processOneCaseEscalation(pool,options),
+    clarificationExchange:()=>processOneClarificationExchange(pool,config.caseFollowupAdapter??config.preparationAdapter,{...options,dataClass:config.dataClass}),
     caseFollowup:()=>config.caseFollowupAdapter?processOneCaseFollowup(pool,config.caseFollowupAdapter,storage,{...options,dataClass:config.dataClass}):false,
     caseFollowupRetention:()=>processOneCaseFollowupPurge(pool,storage,options),
     caseVoiceRetention:()=>processOneCaseVoicePurge(pool,storage,options),

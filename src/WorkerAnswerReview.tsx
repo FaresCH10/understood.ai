@@ -1,5 +1,4 @@
 import {useId} from 'react';
-import {Check} from 'lucide-react';
 import {workerAnswerReviewText} from './worker-answer-review-text';
 import type {WorkerUiLanguage} from './worker-ui-language';
 
@@ -13,12 +12,7 @@ export function WorkerAnswerReview({language,questionType,choices,answerText,con
   const chosen=multiple?choices.find(choice=>choice.id===answerText):null;
   return <section className="worker-answer-record" aria-labelledby={titleId}>
     <h3 id={titleId}>{copy.title}</h3>
-    {multiple?<ul className="worker-answer-record-list">
-      {choices.map(choice=><li key={choice.id} className={choice.id===answerText?'is-chosen':''}>
-        <span lang={contentLanguage} dir="auto">{choice.text}</span>
-        {choice.id===answerText&&<span className="worker-answer-tag"><Check size={13} aria-hidden="true"/>{copy.chosen}</span>}
-      </li>)}
-    </ul>:<p className="briefing-text" lang={contentLanguage} dir="auto">{answerText}</p>}
-    <p className="muted">{multiple&&!chosen?copy.unrecorded:copy.body}</p>
+    <p className="briefing-text" lang={contentLanguage} dir="auto">{multiple?chosen?.text??copy.unrecorded:answerText}</p>
+    {!multiple&&<p className="muted">{copy.body}</p>}
   </section>;
 }

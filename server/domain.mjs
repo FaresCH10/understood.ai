@@ -1,4 +1,5 @@
 import {assessMultipleChoice} from './multiple-choice.mjs';
+import {pendingFlowRepeat} from './clarification-flow.mjs';
 import {requireWorkerSiteAccess} from './site-access.mjs';
 import { randomUUID } from 'node:crypto';
 import {captureReportAudience} from './report-scope.mjs';
@@ -241,10 +242,11 @@ export function submitAnswer(db, session, assignmentId, submissionId, answerText
     requireWritableEntitlement(db,session.org_id);
     if (submissionId.length < 8) throw new Error('Invalid submission ID');
     if (assignment.state !== 'published') throw new Error('Assignment unavailable');
-    if (assignment.due_at && assignment.due_at<=NOW()) throw new Error('Assignment deadline passed');
+    const followup=pendingFlowRepeat(db,assignmentId),canRepeat=followup&&followup.dueAt>NOW();
+    if (!canRepeat&&assignment.due_at && assignment.due_at<=NOW()) throw new Error('Assignment deadline passed');
     if (db.prepare('SELECT 1 FROM recordings WHERE assignment_id=? AND submission_id=?').get(assignmentId, submissionId))
       throw new Error('Submission ID conflict');
-    if(db.prepare(`SELECT sr.kind,r.status FROM submission_receipts sr LEFT JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.submission_id=sr.submission_id AND r.org_id=sr.org_id WHERE sr.assignment_id=? AND sr.org_id=? ORDER BY sr.sequence DESC LIMIT 1`).all(assignmentId,session.org_id).some(row=>row.kind!=='audio'||!['failed','blocked'].includes(row.status)))throw Error('Another answer requires an approved repeat');
+    if(!canRepeat&&db.prepare(`SELECT sr.kind,r.status FROM submission_receipts sr LEFT JOIN recordings r ON r.assignment_id=sr.assignment_id AND r.submission_id=sr.submission_id AND r.org_id=sr.org_id WHERE sr.assignment_id=? AND sr.org_id=? ORDER BY sr.sequence DESC LIMIT 1`).all(assignmentId,session.org_id).some(row=>row.kind!=='audio'||!['failed','blocked'].includes(row.status)))throw Error('Another answer requires an approved repeat');
     const snapshot = JSON.parse(assignment.snapshot_json);
     if(snapshot.responseMode==='acknowledge') throw new Error('This instruction only requires confirmation');
     const presentation=checkedPresentationBinding(db,session,assignmentId,presentationId);
@@ -261,6 +263,7 @@ export function submitAnswer(db, session, assignmentId, submissionId, answerText
       .run(session.org_id, assignmentId, submissionId, 'typed', now);
     db.prepare('INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?)').run(id, session.org_id, assignmentId, submissionId, answerText.trim(), result.outcome, JSON.stringify(result.reasons), now);
     recordPresentationBinding(db,id,presentation,now);
+    if(canRepeat&&result.outcome==='matched')db.prepare("UPDATE clarifications SET status='resolved',notes='[Understood:ready]Correct answer after clarification' WHERE assignment_id=? AND org_id=? AND status='open'").run(assignmentId,session.org_id);
     if (result.outcome !== 'matched') {
       const caseId=randomUUID();
       db.prepare('INSERT INTO clarifications VALUES (?,?,?,?,?,?,?,?,?)').run(caseId, session.org_id, assignmentId, id, result.reasons[0], null, 'open', '', now);

@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowLeft,ArrowRight,CheckCircle2,Clock3,MessageCircle,RefreshCw,TriangleAlert} from 'lucide-react';
 import {WorkerAudioPlayer} from './WorkerAudioPlayer';
 import {readWorkerReceiptSnapshot,workerReceiptText,workerReceiptUnknownText,type ReceiptSelection,type WorkerReceiptSnapshot} from './worker-submission-receipt';
@@ -7,8 +7,8 @@ import {workerSubmissionState,WorkerSubmissionsError} from './worker-submissions
 import {validWorkerSession,type PageSession} from './session-state';
 import {type WorkerUiLanguage,workerUiDirection} from './worker-ui-language';
 
-type Props={choices?:{id:string;text:string}[];session:PageSession;selection:ReceiptSelection;acknowledgedContext:string;language:WorkerUiLanguage;timezone?:string;disabled:boolean;canHelp:boolean;current:()=>boolean;onSessionLost:()=>void;onBack:()=>void;onHelp:()=>void;onChecked?:()=>void};
-export function WorkerSubmissionReceipt({choices,session,selection,acknowledgedContext,language,timezone,disabled,canHelp,current,onSessionLost,onBack,onHelp,onChecked}:Props){
+type Props={clarification?:ReactNode;choices?:{id:string;text:string}[];session:PageSession;selection:ReceiptSelection;acknowledgedContext:string;language:WorkerUiLanguage;timezone?:string;disabled:boolean;canHelp:boolean;current:()=>boolean;onSessionLost:()=>void;onBack:()=>void;onHelp:()=>void;onChecked?:()=>void};
+export function WorkerSubmissionReceipt({clarification,choices,session,selection,acknowledgedContext,language,timezone,disabled,canHelp,current,onSessionLost,onBack,onHelp,onChecked}:Props){
   const t=workerReceiptText[language],key=JSON.stringify([session.clientContext,session.expiresAt,selection.assignmentId,selection.version,selection.language,selection.requestId,selection.kind]);
   const selected=useRef(key);selected.current=key;
   const [retry,setRetry]=useState(0),[read,setRead]=useState<{key:string;data:WorkerReceiptSnapshot|null;failed:boolean;loading:boolean}>({key:'',data:null,failed:false,loading:true});
@@ -60,6 +60,6 @@ export function WorkerSubmissionReceipt({choices,session,selection,acknowledgedC
     </details>}
     {session.mode?.startsWith('synthetic-')&&<p className="muted">{t.synthetic}</p>}
     <p className="muted">{t.limits}</p>
-    <div className="worker-receipt-actions"><button type="button" className="button primary full" disabled={disabled} onClick={onBack}>{workerUiDirection(language)==='rtl'?<ArrowRight size={20} aria-hidden="true"/>:<ArrowLeft size={20} aria-hidden="true"/>}{t.back}</button><button type="button" className="button outline full" disabled={disabled||!canHelp} onClick={onHelp}><MessageCircle size={20} aria-hidden="true"/>{t.help}</button></div>
+    {state==='clarification'&&clarification?clarification:<div className="worker-receipt-actions"><button type="button" className="button primary full" disabled={disabled} onClick={onBack}>{workerUiDirection(language)==='rtl'?<ArrowRight size={20} aria-hidden="true"/>:<ArrowLeft size={20} aria-hidden="true"/>}{t.back}</button>{!clarification&&<button type="button" className="button outline full" disabled={disabled||!canHelp} onClick={onHelp}><MessageCircle size={20} aria-hidden="true"/>{t.help}</button>}</div>}
   </section>;
 }

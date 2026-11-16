@@ -36,6 +36,7 @@ import {processOneInstructionImprovement} from './self-healing.mjs';
 import {resolvePushAdapter} from './push-adapter.mjs';
 import {processOneCaseEscalation} from './case-routing.mjs';
 import {processOneCaseFollowup} from './case-followups.mjs';
+import {processOneClarificationExchange} from './clarification-flow.mjs';
 import {resolveCaseFollowup} from './ai/case-followup-config.mjs';
 import {ensureStaffCaseRecordingSchema} from './staff-case-recording-schema.mjs';
 import {processOneStaffCaseRecordingPurge} from './staff-case-recordings.mjs';
@@ -109,6 +110,7 @@ if (process.argv[1]?.endsWith('worker.mjs')) {
       for(let i=0;i<5 && await processOneSourceAudio(db,sourceAdapter);i++) {}
       for(let i=0;i<5 && await processOneRecording(db,null);i++) {}
       for(let i=0;i<5 && processOneCaseEscalation(db);i++) {}
+      if(await processOneClarificationExchange(db,followupAdapter)) {}
       if(await processOneCaseFollowup(db,followupAdapter)) {}
       for(let i=0;i<5 && processOneDeletionRedaction(db);i++) {}
       for(let i=0;i<5 && processOneDeletionPseudonym(db);i++) {}
