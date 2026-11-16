@@ -13,6 +13,5 @@ export function WorkerAnswerReview({language,questionType,choices,answerText,con
   return <section className="worker-answer-record" aria-labelledby={titleId}>
     <h3 id={titleId}>{copy.title}</h3>
     <p className="briefing-text" lang={contentLanguage} dir="auto">{multiple?chosen?.text??copy.unrecorded:answerText}</p>
-    {!multiple&&<p className="muted">{copy.body}</p>}
   </section>;
 }
