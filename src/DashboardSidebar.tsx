@@ -11,10 +11,10 @@ const accountCopy={
 };
 
 type Item={key:string;label:string;icon:ComponentType<{size?:number}>;active:boolean};
-export function DashboardSidebar({brand,items,name,email,plan,identity,settingsLabel,signOutLabel,closeLabel,accountLabel,onClose,navigate,logout,disabled,open=true}:{brand:ReactNode;items:Item[];name?:string;email?:string;plan?:string;identity:string;settingsLabel:string;signOutLabel:string;closeLabel:string;accountLabel:string;onClose:()=>void;navigate:(path:string)=>void;logout:()=>void;disabled:boolean;open?:boolean}){
+export function DashboardSidebar({brand,organization,site,items,name,email,plan,identity,settingsLabel,signOutLabel,closeLabel,accountLabel,onClose,navigate,logout,disabled,open=true}:{brand:ReactNode;organization?:string;site?:string;items:Item[];name?:string;email?:string;plan?:string;identity:string;settingsLabel:string;signOutLabel:string;closeLabel:string;accountLabel:string;onClose:()=>void;navigate:(path:string)=>void;logout:()=>void;disabled:boolean;open?:boolean}){
   const root=useRef<HTMLElement>(null);
   const more=useRef<HTMLDetailsElement>(null),morePanel=useRef<HTMLDivElement>(null);
-  const moreKeys=new Set(['language-requests','reports']);
+  const moreKeys=new Set(['language-requests']);
   const primaryItems=items.filter(item=>!moreKeys.has(item.key)),moreItems=items.filter(item=>moreKeys.has(item.key));
   const activeMoreKey=moreItems.find(item=>item.active)?.key;
   useEffect(()=>{if(activeMoreKey && more.current)more.current.open=true;},[activeMoreKey]);
@@ -133,6 +133,7 @@ export function DashboardSidebar({brand,items,name,email,plan,identity,settingsL
   const link=(item:Item)=><button key={item.key} aria-current={item.active?'page':undefined} className={`sidebar-link ${item.active?'active':''}`} onClick={()=>navigate(item.key)} onPointerEnter={event=>{if(event.pointerType==='mouse')animateIcon(event.currentTarget,item.key,true);}} onPointerLeave={event=>{if(event.pointerType==='mouse')animateIcon(event.currentTarget,item.key,false);}}><item.icon size={19}/><span>{item.label}</span></button>;
   return <aside ref={root} id="dashboard-sidebar" className="sidebar dashboard-sidebar" inert={disabled||!open} aria-hidden={!open}>
     <div className="sidebar-heading">{brand}<button className="icon-button sidebar-close" aria-label={closeLabel} title={closeLabel} onClick={onClose}><PanelLeftClose size={20}/></button></div>
+    {organization&&<div className="workspace-company"><span aria-hidden="true">{organization.slice(0,2).toUpperCase()}</span><div><strong title={organization}><bdi>{organization}</bdi></strong><small><bdi>{site}</bdi> · {identity}</small></div></div>}
     <nav aria-label={accountLabel}><div className="sidebar-group">{primaryItems.map(link)}{moreItems.length>0&&<details className="sidebar-more" ref={more} onToggle={animateMore}><summary className={`sidebar-link sidebar-more-trigger${activeMoreKey?' has-active':''}`} onPointerEnter={event=>{if(event.pointerType==='mouse')animateMoreDots(event.currentTarget,true);}} onPointerLeave={event=>{if(event.pointerType==='mouse')animateMoreDots(event.currentTarget,false);}} onFocus={event=>animateMoreDots(event.currentTarget,true)} onBlur={event=>animateMoreDots(event.currentTarget,false)}><Ellipsis className="sidebar-more-icon" size={19}/><span>{copy.more}</span><ChevronDown className="sidebar-more-chevron" size={15}/></summary><div className="sidebar-more-panel" ref={morePanel}>{moreItems.map(link)}</div></details>}</div></nav>
     <details ref={account} className="account-disclosure">
       <summary className="profile" aria-label={accountLabel} onClick={event=>{event.preventDefault();setAccount(!accountExpanded.current);}}><span className="avatar">{initials}</span><span><strong><bdi>{name}</bdi></strong><small>{identity}</small></span><ChevronDown className="account-chevron" size={16}/></summary>

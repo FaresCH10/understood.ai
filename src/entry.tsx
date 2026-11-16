@@ -12,6 +12,7 @@ import './worker-workspace.css';
 import './dashboard-header.css';
 import './supervisor-responsive.css';
 import './worker-responsive.css';
+import './workspace-ui.css';
 
 installPageLoadTracking();
 createRoot(document.getElementById('root')!).render(<SignOutConfirmationProvider><PageLoadingBoundary><App/></PageLoadingBoundary></SignOutConfirmationProvider>);

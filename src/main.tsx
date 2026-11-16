@@ -292,6 +292,8 @@ const staffPrimaryNavigation = [
   { key: 'clarifications', label: 'clarifications', icon: FileText },
   { key: 'language-requests', label: 'languageRequests', icon: Languages },
   { key: 'reports', label: 'reports', icon: BarChart3 },
+  { key: 'notifications', label: 'notifications', icon: Bell },
+  { key: 'settings', label: 'settings', icon: Settings },
 ];
 function staffNavigationActive(key:string,view:string) {
   if(key==='overview')return view==='overview';
@@ -705,10 +707,10 @@ export default function App() {
     .filter(({key})=>(session.staffRole!=='administrator'||key==='settings')&&(!['people','people/crews','language-requests'].includes(key)||canWrite))
     .map(item=>({...item,label:staffUi[item.label as keyof typeof staffUi],active:staffNavigationActive(item.key,view)}));
   const staffRouteLabel=staffRouteTitle(view,staffUi,staffT);
-return <StaffLanguageContext.Provider value={staffUiLanguage}><StaffTimezoneContext.Provider value={session.timezone || 'UTC'}><>{sessionGuard.suspended&&<SessionConnectionNotice language={staffUiLanguage} onRetry={sessionGuard.retry} busy={sessionGuard.retrying}/>}<div hidden={sessionGuard.suspended} style={sessionGuard.suspended?{display:'none'}:undefined} className={`staff-shell ${sidebarOpen?'':'sidebar-hidden'}`} lang={staffUiLanguage} dir={staffUiLanguage==='en'?'ltr':'rtl'} inert={sessionGuard.checking} aria-busy={sessionGuard.checking} onClickCapture={blockStaffInput} onSubmitCapture={blockStaffInput} onKeyDownCapture={blockStaffInput}>
+return <StaffLanguageContext.Provider value={staffUiLanguage}><StaffTimezoneContext.Provider value={session.timezone || 'UTC'}><>{sessionGuard.suspended&&<SessionConnectionNotice language={staffUiLanguage} onRetry={sessionGuard.retry} busy={sessionGuard.retrying}/>}<div hidden={sessionGuard.suspended} style={sessionGuard.suspended?{display:'none'}:undefined} className={`staff-shell dev-workspace ${sidebarOpen?'':'sidebar-hidden'}`} lang={staffUiLanguage} dir={staffUiLanguage==='en'?'ltr':'rtl'} inert={sessionGuard.checking} aria-busy={sessionGuard.checking} onClickCapture={blockStaffInput} onSubmitCapture={blockStaffInput} onKeyDownCapture={blockStaffInput}>
   <a className="skip-link" href="#staff-main" onClick={event=>{event.preventDefault();document.getElementById('staff-main')?.focus();}}>{staffUiLanguage==='ar'?'انتقل إلى المحتوى الرئيسي':staffT("Skip to main content")}</a>
   {staffRouteLabel&&<p className="sr-only" role="status" aria-live="polite">{staffRouteLabel}</p>}
-  <DashboardSidebar open={sidebarOpen} brand={<Brand/>} items={staffNavigation} name={session.name} email={session.email} plan={planName?staffT(planName):undefined} identity={staffIdentityLabel(session.staffRole,staffUiLanguage,true)} settingsLabel={staffUi.settings} signOutLabel={staffUi.signOut} closeLabel={sidebarText.hide} accountLabel={sidebarText.account} onClose={closeSidebar} navigate={path=>{navigate(path);if(compactNav)setSidebarOpen(false);}} logout={logout} disabled={siteTransition}/>
+  <DashboardSidebar open={sidebarOpen} brand={<Brand/>} organization={session.organization} site={session.site} items={staffNavigation} name={session.name} email={session.email} plan={planName?staffT(planName):undefined} identity={staffIdentityLabel(session.staffRole,staffUiLanguage,true)} settingsLabel={staffUi.settings} signOutLabel={staffUi.signOut} closeLabel={sidebarText.hide} accountLabel={sidebarText.account} onClose={closeSidebar} navigate={path=>{navigate(path);if(compactNav)setSidebarOpen(false);}} logout={logout} disabled={siteTransition}/>
   <button type="button" className="sidebar-backdrop" aria-hidden="true" tabIndex={-1} onClick={closeSidebar}/>
   <div className="staff-main" inert={drawerActive}><header className="topbar">{!sidebarOpen&&<button className="icon-button sidebar-open-button" aria-label={sidebarText.show} aria-expanded={sidebarOpen} aria-controls="dashboard-sidebar" onClick={event=>{sidebarTrigger.current=event.currentTarget;setSidebarOpen(true);}}><PanelLeft size={21}/></button>}
     <AccountSiteSwitcher language={staffUiLanguage} organization={session.organization} site={session.site} disabled={siteTransition} onSelect={changeSite}/>
@@ -1424,7 +1426,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   };
   if(session.languageSelectionRequired) {
     const setupText=workerLanguageText[language];
-    return <div className="worker-shell worker-navigation-shell" lang={language} dir={workerUiDirection(language)}>
+    return <div className="worker-shell worker-navigation-shell dev-worker" lang={language} dir={workerUiDirection(language)}>
       <a className="skip-link" href="#worker-main" onClick={event=>{event.preventDefault();document.getElementById('worker-main')?.focus();}}>{t.skip}</a>
       <WorkerHeader session={session} language={language}>
         <button className="icon-button" title={leaveText.end} aria-label={leaveText.end} disabled={setupBusy} onClick={()=>askLeave('logout',()=>void endSession())}><LogOut size={20}/></button>
@@ -1455,7 +1457,7 @@ function WorkerApp({ session, view, navigate, refresh, act, logout, message,onSe
   const deliveryMode=detail.data?.deliveryMode==='text'||detail.data?.deliveryMode==='voice'?detail.data.deliveryMode as 'text'|'voice':'both';
   const evidenceMode=responseMode==='acknowledge'&&detail.data?.evidenceMode==='photo'?'photo':'none';
   return (
-    <div className="worker-shell worker-navigation-shell" lang={language} dir={workerUiDirection(language)}>
+    <div className="worker-shell worker-navigation-shell dev-worker" lang={language} dir={workerUiDirection(language)}>
       <a className="skip-link" href="#worker-main" onClick={event=>{event.preventDefault();document.getElementById('worker-main')?.focus();}}>{t.skip}</a>
       <WorkerHeader session={session} language={language}>
         <NotificationBell session={session} label={notices.title} locale={language} disabled={busy} onOpen={()=>navigate('notifications')} onSessionLost={onSessionLost}/>
