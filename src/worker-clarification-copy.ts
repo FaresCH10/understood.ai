@@ -15,3 +15,6 @@ const rows:Record<string,readonly string[]>={
  id:['Bagian instruksi mana yang perlu dijelaskan?','Jawaban belum benar. Sebutkan bagian yang belum dipahami sebelum melanjutkan.','Minta penjelasan','Permintaan dikirim ke supervisor. Tunggu penjelasan sebelum mencoba lagi.','Menyiapkan terjemahan…','Terjemahan belum selesai. Permintaan tersimpan.','Penjelasan supervisor','Periksa status','Permintaan belum dikonfirmasi. Kirim ulang permintaan yang sama.','Kembali ke instruksi'],
 };
 export function workerClarificationCopy(language:string){const values=rows[language];return values?Object.fromEntries(fields.map((field,index)=>[field,values[index]])):{};}
+export const workerClarificationLabels:Record<string,readonly [string,string,string]>={
+ hi:['स्पष्टीकरण','कर्मचारी','सुपरवाइज़र'],bn:['ব্যাখ্যা','কর্মী','সুপারভাইজার'],ml:['വിശദീകരണങ്ങൾ','തൊഴിലാളി','സൂപ്പർവൈസർ'],ta:['விளக்கங்கள்','பணியாளர்','மேற்பார்வையாளர்'],te:['వివరణలు','కార్మికుడు','సూపర్‌వైజర్'],ne:['स्पष्टीकरणहरू','कर्मचारी','सुपरभाइजर'],fil:['Mga paliwanag','Manggagawa','Supervisor'],si:['පැහැදිලි කිරීම්','සේවකයා','අධීක්ෂක'],ru:['Пояснения','Работник','Руководитель'],'pa-Guru':['ਸਪੱਸ਼ਟੀਕਰਨ','ਕਰਮਚਾਰੀ','ਸੁਪਰਵਾਈਜ਼ਰ'],'pa-Arab':['وضاحتاں','کارکن','سپروائزر'],id:['Penjelasan','Pekerja','Supervisor']
+};

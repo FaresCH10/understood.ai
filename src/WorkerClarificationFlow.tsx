@@ -1,11 +1,14 @@
 import {useEffect,useRef,useState} from 'react';
-import {checkedClarificationFlow,clarificationFlowCopy,readClarificationCommand,type ClarificationFlow} from './clarification-flow';
+import {checkedClarificationFlow,clarificationFlowCopy,clarificationMessageCopy,readClarificationCommand,type ClarificationFlow} from './clarification-flow';
 import {validWorkerSession,type PageSession} from './session-state';
 import type {WorkerUiLanguage} from './worker-ui-language';
+import {ClarificationMessages} from './ClarificationMessages';
+import {RefreshCw} from 'lucide-react';
+import './simple-clarifications.css';
 import {workerClarificationCopy} from './worker-clarification-copy';
 
 export function WorkerClarificationFlow({assignmentId,session,language,current,onSessionLost,onReturn,onDirtyChange}:{assignmentId:string;session:PageSession;language:WorkerUiLanguage;current:()=>boolean;onSessionLost:()=>void;onReturn?:()=>void;onDirtyChange?:(dirty:boolean)=>void}){
-  const t={...clarificationFlowCopy(language),...workerClarificationCopy(language)},[data,setData]=useState<ClarificationFlow|null>(null),[text,setText]=useState(''),[error,setError]=useState(false),[busy,setBusy]=useState(false),[tick,setTick]=useState(0);
+  const t={...clarificationFlowCopy(language),...workerClarificationCopy(language)},copy=clarificationMessageCopy(language),[data,setData]=useState<ClarificationFlow|null>(null),[text,setText]=useState(''),[error,setError]=useState(false),[busy,setBusy]=useState(false),[tick,setTick]=useState(0);
   const pending=useRef<{requestId:string;text:string}|null>(null),callbacks=useRef({current,onSessionLost,onDirtyChange});callbacks.current={current,onSessionLost,onDirtyChange};
   const path=`/api/worker/briefings/${encodeURIComponent(assignmentId)}/clarification-flow`,live=useRef(true),inFlight=useRef(false);
   const recoveryKey=`u:clarification-flow:${session.clientContext}:${path}`;
@@ -28,20 +31,25 @@ export function WorkerClarificationFlow({assignmentId,session,language,current,o
     return()=>{active=false;controller.abort();window.clearTimeout(timer);};
   },[path,session.clientContext,tick]);
   async function send(){
-    if(inFlight.current||!data?.needsArea||text.trim().length<3)return;
+    if(inFlight.current||!data?.canMessage||text.trim().length<3)return;
     const command=pending.current??{requestId:crypto.randomUUID(),text:text.trim()};pending.current=command;
     inFlight.current=true;setBusy(true);setError(false);
     try{sessionStorage.setItem(recoveryKey,JSON.stringify(command));const result=await request(command);if(result){if(result.id!==command.requestId)throw Error('Unverified receipt');sessionStorage.removeItem(recoveryKey);pending.current=null;setText('');setTick(n=>n+1);}}catch{if(live.current)setError(true);}finally{inFlight.current=false;if(live.current)setBusy(false);}
   }
-  const items=data?.items.filter(item=>item.attemptId===data.attemptId)??[],explanation=items.find(item=>item.kind==='explanation'),area=items.find(item=>item.kind==='request');
-  return <section className="worker-card clarification-flow" aria-label={t.title}>
-    {error&&<p role="alert">{t.error}</p>}
-    {!data&&!error&&<p role="status">{t.preparing}</p>}
-    {data?.needsArea?<form onSubmit={event=>{event.preventDefault();void send();}}><p role="alert">{t.required}</p><label className="field">{t.area}<textarea required minLength={3} maxLength={500} rows={3} value={text} readOnly={busy||!!pending.current} onChange={event=>setText(event.target.value)} dir="auto"/></label><button className="button primary full" disabled={busy||text.trim().length<3}>{t.send}</button></form>:area&&explanation?.state!=='delivered'&&<p role="status">{t.sent}</p>}
-    {items.some(item=>['queued','processing'].includes(item.state))&&<p role="status">{t.preparing}</p>}
-    {items.some(item=>item.state==='failed')&&<p role="alert">{t.failed}</p>}
-    {area?.state==='failed'&&area.originalText&&<button type="button" className="button outline" disabled={busy} onClick={async()=>{if(inFlight.current)return;inFlight.current=true;setBusy(true);try{await request({requestId:area.id,text:area.originalText!});setTick(n=>n+1);}catch{setError(true);}finally{inFlight.current=false;setBusy(false);}}}>{t.send}</button>}
-    {explanation?.state==='delivered'&&explanation.text&&<><h2>{t.explanation}</h2><p className="briefing-text" lang={explanation.language} dir="auto">{explanation.text}</p></>}
-    <div className="actions"><button type="button" className="button outline" disabled={busy} onClick={()=>setTick(n=>n+1)}>{t.retry}</button>{onReturn&&data&&!data.needsArea&&<button type="button" className="button primary" onClick={onReturn}>{t.back}</button>}</div>
+  const items=data?.items??[];
+  if(data&&!data.canMessage&&!items.length)return null;
+  return <section className="worker-card clarification-flow" aria-label={copy.messages}>
+    <div className="worker-card-head"><h2>{copy.messages}</h2><button type="button" className="icon-button" title={t.retry} aria-label={t.retry} disabled={busy} onClick={()=>setTick(n=>n+1)}><RefreshCw size={18}/></button></div>
+    {error&&<p role="alert">{t.error}</p>}{!data&&!error&&<p role="status">{t.preparing}</p>}
+    {items.length>0&&<ClarificationMessages items={items} language={language} worker timezone={session.timezone} disabled={busy} onRetry={async item=>{
+      if(inFlight.current||!item.originalText)return;inFlight.current=true;setBusy(true);
+      try{await request({requestId:item.id,text:item.originalText});setTick(n=>n+1);}catch{setError(true);}finally{inFlight.current=false;if(live.current)setBusy(false);}
+    }}/>}
+    {data?.canMessage&&<form onSubmit={event=>{event.preventDefault();void send();}}>
+      {data.needsArea&&<p role="alert">{t.required}</p>}
+      <label className="field">{t.area}<textarea required minLength={3} maxLength={500} rows={3} value={text} readOnly={busy||!!pending.current} onChange={event=>setText(event.target.value)} dir="auto"/></label>
+      <button className="button primary full" disabled={busy||text.trim().length<3}>{t.send}</button>
+    </form>}
+    {onReturn&&data&&!data.needsArea&&<button type="button" className="button outline full" onClick={onReturn}>{t.back}</button>}
   </section>;
 }

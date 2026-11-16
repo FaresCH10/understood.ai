@@ -60,6 +60,6 @@ export function WorkerSubmissionReceipt({clarification,choices,session,selection
     </details>}
     {session.mode?.startsWith('synthetic-')&&<p className="muted">{t.synthetic}</p>}
     <p className="muted">{t.limits}</p>
-    {state==='clarification'&&clarification?clarification:<div className="worker-receipt-actions"><button type="button" className="button primary full" disabled={disabled} onClick={onBack}>{workerUiDirection(language)==='rtl'?<ArrowRight size={20} aria-hidden="true"/>:<ArrowLeft size={20} aria-hidden="true"/>}{t.back}</button></div>}
+    {clarification?clarification:<div className="worker-receipt-actions"><button type="button" className="button primary full" disabled={disabled} onClick={onBack}>{workerUiDirection(language)==='rtl'?<ArrowRight size={20} aria-hidden="true"/>:<ArrowLeft size={20} aria-hidden="true"/>}{t.back}</button></div>}
   </section>;
 }

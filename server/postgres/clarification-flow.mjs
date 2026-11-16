@@ -1,3 +1,4 @@
+import {routeNewCase} from './case-routing.mjs';
 import {randomUUID} from 'node:crypto';
 import {domainTransaction,requirePrincipal,domainAudit} from './domain.mjs';
 import {requireWritableEntitlement} from './entitlements.mjs';
@@ -7,7 +8,7 @@ import {recordWorkerEvent,staffAuditOnce} from './notification-events.mjs';
 import {clarificationFlowInput,clarificationTranslationHash} from '../clarification-flow-input.mjs';
 import {translatedContent,translationCheck} from '../ai/prepared-bundle.mjs';
 
-// Use the latest attempt, including an approved repeat. Never send an old answer's request again.
+// Keep messages attached to the instruction, including requests after a correct answer.
 async function context(client,session,id,worker=false,write=false){
   await requirePrincipal(client,session,worker?'worker':'staff',write?['owner','supervisor']:['owner','supervisor','auditor']);
   const row=(await client.query(`SELECT a.id AS assignment_id,a.publication_id,a.worker_id,a.language,w.language AS worker_language,w.code AS worker,
@@ -18,17 +19,23 @@ async function context(client,session,id,worker=false,write=false){
     LEFT JOIN site_settings ss ON ss.site_id=a.site_id AND ss.org_id=a.org_id
     JOIN LATERAL (SELECT at.* FROM attempts at JOIN submission_receipts sr ON sr.assignment_id=at.assignment_id AND sr.submission_id=at.submission_id
       WHERE at.assignment_id=a.id AND at.org_id=a.org_id ORDER BY sr.sequence DESC LIMIT 1) t ON true
-    JOIN LATERAL (SELECT cc.* FROM clarifications cc WHERE cc.assignment_id=a.id AND cc.org_id=a.org_id
-      AND (cc.attempt_id=t.id OR EXISTS(SELECT 1 FROM case_repeats cr WHERE cr.case_id=cc.id AND cr.assignment_id=a.id AND cr.org_id=a.org_id AND cr.status='submitted' AND cr.submission_id=t.submission_id))
+    LEFT JOIN LATERAL (SELECT cc.* FROM clarifications cc WHERE cc.assignment_id=a.id AND cc.org_id=a.org_id AND NOT EXISTS(SELECT 1 FROM case_content_purges retired WHERE retired.case_id=cc.id)
       ORDER BY cc.created_at DESC,cc.id DESC LIMIT 1) c ON true
-    WHERE a.org_id=$1 AND a.site_id=$2 AND ${worker?'a.id=$3 AND a.worker_id=$4':'c.id=$3'} AND w.active AND p.state='published'
+    WHERE a.org_id=$1 AND a.site_id=$2 AND ${worker?'a.id=$3 AND a.worker_id=$4':'EXISTS(SELECT 1 FROM clarifications selected WHERE selected.id=$3 AND selected.assignment_id=a.id AND selected.org_id=a.org_id AND selected.site_id=a.site_id)'} AND w.active AND p.state='published'
       AND publication_content_available(p.id)
       AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=w.id)
       AND NOT EXISTS(SELECT 1 FROM case_content_purges cp WHERE cp.case_id=c.id)
       ${write?'FOR UPDATE OF a':''}`,[session.org_id,session.site_id,id,...(worker?[session.principal_id]:[])])).rows[0];
   if(!row)throw Error('Clarification unavailable');
   if(row.snapshot_json?.rubric?.mode!=='multiple-choice')throw Error('Clarification unavailable');
-  if(write){await requireWritableEntitlement(client,session.org_id);await requireSiteOperational(client,session.org_id,session.site_id);}
+  if(write){
+    await requireWritableEntitlement(client,session.org_id);await requireSiteOperational(client,session.org_id,session.site_id);
+    // Refresh after the assignment lock: a concurrent sender may have opened a case while we waited.
+    const latest=(await client.query(`SELECT c.id,c.status FROM clarifications c WHERE c.assignment_id=$1 AND c.org_id=$2 AND c.site_id=$3
+      AND NOT EXISTS(SELECT 1 FROM case_content_purges retired WHERE retired.case_id=c.id)
+      ORDER BY c.created_at DESC,c.id DESC LIMIT 1`,[row.assignment_id,session.org_id,session.site_id])).rows[0];
+    row.case_id=latest?.id??null;row.status=latest?.status??null;
+  }
   return row;
 }
 const exchange=row=>({id:row.id,kind:row.kind,state:row.state,text:row.state==='delivered'?row.translated_text:null,
@@ -41,9 +48,9 @@ export function listClarificationFlow(pool,session,page=1,{schema='public'}={}){
       FROM clarifications c JOIN assignments a ON a.id=c.assignment_id AND a.org_id=c.org_id AND a.site_id=c.site_id
       JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
       JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
-      WHERE c.org_id=$1 AND c.site_id=$2 AND c.status='open' AND c.attempt_id IS NOT NULL AND p.snapshot_json->'rubric'->>'mode'='multiple-choice'
+      WHERE c.org_id=$1 AND c.site_id=$2 AND c.id=(SELECT cc.id FROM clarifications cc WHERE cc.assignment_id=a.id AND cc.org_id=a.org_id ORDER BY cc.created_at DESC,cc.id DESC LIMIT 1) AND p.snapshot_json->'rubric'->>'mode'='multiple-choice'
         AND p.state='published' AND publication_content_available(p.id) AND w.active
-        AND (SELECT t.outcome FROM attempts t JOIN submission_receipts sr ON sr.assignment_id=t.assignment_id AND sr.submission_id=t.submission_id WHERE t.assignment_id=a.id AND t.org_id=a.org_id ORDER BY sr.sequence DESC LIMIT 1)='clarification'
+        AND (c.status='open' OR (SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='request')>(SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='explanation'))
         AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=w.id)
         AND NOT EXISTS(SELECT 1 FROM case_content_purges cp WHERE cp.case_id=c.id)
       ORDER BY c.created_at DESC,c.id DESC LIMIT 20 OFFSET $3`,[session.org_id,session.site_id,(page-1)*20])).rows;
@@ -53,13 +60,13 @@ export function listClarificationFlow(pool,session,page=1,{schema='public'}={}){
 export function readClarificationFlow(pool,session,id,{schema='public',worker=false}={}){
   return domainTransaction(pool,schema,async client=>{
     let row;try{row=await context(client,session,id,worker);}catch(error){if(worker&&error.message==='Clarification unavailable')return {caseId:null,needsArea:false,items:[]};throw error;}
-    const items=(await client.query('SELECT * FROM clarification_exchanges WHERE case_id=$1 AND org_id=$2 AND site_id=$3 ORDER BY created_at,id',[row.case_id,session.org_id,session.site_id])).rows;
+    const items=(await client.query('SELECT * FROM clarification_exchanges e WHERE assignment_id=$1 AND org_id=$2 AND site_id=$3 AND NOT EXISTS(SELECT 1 FROM case_content_purges retired WHERE retired.case_id=e.case_id) ORDER BY created_at DESC,id DESC LIMIT 1000',[row.assignment_id,session.org_id,session.site_id])).rows.reverse();
     const request=items.find(item=>item.attempt_id===row.attempt_id&&item.kind==='request');
     const locale=worker?row.worker_language:row.staff_language,content=row.snapshot_json.languages?.[locale]??row.snapshot_json.languages?.[row.language];
     const choice=content?.choices?.find(item=>item.id===row.answer_text);
     return {caseId:row.case_id,assignmentId:row.assignment_id,attemptId:row.attempt_id,worker:row.worker,title:content?.title??row.snapshot_json.title,
       instruction:content?.text??'',question:content?.question??'',answer:choice?.text??row.answer_text,outcome:row.outcome,status:row.status,
-      needsArea:row.outcome==='clarification'&&!request,items:items.map(item=>{
+      canMessage:['matched','clarification'].includes(row.outcome),needsArea:row.outcome==='clarification'&&!request&&!items.some(item=>item.kind==='explanation'&&item.state==='delivered'),items:items.map(item=>{
         // A recipient sees only its translation; the author may also recover their original text.
         const own=worker?item.kind==='request':item.kind==='explanation';
         return {...exchange(item),originalText:own?item.source_text:null,originalLanguage:own?item.source_language:null};
@@ -72,17 +79,21 @@ export function saveClarificationExchange(pool,session,id,input,{schema='public'
     const row=await context(client,session,id,worker,true);
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`clarification-exchange:${value.id}`]);
     const previous=(await client.query('SELECT * FROM clarification_exchanges WHERE id=$1',[value.id])).rows[0];
-    if(previous){if(previous.org_id!==session.org_id||previous.site_id!==session.site_id||previous.case_id!==row.case_id||previous.actor_id!==session.principal_id||previous.kind!==kind||previous.request_hash!==value.hash)throw Error('Conversation request conflict');
-      if(previous.state==='failed'&&row.attempt_id===previous.attempt_id&&row.status==='open'&&row.outcome==='clarification'){
+    if(previous){if(previous.org_id!==session.org_id||previous.site_id!==session.site_id||previous.assignment_id!==row.assignment_id||previous.actor_id!==session.principal_id||previous.kind!==kind||previous.request_hash!==value.hash)throw Error('Conversation request conflict');
+      if(previous.state==='failed'&&['matched','clarification'].includes(row.outcome)){
         await client.query("UPDATE clarification_exchanges SET state='queued',attempts=0,retry_at=clock_timestamp(),error_code=NULL WHERE id=$1",[previous.id]);return {id:previous.id,state:'queued'};
       }
       return {id:previous.id,state:previous.state};}
-    if(row.outcome!=='clarification'||row.status!=='open')throw Error('Clarification unavailable');
-    if(!worker&&!(await client.query("SELECT 1 FROM clarification_exchanges WHERE attempt_id=$1 AND kind='request' AND state='delivered'",[row.attempt_id])).rows.length)throw Error('Wait for the worker clarification request');
+    if(!['matched','clarification'].includes(row.outcome))throw Error('Clarification unavailable');
+    if(!row.case_id||row.status!=='open'){
+      row.case_id=randomUUID();row.status='open';
+      await client.query("INSERT INTO clarifications(id,org_id,site_id,assignment_id,attempt_id,reason,status) VALUES($1,$2,$3,$4,$5,'Help requested','open')",[row.case_id,session.org_id,session.site_id,row.assignment_id,null]);
+      await routeNewCase(client,session.org_id,session.site_id,row.case_id);
+    }
     const source=worker?row.worker_language:row.staff_language,target=worker?row.staff_language:row.worker_language;
     const saved=(await client.query(`INSERT INTO clarification_exchanges(id,org_id,site_id,case_id,assignment_id,attempt_id,kind,actor_id,actor_role,source_language,target_language,source_text,request_hash,translated_text,state,delivered_at,data_class)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,CASE WHEN $15='delivered' THEN clock_timestamp() ELSE NULL END,$16)
-      ON CONFLICT(attempt_id,kind) DO NOTHING RETURNING *`,[value.id,session.org_id,session.site_id,row.case_id,row.assignment_id,row.attempt_id,kind,session.principal_id,worker?null:session.role,source,target,value.text,value.hash,source===target?value.text:null,source===target&&worker?'delivered':'queued',integrationMode==='live'?'real':'synthetic'])).rows[0];
+      RETURNING *`,[value.id,session.org_id,session.site_id,row.case_id,row.assignment_id,row.attempt_id,kind,session.principal_id,worker?null:session.role,source,target,value.text,value.hash,source===target?value.text:null,source===target&&worker?'delivered':'queued',integrationMode==='live'?'real':'synthetic'])).rows[0];
     if(!saved)throw Error('A clarification has already been sent for this answer');
     await domainAudit(client,session,worker?'help.requested':'clarification.followup_requested',row.case_id);
     return {id:saved.id,state:saved.state};
@@ -93,19 +104,18 @@ export async function currentClarificationTranslation(client,id,token,orgId,hash
   if(!job||clarificationTranslationHash(job)!==hash)throw Error('Clarification translation authority changed');
   const worker=job.kind==='request',session={principal_type:worker?'worker':'staff',principal_id:job.actor_id,org_id:job.org_id,site_id:job.site_id,role:job.actor_role};
   const row=await context(client,session,worker?job.assignment_id:job.case_id,worker,true);
-  if(row.attempt_id!==job.attempt_id||row.status!=='open'||row.outcome!=='clarification'
-    ||(worker?row.staff_language:row.worker_language)!==job.target_language)throw Error('Clarification translation obsolete');
+  if((worker?row.staff_language:row.worker_language)!==job.target_language||(await client.query('SELECT 1 FROM case_content_purges WHERE case_id=$1',[job.case_id])).rows.length)throw Error('Clarification translation obsolete');
   await client.query("UPDATE clarification_exchanges SET lease_until=clock_timestamp()+interval '120 seconds' WHERE id=$1 AND lease_token=$2",[id,token]);
   return {job,row};
 }
 async function deliver(client,job,text){
   const {row}=await currentClarificationTranslation(client,job.id,job.token,job.org_id,clarificationTranslationHash(job));
   if(job.kind==='explanation'){
-    await client.query("UPDATE case_repeats SET status='expired' WHERE assignment_id=$1 AND status='pending' AND due_at<=clock_timestamp()",[job.assignment_id]);
-    // Explanation and permission to answer again are committed together.
-    await client.query(`INSERT INTO case_repeats(id,org_id,site_id,case_id,assignment_id,publication_id,actor_id,actor_role,due_at)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,clock_timestamp()+interval '24 hours')`,[job.id,job.org_id,job.site_id,job.case_id,job.assignment_id,row.publication_id,job.actor_id,job.actor_role]);
-    await recordWorkerEvent(client,{orgId:job.org_id,siteId:job.site_id,workerId:row.worker_id,kind:'repeat.available',objectType:'case_repeat',objectId:job.id,dedupeKey:`repeat.available:${job.id}`});
+    // A clarification is a translated message; it never creates a question or an answer retry.
+    await recordWorkerEvent(client,{orgId:job.org_id,siteId:job.site_id,workerId:row.worker_id,kind:'clarification.followup',objectType:'assignment',objectId:job.assignment_id,dedupeKey:`clarification.message:${job.id}`});
+    await client.query(`UPDATE clarifications SET status='resolved',notes='[Understood:ready]Instruction clarified by supervisor'
+      WHERE id=$1 AND org_id=$2 AND site_id=$3 AND status='open'
+      AND NOT EXISTS(SELECT 1 FROM clarification_exchanges e WHERE e.case_id=$1 AND e.kind='request' AND e.created_at>$4)`,[job.case_id,job.org_id,job.site_id,job.created_at]);
   }else await staffAuditOnce(client,{orgId:job.org_id,siteId:job.site_id,action:'help.requested',objectId:job.id});
   await client.query("UPDATE clarification_exchanges SET state='delivered',translated_text=$3,delivered_at=clock_timestamp(),lease_token=NULL,lease_until=NULL,error_code=NULL WHERE id=$1 AND lease_token=$2",[job.id,job.token,text]);
 }
@@ -132,7 +142,7 @@ export async function processOneClarificationExchange(pool,adapter,{schema='publ
         }
         return provider[method](...args);
       };
-      const source={title:'Instruction clarification',text:job.source_text,question:'Which part of the instruction needs explaining?'};
+      const source={title:'Instruction clarification',text:job.source_text,question:'Clarification message'};
       const target=translatedContent(await call('translate',source,job.target_language),job.target_language);
       translationCheck(await call('checkTranslation',source,target,job.target_language));
       if(target.text.length>1000)throw Error('Clarification translation unavailable');text=target.text;
