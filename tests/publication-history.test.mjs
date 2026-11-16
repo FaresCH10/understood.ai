@@ -100,3 +100,14 @@ test('version filter and client projections reject foreign, private, duplicate, 
   checkedPublicationDetail(acknowledged,'history','publication-1');
   for(const change of [v=>v.id='foreign',v=>v.briefingId='foreign',v=>v.snapshot=null,v=>v.metrics.responses=0,v=>v.metrics.completion=80,v=>v.secret='private',v=>v.metrics.acknowledged=2,v=>v.metrics.unassessed=1]){const value=structuredClone(acknowledged);change(value);assert.throws(()=>checkedPublicationDetail(value,'history','publication-1'),/unavailable/);}
 });
+
+
+test('sent languages reflect recipient assignments instead of prepared translations',()=>{
+ const db=openDatabase(':memory:');try{
+  seed(db);ensureBriefingSchema(db);
+  const detail=sqlite.getPublicationHistoryDetail(db,owner,'shelf','shelf-v3');
+  checkedPublicationDetail(detail,'shelf','shelf-v3');
+  assert.deepEqual(detail.sentLanguages,['ar','en','ur']);
+  assert.ok(Object.keys(detail.snapshot.languages).length>detail.sentLanguages.length);
+ }finally{db.close();}
+});

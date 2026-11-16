@@ -1,30 +1,20 @@
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useState} from 'react';
-import {MessageCircle,RefreshCw} from 'lucide-react';
+import {RefreshCw} from 'lucide-react';
 import {usePublicationDetail} from './PublicationHistory';
 import type {PublicationSummary} from './publication-history';
-import type {StaffRequestAuthority} from './useStaffRequest';
 
 type Draft={id:string;source:string;state:string;next_version:number;revision:number;contentExpired?:boolean;archive?:unknown};
-type Props={draft:Draft;publication:PublicationSummary|null;context:string;refresh:number;onResponses:()=>void;canWrite:boolean;authority:StaffRequestAuthority;onChanged:()=>void};
-export function InstructionOverview({draft,publication,context,refresh,onResponses,canWrite,authority,onChanged}:Props){
-  const staffT=useStaffStaticText();
-  const [tick,setTick]=useState(0);
+type Props={draft:Draft;publication:PublicationSummary|null;context:string;refresh:number};
+export function InstructionOverview({draft,publication,context,refresh}:Props){
+  const t=useStaffStaticText(),[tick,setTick]=useState(0);
   const read=usePublicationDetail(draft.id,!draft.contentExpired?publication?.id||null:null,context,refresh+tick);
-  const snapshot=read.data?.snapshot,metrics=read.data?.metrics;
-  const source=publication?(typeof snapshot?.source==='string'?snapshot.source:''):draft.source;
-  const question=typeof snapshot?.question==='string'?snapshot.question:'';
-  const facts=Array.isArray(snapshot?.facts)?snapshot.facts.filter((value):value is string=>typeof value==='string'):[];
-  return <div className="instruction-overview-grid"><section className="panel instruction-content-panel">
-    <div className="instruction-section-heading"><h2>{publication?staffT("Published instruction"):staffT("Instruction draft")}</h2><span className="instruction-version-label">{staffT("Version {p0}",{p0:publication?.version??draft.next_version})}</span></div>
-    {(publication&&<p className="instruction-section-note">{staffT("Sent")} {staffT.date(publication.published_at)}{staffT(". This is the saved text for this version.")}</p>)}
-    {draft.contentExpired?<p>{staffT("Instruction content is no longer retained. Version and response records remain in History.")}</p>:publication&&read.loading?<p data-page-loading role="status">{staffT("Loading the published instruction...")}</p>:publication&&read.error?<div><p role="alert">{staffT("The published instruction could not be loaded.")}</p><button className="button outline" onClick={()=>setTick(n=>n+1)}><RefreshCw size={17}/>{staffT("Try again")}</button></div>:<>
-      {source?<p className="instruction-body-text">{source}</p>:<p>{staffT("No instruction text is stored for this version.")}</p>}
-      {!publication&&<p className="instruction-section-note">{staffT("This draft has not been sent to workers. Prepare it before publishing.")}</p>}
-      {snapshot?.responseMode==='acknowledge'?<div className="instruction-question"><h3>{staffT("Worker confirmation")}</h3><p>{staffT("Workers confirm they have read or listened to this instruction. No question is asked.")}</p></div>:question&&<div className="instruction-question"><h3>{staffT("Question for workers")}</h3><p>{question}</p>{facts.length>0&&<details className="instruction-secondary-details"><summary>{staffT("Expected key facts")}</summary><ul>{facts.map((fact,index)=><li key={index}>{fact}</li>)}</ul></details>}</div>}
+  const source=publication?read.data?.snapshot.source:draft.source;
+  return <section className="panel instruction-content-panel minimal-instruction-overview">
+    <h2>{t('Instruction')}</h2>
+    {draft.contentExpired?<p>{t('Instruction content is no longer available.')}</p>:publication&&read.loading?<p role="status">{t('Loading instruction...')}</p>:publication&&read.error?<><p role="alert">{t('The instruction could not be loaded.')}</p><button className="button outline" onClick={()=>setTick(n=>n+1)}><RefreshCw size={17}/>{t('Try again')}</button></>:<>
+      <p className="instruction-body-text" dir="auto">{typeof source==='string'?source:t('No instruction text is available.')}</p>
+      {publication&&<div className="instruction-sent-languages"><h3>{t('Languages sent')}</h3>{read.data?.sentLanguages?.length?<ul>{read.data.sentLanguages.map(code=><li key={code}>{t.language(code)}</li>)}</ul>:<p>{t('No recipients yet.')}</p>}</div>}
     </>}
-  </section><aside className="instruction-overview-aside">
-    <section className="panel instruction-response-summary"><h2>{staffT("Responses")}</h2>{!publication?<p>{staffT("No responses yet. Workers can respond after the instruction is sent.")}</p>:read.loading?<p data-page-loading role="status">{staffT("Loading response summary...")}</p>:metrics?<><div className="instruction-response-total"><strong>{staffT.number(metrics.responses)}<span> / {staffT.number(metrics.assigned)}</span></strong><span>{staffT("workers responded")}</span></div><div className="progress" role="progressbar" aria-label={staffT("Workers responded")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={metrics.completion}><span style={{width:`${metrics.completion}%`}}/></div><dl><div><dt>{staffT("Match key facts")}</dt><dd>{staffT.number(metrics.matches)}</dd></div>{!!metrics.acknowledged&&<div><dt>{staffT("Confirmed receipt")}</dt><dd>{metrics.acknowledged}</dd></div>}<div><dt>{staffT("Need clarification")}</dt><dd className={metrics.clarifications?'instruction-attention':''}>{staffT.number(metrics.clarifications)}</dd></div>{metrics.unassessed>0&&<div><dt>{staffT("Awaiting AI check")}</dt><dd>{staffT.number(metrics.unassessed)}</dd></div>}<div><dt>{staffT("Waiting to respond")}</dt><dd>{staffT.number(metrics.pending)}</dd></div></dl><button className="button outline full" onClick={onResponses}><MessageCircle size={17}/>{staffT("View responses")}</button><p className="instruction-section-note">{staffT("Matching answers reflect the key facts checked, not proof of safe work.")}</p></>:<p>{staffT("Response counts are unavailable. Open Responses to try again.")}</p>}</section>
-    <section className="instruction-next-version"><h2>{publication?staffT("Preparing an update?"):staffT("Next step")}</h2><p>{publication?staffT("Changes go into draft v{p0}. The sent instruction and its responses stay unchanged.",{p0:draft.next_version}):staffT("Use Prepare draft to review the text, prepare translations and choose recipients.")}</p></section>
-  </aside></div>;
+  </section>;
 }

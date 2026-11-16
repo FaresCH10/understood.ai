@@ -28,7 +28,7 @@ export function getPublicationHistoryDetail(db,session,briefingId,publicationId)
     authority(db,session,briefingId);
     const row=db.prepare('SELECT id,version,state,published_at,snapshot_json FROM publications WHERE id=? AND briefing_id=? AND org_id=? AND site_id=?').get(publicationId,briefingId,session.org_id,session.site_id);
     if(!row)throw Error('Publication unavailable');
-    return {id:row.id,briefingId,version:row.version,state:row.state,published_at:row.published_at,snapshot:JSON.parse(row.snapshot_json),metrics:metrics(db,session.org_id,row.id),artifactAudio:null,
+    return {id:row.id,briefingId,version:row.version,state:row.state,published_at:row.published_at,snapshot:JSON.parse(row.snapshot_json),sentLanguages:db.prepare('SELECT DISTINCT language FROM assignments WHERE publication_id=? AND org_id=? AND site_id=? ORDER BY language').all(row.id,session.org_id,session.site_id).map(item=>item.language),metrics:metrics(db,session.org_id,row.id),artifactAudio:null,
       withdrawal:db.prepare('SELECT reason,withdrawn_by,occurred_at FROM publication_withdrawals WHERE publication_id=? AND org_id=? AND site_id=?').get(row.id,session.org_id,session.site_id) || null};
   });
 }

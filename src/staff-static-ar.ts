@@ -1,4 +1,11 @@
 export const staffStaticArabic={
+  "Messages about this instruction.": "رسائل حول هذه التعليمات.",
+  "No clarification requests for this instruction.": "لا توجد طلبات توضيح لهذه التعليمات.",
+  "Languages sent": "لغات الإرسال",
+  "No recipients yet.": "لم تُرسل إلى أي مستلم بعد.",
+  "Instruction content is no longer available.": "لم يعد محتوى التعليمات متاحاً.",
+  "The instruction could not be loaded.": "تعذر تحميل التعليمات.",
+  "No instruction text is available.": "نص التعليمات غير متاح.",
   "Translation feedback is managed by the platform administrator.": "يتولى مسؤول المنصة مراجعة ملاحظات الترجمة.",
   "Updates from your team, all in one place.": "آخر مستجدات فريقك، في مكان واحد.",
   "{p0} unread": "{p0} غير مقروءة",

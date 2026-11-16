@@ -1194,7 +1194,7 @@ export function createAppHandler(db, options = {}) {
         const [,assignmentId,kind,requestId]=workerReceiptMatch;
         return send(res,200,{...workerRequestReceipt(db,session,assignmentId,kind,requestId),assignmentId,requestId,clientContext:clientSessionContext(session).clientContext});
       }
-      if(path==='/api/clarification-flow'&&req.method==='GET')return send(res,200,{...listClarificationFlow(db,session,Number(url.searchParams.get('page')??1)),clientContext:clientSessionContext(session).clientContext});
+      if(path==='/api/clarification-flow'&&req.method==='GET')return send(res,200,{...listClarificationFlow(db,session,Number(url.searchParams.get('page')??1),{briefingId:url.searchParams.get('briefingId')}),clientContext:clientSessionContext(session).clientContext});
       const flow=path.match(/^\/api\/(worker\/briefings|clarifications)\/([^/]+)\/clarification-flow$/);
       if(flow){
         const settings={worker:flow[1]==='worker/briefings'};

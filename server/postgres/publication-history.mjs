@@ -31,6 +31,7 @@ export function getPublicationHistoryDetail(pool,session,briefingId,publicationI
       WHERE p.id=$1 AND p.briefing_id=$2 AND p.org_id=$3 AND p.site_id=$4`,[publicationId,briefingId,session.org_id,session.site_id])).rows[0];
     if(!row)throw Error('Publication unavailable');
     return {...row,briefingId,published_at:row.published_at instanceof Date?row.published_at.toISOString():row.published_at,
+      sentLanguages:(await client.query('SELECT DISTINCT language FROM assignments WHERE publication_id=$1 AND org_id=$2 AND site_id=$3 ORDER BY language',[row.id,session.org_id,session.site_id])).rows.map(item=>item.language),
       metrics:metricsFromResponses(await publicationResponses(client,session,row.id)),artifactAudio:await staffArtifactUrls(client,session,briefingId,row.id,row.snapshot)};
   });
 }

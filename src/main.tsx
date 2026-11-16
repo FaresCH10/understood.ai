@@ -23,6 +23,7 @@ import {workerCrewText} from './worker-crew-text';
 import './worker-journey.css';
 import {workerJourneyText} from './worker-journey-text';
 import {workListPath,type WorkFilter,type WorkerWorkPage} from './worker-journey';
+import {SentInstructionDetail} from './SentInstructionDetail';
 import {InstructionOverview} from './InstructionOverview';
 import {InstructionViewTabs} from './InstructionViewTabs';
 import {DashboardSidebar} from './DashboardSidebar';
@@ -889,6 +890,7 @@ function BriefingDetail({ id, refresh, act, navigate,onChanged,canWrite,scope,la
   if (loading && !data) return <p>{staffT("Loading instruction...")}</p>;
   if (error || !data) return <Notice>{((error?staffT.error(error):staffT("Instruction unavailable")))}</Notice>;
   const current = data.publications?.[0];
+  if(current)return <SentInstructionDetail draft={data} publication={current} context={languageSession.clientContext} refresh={refresh} authority={authority} navigate={navigate}/>;
   const readyToPublish=draftSteps(data)[2].available;
   const canPrepare=canWrite && !data.archive && !data.contentExpired;
   return <div className="briefing-draft-detail instruction-detail">
@@ -899,11 +901,9 @@ function BriefingDetail({ id, refresh, act, navigate,onChanged,canWrite,scope,la
     {((deliveryNotice==='sent'&&detailView==='overview')||(deliveryNotice==='scheduled'&&detailView==='history'))&&<p className="notice notice-green" role="status">{deliveryNotice==='scheduled'?staffT("Delivery scheduled. Review its timing and status in Delivery schedules below."):staffT("Instruction sent. Track replies in Responses.")}</p>}
     <InstructionViewTabs label={staffT("Instruction views")}>
       <button disabled={editing} aria-pressed={detailView==='overview'} onClick={()=>{setSelectedPublication(null);setDetailView('overview');}}>{staffT("Overview")}</button>
-      <button disabled={editing} aria-pressed={detailView==='responses'} onClick={()=>setDetailView('responses')}>{staffT("Responses")}</button>
-      <button disabled={editing} aria-pressed={detailView==='history'} onClick={()=>setDetailView('history')}>{staffT("History")}</button>
-      {canPrepare&&<button disabled={editing} aria-pressed={detailView==='draft'} onClick={()=>selectStep(draftStep)}>{staffT("Draft v")}{staffT.number(data.next_version)}</button>}
+      {canPrepare&&<button disabled={editing} aria-pressed={detailView==='draft'} onClick={()=>selectStep(draftStep)}>{staffT("Prepare instruction")}</button>}
     </InstructionViewTabs>
-    {detailView==='overview'&&<InstructionOverview key={`${id}:${languageSession.clientContext}`} draft={data} publication={current||null} context={languageSession.clientContext} refresh={refresh} onResponses={()=>{setSelectedPublication(current||null);setDetailView('responses');}} canWrite={canWrite} authority={authority} onChanged={onChanged}/>}
+    {detailView==='overview'&&<InstructionOverview key={`${id}:${languageSession.clientContext}`} draft={data} publication={current||null} context={languageSession.clientContext} refresh={refresh}/>}
     {detailView==='overview'&&!data.contentExpired&&<StaffInstructionFiles authority={authority} briefingId={id} refresh={refresh}/>}
     {detailView==='responses'&&<PublicationResponses authority={authority} key={(selectedPublication||current)?.id||'empty'} briefingId={id} publication={selectedPublication||current||null} onSelect={setSelectedPublication} context={languageSession.clientContext} refresh={refresh} navigate={navigate} canPlayAudio={canWrite}/>}
     {detailView==='history'&&<><div className="instruction-history-grid"><Panel><PublicationHistory authority={authority} briefingId={id} selected={selectedPublication||current||null} onSelect={setSelectedPublication} context={languageSession.clientContext} refresh={refresh} disabled={editing||loading} onView={view=>{if(!selectedPublication&&current)setSelectedPublication(current);setDetailView(view);}} canWrite={canWrite} onChanged={()=>{setDeliveryNotice(null);onChanged();}}/></Panel><Panel className="instruction-manage-actions" title={staffT("Manage instruction")}><p>{staffT("Copy this instruction into a separate draft, or archive it to stop new activity. Saved history is retained.")}</p><div className="actions">{canWrite&&!data.contentExpired&&<CopyDraftControl authority={authority} id={id} revision={data.revision} title={data.title} disabled={editing||loading} onCopied={copyId=>navigate(`briefings/${copyId}`)}/>} {canWrite&&!data.archive&&<ArchiveBriefingControl authority={authority} id={id} revision={data.revision} nextVersion={data.next_version} disabled={editing||loading} onChanged={()=>{setDeliveryNotice(null);onChanged();}}/>}</div>{!canWrite&&<p>{staffT("Your role can review history but cannot copy or archive instructions.")}</p>}</Panel></div>{canWrite&&<section className="instruction-schedules"><BriefingView label={staffT("Delivery schedules")}><PublicationSchedules authority={authority} id={id} refresh={refresh} onChanged={()=>{setDeliveryNotice(null);onChanged();}} timezone={timezone}/></BriefingView></section>}</>}

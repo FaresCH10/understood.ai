@@ -7,6 +7,7 @@ import {requestCaseRepeat} from '../server/postgres/case-repeats.mjs';
 import {submitAnswer} from '../server/postgres/domain.mjs';
 import {processOneAssessment} from '../server/postgres/assessment-worker.mjs';
 import {readClarificationFlow,saveClarificationExchange,processOneClarificationExchange,listClarificationFlow} from '../server/postgres/clarification-flow.mjs';
+import {getPublicationHistoryDetail} from '../server/postgres/publication-history.mjs';
 import {workerBriefing} from '../server/postgres/read-models.mjs';
 import {postgresWorkspace} from '../server/postgres/workspace.mjs';
 import {clarificationFlowInput} from '../server/clarification-flow-input.mjs';
@@ -26,6 +27,10 @@ test('clarification is a translated message with further replies, never a genera
   assert.equal((await readClarificationFlow(pool,worker,'assignment',settings)).needsArea,true);
   assert.throws(()=>saveClarificationExchange(pool,worker,'assignment',command(' '),settings),/Describe/);
   assert.equal((await listClarificationFlow(pool,owner)).rows.length,1);
+  assert.equal((await listClarificationFlow(pool,owner,1,{briefingId:'unrelated-instruction'})).total,0);
+  const briefing=(await db.query("SELECT briefing_id FROM publications WHERE id=(SELECT publication_id FROM assignments WHERE id='assignment')")).rows[0].briefing_id;
+  assert.equal((await listClarificationFlow(pool,owner,1,{briefingId:briefing})).total,1);
+  assert.deepEqual((await getPublicationHistoryDetail(pool,owner,briefing,'published')).sentLanguages,['ar']);
   const request=command('لم أفهم أي رف أستخدم.');const accepted=await saveClarificationExchange(pool,worker,'assignment',request,settings);
   assert.equal(accepted.state,'queued');assert.equal((await saveClarificationExchange(pool,worker,'assignment',request,settings)).id,accepted.id);
   await assert.rejects(saveClarificationExchange(pool,worker,'assignment',{...request,text:'نص مختلف'},settings),/conflict/);
