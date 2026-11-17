@@ -1,4 +1,7 @@
 export const staffStaticArabic={
+  "Clarifications move here after your explanation is delivered.": "تنتقل التوضيحات إلى هنا بعد إيصال شرحك.",
+  "Worker clarification requests will appear here.": "ستظهر طلبات التوضيح من العمال هنا.",
+  "Use the date controls to review another day.": "استخدم أدوات التاريخ لمراجعة يوم آخر.",
   "Workers who have not yet replied to their instructions.": "العمال الذين لم يردوا على تعليماتهم بعد.",
   "All dates": "جميع التواريخ",
   "Your instructions, worker replies, and requests needing attention.": "تعليماتك وردود العمال والطلبات التي تحتاج إلى متابعة.",
