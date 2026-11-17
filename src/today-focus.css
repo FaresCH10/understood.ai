@@ -1,6 +1,7 @@
 .dev-workspace .today-surface.today-focus{max-width:1200px;margin-inline:auto;color:var(--ws-ink,#183c32)}
 .dev-workspace .today-focus>.page-header{align-items:center;margin-bottom:32px}
 .dev-workspace .today-focus>.page-header h1{margin-bottom:0}
+.dev-workspace .today-focus .today-focus-section:not(.today-focus-delivery),.dev-workspace .today-focus .today-focus-summary>button{border-color:#71a98a;box-shadow:0 4px 14px rgb(23 98 71 / 10%)}
 .today-focus-queues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start}
 .today-focus-section{min-width:0;background:#fff;border:1px solid #dce5de;border-radius:12px;padding:24px}
 .today-focus-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
@@ -51,3 +52,4 @@ button.today-focus-row{cursor:pointer;border-radius:0}
 @media(max-width:800px){.today-focus-queues{grid-template-columns:minmax(0,1fr);gap:16px}.today-focus-section{padding:20px}.today-focus-delivery,.today-focus-recent{margin-top:16px}}
 @media(max-width:800px){.today-focus-summary{gap:10px}.today-focus-summary>button{padding:16px;gap:10px}.today-summary-icon{display:none}.today-latest-content{align-items:flex-start;flex-direction:column;gap:16px}}
 @media(max-width:480px){.today-focus-section{padding:18px 16px}.today-focus-row{gap:10px}.today-focus-instruction{flex-wrap:wrap}.today-focus-instruction .today-focus-copy{flex-basis:calc(100% - 30px)}.today-focus-progress{flex-shrink:1}.today-focus-heading>.text-link{margin-inline-start:0}.dev-workspace .today-focus>.page-header{gap:18px;align-items:flex-start}.today-focus-summary{grid-template-columns:minmax(0,1fr);gap:0;border:1px solid #dce5de;border-radius:12px;overflow:hidden}.today-focus-summary>button{border:0;border-radius:0;border-bottom:1px solid #e7ece8}.today-focus-summary>button:last-child{border-bottom:0}.today-focus-summary>button>span:nth-child(2){flex-direction:row;align-items:center;justify-content:space-between;gap:14px}.today-focus-summary strong{font-size:24px}}
+@media(max-width:480px){.dev-workspace .today-focus .today-focus-summary{border-color:#71a98a;box-shadow:0 4px 14px rgb(23 98 71 / 10%)}.dev-workspace .today-focus .today-focus-summary>button{box-shadow:none;border-bottom-color:#d7e7dc}}
