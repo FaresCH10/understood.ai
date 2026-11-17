@@ -2,7 +2,7 @@ export const staffStaticArabic={
   "Preparing instruction and question audio…": "جارٍ إعداد صوت التعليمات والسؤال…",
   "Preparing instruction audio…": "جارٍ إعداد صوت التعليمات…",
   "For voice delivery, shorten the instruction to {p0} characters or fewer.": "للإرسال الصوتي، اختصر التعليمات إلى {p0} حرفاً أو أقل.",
-  "Groq voice is available for English and Arabic. Workers can listen to the instruction and, when included, the question and answer choices.": "صوت Groq متاح بالإنجليزية والعربية. يمكن للعمال الاستماع إلى التعليمات وإلى السؤال وخيارات الإجابة عند تضمينها.",
+  "Workers can listen to the instruction and, when included, the question and answer choices. Language availability is shown below.": "يمكن للعمال الاستماع إلى التعليمات وإلى السؤال وخيارات الإجابة عند تضمينها. اللغات المتاحة موضحة أدناه.",
   "Browse clarification dates": "تصفح تواريخ التوضيحات",
   "Clarification date": "تاريخ التوضيحات",
   "Previous day": "اليوم السابق",

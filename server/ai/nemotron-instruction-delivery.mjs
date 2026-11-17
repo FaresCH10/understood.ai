@@ -1,5 +1,5 @@
 import {preparationCheck,translationCheck} from './prepared-bundle.mjs';
-import {languageTextMatches} from '../languages.mjs';
+import {languageTextMatches,WORKER_LANGUAGE_CODES} from '../languages.mjs';
 import {withMultipleChoice} from '../multiple-choice.mjs';
 import {createNemotronAdapter,NEMOTRON_ULTRA_MODEL} from './nemotron.mjs';
 import {NEMOTRON_DELIVERY_ADAPTER} from './instruction-text-providers.mjs';
@@ -9,6 +9,7 @@ const PREPARE_TIMEOUT_MS=20000;
 const TRANSLATE_TIMEOUT_MS=6000;
 const BUDGET_MS=25000;
 const MAX_CONCURRENCY=8;
+const ACKNOWLEDGMENT='Confirm that you have read or listened to this instruction.';
 // Staff sources are English or Arabic by product scope. Any other worker-script
 // source is normalized too, so generation always runs on English text.
 const NON_LATIN_SCRIPT=/[\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Malayalam}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Sinhala}\p{Script=Cyrillic}\p{Script=Gurmukhi}]/u;
@@ -109,6 +110,7 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch,sharedLimiter=n
   const deeplKey=(env.DEEPL_API_KEY ?? '').trim();
   if(!deeplKey)return null;
   const textModel=(env.NVIDIA_TEXT_MODEL || '').trim() || NEMOTRON_ULTRA_MODEL;
+  const multilingual=env.UNDERSTOOD_VERCEL_INSTRUCTION_SPEECH==='groq-azure';
   const options={apiKey,dataClass:'synthetic',textModel,fetchImpl:fetcher};
   const adapterFor=timeoutMs=>createNemotronAdapter({...options,timeoutMs,requestJournal:inlineJournal});
   const translatorFor=timeoutMs=>createDeepLTranslateAdapter({apiKey:deeplKey,fetchImpl:fetcher,timeoutMs});
@@ -128,14 +130,16 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch,sharedLimiter=n
     forRequest:()=>nemotronInstructionDelivery(env,fetcher,limiter),
     mode:'nemotron-text',
     label:'Nemotron 3 Ultra 550B',
-    translationLabel:'DeepL',
-    translationAdapter:DEEPL_TRANSLATE_ADAPTER,
-    textLanguages:DEEPL_TRANSLATE_LANGUAGES,
+    translationLabel:multilingual?'DeepL + Nemotron': 'DeepL',
+    translationAdapter:multilingual?'deepl-nemotron-v1':DEEPL_TRANSLATE_ADAPTER,
+    textLanguages:multilingual?WORKER_LANGUAGE_CODES:DEEPL_TRANSLATE_LANGUAGES,
     normalizesSource:true,
     provenanceAdapter:NEMOTRON_DELIVERY_ADAPTER,
     model:textModel,
     async prepare(briefing,instruction) {
-      deadline=Date.now()+BUDGET_MS;
+      // The two DeepL gaps need a translation call and a separate check.
+      // Reserve their budget within the existing 180-second Vercel request.
+      deadline=Date.now()+(multilingual?45000:BUDGET_MS);
       const fail=code=>{if(briefing && typeof briefing==='object')failures.set(briefing,code);return null;};
       const voiceAcknowledgment=instruction?.response_mode==='acknowledge'&&instruction?.delivery_mode!=='text';
       if(instruction?.response_mode!=='question'&&!voiceAcknowledgment)return null;
@@ -148,7 +152,7 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch,sharedLimiter=n
             ? await translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,remaining()-500)).translateToEnglish(original)
             : original;
         } catch { return fail('source_translation_failed'); }
-        if(voiceAcknowledgment)return {responseMode:'acknowledge',title:english.title,source:briefing.source,facts:[english.text.slice(0,500)],languages:{en:{...english,speech:'device-synthesis-demo'}},provenance:{adapter:'synthetic-instruction-v1',live:false}};
+        if(voiceAcknowledgment)return {responseMode:'acknowledge',title:english.title,source:briefing.source,facts:[english.text.slice(0,500)],languages:{en:{...english,question:ACKNOWLEDGMENT,speech:'device-synthesis-demo'}},provenance:{adapter:'synthetic-instruction-v1',live:false}};
         // NIM occasionally fails or returns the generic template. A retry
         // covers transient and content failures, but a timed-out attempt has
         // no budget left to be useful, so the caller sees that cause instead.
@@ -177,11 +181,11 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch,sharedLimiter=n
         const candidate={title:en.title,facts:prepared.facts,question:en.question,askedFacts:prepared.rubric.askedFacts,choices:ordered.map(choice=>choice.text)};
         if(!preparationCheck(en.text,candidate,await adapterFor(12000).checkPreparation(en.text,candidate)))throw Error('Voice question did not pass its grounding check');
       }
-      const originalEnglish={title:en.title,text:en.text,...(questionMode?{question:en.question,answerChoices:ordered.map(choice=>choice.text)}:{})};
+      const originalEnglish={title:en.title,text:en.text,question:en.question||ACKNOWLEDGMENT,...(questionMode?{answerChoices:ordered.map(choice=>choice.text)}:{})};
       const checks=Object.entries(prepared.languages).map(async([language,item])=>{
         if(language==='en'&&en.text===original.source&&en.title===original.title)return;
         const source=language==='en'?{...originalEnglish,title:original.title,text:original.source}:originalEnglish;
-        const translated={title:item.title,text:item.text,...(questionMode?{question:item.question,answerChoices:ordered.map(choice=>item.choices.find(target=>target.id===choice.id).text)}:{})};
+        const translated={title:item.title,text:item.text,question:item.question||ACKNOWLEDGMENT,...(questionMode?{answerChoices:ordered.map(choice=>item.choices.find(target=>target.id===choice.id).text)}:{})};
         const terms=glossary.terms.filter(term=>term.sourceLanguage==='en'&&term.targetLanguage===language&&en.text.toLowerCase().includes(term.term.toLowerCase())).map(term=>({term:term.term,translation:term.override||term.suggestion}));
         await assertCurrent();
         translationCheck(await adapterFor(12000).checkTranslation(source,translated,language,{terms}));
@@ -197,11 +201,18 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch,sharedLimiter=n
       try {
         const left=remaining();
         if(left<2000)throw Error('DeepL translation budget exhausted');
-        const translator=translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,left-500));
+        const fallback=multilingual&&!DEEPL_TRANSLATE_LANGUAGES.includes(language);
+        const translator=fallback?adapterFor(Math.min(12000,left-500)):translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,left-500));
         const choices=Array.isArray(content?.choices);
-        const translated=await translator.translate({title:content.title,text:content.text,
+        const input={title:content.title,text:content.text,
           ...(typeof content.question==='string'?{question:content.question}:{}),
-          ...(choices?{answerChoices:content.choices.map(choice=>choice.text)}:{})},language);
+          ...(choices?{answerChoices:content.choices.map(choice=>choice.text)}:{})};
+        const translated=await translator.translate(input,language);
+        if(fallback){
+          const leftForCheck=remaining();if(leftForCheck<1500)throw Error('Translation check budget exhausted');
+          translationCheck(await adapterFor(Math.min(12000,leftForCheck-500)).checkTranslation(
+            {...input,question:input.question||input.text},{...translated,question:translated.question||translated.text},language));
+        }
         return {title:translated.title,text:translated.text,
           ...(typeof content.question==='string'?{question:translated.question}:{}),
           ...(choices?{questionType:'multiple-choice',choices:content.choices.map((choice,index)=>({id:choice.id,text:translated.answerChoices[index]}))}:{})};

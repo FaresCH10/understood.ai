@@ -10,6 +10,7 @@ import {nemotronInstructionDelivery} from '../server/ai/nemotron-instruction-del
 import {NEMOTRON_DELIVERY_ADAPTER} from '../server/ai/instruction-text-providers.mjs';
 import {DEEPL_TRANSLATE_ADAPTER,DEEPL_TRANSLATE_LANGUAGES} from '../server/ai/deepl-translate.mjs';
 import {NEMOTRON_ULTRA_MODEL} from '../server/ai/nemotron.mjs';
+import {WORKER_LANGUAGE_CODES} from '../server/languages.mjs';
 
 const baseEnv={UNDERSTOOD_INSTRUCTION_TEXT_PROVIDER:'nemotron',VERCEL_ENV:'production',NVIDIA_API_KEY:'test-only-nvidia-key',DEEPL_API_KEY:'test-only-deepl-key:fx'};
 const source='Place 2 cartons on the blue shelf before 4 pm. Keep the walkway clear.';
@@ -27,6 +28,36 @@ const hindiValues=[hindi.title,hindi.text,hindi.question,...hindi.answerChoices]
 const english={title:'Carton routing',text:source,question,questionType:'multiple-choice',
   choices:choices.map((text,index)=>({id:`c${index}`,text}))};
 const englishValues=[english.title,english.text,english.question,...choices];
+test('multilingual mode uses checked Nemotron for Sinhala and Shahmukhi without changing answer IDs',async()=>{
+ const good={faithful:true,complete:true,languageCorrect:true,terminologyApplied:true,reasons:[]};
+ for(const [language,word] of [['si','උපදෙස්'],['pa-Arab','ہدایت']]){
+   let calls=0;
+   const adapter=nemotronInstructionDelivery({...baseEnv,UNDERSTOOD_VERCEL_INSTRUCTION_SPEECH:'groq-azure'},async(url)=>{
+     assert.match(url,/nvidia/);calls++;
+     return reply(calls%2?{title:word,text:word,question:word,answerChoices:[1,2,3,4].map(n=>`${word} ${n}`)}:good);
+   });
+   assert.deepEqual(adapter.textLanguages,WORKER_LANGUAGE_CODES);await resetBudget(adapter);
+   const result=await adapter.translate(language,english);assert.equal(calls,2);
+   assert.equal(result.text,word);assert.deepEqual(result.choices.map(c=>c.id),english.choices.map(c=>c.id));
+   const bad=nemotronInstructionDelivery({...baseEnv,UNDERSTOOD_VERCEL_INSTRUCTION_SPEECH:'groq-azure'},async()=>reply(++calls%2?{title:word,text:word,question:word,answerChoices:[1,2,3,4].map(n=>`${word} ${n}`)}:{...good,faithful:false}));
+   await resetBudget(bad);await assert.rejects(bad.translate(language,english),{code:'translation_check_failed'});
+ }
+});
+test('voice acknowledgment translates and checks the fixed receipt prompt without generating questions',async()=>{
+ const good={faithful:true,complete:true,languageCorrect:true,terminologyApplied:true,reasons:[]};
+ let generation=0,checks=0;
+ const adapter=nemotronInstructionDelivery({...baseEnv,UNDERSTOOD_VERCEL_INSTRUCTION_SPEECH:'groq-azure'},async(url,options)=>{
+   if(url.includes('deepl'))return deeplReply([hindi.title,hindi.text,'पुष्टि करें कि आपने यह निर्देश पढ़ या सुन लिया है।']);
+   const request=JSON.parse(options.body);
+   if(request.messages[0].content.includes('Independently compare')){checks++;return reply(good);}
+   generation++;throw Error('No question generation expected');
+ });
+ const briefing={source,title:'Carton routing'},prepared=await adapter.prepare(briefing,{response_mode:'acknowledge',delivery_mode:'both'});
+ assert.match(prepared.languages.en.question,/Confirm that/);
+ prepared.languages.hi=await adapter.translate('hi',prepared.languages.en);
+ assert.equal(await adapter.verifySpeech(prepared,briefing,{responseMode:'acknowledge',glossary:{terms:[]}}),true);
+ assert.equal(generation,0);assert.equal(checks,1);assert.equal(prepared.languages.hi.choices,undefined);
+});
 async function resetBudget(adapter){
   // Acknowledgment preparation resets the per-send time budget without a provider call.
   await adapter.prepare({source,title:'Carton routing'},{response_mode:'acknowledge',delivery_mode:'text'});

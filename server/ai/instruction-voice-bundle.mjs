@@ -7,14 +7,14 @@ const hash=value=>createHash('sha256').update(typeof value==='string'?value:JSON
 const confirmation={en:'Confirm that you have read or listened to this instruction.',ar:'أكد أنك قرأت هذه التعليمات أو استمعت إليها.'};
 
 // Preserve the checked instruction and frozen choice order from the existing
-// Nemotron/DeepL path. Groq only narrates; it never writes another question.
+// text path. Speech providers only narrate; they never write another question.
 export async function instructionVoiceBundle(prepared,{source,title,revision,review,glossary,responseMode,textModel},speech,assertCurrent){
   const languages=['en',...WORKER_LANGUAGE_CODES.filter(code=>code!=='en'&&prepared.languages[code])];
   if(!languages.every(code=>speech.languages.includes(code)))throw Error('Instruction voice language unavailable');
   const questionMode=responseMode==='question';
-  const provenance={adapter:'nemotron-deepl-groq-v1',dataClass:'synthetic',textModel:textModel||'checked-instruction-text',speechModel:'canopylabs/orpheus-english-arabic',voice:'austin/fahad',promptVersion:'instruction-voice-v1',schemaVersion:PREPARED_BUNDLE_SCHEMA};
+  const provenance={adapter:speech.provenance?.adapter||'nemotron-deepl-groq-v1',dataClass:'synthetic',textModel:textModel||'checked-instruction-text',speechModel:speech.provenance?.speechModel||'canopylabs/orpheus-english-arabic',voice:speech.provenance?.voice||'austin/fahad',promptVersion:'instruction-voice-v1',schemaVersion:PREPARED_BUNDLE_SCHEMA};
   const dependencies={revision,titleHash:hash(title.trim()),sourceHash:hash(source),reviewHash:hash(reviewContent(review,revision)),glossaryHash:glossary.hash,glossaryRevision:glossary.revision,languages,provider:provenance,schemaVersion:PREPARED_BUNDLE_SCHEMA};
-  const localized=Object.fromEntries(languages.map(code=>{const item=prepared.languages[code];return [code,{title:item.title,text:item.text,question:questionMode?item.question:confirmation[code],...(questionMode?{questionType:item.questionType,choices:structuredClone(item.choices)}:{}),speech:{}}];}));
+  const localized=Object.fromEntries(languages.map(code=>{const item=prepared.languages[code];return [code,{title:item.title,text:item.text,question:item.question||confirmation[code],...(questionMode?{questionType:item.questionType,choices:structuredClone(item.choices)}:{}),speech:{}}];}));
   const audio=[];
   const results=await Promise.allSettled(languages.flatMap(language=>['body','question'].map(async kind=>{
     const item=localized[language],includesChoices=kind==='question'&&questionMode;

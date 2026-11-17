@@ -16,7 +16,7 @@ import {syntheticAssessmentAdapter} from './postgres/synthetic-assessment.mjs';
 import {vercelDatabaseOptions,vercelRequestsLiveMode} from './vercel-database.mjs';
 import {cloudflareGemma4Test} from './ai/cloudflare-gemma4-test.mjs';
 import {cloudflareGemma4Delivery} from './ai/cloudflare-gemma4-delivery.mjs';
-import {vercelInstructionSpeech} from './ai/groq-instruction-speech.mjs';
+import {vercelInstructionSpeech} from './ai/instruction-speech.mjs';
 import {vercelSourceTranscription} from './ai/groq-source-transcription.mjs';
 import {vercelClarificationTranslation} from './ai/vercel-clarification-translation.mjs';
 import {nemotronInstructionDelivery} from './ai/nemotron-instruction-delivery.mjs';
@@ -58,7 +58,7 @@ export async function createVercelNeonHandler({env=process.env,pool,send,createP
       secretAccessKey:env.UNDERSTOOD_NEON_STORAGE_SECRET_ACCESS_KEY,
     }):undefined;
     const instructionSpeechAdapter=!production&&storage&&typeof instructionTextAdapter?.verifySpeech==='function'?vercelInstructionSpeech(env):undefined;
-    const deliveryTextAdapter=instructionTextAdapter&&env.UNDERSTOOD_VERCEL_INSTRUCTION_SPEECH==='groq'?{...instructionTextAdapter,speechLanguages:instructionSpeechAdapter?.languages??[],...(instructionSpeechAdapter?{speechProviderLabel:instructionSpeechAdapter.label,speechMaxCharacters:instructionSpeechAdapter.maxCharacters}:{})}:instructionTextAdapter;
+    const deliveryTextAdapter=instructionTextAdapter&&['groq','groq-azure'].includes(env.UNDERSTOOD_VERCEL_INSTRUCTION_SPEECH)?{...instructionTextAdapter,speechLanguages:instructionSpeechAdapter?.languages??[],...(instructionSpeechAdapter?{speechProviderLabel:instructionSpeechAdapter.label,speechMaxCharacters:instructionSpeechAdapter.maxCharacters}:{})}:instructionTextAdapter;
     const requestAddress=production?config.requestAddress:req=>{
       if(!hosts.has(req.headers.host) || req.headers['x-forwarded-proto']!=='https')throw Error('Forbidden transport');
       const address=req.headers['x-vercel-forwarded-for'] || req.headers['x-forwarded-for'];
