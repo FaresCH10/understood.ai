@@ -16,6 +16,7 @@ import {syntheticAssessmentAdapter} from './postgres/synthetic-assessment.mjs';
 import {vercelDatabaseOptions,vercelRequestsLiveMode} from './vercel-database.mjs';
 import {cloudflareGemma4Test} from './ai/cloudflare-gemma4-test.mjs';
 import {cloudflareGemma4Delivery} from './ai/cloudflare-gemma4-delivery.mjs';
+import {vercelClarificationTranslation} from './ai/vercel-clarification-translation.mjs';
 import {nemotronInstructionDelivery} from './ai/nemotron-instruction-delivery.mjs';
 
 // Preserve the existing synthetic application mode, but persist accounts and
@@ -65,7 +66,7 @@ export async function createVercelNeonHandler({env=process.env,pool,send,createP
       mail:production?config.mail:{available:false},registrationVerification,
       // Serverless synthetic runs have no background worker: drain its own queue.
       ...(production?{}:{inlineJobs:true,inlineAssessment:syntheticAssessmentAdapter,gemma4Test:cloudflareGemma4Test(env),
-        instructionTextAdapter}),
+        instructionTextAdapter,clarificationTranslationAdapter:vercelClarificationTranslation(env)}),
       pilotDestination:pilotGmail?.destination ?? config.pilotDestination ?? null,sendPilot:pilotGmail?.send,
       dispatchRegistration:registrationId=>processOneRegistration(pool,registrationVerification,
         {schema,registrationId,throwOnFailure:true,...(send?{send}:{})}),

@@ -119,9 +119,9 @@ async function deliver(client,job,text){
   }else await staffAuditOnce(client,{orgId:job.org_id,siteId:job.site_id,action:'help.requested',objectId:job.id});
   await client.query("UPDATE clarification_exchanges SET state='delivered',translated_text=$3,delivered_at=clock_timestamp(),lease_token=NULL,lease_until=NULL,error_code=NULL WHERE id=$1 AND lease_token=$2",[job.id,job.token,text]);
 }
-export async function processOneClarificationExchange(pool,adapter,{schema='public',dataClass='synthetic'}={}){
+export async function processOneClarificationExchange(pool,adapter,{schema='public',dataClass='synthetic',exchangeId=null,orgId=null,siteId=null}={}){
   const job=await domainTransaction(pool,schema,async client=>{
-    const row=(await client.query(`SELECT * FROM clarification_exchanges WHERE (state='queued' AND retry_at<=clock_timestamp()) OR (state='processing' AND lease_until<=clock_timestamp()) ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1`)).rows[0];
+    const row=(await client.query(`SELECT * FROM clarification_exchanges WHERE ((state='queued' AND retry_at<=clock_timestamp()) OR (state='processing' AND lease_until<=clock_timestamp())) AND ($1::text IS NULL OR id=$1) AND ($2::text IS NULL OR org_id=$2) AND ($3::text IS NULL OR site_id=$3) ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1`,[exchangeId,orgId,siteId])).rows[0];
     if(!row||!await dispatchAllowed(client,row.org_id,{provider:true}))return null;
     if(row.attempts>=3){await client.query("UPDATE clarification_exchanges SET state='failed',lease_token=NULL,lease_until=NULL,error_code='translation_unavailable' WHERE id=$1",[row.id]);return {exhausted:true};}
     const token=randomUUID();await client.query("UPDATE clarification_exchanges SET state='processing',lease_token=$2,lease_until=clock_timestamp()+interval '120 seconds',attempts=attempts+1 WHERE id=$1",[row.id,token]);return {...row,token};

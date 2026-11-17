@@ -59,7 +59,7 @@ import {handleImprovementRoute} from '../self-healing-http.mjs';
 import {improvementHttpError} from '../self-healing-input.mjs';
 import {readInstructionImprovement,analyzeInstructionImprovement,createImprovementDraft} from './self-healing.mjs';
 import { publish,submitAnswer,withdrawPublication,domainTransaction } from './domain.mjs';
-import {listClarificationFlow,readClarificationFlow,saveClarificationExchange} from './clarification-flow.mjs';
+import {listClarificationFlow,readClarificationFlow,saveClarificationExchange,processOneClarificationExchange} from './clarification-flow.mjs';
 import {createSchedule,listSchedules,cancelSchedule} from './schedules.mjs';
 import {listReverificationCandidates} from './reverification.mjs';
 import {scheduleHttpError} from '../schedule-input.mjs';
@@ -755,8 +755,19 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       if(simpleClarification){
         if(url.search)throw Error('Invalid clarification request');
         const worker=simpleClarification[1]==='worker/briefings',id=simpleClarification[2],settings={...repository,worker};
-        const result=req.method==='GET'?await readClarificationFlow(pool,session,id,settings):req.method==='POST'?await saveClarificationExchange(pool,session,id,await readJson(req),settings):null;
+        let result=req.method==='GET'?await readClarificationFlow(pool,session,id,settings):req.method==='POST'?await saveClarificationExchange(pool,session,id,await readJson(req),settings):null;
         if(!result)throw Error('Invalid clarification request');
+        // Authorize the thread before claiming one of its jobs. Await bounded work
+        // within this invocation: serverless instances have no persistent worker.
+        // Polling also recovers messages queued by preceding deployments.
+        if(scheduleDrains&&repository.integrationMode!=='live'){
+          const exchangeId=req.method==='POST'?result.id:result.items.find(item=>['queued','processing'].includes(item.state))?.id;
+          if(exchangeId){
+            await processOneClarificationExchange(pool,options.clarificationTranslationAdapter,{schema:repository.schema,dataClass:'synthetic',exchangeId,orgId:session.org_id,siteId:session.site_id});
+            const updated=await readClarificationFlow(pool,session,id,settings);
+            result=req.method==='GET'?updated:{...result,state:updated.items.find(item=>item.id===exchangeId)?.state??result.state};
+          }
+        }
         return send(res,req.method==='POST'?202:200,{...result,clientContext:clientSessionContext(session).clientContext});
       }
       const questionRepeat=path.match(/^\/api\/clarifications\/([^/]+)\/question-repeat$/);
