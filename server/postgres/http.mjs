@@ -31,6 +31,7 @@ import {listSites,createSite,siteCreationReceipt,saveSiteAccess,siteAccessReceip
 import {requireSiteOperational} from './site-lifecycle.mjs';
 import {archivedWriteAllowed} from '../site-lifecycle-input.mjs';
 import {siteHttpError} from '../site-input.mjs';
+import {processOneSourceAudio} from './source-audio-worker.mjs';
 import {handleSourceAudioRoute} from '../source-audio-http.mjs';
 import {receiveSourceAudio,getSourceAudioReceipt,getSourceAudio,listSourceAudio} from './source-audio.mjs';
 import {retrySourceAudio,getSourceRetryReceipt} from './source-audio-retry.mjs';
@@ -417,7 +418,16 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         retry:(s,id,input)=>retrySourceAudio(pool,s,id,input,repository),
         retryReceipt:(s,id,retryId)=>getSourceRetryReceipt(pool,s,id,retryId,repository),
         receive:(s,input,original,wav)=>receiveSourceAudio(pool,s,input,original,wav,storage,repository),
-        receipt:(s,id)=>getSourceAudioReceipt(pool,s,id,repository),
+        receipt:async(s,id)=>{
+          const receipt=await getSourceAudioReceipt(pool,s,id,repository);
+          // Lookup authenticates the uploader before a bounded serverless claim.
+          // Polls recover uploads received before this processor was deployed.
+          if(receipt.found&&['received','processing'].includes(receipt.status)&&scheduleDrains&&repository.integrationMode!=='live'){
+            await processOneSourceAudio(pool,options.sourceAdapter,storage,{...repository,requestId:id,orgId:s.org_id,siteId:s.site_id,requestedBy:s.principal_id});
+            return getSourceAudioReceipt(pool,s,id,repository);
+          }
+          return receipt;
+        },
         audio:(s,id,kind)=>getSourceAudio(pool,s,id,storage,kind,repository),
       }))return;
       if (path==='/api/session' && req.method==='GET') return send(res,200,{authenticated:true,mode:`${config.aiMode}-credential`,...clientSessionContext(session),...await sessionContext(pool,session,repository)});

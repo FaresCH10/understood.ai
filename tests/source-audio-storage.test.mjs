@@ -452,3 +452,20 @@ test('backup restore and PostgreSQL import preserve source cleanup tombstones wi
     assert.equal((await f.raw("SELECT count(*) n FROM audit WHERE action='briefing.source_audio_purged'")).rows[0].n,1);
   }finally {db.close();if(f)await f.close();await rm(root,{recursive:true,force:true});}
 });
+
+test('serverless source receipt drains only the authenticated uploader request and preserves transcript review',async()=>{
+ const f=await fixture(true),st=memoryStore(),value=input(),other=input();let calls=0,server;
+ try{
+  await provisionStaffCredential(f.pool,{staffId:'maya',orgId:'cedar',siteId:'beirut',email:'source@example.test',password:'Synthetic-source-password-123'},f.options);
+  await f.receive(owner,value,original,wav(),st);await f.receive({...owner,principal_id:'rami',role:'supervisor'},other,original,wav(),st);
+  const origin='http://127.0.0.1:3020';server=createPostgresRehearsalServer(f.pool,{...f.options,storage:st,tier:'local',aiMode:'synthetic',accessMode:'credential',dataClass:'synthetic',publicOrigin:origin,inlineJobs:true,sourceAdapter:{provenance:{dataClass:'real'},async transcribe(){calls++;return {text:CANONICAL_SOURCE};}}});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api`;
+  assert.equal((await fetch(base+'/source-audio/'+value.requestId)).status,401);assert.equal(calls,0);
+  const login=await fetch(base+'/auth/staff/login',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({email:'source@example.test',password:'Synthetic-source-password-123'})});assert.equal(login.status,200);
+  const cookie=login.headers.get('set-cookie').split(';')[0],session=await(await fetch(base+'/session',{headers:{cookie}})).json(),headers={cookie,'x-client-session-context':session.clientContext};
+  assert.equal((await(await fetch(base+'/source-audio/'+other.requestId,{headers})).json()).found,false);assert.equal(calls,0);
+  const response=await fetch(base+'/source-audio/'+value.requestId,{headers});assert.equal(response.status,200);const receipt=await response.json();assert.equal(receipt.status,'transcribed');assert.equal(calls,1);
+  const draft=await(await fetch(base+'/briefings/'+receipt.briefingId,{headers})).json();assert.equal(draft.source,CANONICAL_SOURCE);assert.equal(draft.publications.length,0);
+  await fetch(base+'/source-audio/'+value.requestId,{headers});assert.equal(calls,1);assert.equal((await f.receipt({...owner,principal_id:'rami',role:'supervisor'},other.requestId)).status,'received');
+ }finally{if(server)await new Promise(resolve=>server.close(resolve));await f.close();}
+});

@@ -18,8 +18,9 @@ export default function VoiceTranscript({authority,title,onApproved,onClose,repl
   checkSourceUpload(pending,sourceFetch,controller.signal).then(async receipt=>{
    if(!current()||controller.signal.aborted)return;
    setCanRestart(!receipt.found||['failed','blocked'].includes(receipt.status||''));
+   if(receipt.status!=='failed'&&receipt.status!=='blocked')setError('');
    if(receipt.status==='transcribed'&&receipt.briefingId){const draft=await request<{source:string}>(`/briefings/${receipt.briefingId}`,'GET',undefined,controller.signal);if(current()&&!controller.signal.aborted){setTranscript(draft.source);setStatus('Review the transcript. Nothing has been added to your instruction.');}}
-   else if(['failed','blocked'].includes(receipt.status||''))setError('Transcription is unavailable. Try again, or write the instruction.');
+   else if(['failed','blocked'].includes(receipt.status||'')){setStatus('');setError('Transcription is unavailable. Try again, or write the instruction.');}
    else{setStatus(receipt.found?'Transcribing your recording…':'Upload receipt not confirmed. Check again before recording another source.');if(receipt.found)timer=setTimeout(()=>setTick(value=>value+1),2000);}
   }).catch(reason=>{if(current()&&!controller.signal.aborted)setError(reason.message);});
   return()=>{controller.abort();clearTimeout(timer);};

@@ -8,7 +8,7 @@ import {dispatchAllowed,dispatchPredicate} from './operations-gates.mjs';
 import {reserveProviderOperation,providerRequestJournal} from './provider-budget.mjs';
 import {sourceTranscriptionInputHash} from '../ai/audio-provenance.mjs';
 
-export function sourceAudioProcessingJournal(pool,{schema='public'}={}) {
+export function sourceAudioProcessingJournal(pool,{schema='public',requestId=null,orgId=null,siteId=null,requestedBy=null}={}) {
   const run=fn=>domainTransaction(pool,schema,fn);
   async function valid(client,row) {
     if(!await dispatchAllowed(client,row.org_id,{provider:true}))return null;
@@ -26,7 +26,8 @@ export function sourceAudioProcessingJournal(pool,{schema='public'}={}) {
       const row=(await client.query(`SELECT * FROM source_audio_requests WHERE ((status='received' AND (retry_at IS NULL OR retry_at<=clock_timestamp()))
         OR (status='processing' AND lease_until<=clock_timestamp())) AND NOT EXISTS(SELECT 1 FROM source_audio_purges p WHERE p.request_id=source_audio_requests.request_id)
         AND ${dispatchPredicate('source_audio_requests',{provider:true})}
-        ORDER BY created_at,request_id FOR UPDATE SKIP LOCKED LIMIT 1`)).rows[0];
+        AND ($1::text IS NULL OR request_id=$1) AND ($2::text IS NULL OR org_id=$2) AND ($3::text IS NULL OR site_id=$3) AND ($4::text IS NULL OR requested_by=$4)
+        ORDER BY created_at,request_id FOR UPDATE SKIP LOCKED LIMIT 1`,[requestId,orgId,siteId,requestedBy])).rows[0];
       if(!row || !await dispatchAllowed(client,row.org_id,{provider:true}))return null;
       if(row.attempts>=3) {await client.query("UPDATE source_audio_requests SET status='failed',lease_token=NULL,lease_until=NULL,retry_at=NULL,error='Source transcription attempts exhausted' WHERE request_id=$1",[row.request_id]);return {...row,exhausted:true};}
       return (await client.query("UPDATE source_audio_requests SET status='processing',lease_token=$2,lease_until=clock_timestamp()+interval '180 seconds',attempts=attempts+1,retry_at=NULL,error=NULL WHERE request_id=$1 RETURNING *",[row.request_id,randomUUID()])).rows[0];
