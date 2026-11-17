@@ -110,7 +110,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const [evidenceMode,setEvidenceMode]=useState<EvidenceMode>(restoredPending?.evidenceMode || 'none');
   const [audience,setAudience]=useState<AudienceOverview|null>(null);
   const [audienceError,setAudienceError]=useState('');
-  const [readiness,setReadiness]=useState<{mode:string;textLanguages:string[];speechLanguages:string[];providerLabel?:string|null;translationProviderLabel?:string|null}|null>(null);
+  const [readiness,setReadiness]=useState<{mode:string;textLanguages:string[];speechLanguages:string[];providerLabel?:string|null;translationProviderLabel?:string|null;speechProviderLabel?:string;speechMaxCharacters?:number}|null>(null);
   const [readinessError,setReadinessError]=useState('');
 
   const [audienceLoading,setAudienceLoading]=useState(false),[audienceRevision,setAudienceRevision]=useState(0);
@@ -153,7 +153,8 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const audienceReady=!!selectedAudience && selectedAudience.total>0 && !selectedAudience.notSelected;
   const deliveryBlocked=audienceReady && !!readiness && readyWorkers===0;
   const canSwitchToText=deliveryBlocked && deliveryMode!=='text' && audienceLanguages.some(([code])=>readiness.textLanguages.includes(code));
-  const deliveryHint=canSwitchToText
+  const voiceTooLong=deliveryMode!=='text'&&!!readiness?.speechMaxCharacters&&source.length>readiness.speechMaxCharacters;
+  const deliveryHint=voiceTooLong?staffT('For voice delivery, shorten the instruction to {p0} characters or fewer.',{p0:readiness!.speechMaxCharacters!}):canSwitchToText
     ? staffT.locale==='ar'?'الصوت غير متاح للمستلمين المحددين. اختر النص فقط للإرسال إلى المستلمين الجاهزين.':'Voice is unavailable for the selected recipients. Choose Text only to send to recipients who can receive it.'
     : staffT.locale==='ar'?'لا تتوفر ترجمة لهذه التعليمات بلغات المستلمين المحددين.':'Translation is unavailable for this instruction in the selected recipients’ languages.';
   const audienceHint=audienceType==='crew'&&!selectedCrew?staffT("Select a crew to continue."):audienceType==='crew'&&selectedCrew?.members===0?staffT("This crew has no workers yet."):selectedAudience?.notSelected?staffT("Select a language for every worker in this audience."):selectedAudience?staffT("Choose at least one worker with a selected language."):staffT("Loading recipients...");
@@ -456,6 +457,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
         onSwitchToText={()=>setDeliveryMode('text')}
       />
       {readiness?.mode==='synthetic'&&<p className="notice notice-amber" role="status">{(readiness.textLanguages.length>1?staffT.locale==='ar'?'وضع تجريبي: المثال المحفوظ مترجم إلى كل لغة عامل ويستخدم صوت الجهاز. التعليمات الأخرى تدعم النص الإنجليزي فقط حتى يتم تفعيل مساحة عمل حية.':'Demo mode: the seeded shelf example is translated into every worker language and uses device speech. Other instructions support English text only until a live workspace is configured.':staffT.locale==='ar'?'وضع تجريبي: تدعم التعليمات العامة النص الإنجليزي فقط. الترجمة متعددة اللغات والصوت المُولّد يتطلبان تفعيل خدمات الذكاء الاصطناعي.':'Test mode: general instructions support English text only. Multilingual translation and generated audio require a configured live workspace.')}</p>}
+      {readiness?.speechProviderLabel&&<p className="notice notice-blue">{staffT('Groq voice is available for English and Arabic. Workers can listen to the instruction and, when included, the question and answer choices.')}</p>}
       {readiness?.providerLabel&&readiness.mode.endsWith('-text')&&<p className="muted" role="status">{staffT.locale==='ar'
         ?readiness.translationProviderLabel?`${readiness.providerLabel} يكتب سؤال التحقق. ${readiness.translationProviderLabel} يترجم نص التعليمات. يعتمد توفر الصوت على لغة العامل.`:`${readiness.providerLabel} يمكنه ترجمة التعليمات الإنجليزية للتسليم النصي. يعتمد توفر الصوت على لغة العامل.`
         :readiness.translationProviderLabel?`${readiness.providerLabel} writes the check question. ${readiness.translationProviderLabel} translates the instruction text. Voice availability depends on the worker’s language.`:`${readiness.providerLabel} can translate English instructions for text delivery. Voice availability depends on the worker’s language.`}</p>}
@@ -517,6 +519,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
           {attachmentBusy&&<li><Circle size={16} aria-hidden="true"/><span>{staffT("Wait for the attachment to finish uploading.")}</span><span className="sr-only">{staffT("Requirement not met")}</span></li>}
         </ul>
       </div>}
+      {busy&&deliveryMode!=='text'&&readiness?.speechProviderLabel&&<p role="status">{staffT(responseMode==='question'?'Preparing instruction and question audio…':'Preparing instruction audio…')}</p>}
       <div className="send-submit">
         <span className="muted"><Users size={17}/> {audience?staffT("Recipients are resolved when you send; later joiners are not added automatically."):staffT("Loading recipients...")}</span>
         <button className="button primary" disabled={!canSubmit||!draftLoaded} onClick={()=>void submit()}>{busy?staffT("Sending..."):<><Send size={20}/>{tr("Send instruction")}</>}</button>

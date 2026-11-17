@@ -9,6 +9,7 @@ import { draftInput,expectedRevision,copyDraftInput,checkDraftCopyReplay,archive
 import {checkedSyntheticReview} from '../briefing-input.mjs';
 import {readGlossarySnapshot} from './glossary.mjs';
 import {checkedSyntheticGlossary,assertGlossaryCurrent} from '../glossary-input.mjs';
+import {instructionVoiceBundle} from '../ai/instruction-voice-bundle.mjs';
 import {prepareLanguageBundle} from '../ai/prepared-bundle.mjs';
 import {checkPreparationClaim,recordPreparationStage,stagePreparedBundle,attachPreparedBundle} from './generated-audio.mjs';
 import {loadTargetRegeneration} from './regeneration.mjs';
@@ -180,7 +181,7 @@ export function requestPreparation(pool,session,id,value,{schema='public'}={}) {
 }
 
 export async function processOnePreparation(pool,{schema='public',integrationMode,prepare=syntheticPrepare,adapter,storage,languages,
-  briefingId=null,instructionTextAdapter}={}) {
+  briefingId=null,instructionTextAdapter,instructionSpeechAdapter}={}) {
   const dataClass=integrationDataClass(integrationMode);
   if(integrationMode==='live')assertProviderMode(adapter,integrationMode);
   const job=await domainTransaction(pool,schema,async (client) => {
@@ -195,7 +196,7 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     return {...row,attempts:row.attempts+1,token};
   });
   if (!job) return false;
-  let translating=false,questionFailure=null;
+  let translating=false,voicing=false,questionFailure=null;
   try {
     if (job.attempts>3) throw new Error('Preparation interrupted too many times');
     const briefing=await domainTransaction(pool,schema,async (client) => (await client.query(`SELECT b.source,b.title,b.state,b.revision,
@@ -256,8 +257,9 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     if(intent) throw Error('Generated target regeneration requires its configured adapter');
     // Cached adapters must not share a request's deadline with another job.
     instructionTextAdapter=instructionTextAdapter?.forRequest?.() ?? instructionTextAdapter;
+    const voiceDelivery=!!instructionSpeechAdapter&&!!briefing.instruction_request_id&&!!instruction&&instruction.delivery_mode!=='text';
     let providerPrepared=false,base=null,providerInput=null;
-    if(instruction?.delivery_mode==='text' && typeof instructionTextAdapter?.prepare==='function') {
+    if((instruction?.delivery_mode==='text'||voiceDelivery) && typeof instructionTextAdapter?.prepare==='function') {
       providerInput={source:briefing.source,title:briefing.title};
       base=await instructionTextAdapter.prepare(providerInput,instruction).catch(()=>null);
       providerPrepared=!!base;
@@ -284,8 +286,8 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     // A provider that declares its languages cannot translate the rest; those
     // recipients are left undelivered instead of failing the whole send.
     const translatable=Array.isArray(instructionTextAdapter?.textLanguages)
-      ? missing.filter(language=>instructionTextAdapter.textLanguages.includes(language)) : missing;
-    if(integrationMode==='synthetic' && instructionTextAdapter && briefing.instruction_request_id && instruction.delivery_mode==='text' && translatable.length){
+      ? missing.filter(language=>instructionTextAdapter.textLanguages.includes(language)&&(!voiceDelivery||instructionSpeechAdapter.languages.includes(language))) : missing;
+    if(integrationMode==='synthetic' && instructionTextAdapter && briefing.instruction_request_id && (instruction.delivery_mode==='text'||voiceDelivery) && translatable.length){
       translating=true;
       const claim={source:briefing.source,review:review ?? null,glossary};
       await checkPreparationClaim(pool,job,claim,{schema});
@@ -315,8 +317,19 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
     }
     if(!instruction)prepared=withMultipleChoice(prepared,{preserveQuestions:true,preserveAskedFacts:true});
     if(recordedSource)prepared=withMultipleChoice(prepared);
-    const available=targets.filter(language=>prepared.languages[language]);
+    const available=targets.filter(language=>prepared.languages[language]&&(!voiceDelivery||instructionSpeechAdapter.languages.includes(language)));
     prepared.languages=Object.fromEntries(available.map(language=>[language,prepared.languages[language]]));
+    if(voiceDelivery){
+      translating=false;voicing=true;
+      const assertCurrent=()=>checkPreparationClaim(pool,job,{source:briefing.source,review:review??null,glossary},{schema});
+      await assertCurrent();
+      if(typeof instructionTextAdapter?.verifySpeech!=='function'||await instructionTextAdapter.verifySpeech(prepared,{source:briefing.source,title:briefing.title},{responseMode:instruction.response_mode,glossary,assertCurrent})!==true)throw Error('Instruction speech validation unavailable');
+      await assertCurrent();
+      const bundle=await instructionVoiceBundle(prepared,{source:briefing.source,title:briefing.title,revision:job.revision,review:review??null,glossary,responseMode:instruction.response_mode,textModel:instructionTextAdapter?.model},instructionSpeechAdapter,assertCurrent);
+      const bundleId=randomUUID();
+      await stagePreparedBundle(pool,job,bundle,storage,{schema,bundleId});
+      await attachPreparedBundle(pool,job,bundleId,storage,{schema});return true;
+    }
     readySnapshot({...briefing,state:'ready',prepared_json:prepared},available.map((language) => ({language})),integrationMode,
       instruction ? {responseMode:instruction.response_mode,deliveryMode:instruction.delivery_mode,evidenceMode:instruction.evidence_mode ?? 'none'} : undefined);
     await domainTransaction(pool,schema,async (client) => {
@@ -349,7 +362,7 @@ export async function processOnePreparation(pool,{schema='public',integrationMod
         ? ` (${questionFailure.causeCode})` : '';
       const failure=questionFailure
         ? `${instructionTextAdapter?.label ?? 'The question provider'} could not generate a checked question${cause}. Retry delivery.`
-        : translating?`${translationLabel} could not prepare the translations${detail}. Retry delivery.`:'Synthetic preparation failed';
+        : voicing?'Groq could not prepare instruction audio. Check voice availability or shorten the instruction, then retry delivery.':translating?`${translationLabel} could not prepare the translations${detail}. Retry delivery.`:'Synthetic preparation failed';
       await client.query(`UPDATE jobs SET status='failed',lease_token=NULL,lease_until=NULL,error=$2 WHERE id=$1`,
         [job.id,failure]);
       await client.query(`UPDATE briefings SET state='failed',updated_at=clock_timestamp() WHERE id=$1 AND org_id=$2 AND site_id=$3 AND revision=$4 AND state='processing'`,[job.briefing_id,job.org_id,job.site_id,job.revision]);

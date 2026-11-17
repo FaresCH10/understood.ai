@@ -11,5 +11,6 @@ export function instructionReadiness(config,source){
  if(!config.instructionTextAdapter)return {mode:'synthetic',...hostedInstructionLanguages(source)};
  return {mode:config.instructionTextAdapter.mode ?? 'gemma4-text',providerLabel:config.instructionTextAdapter.label ?? null,
   translationProviderLabel:config.instructionTextAdapter.translationLabel ?? null,
+  ...(config.instructionTextAdapter.speechProviderLabel?{speechProviderLabel:config.instructionTextAdapter.speechProviderLabel,speechMaxCharacters:config.instructionTextAdapter.speechMaxCharacters}:{}),
   ...hostedInstructionLanguages(source,config.instructionTextAdapter)};
 }

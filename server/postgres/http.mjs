@@ -278,7 +278,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
     // must never claim that job with the local demo processor.
     if(options.preparationAdapter||repository.integrationMode==='live')return state();
     if(await state()==='processing')await processOnePreparation(pool,{
-      schema:repository.schema,integrationMode:'synthetic',briefingId:started.briefingId,instructionTextAdapter,
+      schema:repository.schema,integrationMode:'synthetic',briefingId:started.briefingId,instructionTextAdapter,instructionSpeechAdapter:options.instructionSpeechAdapter,storage,
     });
     return state();
   };

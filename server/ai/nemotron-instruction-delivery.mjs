@@ -1,3 +1,4 @@
+import {preparationCheck,translationCheck} from './prepared-bundle.mjs';
 import {languageTextMatches} from '../languages.mjs';
 import {withMultipleChoice} from '../multiple-choice.mjs';
 import {createNemotronAdapter,NEMOTRON_ULTRA_MODEL} from './nemotron.mjs';
@@ -136,7 +137,8 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch,sharedLimiter=n
     async prepare(briefing,instruction) {
       deadline=Date.now()+BUDGET_MS;
       const fail=code=>{if(briefing && typeof briefing==='object')failures.set(briefing,code);return null;};
-      if(instruction?.response_mode!=='question')return null;
+      const voiceAcknowledgment=instruction?.response_mode==='acknowledge'&&instruction?.delivery_mode!=='text';
+      if(instruction?.response_mode!=='question'&&!voiceAcknowledgment)return null;
       try {
         const original={title:briefing?.title?.trim(),text:briefing?.source?.trim()};
         if(!original.title || !original.text)return fail('invalid_source');
@@ -146,6 +148,7 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch,sharedLimiter=n
             ? await translatorFor(Math.min(TRANSLATE_TIMEOUT_MS,remaining()-500)).translateToEnglish(original)
             : original;
         } catch { return fail('source_translation_failed'); }
+        if(voiceAcknowledgment)return {responseMode:'acknowledge',title:english.title,source:briefing.source,facts:[english.text.slice(0,500)],languages:{en:{...english,speech:'device-synthesis-demo'}},provenance:{adapter:'synthetic-instruction-v1',live:false}};
         // NIM occasionally fails or returns the generic template. A retry
         // covers transient and content failures, but a timed-out attempt has
         // no budget left to be useful, so the caller sees that cause instead.
@@ -165,6 +168,26 @@ export function nemotronInstructionDelivery(env={},fetcher=fetch,sharedLimiter=n
           provenance:{adapter:'synthetic-instruction-v1',live:false},
         },{preserveQuestions:true,preserveAskedFacts:true});
       } catch { return fail('generation_failed'); }
+    },
+    async verifySpeech(prepared,original,{responseMode,glossary,assertCurrent=async()=>{}}) {
+      const en=prepared.languages.en,questionMode=responseMode==='question';
+      const ordered=questionMode?[en.choices.find(choice=>choice.id===prepared.rubric.correctChoiceId),...en.choices.filter(choice=>choice.id!==prepared.rubric.correctChoiceId)]:[];
+      if(questionMode){
+        await assertCurrent();
+        const candidate={title:en.title,facts:prepared.facts,question:en.question,askedFacts:prepared.rubric.askedFacts,choices:ordered.map(choice=>choice.text)};
+        if(!preparationCheck(en.text,candidate,await adapterFor(12000).checkPreparation(en.text,candidate)))throw Error('Voice question did not pass its grounding check');
+      }
+      const originalEnglish={title:en.title,text:en.text,...(questionMode?{question:en.question,answerChoices:ordered.map(choice=>choice.text)}:{})};
+      const checks=Object.entries(prepared.languages).map(async([language,item])=>{
+        if(language==='en'&&en.text===original.source&&en.title===original.title)return;
+        const source=language==='en'?{...originalEnglish,title:original.title,text:original.source}:originalEnglish;
+        const translated={title:item.title,text:item.text,...(questionMode?{question:item.question,answerChoices:ordered.map(choice=>item.choices.find(target=>target.id===choice.id).text)}:{})};
+        const terms=glossary.terms.filter(term=>term.sourceLanguage==='en'&&term.targetLanguage===language&&en.text.toLowerCase().includes(term.term.toLowerCase())).map(term=>({term:term.term,translation:term.override||term.suggestion}));
+        await assertCurrent();
+        translationCheck(await adapterFor(12000).checkTranslation(source,translated,language,{terms}));
+      });
+      const results=await Promise.allSettled(checks),failed=results.find(result=>result.status==='rejected');if(failed)throw failed.reason;
+      return true;
     },
     failureCause(briefing) {
       return failures.get(briefing) ?? null;

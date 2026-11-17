@@ -20,9 +20,11 @@ export function hostedInstructionLanguages(source,instructionTextAdapter) {
     : speechLanguages.length>0);
   return {
     textLanguages:textSupported?declared??[...WORKER_LANGUAGE_CODES]:speechLanguages,
-    speechLanguages,
+    speechLanguages:Array.isArray(instructionTextAdapter?.speechLanguages)?speechLanguagesForProvider(source,instructionTextAdapter,textSupported):speechLanguages,
   };
 }
+
+function speechLanguagesForProvider(source,adapter,textSupported){return textSupported&&(!adapter.speechMaxCharacters||source.length<=adapter.speechMaxCharacters)?WORKER_LANGUAGE_CODES.filter(code=>adapter.speechLanguages.includes(code)&&(!Array.isArray(adapter.textLanguages)||adapter.textLanguages.includes(code))):[];}
 
 const stage=(pipeline,id)=>pipeline?.stages?.find((item)=>item?.id===id);
 

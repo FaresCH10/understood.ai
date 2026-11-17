@@ -44,7 +44,7 @@ export function createStaffRequest(session:PageSession,current:()=>boolean,fetch
     try {encoded=format==='csv'?body as Blob:mutation?JSON.stringify(body):undefined;}catch {throw new StaffRequestError('Invalid staff request');}
     assertCurrent();
     const instructionSend=url.pathname==='/api/instructions/send' || /^\/api\/instructions\/sends\/[^/]+(?:\/retry)?$/.test(url.pathname);
-    const timeout=AbortSignal.timeout(instructionSend?28000:15000),requestSignal=signal?AbortSignal.any([signal,timeout]):timeout;
+    const timeout=AbortSignal.timeout(instructionSend?175000:15000),requestSignal=signal?AbortSignal.any([signal,timeout]):timeout;
     let response:Response,data:any,decoded=true;
     try {
       sent=true;response=await fetcher(path,{method,credentials:'include',cache:'no-store',redirect:'error',signal:requestSignal,

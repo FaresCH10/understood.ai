@@ -371,3 +371,14 @@ test('a Vercel instruction send publishes supported languages and leaves Sinhala
     await db.close();
   }
 });
+
+
+test('voice preparation independently checks question grounding before narration',async()=>{
+ const checks={sourceGrounded:true,questionAligned:true,ambiguous:false,choicesAligned:true,factEvidence:facts.map((quote,factIndex)=>({factIndex,quote})),askedFactIndexes:[0,1],reasons:[]};
+ const mock=fetcher((body,count)=>reply(count===1?prepared:checks)),adapter=nemotronInstructionDelivery(baseEnv,mock.fetch);
+ const original={source,title:'Carton routing'},value=await adapter.prepare(original,{response_mode:'question',delivery_mode:'both'});
+ assert.equal(await adapter.verifySpeech(value,original,{responseMode:'question',glossary:{terms:[]}}),true);assert.equal(mock.calls.length,2);
+ const rejected=nemotronInstructionDelivery(baseEnv,fetcher((body,count)=>reply(count===1?prepared:{...checks,sourceGrounded:false})).fetch);
+ const bad=await rejected.prepare(original,{response_mode:'question',delivery_mode:'both'});
+ await assert.rejects(rejected.verifySpeech(bad,original,{responseMode:'question',glossary:{terms:[]}}),/preparation/);
+});

@@ -5,7 +5,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/gateway.mjs": {
-      "maxDuration": 30,
+      "maxDuration": 180,
       "includeFiles": "server/postgres/migrations/*.sql"
     }
   },

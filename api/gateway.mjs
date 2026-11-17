@@ -38,4 +38,4 @@ export default async function gateway(req, res) {
   }
 }
 
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 180 };
