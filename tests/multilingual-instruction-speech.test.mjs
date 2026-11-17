@@ -72,6 +72,20 @@ test('Punjabi failed validation or authority change prevents narration',async()=
  await assert.rejects(invalid.speech('راستہ','pa-Arab'),/conversion/);assert.equal(calls,0);
 });
 
+test('Azure free-tier throttling waits once, rechecks authority, and bounds retries',async()=>{
+ let calls=0,waited=0,checks=0;
+ const adapter=createAzureInstructionSpeech({apiKey:'fixture',region:'eastus',sleep:async ms=>{waited+=ms;},fetchImpl:async()=>++calls===1?new Response('throttled',{status:429,headers:{'retry-after':'60'}}):new Response(wav())});
+ assert.deepEqual(await adapter.speech('रास्ता साफ रखें।','hi',async()=>{checks++;}),wav());
+ assert.equal(calls,2);assert.equal(waited,60000);assert.ok(checks>=15);
+ calls=0;
+ const revoked=createAzureInstructionSpeech({apiKey:'fixture',region:'eastus',sleep:async()=>{},fetchImpl:async()=>{calls++;return new Response('throttled',{status:429});}});
+ let authority=0;await assert.rejects(revoked.speech('रास्ता','hi',async()=>{if(++authority===4)throw Error('Revoked');}),/Revoked/);assert.equal(calls,1);
+ calls=0;const exhausted=createAzureInstructionSpeech({apiKey:'fixture',region:'eastus',sleep:async()=>{},fetchImpl:async()=>{calls++;return new Response('throttled',{status:429,headers:{'retry-after':'1'}});}});
+ await assert.rejects(exhausted.speech('रास्ता','hi'),/429/);assert.equal(calls,2);
+ const longRetry=createAzureInstructionSpeech({apiKey:'fixture',region:'eastus',sleep:async()=>assert.fail('Must not wait beyond lease'),fetchImpl:async()=>new Response('throttled',{status:429,headers:{'retry-after':'300'}})});
+ await assert.rejects(longRetry.speech('रास्ता','hi'),/429/);
+});
+
 test('new configuration preserves Groq when Azure is absent and keeps live-tier admission separate',()=>{
  const {AZURE_SPEECH_KEY,AZURE_SPEECH_REGION,...withoutAzure}=env;
  assert.deepEqual(vercelInstructionSpeech(withoutAzure).languages,['en','ar']);

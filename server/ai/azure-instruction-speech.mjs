@@ -1,6 +1,7 @@
 import {inspectWav} from '../audio.mjs';
 import {languageTextMatches} from '../languages.mjs';
 import {normalizeGroqSpeech} from './groq-instruction-speech.mjs';
+import {setTimeout as delay} from 'node:timers/promises';
 
 // Standard neural voices, not region-specific HD previews.
 export const AZURE_INSTRUCTION_VOICES=Object.freeze({
@@ -11,7 +12,7 @@ export const AZURE_INSTRUCTION_VOICES=Object.freeze({
 });
 const xml=text=>text.replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[char]));
 
-export function createAzureInstructionSpeech({apiKey,region,fetchImpl=fetch,timeoutMs=15000,shahmukhiToGurmukhi}={}){
+export function createAzureInstructionSpeech({apiKey,region,fetchImpl=fetch,timeoutMs=15000,shahmukhiToGurmukhi,sleep=delay}={}){
   if(typeof apiKey!=='string'||!apiKey||apiKey.length>300||/[\s\x00-\x1f\x7f]/.test(apiKey))throw Error('Azure speech credentials are required');
   if(typeof region!=='string'||!/^[a-z][a-z0-9]{1,40}$/.test(region))throw Error('Invalid Azure speech region');
   if(!Number.isInteger(timeoutMs)||timeoutMs<1000||timeoutMs>20000)throw Error('Invalid speech timeout');
@@ -34,11 +35,24 @@ export function createAzureInstructionSpeech({apiKey,region,fetchImpl=fetch,time
         const voice=AZURE_INSTRUCTION_VOICES[language==='pa-Arab'?'pa-Guru':language];
         const locale=voice.split('-').slice(0,2).join('-');
         await assertCurrent();
-        const response=await fetchImpl(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,{
+        const request=()=>fetchImpl(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,{
           method:'POST',redirect:'error',signal:AbortSignal.timeout(timeoutMs),
           headers:{'Ocp-Apim-Subscription-Key':apiKey,'Content-Type':'application/ssml+xml','X-Microsoft-OutputFormat':'riff-16khz-16bit-mono-pcm'},
           body:`<speak version="1.0" xml:lang="${locale}"><voice name="${voice}">${xml(text)}</voice></speak>`,
         });
+        let response=await request();
+        // F0 permits 20 synthesis requests per minute. One instruction in all
+        // locales needs 26 Azure tracks. Azure's 429 is shared across instances,
+        // unlike a process-local counter. Retry once within the request lease.
+        if(response.status===429){
+          const retry=response.headers?.get?.('retry-after');
+          const seconds=retry===null||retry===undefined?60:/^\d+$/.test(retry)?Number(retry):Math.ceil((Date.parse(retry)-Date.now())/1000);
+          await response.body?.cancel();
+          if(!Number.isFinite(seconds)||seconds<0||seconds>60)throw Error('Azure speech request failed (429)');
+          let remaining=Math.max(1000,seconds*1000);
+          while(remaining>0){await assertCurrent();const step=Math.min(5000,remaining);await sleep(step);remaining-=step;}
+          await assertCurrent();response=await request();
+        }
         if(!response.ok){await response.body?.cancel();throw Error(`Azure speech request failed (${response.status})`);}
         const max=2880044+65536,parts=[];let size=0;
         if(response.body?.getReader){

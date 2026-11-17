@@ -45,6 +45,9 @@ check is configuration evidence, not a pronunciation test.
 - Acknowledgments use a translated fixed receipt prompt, without quiz generation.
 - Audio is limited to 90 seconds per track and 1,000 input characters. Longer
   translated tracks can fail these limits; shorten the instruction if needed.
+- Azure F0 permits 20 synthesis requests per minute. Sends spanning many
+  languages can take about a minute longer: a throttled track retries once,
+  rechecking job authority while waiting. No pricing tier is upgraded.
 - Without either Azure setting, the new mode continues with Groq's English and
   Arabic. A partially configured Azure resource is an explicit configuration
   error. Unsupported languages are not advertised as available.
@@ -57,8 +60,9 @@ Automated tests use synthetic provider responses. After configuring the resource
 send a short synthetic instruction to a test worker in each language. Check the
 instruction, question and all choices; check acknowledgment-only delivery too.
 Ask native speakers to review Sinhala, Nepali and both Punjabi scripts before
-relying on their pronunciation. No live Azure synthesis was verified while the
-resource credentials were absent.
+relying on their pronunciation. On 2026-11-17, the Vercel build verified actual
+Azure synthesis for all 13 routes using fixed synthetic phrases, including a
+checked Shahmukhi-to-Gurmukhi conversion. Keys remained in Vercel.
 
 Rollback: set `UNDERSTOOD_VERCEL_INSTRUCTION_SPEECH=groq` and redeploy.
 
