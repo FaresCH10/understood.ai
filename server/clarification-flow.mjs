@@ -1,3 +1,4 @@
+import {clarificationDay,clarificationDateAt} from './clarification-day.mjs';
 import {randomUUID} from 'node:crypto';
 import {routeNewCase} from './case-routing.mjs';
 import {recordWorkerEvent,staffAuditOnce} from './notification-events.mjs';
@@ -35,16 +36,18 @@ function context(db,session,id,worker=false,write=false){
       AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=w.id)`).get(session.org_id,session.site_id,id,...(worker?[session.principal_id]:[]));
   if(!row||JSON.parse(row.snapshot_json).rubric?.mode!=='multiple-choice')throw Error('Clarification unavailable');if(write){requireWritableEntitlement(db,session.org_id);requireSiteOperational(db,session.org_id,session.site_id);}return row;
 }
-export function listClarificationFlow(db,session,page=1,{briefingId=null}={}){
+export function listClarificationFlow(db,session,page=1,{briefingId=null,day=null}={}){
   ensureClarificationFlowSchema(db);requireClarificationPrincipal(db,session);
+  day=clarificationDay(day);
   if(!Number.isSafeInteger(page)||page<1||page>5000)throw Error('Invalid clarification page');
-  const all=db.prepare(`SELECT c.id,w.code AS worker,json_extract(p.snapshot_json,'$.title') AS title FROM clarifications c
-    JOIN assignments a ON a.id=c.assignment_id JOIN publications p ON p.id=a.publication_id JOIN workers w ON w.id=a.worker_id
+  const all=db.prepare(`SELECT c.id,c.created_at,s.timezone,w.code AS worker,json_extract(p.snapshot_json,'$.title') AS title,
+    (SELECT json_group_array(e.created_at) FROM clarification_exchanges e WHERE e.case_id=c.id AND e.org_id=c.org_id AND e.site_id=a.site_id AND e.kind='request') AS request_dates FROM clarifications c
+    JOIN assignments a ON a.id=c.assignment_id JOIN publications p ON p.id=a.publication_id JOIN workers w ON w.id=a.worker_id JOIN sites s ON s.id=a.site_id AND s.org_id=a.org_id
     WHERE c.org_id=? AND a.site_id=? AND (? IS NULL OR p.briefing_id=?) AND p.state='published' AND w.active=1
-      AND c.id=(SELECT cc.id FROM clarifications cc WHERE cc.assignment_id=a.id ORDER BY cc.created_at DESC,cc.rowid DESC LIMIT 1)
+      AND (? IS NOT NULL OR c.id=(SELECT cc.id FROM clarifications cc WHERE cc.assignment_id=a.id ORDER BY cc.created_at DESC,cc.rowid DESC LIMIT 1))
       AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=w.id) AND json_extract(p.snapshot_json,'$.rubric.mode')='multiple-choice'
-      AND (? IS NOT NULL OR c.status='open' OR (SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='request')>(SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='explanation'))
-    ORDER BY c.created_at DESC,c.id DESC`).all(session.org_id,session.site_id,briefingId,briefingId,briefingId);
+      AND (? IS NOT NULL OR ? IS NOT NULL OR c.status='open' OR (SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='request')>(SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='explanation'))
+    ORDER BY c.created_at DESC,c.id DESC`).all(session.org_id,session.site_id,briefingId,briefingId,day,day,briefingId).filter(row=>!day||[row.created_at,...JSON.parse(row.request_dates)].some(date=>clarificationDateAt(date,row.timezone)===day)).map(({id,worker,title})=>({id,worker,title}));
   return {rows:all.slice((page-1)*20,page*20),total:all.length,page};
 }
 export function readClarificationFlow(db,session,id,{worker=false}={}){

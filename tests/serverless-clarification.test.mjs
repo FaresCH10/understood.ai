@@ -20,6 +20,8 @@ test('serverless clarification send and refresh deliver both directions and reco
   assert.equal((await fetch(base+path)).status,401);assert.equal(calls,0);
   const login=await fetch(base+'/auth/staff/login',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({email:'owner@example.test',password})});assert.equal(login.status,200);
   const cookie=login.headers.get('set-cookie').split(';')[0],session=await(await fetch(base+'/session',{headers:{cookie}})).json(),headers={cookie,'x-client-session-context':session.clientContext};
+  const previousDay=await fetch(base+'/clarification-flow?day=2000-01-01',{headers});assert.equal(previousDay.status,200);assert.equal((await previousDay.json()).total,0);
+  assert.equal((await fetch(base+'/clarification-flow?day=2026-02-30',{headers})).status,400);
   const recovered=await fetch(base+path,{headers});assert.equal(recovered.status,200);assert.equal((await recovered.json()).items[0].text,'Which shelf should I use?');assert.equal(calls,1);
   const result=await fetch(base+path,{method:'POST',headers:{...headers,origin,'content-type':'application/json'},body:JSON.stringify(command('Use the blue shelf.'))});assert.equal(result.status,202);assert.equal((await result.json()).state,'delivered');
   assert.equal((await readClarificationFlow(f.pool,worker,'assignment',{schema,worker:true})).items[1].text,'استخدم الرف الأزرق.');assert.equal(calls,2);

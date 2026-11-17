@@ -1,4 +1,10 @@
 export const staffStaticArabic={
+  "Browse clarification dates": "تصفح تواريخ التوضيحات",
+  "Clarification date": "تاريخ التوضيحات",
+  "Previous day": "اليوم السابق",
+  "Next day": "اليوم التالي",
+  "No clarification requests today.": "لا توجد طلبات توضيح اليوم.",
+  "No clarification requests on this day.": "لا توجد طلبات توضيح في هذا اليوم.",
   "Messages about this instruction.": "رسائل حول هذه التعليمات.",
   "No clarification requests for this instruction.": "لا توجد طلبات توضيح لهذه التعليمات.",
   "Languages sent": "لغات الإرسال",

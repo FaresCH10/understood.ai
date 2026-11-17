@@ -1,6 +1,7 @@
+import {clarificationDay,clarificationDateAt,shiftClarificationDay} from '../server/clarification-day.mjs';
 import {useStaffText} from './staff-language';
 import {useEffect,useRef,useState,type RefObject} from 'react';
-import {ArrowLeft,ChevronRight,FileText,MessageSquareText,RefreshCw,Send} from 'lucide-react';
+import {ArrowLeft,ChevronLeft,ChevronRight,FileText,MessageSquareText,RefreshCw,Send} from 'lucide-react';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {checkedClarificationFlow,clarificationFlowCopy,clarificationMessageCopy,readClarificationCommand,type ClarificationFlow,type ClarificationExchange} from './clarification-flow';
 import {ClarificationMessages} from './ClarificationMessages';
@@ -12,19 +13,34 @@ import './simple-clarifications.css';
 type Shared={briefingId?:string;refresh:number;navigate:(path:string)=>void;authority:StaffRequestAuthority;canWrite?:boolean;timezone?:string;language?:CaseLocale;onLanguageChange?:(language:CaseLocale)=>void};
 export function ClarificationsPage({refresh,navigate,authority,language='en',briefingId}:Shared){
   const staffT=useStaffText(),t=clarificationFlowCopy(language),copy=clarificationMessageCopy(language),api=useStaffRequest(authority),[data,setData]=useState<{rows:{id:string;worker:string;title:string}[];total:number}|null>(null),[tick,setTick]=useState(0),[error,setError]=useState(false),[page,setPage]=useState(1);
+  const timezone=authority.session.timezone||'UTC',storageKey=`u:clarification-day:${authority.session.clientContext}`;
+  const [today,setToday]=useState(()=>clarificationDateAt(Date.now(),timezone));
+  const [day,setDay]=useState<string>(()=>{try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||'null');return saved?.today===today&&clarificationDay(saved.day)&&saved.day<=today?saved.day:today;}catch{return today;}});
+  const lastToday=useRef(today);
+  function selectDay(value:string){try{if(!clarificationDay(value)||value>today)return;setDay(value);setPage(1);setData(null);}catch{/* Keep the last valid date while a native date input is incomplete. */}}
+  useEffect(()=>{if(lastToday.current!==today){lastToday.current=today;setDay(today);setPage(1);setData(null);}},[today]);
+  useEffect(()=>{if(!briefingId)try{sessionStorage.setItem(storageKey,JSON.stringify({day,today}));}catch{/* Date browsing remains usable when storage is unavailable. */}},[day,today,storageKey,briefingId]);
+  useEffect(()=>{const update=()=>setToday(clarificationDateAt(Date.now(),timezone));const timer=window.setInterval(update,30000);const visible=()=>{if(document.visibilityState==='visible'){update();setTick(n=>n+1);}};document.addEventListener('visibilitychange',visible);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[timezone]);
   useEffect(()=>{let live=true;const controller=new AbortController();setError(false);
-    api.request<{rows:{id:string;worker:string;title:string}[];total:number;clientContext:string;page:number}>(`/api/clarification-flow?page=${page}${briefingId?`&briefingId=${encodeURIComponent(briefingId)}`:''}`,undefined,controller.signal).then(value=>{if(value.clientContext!==authority.session.clientContext||value.page!==page||!Array.isArray(value.rows))throw Error('Unverified clarification list');if(live&&api.current())setData(value);}).catch(()=>{if(live)setError(true);});
+    api.request<{rows:{id:string;worker:string;title:string}[];total:number;clientContext:string;page:number}>(`/api/clarification-flow?page=${page}${briefingId?`&briefingId=${encodeURIComponent(briefingId)}`:`&day=${day}`}`,undefined,controller.signal).then(value=>{if(value.clientContext!==authority.session.clientContext||value.page!==page||!Array.isArray(value.rows))throw Error('Unverified clarification list');if(live&&api.current())setData(value);}).catch(()=>{if(live)setError(true);});
     const timer=window.setTimeout(()=>{if(document.visibilityState==='visible')setTick(n=>n+1);},10000);
     return()=>{live=false;controller.abort();window.clearTimeout(timer);};
-  },[api,page,tick,refresh,briefingId]);
+  },[api,page,tick,refresh,briefingId,day]);
   return <div className="simple-clarifications clarification-inbox" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     <header className="clarification-page-heading"><div>{briefingId?<h2>{t.title}</h2>:<h1>{t.title}</h1>}<p>{briefingId?staffT('Messages about this instruction.'):copy.intro}</p></div><button className="icon-button" title={t.retry} aria-label={t.retry} onClick={()=>setTick(n=>n+1)}><RefreshCw size={18}/></button></header>
-    {error&&<p className="clarification-feedback" role="alert">{t.error}</p>}{!data&&!error&&<p role="status">{t.preparing}</p>}
+    {!briefingId&&<nav className="clarification-day-controls" aria-label={staffT('Browse clarification dates')}>
+      <button className="icon-button" title={staffT('Previous day')} aria-label={staffT('Previous day')} onClick={()=>selectDay(shiftClarificationDay(day,-1))}><ChevronLeft className="directional-icon" size={19}/></button>
+      <label className="clarification-day-field"><span>{staffT('Date')}</span><input type="date" aria-label={staffT('Clarification date')} max={today} value={day} onChange={event=>selectDay(event.target.value)}/></label>
+      <button className="icon-button" title={staffT('Next day')} aria-label={staffT('Next day')} disabled={day>=today} onClick={()=>selectDay(shiftClarificationDay(day,1))}><ChevronRight className="directional-icon" size={19}/></button>
+      <button className="button outline" disabled={day===today} onClick={()=>selectDay(today)}>{staffT('Today')}</button>
+      <span className="clarification-day-timezone">{staffT('Site time')} · {timezone}</span>
+    </nav>}
+    {error&&<p className="clarification-feedback" role="alert">{t.error}</p>}{!data&&!error&&<p role="status">{staffT('Loading clarifications...')}</p>}
     {data&&<section className="clarification-instruction-list" aria-label={t.title}>
       {data.rows.map(item=><button type="button" className="clarification-instruction-row" key={item.id} onClick={()=>navigate(`clarifications/${item.id}`)}>
         <span className="clarification-instruction-icon" aria-hidden="true"><FileText size={21}/></span><span className="clarification-instruction-label"><strong>{briefingId?item.worker:item.title}</strong>{!briefingId&&<span>{item.worker}</span>}</span><ChevronRight className="directional-icon" size={19} aria-hidden="true"/>
       </button>)}
-      {!data.rows.length&&<div className="clarification-empty"><MessageSquareText size={28} aria-hidden="true"/><p>{briefingId?staffT('No clarification requests for this instruction.'):copy.empty}</p></div>}
+      {!data.rows.length&&<div className="clarification-empty"><MessageSquareText size={28} aria-hidden="true"/><p>{briefingId?staffT('No clarification requests for this instruction.'):staffT(day===today?'No clarification requests today.':'No clarification requests on this day.')}</p></div>}
     </section>}
     {data&&(page>1||data.total>20)&&<div className="clarification-pagination"><button className="button outline" disabled={page===1} onClick={()=>{setData(null);setPage(n=>n-1);}}>{copy.previous}</button><span>{page}</span><button className="button outline" disabled={page*20>=data.total} onClick={()=>{setData(null);setPage(n=>n+1);}}>{copy.next}</button></div>}
   </div>;

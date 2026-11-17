@@ -207,7 +207,7 @@ const badInput = new Set(['Select one of the published choices','Invalid USD amo
   'Recipient unavailable','Recipient language is unavailable','Recipient language not selected','Briefing is not technically ready','Invalid answer submission','Invalid submission ID','Invalid grant expiry','Invalid grant reference','Expected WAV audio','Recording is too large',
   'Unsupported or corrupt recording','Invalid recording length','No audio detected','Invalid input','Invalid worker code','Invalid crew name','Invalid language','Invalid page','Invalid status','Invalid search','Invalid crew',
   'Invalid activity filter','Invalid activity date','Activity exceeds limit; narrow the date, actor or action filter','Activity exceeds export limit',
-  'Invalid help request','Invalid clarification filter','Clarifications exceed limit; narrow filters','Resolution notes are required','Invalid clarification owner',
+  'Invalid clarification date','Invalid clarification page','Invalid help request','Invalid clarification filter','Clarifications exceed limit; narrow filters','Resolution notes are required','Invalid clarification owner',
   'Use text/csv for CSV upload','Invalid import request','Invalid import confirmation','Invalid CSV request','CSV must contain 1 byte to 256 KiB','CSV exceeds 256 KiB limit','Invalid export request','Report exceeds export limit']);
 
 for(const message of ['Invalid deletion filters','Invalid deletion request','Invalid retention request','Invalid retention policy','Invalid language readiness request','Invalid usage request'])badInput.add(message);
@@ -750,7 +750,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         if(!requestId && req.method==='GET'){if(!url.search)return send(res,200,await listCaseReviews(pool,session,id,repository));if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid case workflow page');return send(res,200,{...await caseReviewPage(pool,session,id,Object.fromEntries(url.searchParams),repository),clientContext:context});}
         if(!requestId && req.method==='POST'){if(url.search)throw Error('Invalid case review');return send(res,200,{...await saveCaseReview(pool,session,id,await readJson(req),repository),clientContext:context});}
       }
-      if(path==='/api/clarification-flow'&&req.method==='GET')return send(res,200,{...await listClarificationFlow(pool,session,Number(url.searchParams.get('page')??1),{...repository,briefingId:url.searchParams.get('briefingId')}),clientContext:clientSessionContext(session).clientContext});
+      if(path==='/api/clarification-flow'&&req.method==='GET')return send(res,200,{...await listClarificationFlow(pool,session,Number(url.searchParams.get('page')??1),{...repository,briefingId:url.searchParams.get('briefingId'),day:url.searchParams.get('day')}),clientContext:clientSessionContext(session).clientContext});
       const simpleClarification=path.match(/^\/api\/(worker\/briefings|clarifications)\/([^/]+)\/clarification-flow$/);
       if(simpleClarification){
         if(url.search)throw Error('Invalid clarification request');
