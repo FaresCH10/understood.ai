@@ -1,4 +1,6 @@
 export const staffStaticArabic={
+  "Workers who have not yet replied to their instructions.": "العمال الذين لم يردوا على تعليماتهم بعد.",
+  "All dates": "جميع التواريخ",
   "Your instructions, worker replies, and requests needing attention.": "تعليماتك وردود العمال والطلبات التي تحتاج إلى متابعة.",
   "Current workload": "ملخص العمل الحالي",
   "Active instructions": "التعليمات النشطة",
