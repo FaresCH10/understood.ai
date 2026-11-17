@@ -2,7 +2,8 @@ function staffWorkspaceLanguage(value:'en'|'ar'|'ur'):'en'|'ar'|'ur'{return valu
 import {workerWorkflowCopy} from './worker-workflow-copy';
 import {SessionRecoveryScreen} from './SessionRecoveryScreen';
 import {useSignOutConfirmation} from './SignOutConfirmation';
-import {TodayQueue,TodayLoading,type TodayQueueGroup} from './TodayQueue';
+import {TodayLoading} from './TodayQueue';
+import './today-focus.css';
 import {BrandLogo} from './BrandLogo';
 import {signedInDestination} from './sign-in-navigation';
 import {useStaffText as useStaffStaticText} from './staff-language';
@@ -768,93 +769,46 @@ function Overview({ refresh, navigate:onNavigate,canWrite,name,greeting,authorit
   const dateLanguage=React.useContext(StaffLanguageContext),dateTimezone=React.useContext(StaffTimezoneContext);
   const {current}=useBriefingRequest(authority),navigate=(path:string)=>{if(current())onNavigate(path);};
   const [retry,setRetry]=useState(0);
-  const { data, error, loading } = useArtifactRead<any>(authority,'/api/overview',refresh+retry);
-  const briefings=useArtifactRead<{items:BriefingRow[]}>(authority,'/api/briefings?archiveStatus=active&sort=updated&page=1&pageSize=5',refresh+retry);
+  const {data,error,loading}=useArtifactRead<any>(authority,'/api/overview',refresh+retry);
+  const briefings=useArtifactRead<{items:BriefingRow[];counts:{total:number}}>(authority,'/api/briefings?archiveStatus=active&sort=updated&page=1&pageSize=5',refresh+retry);
+  const replies=useArtifactRead<{rows:{id:string;worker:string;title:string;createdAt:string}[];total:number}>(authority,'/api/clarification-flow?section=unread',refresh+retry);
   const [attentionView,setAttentionView]=useState<{group:'waiting'|'delivery';page:number}|null>(null);
-  const [queueSelection,setQueueSelection]=useState<TodayQueueGroup|null>(null);
-  const attentionPage=attentionView?.page ?? 1;
-  const attentionPath=attentionView?`/api/overview/attention?${new URLSearchParams({group:attentionView.group,page:String(attentionView.page),pageSize:'20'})}`:'/api/overview/attention?group=waiting&page=1&pageSize=20';
-  const attentionDetail=useArtifactRead<AttentionPageData>(authority,attentionPath,refresh+retry,!attentionView);
-  if (loading) return <TodayLoading/>;
-  if (error || !data) return <div className="today-surface"><div className="page-header"><h1>{staffT("Today")}</h1></div><Notice>{error?staffT.error(error):staffT("Overview unavailable")}</Notice><button className="button outline" onClick={()=>setRetry(value=>value+1)}><RefreshCw size={18}/>{staffT("Retry")}</button></div>;
-  const m: Counts = data.metrics;
-  const attention: Attention = data.attention;
-  const actionCount=attention.delivery.total+attention.needsAttention.total;
-  const selectedQueue=queueSelection||(attention.delivery.total>0?'delivery':attention.needsAttention.total>0?'cases':'waiting');
-  const partial=(item:BriefingRow)=>item.sendState==='published' && (item.undelivered || 0)>0;
-  const deliveryReason=(reason:DeliveryReason)=>{
-    const language=reason.language?staffT.language(reason.language):'';
-    if(['language_unavailable','content_unavailable','question_unavailable','speech_unavailable'].includes(reason.reason))
-      return language?staffT("{p0} version not ready",{p0:language}):staffT("Language version not ready");
-    if(reason.reason==='worker_inactive')return staffT("Worker no longer active");
-    return '';
-  };
-  const deliveryReasons=(item:DeliveryProblem)=>[...item.reasons].sort((a,b)=>b.count-a.count)
-    .map(reason=>{const text=deliveryReason(reason);return text?`${text} (${staffT.number(reason.count)})`:'';})
-    .filter(Boolean).join(' · ');
-  const waitingRow=(item:WaitingReply)=>{const overdue=!!item.dueAt && Date.parse(item.dueAt)<Date.now();return <button className="item-row overview-waiting" key={item.assignmentId} onClick={()=>navigate(`briefings/${item.briefingId}`)}><span className="small-avatar"><Clock3 size={18}/></span><span className="item-main"><strong>{item.worker} · {item.language.toUpperCase()}</strong><small>{item.title} · {item.dueAt?staffT(overdue?"Was due {p0}":"Due {p0}",{p0:staffT.date(item.dueAt)}):staffT("No deadline")}</small></span><ChevronRight size={16}/></button>;};
-  const deliveryRow=(item:DeliveryProblem)=>{const reason=deliveryReasons(item);return <button className="item-row overview-delivery" key={item.requestId} onClick={()=>navigate(`briefings/${item.briefingId}`)}><span className="small-avatar"><TriangleAlert size={18}/></span><span className="item-main"><strong>{item.title}</strong><small>{staffT("{p0} not delivered",{p0:staffT.number(item.undelivered)})}{reason?` · ${reason}`:''}</small></span><ChevronRight size={16}/></button>;};
-  const attentionPages=(total:number)=>Math.max(1,Math.ceil(total/20));
-  const attentionPageCount=attentionPages(attentionDetail.data?.total||0);
-  const showAttentionPager=attentionPageCount>1||attentionPage>attentionPageCount;
-  return <div className="today-surface"><div className="page-header"><div><div className="today-header-date"><SiteClock timezone={dateTimezone} language={dateLanguage}/></div><h1>{staffT(greeting)}{name ? `, ${name.split(' ')[0]}` : '' }.</h1><p>{staffT("What needs attention today, and what your team is working on.")}</p></div>{canWrite && <button className="button primary" onClick={() => navigate('send')}><Send size={20} /> {staffT("Send instruction")}</button>}</div><section className="today-publication" aria-label={staffT("Latest instruction")}><div className="today-publication-heading"><div><p className="overview-scope-label">{staffT("Latest instruction")}</p>{data.publication?<button onClick={()=>navigate(`briefings/${data.publication.briefingId}`)}>{data.publication.title}<ChevronRight size={16} aria-hidden="true"/></button>:<span>{staffT("No instructions yet.")}</span>}</div>{data.publication&&<span className="today-publication-version">{staffT("· Published v")}{staffT.number(data.publication.version)}</span>}</div>{data.publication&&<div className="metrics overview-metrics" role="group" aria-label={staffT("Latest instruction summary")}><Metric icon={Users} value={m.assigned} label={staffT("Workers assigned")} /><Metric icon={FileText} value={m.responses} label={staffT("Responses received")} /><Metric icon={MessageCircle} value={m.clarifications} label={staffT("Need clarification")} warn={m.clarifications>0} /><Metric icon={Clock3} value={m.pending} label={staffT("Waiting to answer")} /></div>}</section>
-  <div className="overview-dashboard"><div className="today-main-column">
-    <Panel className="overview-attention" title={staffT("Open work")}>
-      <p className="overview-scope-label">{staffT("Needs your action: {p0} · Waiting for workers: {p1}",{p0:actionCount,p1:attention.waiting.total})}</p>
-      {attention.total===0?<p className="muted">{staffT("You're all caught up. No help requests, delivery problems, or workers waiting for a reply.")}</p> :<TodayQueue group={selectedQueue} onGroup={value=>{setQueueSelection(value);setAttentionView(null);}} counts={{cases:attention.needsAttention.total,waiting:attention.waiting.total,delivery:attention.delivery.total}} motionKey={`${attentionView?.group||'preview'}:${attentionPage}:${attentionDetail.loading}`}>
-        <section role="tabpanel" id="today-panel-cases" aria-labelledby="today-tab-cases" hidden={selectedQueue!=='cases'} tabIndex={0} className={`attention-group${attention.needsAttention.total===0?' is-empty':''}`}>
-          <div className="attention-group-head"><span className="attention-mark amber"><MessageCircle size={16}/></span><h3>{staffT("Help & follow-ups")}</h3><span className="attention-count">{staffT.number(attention.needsAttention.total)}</span></div>
-          {attention.needsAttention.items.length?<div className="row-list">{attention.needsAttention.items.map((item:Case)=><button className="item-row overview-case" key={item.id} onClick={()=>navigate(`clarifications/${item.id}`)}><span className="small-avatar"><MessageCircle size={18}/></span><span className="item-main"><strong>{item.worker} · {item.language.toUpperCase()}</strong><small>{item.title} · {staffT(caseReason(staffT.locale,item.reason))}</small></span><ChevronRight size={16}/></button>)}</div>:<p className="attention-none">{staffT("No help requests or follow-ups are open.")}</p>}
-          {attention.needsAttention.total>attention.needsAttention.items.length&&<p className="attention-showing">{staffT("Showing {p0} of {p1}",{p0:attention.needsAttention.items.length,p1:attention.needsAttention.total})}</p>}
-          {attention.needsAttention.total>0&&<button className="text-link" onClick={()=>navigate('clarifications')}>{staffT("Open all help & follow-ups")} <ChevronRight size={16}/></button>}
-        </section>
-        <section role="tabpanel" id="today-panel-waiting" aria-labelledby="today-tab-waiting" hidden={selectedQueue!=='waiting'} tabIndex={0} className={`attention-group${attention.waiting.total===0?' is-empty':''}`}>
-          <div className="attention-group-head"><span className="attention-mark blue"><Clock3 size={16}/></span><h3>{staffT("Waiting for workers")}</h3><span className="attention-count">{staffT.number(attention.waiting.total)}</span></div>
-          {attention.waiting.total>0&&<p className="attention-showing">{staffT("Workers answer in their own time. Only passed deadlines need action.")}</p>}
-          {attentionView?.group==='waiting'?<div className="attention-expanded">
-            {attentionDetail.loading?<p data-page-loading role="status">{staffT("Loading")}</p>:attentionDetail.error?<p role="alert" className="record-error">{staffT.error(attentionDetail.error)}</p>:<>
-              {(attentionDetail.data?.items as WaitingReply[]|undefined)?.length?<div className="row-list">{(attentionDetail.data!.items as WaitingReply[]).map(waitingRow)}</div>:<p className="attention-none">{staffT("No workers are waiting for a reply.")}</p>}
-              {showAttentionPager&&<div className="attention-pagination"><button className="icon-button" aria-label={staffT("Previous page")} title={staffT("Previous page")} disabled={attentionPage<=1} onClick={()=>setAttentionView({group:'waiting',page:attentionPage-1})}><ChevronLeft size={16}/></button><span>{staffT("Page {page} of {pages}",{page:attentionPage,pages:attentionPageCount})}</span><button className="icon-button" aria-label={staffT("Next page")} title={staffT("Next page")} disabled={attentionPage>=attentionPageCount} onClick={()=>setAttentionView({group:'waiting',page:attentionPage+1})}><ChevronRight size={16}/></button></div>}
-              <button className="text-link" onClick={()=>{setAttentionView(null);requestAnimationFrame(()=>document.getElementById("today-tab-waiting")?.focus());}}>{staffT("Show less")}</button>
-            </>}
-          </div>:<>
-            {attention.waiting.items.length?<div className="row-list">{attention.waiting.items.map(waitingRow)}</div>:<p className="attention-none">{staffT("No workers are waiting for a reply.")}</p>}
-            {attention.waiting.total>attention.waiting.items.length&&<div className="attention-more"><p className="attention-showing">{staffT("Showing {p0} of {p1}",{p0:attention.waiting.items.length,p1:attention.waiting.total})}</p><button className="text-link" onClick={()=>setAttentionView({group:'waiting',page:1})}>{staffT("View all waiting replies")} <ChevronRight size={16}/></button></div>}
-          </>}
-        </section>
-        <section role="tabpanel" id="today-panel-delivery" aria-labelledby="today-tab-delivery" hidden={selectedQueue!=='delivery'} tabIndex={0} className={`attention-group${attention.delivery.total===0?' is-empty':''}`}>
-          <div className="attention-group-head"><span className="attention-mark red"><TriangleAlert size={16}/></span><h3>{staffT("Delivery problems")}</h3><span className="attention-count">{staffT.number(attention.delivery.total)}</span></div>
-          {attentionView?.group==='delivery'?<div className="attention-expanded">
-            {attentionDetail.loading?<p data-page-loading role="status">{staffT("Loading")}</p>:attentionDetail.error?<p role="alert" className="record-error">{staffT.error(attentionDetail.error)}</p>:<>
-              {(attentionDetail.data?.items as DeliveryProblem[]|undefined)?.length?<div className="row-list">{(attentionDetail.data!.items as DeliveryProblem[]).map(deliveryRow)}</div>:<p className="attention-none">{staffT("No delivery problems.")}</p>}
-              {showAttentionPager&&<div className="attention-pagination"><button className="icon-button" aria-label={staffT("Previous page")} title={staffT("Previous page")} disabled={attentionPage<=1} onClick={()=>setAttentionView({group:'delivery',page:attentionPage-1})}><ChevronLeft size={16}/></button><span>{staffT("Page {page} of {pages}",{page:attentionPage,pages:attentionPageCount})}</span><button className="icon-button" aria-label={staffT("Next page")} title={staffT("Next page")} disabled={attentionPage>=attentionPageCount} onClick={()=>setAttentionView({group:'delivery',page:attentionPage+1})}><ChevronRight size={16}/></button></div>}
-              <button className="text-link" onClick={()=>{setAttentionView(null);requestAnimationFrame(()=>document.getElementById("today-tab-delivery")?.focus());}}>{staffT("Show less")}</button>
-            </>}
-          </div>:<>
-            {attention.delivery.items.length?<div className="row-list">{attention.delivery.items.map(deliveryRow)}</div>:<p className="attention-none">{staffT("No delivery problems.")}</p>}
-            {attention.delivery.total>attention.delivery.items.length&&<div className="attention-more"><p className="attention-showing">{staffT("Showing {p0} of {p1}",{p0:attention.delivery.items.length,p1:attention.delivery.total})}</p><button className="text-link" onClick={()=>setAttentionView({group:'delivery',page:1})}>{staffT("View all delivery problems")} <ChevronRight size={16}/></button></div>}
-          </>}
-        </section>
-      </TodayQueue>}
-    </Panel>
-    <Panel className="overview-recent" title={staffT("Recent instructions")}>
-        {briefings.loading?<p data-page-loading role="status">{staffT("Loading instructions...")}</p>:briefings.error?<p role="alert" className="record-error">{staffT.error(briefings.error)}</p>:briefings.data?.items.length?<div className="table-wrap"><table className="overview-briefing-table"><thead><tr><th>{staffT("Title")}</th><th>{staffT("Languages")}</th><th>{staffT("Answers / assigned")}</th><th>{staffT("Status")}</th><th><span className="sr-only">{staffT("Open")}</span></th></tr></thead><tbody>
-          {briefings.data.items.map(item=><tr key={item.id}><td><button className="briefing-title-button" onClick={()=>navigate(`briefings/${item.id}`)}><strong>{item.title}</strong></button></td><td><LanguageChips codes={item.languages}/></td><td>{(()=>{const counts=instructionResponseCounts(item);return counts?`${staffT.number(counts.responses)} / ${staffT.number(counts.assigned)}`:'—';})()}</td><td>{partial(item)?<span className="status status-amber"><span className="status-dot" />{staffT("partly sent ·")} {staffT.number(item.undelivered||0)} {staffT("not delivered")}</span>:<Status value={instructionSendState(item)}/>}</td><td><button className="icon-button" aria-label={staffT("Open {p0}",{p0:item.title})} title={staffT("Open {p0}",{p0:item.title})} onClick={()=>navigate(`briefings/${item.id}`)}><ChevronRight size={17}/></button></td></tr>)}
-        </tbody></table></div>:<p>{staffT("No instructions yet.")}</p>}
-        <button className="text-link" onClick={()=>navigate('briefings')}>{staffT("View all instructions")} <ChevronRight size={16}/></button>
-      </Panel>
-    </div><div className="today-evidence-column"><Panel className="overview-completion" title={staffT("Response completion")}>
-      {!data.publication?<p className="muted">{staffT("Send an instruction to start tracking answers.")}</p>:m.assigned===0?<p className="muted">{staffT("No workers were assigned to this instruction.")}</p>:<>
-        <div className="progress-row"><strong>{staffT.percent(m.completion)}</strong><span>{staffT("answered ·")} {staffT.number(m.responses)} {staffT("of")} {staffT.number(m.assigned)} {staffT("recipients")}</span></div>
-        <div className="progress" role="progressbar" aria-label={staffT("Response completion")} aria-valuenow={m.completion} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${m.completion}%` }} /></div>
-        <div className="legend"><span><i className="dot green" />{staffT.number(m.matches)} {staffT("match the key facts")}</span><span><i className="dot amber" />{staffT.number(m.clarifications)} {staffT("need clarification")}</span>{m.unassessed > 0 && <span><i className="dot blue" />{staffT.number(m.unassessed)} {staffT("awaiting assessment")}</span>}{!!m.acknowledged && <span><i className="dot violet" />{staffT.number(m.acknowledged)} {staffT("acknowledged")}</span>}<span><i className="dot grey" />{staffT.number(m.pending)} {staffT("waiting to answer")}</span></div>
+  const attentionPath=`/api/overview/attention?${new URLSearchParams({group:attentionView?.group||'waiting',page:String(attentionView?.page||1),pageSize:'20'})}`;
+  const detail=useArtifactRead<AttentionPageData>(authority,attentionPath,refresh+retry,!attentionView);
+  if(loading)return <TodayLoading/>;
+  if(error||!data)return <div className="today-surface today-focus"><h1>{staffT('Today')}</h1><Notice>{error?staffT.error(error):staffT('Overview unavailable')}</Notice><button className="button outline" onClick={()=>setRetry(n=>n+1)}>{staffT('Retry')}</button></div>;
+  const attention:Attention=data.attention;
+  const firstInstruction=!briefings.loading&&!briefings.error&&!replies.loading&&!replies.error&&briefings.data?.counts?.total===0&&!data.publication&&attention.total===0&&replies.data?.total===0;
+  const retryButton=<button className="text-link" onClick={()=>setRetry(n=>n+1)}><RefreshCw size={16}/>{staffT('Retry')}</button>;
+  const waitingRow=(item:WaitingReply)=><button className="today-focus-row" key={item.assignmentId} onClick={()=>navigate(`briefings/${item.briefingId}`)}><span className="today-focus-copy"><strong dir="auto">{item.title}</strong><span><bdi>{item.worker}</bdi> · {staffT.language(item.language)}{item.dueAt&&<> · {staffT(Date.parse(item.dueAt)<Date.now()?'Was due {p0}':'Due {p0}',{p0:staffT.date(item.dueAt)})}</>}</span></span><ChevronRight size={18} className="directional-icon" aria-hidden="true"/></button>;
+  const deliveryRow=(item:DeliveryProblem)=><button className="today-focus-row" key={item.requestId} onClick={()=>navigate(`briefings/${item.briefingId}`)}><span className="today-focus-copy"><strong dir="auto">{item.title}</strong><span>{staffT('{p0} not delivered',{p0:item.undelivered})}{item.reasons.filter(r=>r.language).map(r=>` · ${staffT.language(r.language!)}`).join('')}</span></span><ChevronRight size={18} className="directional-icon" aria-hidden="true"/></button>;
+  const queue=(group:'waiting'|'delivery')=>{
+    const expanded=attentionView?.group===group,preview=attention[group],page=attentionView?.page||1,pages=Math.max(1,Math.ceil((detail.data?.total||0)/20));
+    const items=expanded?detail.data?.items:preview.items;
+    return <>
+      {expanded&&detail.loading?<p role="status" data-page-loading>{staffT('Loading')}</p>:expanded&&detail.error?<div role="alert"><p>{staffT.error(detail.error)}</p>{retryButton}</div>:<>
+        {items?.length?<div>{items.map(item=>group==='waiting'?waitingRow(item as WaitingReply):deliveryRow(item as DeliveryProblem))}</div>:<p className="today-focus-empty">{staffT(group==='waiting'?'No replies pending.':'No delivery problems.')}</p>}
+        {expanded?<div className="today-focus-footer"><button className="text-link" onClick={()=>setAttentionView(null)}>{staffT('Show less')}</button>{(pages>1||page>pages)&&<div className="attention-pagination"><button className="icon-button" aria-label={staffT('Previous page')} disabled={page<=1} onClick={()=>setAttentionView({group,page:page-1})}><ChevronLeft size={18}/></button><span>{staffT('Page {page} of {pages}',{page,pages})}</span><button className="icon-button" aria-label={staffT('Next page')} disabled={page>=pages} onClick={()=>setAttentionView({group,page:page+1})}><ChevronRight size={18}/></button></div>}</div>:preview.total>preview.items.length&&<button className="text-link today-focus-more" onClick={()=>setAttentionView({group,page:1})}>{staffT(group==='waiting'?'View all waiting replies':'View all delivery problems')}<ChevronRight size={16}/></button>}
       </>}
-      {data.publication && <button className="text-link" onClick={() => navigate(`briefings/${data.publication.briefingId}`)}>{data.publication.title} {staffT("· Published v")}{staffT.number(data.publication.version)}<ChevronRight size={18} /></button>}
-    </Panel>
-    <Panel className="overview-team" title={staffT("Team")}><button className="text-link" onClick={() => navigate('people')}>{staffT("Open team")} <ChevronRight size={16}/></button><p className="muted">{staffT("Manage worker access, crews and languages in Team.")}</p></Panel>
-    <Panel className="overview-tools" title={staffT("More for supervisors")}><div className="row-list"><button className="item-row" onClick={()=>navigate('source-audio')}><span className="small-avatar"><Volume2 size={19}/></span><span className="item-main"><strong>{staffT("Audio uploads")}</strong><small>{staffT("Upload and review recorded sources")}</small></span><ChevronRight size={17}/></button><button className="item-row" onClick={()=>navigate('processing')}><span className="small-avatar"><Sparkles size={19}/></span><span className="item-main"><strong>{staffT("AI processing")}</strong><small>{staffT("Preparation status and retries")}</small></span><ChevronRight size={17}/></button></div></Panel>
-  </div></div><Notice tone="blue">{staffT("Matching answers record the key facts asked. This does not certify understanding or safe work.")}</Notice></div>;
+    </>;
+  };
+  return <div className="today-surface today-focus">
+    <div className="page-header"><div><div className="today-header-date"><SiteClock timezone={dateTimezone} language={dateLanguage}/></div><h1>{staffT(greeting)}{name?`, ${name.split(' ')[0]}`:''}.</h1></div>{canWrite&&!firstInstruction&&<button className="button primary" onClick={()=>navigate('send')}><Send size={18}/>{staffT('Send instruction')}</button>}</div>
+    {firstInstruction?<section className="today-focus-welcome"><FileText size={30} aria-hidden="true"/><h2>{staffT('Send your first instruction')}</h2><p>{staffT(canWrite?'Choose your workers, write or record an instruction, and send it in their languages.':'Instructions will appear here after a supervisor sends one.')}</p>{canWrite&&<button className="button primary" onClick={()=>navigate('send')}><Send size={18}/>{staffT('Send instruction')}</button>}</section>:<>
+      <div className="today-focus-queues">
+        <section className="today-focus-section" aria-labelledby="today-replies"><div className="today-focus-heading"><h2 id="today-replies">{staffT('Needs your reply')}</h2>{replies.data&&<span className="today-focus-count">{staffT.number(replies.data.total)}</span>}</div>
+          {replies.loading?<p role="status" data-page-loading>{staffT('Loading')}</p>:replies.error?<div role="alert"><p>{staffT.error(replies.error)}</p>{retryButton}</div>:replies.data?.rows.length?<><p className="today-focus-hint">{staffT('Oldest requests first')}</p><div>{replies.data.rows.slice(0,5).map(item=><div className="today-focus-row" key={item.id}><span className="today-focus-copy"><strong dir="auto">{item.title}</strong><span><bdi>{item.worker}</bdi> · <time dateTime={item.createdAt}>{staffT.date(item.createdAt)}</time></span></span><button className="button outline" aria-label={staffT(canWrite?'Reply to {p0}':'Open {p0}',{p0:item.title})} onClick={()=>navigate(`clarifications/${item.id}`)}>{staffT(canWrite?'Reply':'Open')}<ChevronRight className="directional-icon" size={16}/></button></div>)}</div><button className="text-link today-focus-more" onClick={()=>navigate('clarifications')}>{staffT('View all clarifications')}<ChevronRight size={16}/></button></>:<p className="today-focus-empty">{staffT('No clarification requests need a reply.')}</p>}
+        </section>
+        <section className="today-focus-section" aria-labelledby="today-waiting"><div className="today-focus-heading"><h2 id="today-waiting">{staffT('Waiting for workers')}</h2><span className="today-focus-count">{staffT.number(attention.waiting.total)}</span></div>{queue('waiting')}</section>
+      </div>
+      {attention.delivery.total>0&&<section className="today-focus-section today-focus-delivery" aria-labelledby="today-delivery"><div className="today-focus-heading"><TriangleAlert size={18}/><h2 id="today-delivery">{staffT('Delivery problems')}</h2><span className="today-focus-count">{staffT.number(attention.delivery.total)}</span></div>{queue('delivery')}</section>}
+      <section className="today-focus-section today-focus-recent" aria-labelledby="today-recent"><div className="today-focus-heading"><h2 id="today-recent">{staffT('Recent instructions')}</h2><button className="text-link" onClick={()=>navigate('briefings')}>{staffT('View all instructions')}<ChevronRight size={16}/></button></div>
+        {briefings.loading?<p role="status" data-page-loading>{staffT('Loading instructions...')}</p>:briefings.error?<div role="alert"><p>{staffT.error(briefings.error)}</p>{retryButton}</div>:briefings.data?.items.length?<div>{briefings.data.items.map(item=>{const counts=instructionResponseCounts(item);return <button className="today-focus-row today-focus-instruction" key={item.id} onClick={()=>navigate(`briefings/${item.id}`)}><span className="today-focus-copy"><strong dir="auto">{item.title}</strong><span>{staffT('Updated {p0}',{p0:staffT.date(item.updated_at)})}</span></span><span className="today-focus-progress">{counts?staffT('{p0} of {p1} replied',{p0:counts.responses,p1:counts.assigned}):<Status value={instructionSendState(item)}/>}</span><ChevronRight className="directional-icon" size={18} aria-hidden="true"/></button>;})}</div>:<p className="today-focus-empty">{staffT('No active instructions.')}</p>}
+      </section>
+    </>}
+  </div>;
 }
+
 
 type BriefingRow=Briefing & {languages?:string[];metrics?:Counts|null;responseMode?:string;deliveryMode?:string;sendState?:string;delivered?:number;undelivered?:number};
 function Briefings({ refresh, navigate:onNavigate,canWrite,authority }: { refresh: number; navigate: (path: string) => void;canWrite:boolean;authority:StaffRequestAuthority }) {
