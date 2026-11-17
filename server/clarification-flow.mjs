@@ -6,7 +6,7 @@ import {NOW,transaction} from './db.mjs';
 import {requireClarificationPrincipal} from './clarifications.mjs';
 import {requireWritableEntitlement} from './entitlements.mjs';
 import {requireSiteOperational} from './site-lifecycle.mjs';
-import {clarificationFlowInput} from './clarification-flow-input.mjs';
+import {clarificationFlowInput,clarificationFlowSection} from './clarification-flow-input.mjs';
 import {translatedContent,translationCheck} from './ai/prepared-bundle.mjs';
 export function ensureClarificationFlowSchema(db){
  const create=`CREATE TABLE IF NOT EXISTS clarification_exchanges (
@@ -36,19 +36,23 @@ function context(db,session,id,worker=false,write=false){
       AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=w.id)`).get(session.org_id,session.site_id,id,...(worker?[session.principal_id]:[]));
   if(!row||JSON.parse(row.snapshot_json).rubric?.mode!=='multiple-choice')throw Error('Clarification unavailable');if(write){requireWritableEntitlement(db,session.org_id);requireSiteOperational(db,session.org_id,session.site_id);}return row;
 }
-export function listClarificationFlow(db,session,page=1,{briefingId=null,day=null}={}){
+export function listClarificationFlow(db,session,page=1,{briefingId=null,day=null,section=null,summaryOnly=false}={}){
   ensureClarificationFlowSchema(db);requireClarificationPrincipal(db,session);
   day=clarificationDay(day);
+  section=clarificationFlowSection(section);
   if(!Number.isSafeInteger(page)||page<1||page>5000)throw Error('Invalid clarification page');
-  const all=db.prepare(`SELECT c.id,c.created_at,s.timezone,w.code AS worker,json_extract(p.snapshot_json,'$.title') AS title,
+  const eligible=db.prepare(`SELECT c.id,c.created_at,c.status,p.briefing_id,s.timezone,w.code AS worker,json_extract(p.snapshot_json,'$.title') AS title,
+    c.id=(SELECT cc.id FROM clarifications cc WHERE cc.assignment_id=a.id ORDER BY cc.created_at DESC,cc.id DESC LIMIT 1) AS latest,
     (SELECT json_group_array(e.created_at) FROM clarification_exchanges e WHERE e.case_id=c.id AND e.org_id=c.org_id AND e.site_id=a.site_id AND e.kind='request') AS request_dates FROM clarifications c
     JOIN assignments a ON a.id=c.assignment_id JOIN publications p ON p.id=a.publication_id JOIN workers w ON w.id=a.worker_id JOIN sites s ON s.id=a.site_id AND s.org_id=a.org_id
-    WHERE c.org_id=? AND a.site_id=? AND (? IS NULL OR p.briefing_id=?) AND p.state='published' AND w.active=1
-      AND (? IS NOT NULL OR c.id=(SELECT cc.id FROM clarifications cc WHERE cc.assignment_id=a.id ORDER BY cc.created_at DESC,cc.rowid DESC LIMIT 1))
+    WHERE c.org_id=? AND a.site_id=? AND p.state='published' AND w.active=1
       AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=w.id) AND json_extract(p.snapshot_json,'$.rubric.mode')='multiple-choice'
-      AND (? IS NOT NULL OR ? IS NOT NULL OR c.status='open' OR (SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='request')>(SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='explanation'))
-    ORDER BY c.created_at DESC,c.id DESC`).all(session.org_id,session.site_id,briefingId,briefingId,day,day,briefingId).filter(row=>!day||[row.created_at,...JSON.parse(row.request_dates)].some(date=>clarificationDateAt(date,row.timezone)===day)).map(({id,worker,title})=>({id,worker,title}));
-  return {rows:all.slice((page-1)*20,page*20),total:all.length,page};
+    ORDER BY c.created_at ASC,c.id ASC`).all(session.org_id,session.site_id);
+  const unreadInstructions=new Set(eligible.filter(row=>row.status==='open').map(row=>row.briefing_id)).size;
+  if(summaryOnly)return {unreadInstructions};
+  const dated=eligible.filter(row=>(!briefingId||row.briefing_id===briefingId)&&(day||row.latest)&&(!day||[row.created_at,...JSON.parse(row.request_dates)].some(date=>clarificationDateAt(date,row.timezone)===day)));
+  const all=dated.filter(row=>section?row.status===(section==='unread'?'open':'resolved'):day||briefingId||row.status==='open');
+  return {rows:all.slice((page-1)*20,page*20).map(({id,worker,title,created_at,status})=>({id,worker,title,createdAt:created_at,status})),total:all.length,page,unread:dated.filter(row=>row.status==='open').length,done:dated.filter(row=>row.status==='resolved').length,unreadInstructions};
 }
 export function readClarificationFlow(db,session,id,{worker=false}={}){
   ensureClarificationFlowSchema(db);let row;try{row=context(db,session,id,worker);}catch(error){if(worker&&error.message==='Clarification unavailable')return {caseId:null,needsArea:false,items:[]};throw error;}

@@ -11,9 +11,13 @@ import './clarifications-inbox.css';
 import './simple-clarifications.css';
 
 type Shared={briefingId?:string;refresh:number;navigate:(path:string)=>void;authority:StaffRequestAuthority;canWrite?:boolean;timezone?:string;language?:CaseLocale;onLanguageChange?:(language:CaseLocale)=>void};
+type ClarificationList={rows:{id:string;worker:string;title:string;createdAt:string;status:string}[];total:number;unread:number;done:number};
 export function ClarificationsPage({refresh,navigate,authority,language='en',briefingId}:Shared){
-  const staffT=useStaffText(),t=clarificationFlowCopy(language),copy=clarificationMessageCopy(language),api=useStaffRequest(authority),[data,setData]=useState<{rows:{id:string;worker:string;title:string}[];total:number}|null>(null),[tick,setTick]=useState(0),[error,setError]=useState(false),[page,setPage]=useState(1);
+  const staffT=useStaffText(),t=clarificationFlowCopy(language),copy=clarificationMessageCopy(language),api=useStaffRequest(authority),[data,setData]=useState<ClarificationList|null>(null),[tick,setTick]=useState(0),[error,setError]=useState(false),[page,setPage]=useState(1);
   const timezone=authority.session.timezone||'UTC',storageKey=`u:clarification-day:${authority.session.clientContext}`;
+  const sectionKey=`${storageKey}:section:${briefingId||'all'}`;
+  const [section,setSection]=useState<'unread'|'done'>(()=>{try{return sessionStorage.getItem(sectionKey)==='done'?'done':'unread';}catch{return 'unread';}});
+  useEffect(()=>{try{sessionStorage.setItem(sectionKey,section);}catch{/* Keep browsing when storage is unavailable. */}},[sectionKey,section]);
   const [today,setToday]=useState(()=>clarificationDateAt(Date.now(),timezone));
   const [day,setDay]=useState<string>(()=>{try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||'null');return saved?.today===today&&clarificationDay(saved.day)&&saved.day<=today?saved.day:today;}catch{return today;}});
   const lastToday=useRef(today);
@@ -22,10 +26,10 @@ export function ClarificationsPage({refresh,navigate,authority,language='en',bri
   useEffect(()=>{if(!briefingId)try{sessionStorage.setItem(storageKey,JSON.stringify({day,today}));}catch{/* Date browsing remains usable when storage is unavailable. */}},[day,today,storageKey,briefingId]);
   useEffect(()=>{const update=()=>setToday(clarificationDateAt(Date.now(),timezone));const timer=window.setInterval(update,30000);const visible=()=>{if(document.visibilityState==='visible'){update();setTick(n=>n+1);}};document.addEventListener('visibilitychange',visible);return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[timezone]);
   useEffect(()=>{let live=true;const controller=new AbortController();setError(false);
-    api.request<{rows:{id:string;worker:string;title:string}[];total:number;clientContext:string;page:number}>(`/api/clarification-flow?page=${page}${briefingId?`&briefingId=${encodeURIComponent(briefingId)}`:`&day=${day}`}`,undefined,controller.signal).then(value=>{if(value.clientContext!==authority.session.clientContext||value.page!==page||!Array.isArray(value.rows))throw Error('Unverified clarification list');if(live&&api.current())setData(value);}).catch(()=>{if(live)setError(true);});
+    api.request<ClarificationList&{clientContext:string;page:number}>(`/api/clarification-flow?page=${page}&section=${section}${briefingId?`&briefingId=${encodeURIComponent(briefingId)}`:`&day=${day}`}`,undefined,controller.signal).then(value=>{if(value.clientContext!==authority.session.clientContext||value.page!==page||!Array.isArray(value.rows)||![value.total,value.unread,value.done].every(n=>Number.isSafeInteger(n)&&n>=0))throw Error('Unverified clarification list');if(live&&api.current()){const lastPage=Math.max(1,Math.ceil(value.total/20));if(page>lastPage){setPage(lastPage);setData(null);}else setData(value);}}).catch(()=>{if(live)setError(true);});
     const timer=window.setTimeout(()=>{if(document.visibilityState==='visible')setTick(n=>n+1);},10000);
     return()=>{live=false;controller.abort();window.clearTimeout(timer);};
-  },[api,page,tick,refresh,briefingId,day]);
+  },[api,page,tick,refresh,briefingId,day,section]);
   return <div className="simple-clarifications clarification-inbox" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     <header className="clarification-page-heading"><div>{briefingId?<h2>{t.title}</h2>:<h1>{t.title}</h1>}<p>{briefingId?staffT('Messages about this instruction.'):copy.intro}</p></div><button className="icon-button" title={t.retry} aria-label={t.retry} onClick={()=>setTick(n=>n+1)}><RefreshCw size={18}/></button></header>
     {!briefingId&&<nav className="clarification-day-controls" aria-label={staffT('Browse clarification dates')}>
@@ -35,12 +39,15 @@ export function ClarificationsPage({refresh,navigate,authority,language='en',bri
       <button className="button outline" disabled={day===today} onClick={()=>selectDay(today)}>{staffT('Today')}</button>
       <span className="clarification-day-timezone">{staffT('Site time')} · {timezone}</span>
     </nav>}
+    <div className="clarification-section-toolbar"><div className="clarification-sections" role="group" aria-label={staffT('Clarification status')}>
+      {(['unread','done'] as const).map(value=><button type="button" key={value} aria-pressed={section===value} onClick={()=>{if(section!==value){setSection(value);setPage(1);setData(null);}}}>{staffT(value==='unread'?'Unread':'Done')}{data&&<span>{staffT.number(data[value])}</span>}</button>)}
+    </div><span className="clarification-sort-label">{staffT('Oldest first')}</span></div>
     {error&&<p className="clarification-feedback" role="alert">{t.error}</p>}{!data&&!error&&<p role="status">{staffT('Loading clarifications...')}</p>}
     {data&&<section className="clarification-instruction-list" aria-label={t.title}>
       {data.rows.map(item=><button type="button" className="clarification-instruction-row" key={item.id} onClick={()=>navigate(`clarifications/${item.id}`)}>
-        <span className="clarification-instruction-icon" aria-hidden="true"><FileText size={21}/></span><span className="clarification-instruction-label"><strong>{briefingId?item.worker:item.title}</strong>{!briefingId&&<span>{item.worker}</span>}</span><ChevronRight className="directional-icon" size={19} aria-hidden="true"/>
+        <span className="clarification-instruction-icon" aria-hidden="true"><FileText size={21}/></span><span className="clarification-instruction-label"><strong>{briefingId?item.worker:item.title}</strong><span className="clarification-instruction-meta">{!briefingId&&<bdi>{item.worker}</bdi>}<time dateTime={item.createdAt} dir="auto">{new Intl.DateTimeFormat(language,{timeZone:timezone,dateStyle:'medium',timeStyle:'short'}).format(new Date(item.createdAt))}</time></span></span><ChevronRight className="directional-icon" size={19} aria-hidden="true"/>
       </button>)}
-      {!data.rows.length&&<div className="clarification-empty"><MessageSquareText size={28} aria-hidden="true"/><p>{briefingId?staffT('No clarification requests for this instruction.'):staffT(day===today?'No clarification requests today.':'No clarification requests on this day.')}</p></div>}
+      {!data.rows.length&&<div className="clarification-empty"><MessageSquareText size={28} aria-hidden="true"/><p>{staffT(section==='unread'?'No unread clarification requests.':'No completed clarifications.')}</p></div>}
     </section>}
     {data&&(page>1||data.total>20)&&<div className="clarification-pagination"><button className="button outline" disabled={page===1} onClick={()=>{setData(null);setPage(n=>n-1);}}>{copy.previous}</button><span>{page}</span><button className="button outline" disabled={page*20>=data.total} onClick={()=>{setData(null);setPage(n=>n+1);}}>{copy.next}</button></div>}
   </div>;
@@ -51,6 +58,8 @@ export function ClarificationPage({id,refresh,navigate,authority,canWrite=false,
   const t=clarificationFlowCopy(language),copy=clarificationMessageCopy(language),api=useStaffRequest(authority),[data,setData]=useState<ClarificationFlow|null>(null),[tick,setTick]=useState(0),[text,setText]=useState(''),[error,setError]=useState(false),[busy,setBusy]=useState(false);
   const pending=useRef<{requestId:string;text:string}|null>(null),active=useRef(true),sending=useRef(false),path=`/api/clarifications/${encodeURIComponent(id)}/clarification-flow`;
   const recoveryKey=`u:clarification-flow:${authority.session.clientContext}:${path}`;
+  const previousStatus=useRef<string|undefined>(undefined);
+  useEffect(()=>{if(data?.status!==previousStatus.current){previousStatus.current=data?.status;window.dispatchEvent(new Event('understood:clarification-change'));}},[data?.status]);
   useEffect(()=>{try{const retained=readClarificationCommand(recoveryKey);if(retained){pending.current=retained;setText(retained.text);}}catch{setError(true);}},[recoveryKey]);
   useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
   useEffect(()=>{let live=true;const controller=new AbortController();
@@ -66,7 +75,7 @@ export function ClarificationPage({id,refresh,navigate,authority,canWrite=false,
     if(sending.current||!canWrite||!authority.canMutate()||text.trim().length<3)return;
     const command=pending.current??{requestId:crypto.randomUUID(),text:text.trim()};pending.current=command;sending.current=true;setBusy(true);setError(false);
     try{sessionStorage.setItem(recoveryKey,JSON.stringify(command));const value=await api.request<{id:string;clientContext:string}>(path,command);if(value.id!==command.requestId||value.clientContext!==authority.session.clientContext)throw Error('Unverified clarification receipt');
-      sessionStorage.removeItem(recoveryKey);pending.current=null;if(active.current){setText('');setTick(n=>n+1);}}
+      sessionStorage.removeItem(recoveryKey);pending.current=null;window.dispatchEvent(new Event('understood:clarification-change'));if(active.current){setText('');setTick(n=>n+1);}}
     catch{if(active.current)setError(true);}finally{sending.current=false;if(active.current)setBusy(false);}
   }
   async function retryMessage(item:ClarificationExchange){

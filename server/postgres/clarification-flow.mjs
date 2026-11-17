@@ -6,7 +6,7 @@ import {requireWritableEntitlement} from './entitlements.mjs';
 import {requireSiteOperational} from './site-lifecycle.mjs';
 import {dispatchAllowed} from './operations-gates.mjs';
 import {recordWorkerEvent,staffAuditOnce} from './notification-events.mjs';
-import {clarificationFlowInput,clarificationTranslationHash} from '../clarification-flow-input.mjs';
+import {clarificationFlowInput,clarificationTranslationHash,clarificationFlowSection} from '../clarification-flow-input.mjs';
 import {translatedContent,translationCheck} from '../ai/prepared-bundle.mjs';
 
 // Keep messages attached to the instruction, including requests after a correct answer.
@@ -41,24 +41,36 @@ async function context(client,session,id,worker=false,write=false){
 }
 const exchange=row=>({id:row.id,kind:row.kind,state:row.state,text:row.state==='delivered'?row.translated_text:null,
   language:row.target_language,originalText:row.source_text,originalLanguage:row.source_language,createdAt:row.created_at,attemptId:row.attempt_id});
-export function listClarificationFlow(pool,session,page=1,{schema='public',briefingId=null,day=null}={}){
+export function listClarificationFlow(pool,session,page=1,{schema='public',briefingId=null,day=null,section=null,summaryOnly=false}={}){
   day=clarificationDay(day);
+  section=clarificationFlowSection(section);
   if(!Number.isSafeInteger(page)||page<1||page>5000)throw Error('Invalid clarification page');
   return domainTransaction(pool,schema,async client=>{
     await requirePrincipal(client,session,'staff',['owner','supervisor','auditor']);
-    const rows=(await client.query(`SELECT c.id,w.code AS worker,p.snapshot_json->>'title' AS title,count(*) OVER()::int AS total
+    const eligible=`SELECT c.id,c.created_at,c.status,c.assignment_id,p.briefing_id,w.code AS worker,p.snapshot_json->>'title' AS title,s.timezone,
+      ARRAY(SELECT e.created_at FROM clarification_exchanges e WHERE e.case_id=c.id AND e.org_id=c.org_id AND e.site_id=c.site_id AND e.kind='request') AS request_dates,
+      c.id=(SELECT cc.id FROM clarifications cc WHERE cc.assignment_id=a.id AND cc.org_id=a.org_id ORDER BY cc.created_at DESC,cc.id DESC LIMIT 1) AS latest
       FROM clarifications c JOIN assignments a ON a.id=c.assignment_id AND a.org_id=c.org_id AND a.site_id=c.site_id
       JOIN workers w ON w.id=a.worker_id AND w.org_id=a.org_id AND w.site_id=a.site_id
       JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
       JOIN sites s ON s.id=c.site_id AND s.org_id=c.org_id
-      WHERE c.org_id=$1 AND c.site_id=$2 AND ($4::text IS NULL OR p.briefing_id=$4) AND ($5::date IS NOT NULL OR c.id=(SELECT cc.id FROM clarifications cc WHERE cc.assignment_id=a.id AND cc.org_id=a.org_id ORDER BY cc.created_at DESC,cc.id DESC LIMIT 1))
-        AND ($5::date IS NULL OR (c.created_at AT TIME ZONE s.timezone)::date=$5::date OR EXISTS(SELECT 1 FROM clarification_exchanges e WHERE e.case_id=c.id AND e.org_id=c.org_id AND e.site_id=c.site_id AND e.kind='request' AND (e.created_at AT TIME ZONE s.timezone)::date=$5::date)) AND p.snapshot_json->'rubric'->>'mode'='multiple-choice'
+      WHERE c.org_id=$1 AND c.site_id=$2 AND p.snapshot_json->'rubric'->>'mode'='multiple-choice'
         AND p.state='published' AND publication_content_available(p.id) AND w.active
-        AND ($5::date IS NOT NULL OR $4::text IS NOT NULL OR c.status='open' OR (SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='request')>(SELECT max(e.created_at) FROM clarification_exchanges e WHERE e.assignment_id=a.id AND e.kind='explanation'))
         AND NOT EXISTS(SELECT 1 FROM worker_deletion_requests d WHERE d.worker_id=w.id)
-        AND NOT EXISTS(SELECT 1 FROM case_content_purges cp WHERE cp.case_id=c.id)
-      ORDER BY c.created_at DESC,c.id DESC LIMIT 20 OFFSET $3`,[session.org_id,session.site_id,(page-1)*20,briefingId,day])).rows;
-    return {rows:rows.map(({id,worker,title})=>({id,worker,title})),total:rows[0]?.total??0,page};
+        AND NOT EXISTS(SELECT 1 FROM case_content_purges cp WHERE cp.case_id=c.id)`;
+    if(summaryOnly){
+      const row=(await client.query(`WITH eligible AS (${eligible}) SELECT count(DISTINCT briefing_id)::int AS "unreadInstructions" FROM eligible WHERE status='open'`,[session.org_id,session.site_id])).rows[0];
+      return {unreadInstructions:row.unreadInstructions};
+    }
+    const row=(await client.query(`WITH eligible AS (${eligible}), dated AS (
+      SELECT * FROM eligible c WHERE ($4::text IS NULL OR briefing_id=$4) AND ($5::date IS NOT NULL OR latest)
+      AND ($5::date IS NULL OR (created_at AT TIME ZONE timezone)::date=$5::date OR EXISTS(SELECT 1 FROM unnest(request_dates) d WHERE (d AT TIME ZONE timezone)::date=$5::date))
+    ), filtered AS (SELECT * FROM dated WHERE ($6::text IS NULL AND ($5::date IS NOT NULL OR $4::text IS NOT NULL OR status='open')) OR ($6='unread' AND status='open') OR ($6='done' AND status='resolved'))
+    SELECT (SELECT count(*)::int FROM filtered) AS total,
+      (SELECT count(*)::int FROM dated WHERE status='open') AS unread,(SELECT count(*)::int FROM dated WHERE status='resolved') AS done,
+      (SELECT count(DISTINCT briefing_id)::int FROM eligible WHERE status='open') AS "unreadInstructions",
+      (SELECT coalesce(json_agg(items),'[]'::json) FROM (SELECT id,worker,title,created_at AS "createdAt",status FROM filtered ORDER BY created_at ASC,id ASC LIMIT 20 OFFSET $3) items) AS rows`,[session.org_id,session.site_id,(page-1)*20,briefingId,day,section])).rows[0];
+    return {...row,page};
   });
 }
 export function readClarificationFlow(pool,session,id,{schema='public',worker=false}={}){

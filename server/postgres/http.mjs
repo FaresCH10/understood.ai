@@ -760,7 +760,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         if(!requestId && req.method==='GET'){if(!url.search)return send(res,200,await listCaseReviews(pool,session,id,repository));if(new Set(url.searchParams.keys()).size!==[...url.searchParams.keys()].length)throw Error('Invalid case workflow page');return send(res,200,{...await caseReviewPage(pool,session,id,Object.fromEntries(url.searchParams),repository),clientContext:context});}
         if(!requestId && req.method==='POST'){if(url.search)throw Error('Invalid case review');return send(res,200,{...await saveCaseReview(pool,session,id,await readJson(req),repository),clientContext:context});}
       }
-      if(path==='/api/clarification-flow'&&req.method==='GET')return send(res,200,{...await listClarificationFlow(pool,session,Number(url.searchParams.get('page')??1),{...repository,briefingId:url.searchParams.get('briefingId'),day:url.searchParams.get('day')}),clientContext:clientSessionContext(session).clientContext});
+      if(path==='/api/clarification-flow'&&req.method==='GET')return send(res,200,{...await listClarificationFlow(pool,session,Number(url.searchParams.get('page')??1),{...repository,briefingId:url.searchParams.get('briefingId'),day:url.searchParams.get('day'),section:url.searchParams.get('section'),summaryOnly:url.searchParams.get('summary')==='1'}),clientContext:clientSessionContext(session).clientContext});
       const simpleClarification=path.match(/^\/api\/(worker\/briefings|clarifications)\/([^/]+)\/clarification-flow$/);
       if(simpleClarification){
         if(url.search)throw Error('Invalid clarification request');

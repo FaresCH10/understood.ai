@@ -12,6 +12,7 @@
 .clarification-instruction-label{flex:1;display:grid;gap:7px;min-width:0}
 .clarification-instruction-label strong{font-size:16px;line-height:1.5;font-weight:600;overflow-wrap:anywhere}
 .clarification-instruction-label>span{font-size:13px;color:var(--muted,#64756e)}
+.clarification-instruction-meta{display:flex;flex-wrap:wrap;gap:6px 12px;overflow-wrap:anywhere}
 .clarification-instruction-row>svg{flex:none;color:#74867c}
 .clarification-empty{padding:64px 24px;text-align:center;color:var(--muted,#64756e);display:grid;justify-items:center;gap:16px}
 .clarification-empty p{margin:0;max-width:38ch;line-height:1.65}
@@ -49,6 +50,13 @@
 @media(max-width:640px){.simple-clarifications{gap:20px}.clarification-page-heading h1{font-size:22px}.clarification-instruction-row{padding:18px 16px;gap:12px}.clarification-instruction-content{padding:22px 20px}.clarification-answer{margin:20px 20px 0}.clarification-correspondence{padding-inline:20px}.clarification-reply-form{padding:20px}.clarification-reply-footer{align-items:stretch;flex-direction:column;gap:14px}.clarification-reply-footer .button{width:100%;white-space:normal}.clarification-page-heading{gap:12px}}
 
 .clarification-day-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.clarification-section-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.clarification-sections{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line,#e0e6e2);border-radius:12px;background:var(--surface,#fff)}
+.clarification-sections button{display:inline-flex;align-items:center;gap:10px;min-height:40px;padding:8px 16px;border:0;border-radius:8px;background:transparent;color:var(--muted,#64756e);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.clarification-sections button[aria-pressed=true]{background:#e9f1eb;color:#195c45}
+.clarification-sections button:focus-visible{outline:2px solid var(--green,#207255);outline-offset:2px}
+.clarification-sections button>span{font-size:12px;min-width:18px;font-variant-numeric:tabular-nums}
+.clarification-sort-label{font-size:12px;color:var(--muted,#64756e)}
 .clarification-day-field{display:grid;gap:5px;min-width:0;font-size:12px;color:var(--muted,#64756e)}
 .clarification-day-field input{min-height:42px;padding:8px 12px;border:1px solid var(--line,#e0e6e2);border-radius:8px;background:var(--surface,#fff);color:var(--ink,#153a31);font:inherit;font-size:14px;max-width:100%;color-scheme:light}
 .clarification-day-controls>.icon-button{align-self:flex-end;min-width:42px;min-height:42px}

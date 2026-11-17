@@ -3,6 +3,7 @@ import {useContext,useEffect,useRef,useState,type ComponentType,type ReactNode} 
 import {Ellipsis,BookOpen,ChevronDown,ChevronRight,LifeBuoy,LogOut,Mail,PanelLeftClose,Settings} from 'lucide-react';
 import {gsap,useGSAP} from './gsap';
 import {StaffLanguageContext} from './staff-language';
+import {ClarificationCountBadge} from './ClarificationCount';
 
 const accountCopy={
   en:{more:'More',help:'Help & support',center:'Help center',guide:'Interactive walkthrough',contact:'Contact support',settings:'Workspace preferences',helpHint:'Find answers and get in touch'},
@@ -130,7 +131,7 @@ export function DashboardSidebar({brand,organization,site,items,name,email,plan,
     }
     gsap.fromTo(icon,{y:0},{y:-2.5,duration:.16,ease:'power2.out',yoyo:true,repeat:1,overwrite:true});
   });
-  const link=(item:Item)=><button key={item.key} aria-current={item.active?'page':undefined} className={`sidebar-link ${item.active?'active':''}`} onClick={()=>navigate(item.key)} onPointerEnter={event=>{if(event.pointerType==='mouse')animateIcon(event.currentTarget,item.key,true);}} onPointerLeave={event=>{if(event.pointerType==='mouse')animateIcon(event.currentTarget,item.key,false);}}><item.icon size={19}/><span>{item.label}</span></button>;
+  const link=(item:Item)=><button key={item.key} aria-current={item.active?'page':undefined} className={`sidebar-link ${item.active?'active':''}`} onClick={()=>navigate(item.key)} onPointerEnter={event=>{if(event.pointerType==='mouse')animateIcon(event.currentTarget,item.key,true);}} onPointerLeave={event=>{if(event.pointerType==='mouse')animateIcon(event.currentTarget,item.key,false);}}><item.icon size={19}/><span>{item.label}</span>{item.key==='clarifications'&&<ClarificationCountBadge/>}</button>;
   return <aside ref={root} id="dashboard-sidebar" className="sidebar dashboard-sidebar" inert={disabled||!open} aria-hidden={!open}>
     <div className="sidebar-heading">{brand}<button className="icon-button sidebar-close" aria-label={closeLabel} title={closeLabel} onClick={onClose}><PanelLeftClose size={20}/></button></div>
     {organization&&<div className="workspace-company"><span aria-hidden="true">{organization.slice(0,2).toUpperCase()}</span><div><strong title={organization}><bdi>{organization}</bdi></strong><small><bdi>{site}</bdi> · {identity}</small></div></div>}

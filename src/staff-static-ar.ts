@@ -1,4 +1,9 @@
 export const staffStaticArabic={
+  "Clarification status": "حالة التوضيح",
+  "No unread clarification requests.": "لا توجد طلبات توضيح غير مقروءة.",
+  "No completed clarifications.": "لا توجد توضيحات مكتملة.",
+  "{p0} instructions need clarification": "تحتاج {p0} من التعليمات إلى توضيح",
+  "{p0} instruction needs clarification": "تحتاج تعليمة واحدة إلى توضيح",
   "Preparing instruction and question audio…": "جارٍ إعداد صوت التعليمات والسؤال…",
   "Preparing instruction audio…": "جارٍ إعداد صوت التعليمات…",
   "For voice delivery, shorten the instruction to {p0} characters or fewer.": "للإرسال الصوتي، اختصر التعليمات إلى {p0} حرفاً أو أقل.",

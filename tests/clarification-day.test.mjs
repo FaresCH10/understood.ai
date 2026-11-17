@@ -45,6 +45,11 @@ test('SQLite daily view uses the same site-local dates and preserves prior resol
   assert.deepEqual(listClarificationFlow(db,staff,1,{day:'2025-01-01'}).rows.map(row=>row.id),['before-midnight']);
   assert.deepEqual(listClarificationFlow(db,staff,1,{day:'2025-01-02'}).rows.map(row=>row.id),['after-midnight']);
   assert.equal(listClarificationFlow(db,staff,1,{day:'2025-01-03'}).total,0);
+  const done=listClarificationFlow(db,staff,1,{day:'2025-01-01',section:'done'});assert.equal(done.total,1);assert.equal(done.done,1);assert.equal(done.unread,0);
+  assert.equal(listClarificationFlow(db,staff,1,{day:'2025-01-01',section:'unread'}).total,0);
+  assert.equal(listClarificationFlow(db,staff,1,{summaryOnly:true}).unreadInstructions,1);
+  db.prepare("UPDATE clarifications SET status='resolved'").run();assert.equal(listClarificationFlow(db,staff,1,{summaryOnly:true}).unreadInstructions,0);
+  assert.throws(()=>listClarificationFlow(db,staff,1,{section:'invalid'}),/Invalid clarification filter/);
   assert.throws(()=>listClarificationFlow(db,staff,1,{day:'2026-02-30'}),/Invalid/);
  }finally{db.close();}
 });
