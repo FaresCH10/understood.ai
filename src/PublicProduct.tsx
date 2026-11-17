@@ -13,6 +13,7 @@ import {ContactPage} from './PublicContact';
 import './public-product.css';
 import './landing-page.css';
 import './landing-mobile-compact.css';
+import './landing-interactions.css';
 
 const localeKey='understood:public-language';
 function savedLocale():LandingLocale{try{return sessionStorage.getItem(localeKey)==='ar'?'ar':'en';}catch{return 'en';}}

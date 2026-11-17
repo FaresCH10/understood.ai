@@ -18,7 +18,7 @@ export function LandingHero({locale,registrationAvailable,motionPaused}:{locale:
         .from('.hero-intro-kicker',{y:10,autoAlpha:0,duration:.45},.08)
         .from('.hero-heading-line>span',{yPercent:110,rotation:1.5,stagger:.1,duration:.75},.13)
         .from('.hero-intro-description',{y:14,autoAlpha:0,duration:.55},.55)
-        .from('.hero-intro-actions>a',{y:18,autoAlpha:0,stagger:.1,duration:.5},.72)
+        .fromTo('.hero-intro-actions>a',{y:18,autoAlpha:0},{y:0,autoAlpha:1,stagger:.1,duration:.5,clearProps:'transform,translate,rotate,scale'},.72)
         .from('.hero-intro-assurances>li',{y:8,autoAlpha:0,stagger:.07,duration:.4},1.02);
       const scene=gsap.timeline({id:'understood-hero-scene',paused:true,defaults:{ease:'power3.out'}})
         .from('.hero-intro-background img',{opacity:0,scale:1.035,duration:1.15},0)
