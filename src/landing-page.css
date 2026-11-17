@@ -1,7 +1,8 @@
 .marketing-site{--landing-green:#104f43;--landing-ink:#132b25;--landing-muted:#53695f;--landing-soft:#eff5f0;--landing-border:#dce6df;background:#fff;color:var(--landing-ink);font-family:'Segoe UI',Arial,sans-serif;overflow:clip;isolation:isolate}
 .marketing-site[lang=ar]{font-family:Tahoma,'Segoe UI',Arial,sans-serif}
 .marketing-site .landing-container{width:min(1320px,calc(100% - 96px));max-width:none;margin-inline:auto;padding-inline:0}
-.marketing-site>main{max-width:none;margin:0;padding:0}
+/* The landing sections own their containers; legacy public-page grids must not narrow them again. */
+.public-product.marketing-site>main{display:block;width:100%;max-width:none;margin:0;padding:0}
 .marketing-site h1,.marketing-site h2,.marketing-site h3{text-wrap:balance;letter-spacing:0;color:var(--landing-ink);overflow-wrap:normal}
 .marketing-site p{color:#425a50;line-height:1.65;text-wrap:pretty}
 .marketing-site a:hover{text-decoration:none}
