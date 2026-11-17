@@ -1,4 +1,12 @@
 export const staffStaticArabic={
+  "Your instructions, worker replies, and requests needing attention.": "تعليماتك وردود العمال والطلبات التي تحتاج إلى متابعة.",
+  "Current workload": "ملخص العمل الحالي",
+  "Active instructions": "التعليمات النشطة",
+  "Waiting for a reply": "بانتظار الرد",
+  "Clarification requests": "طلبات التوضيح",
+  "Reply progress for this instruction": "تقدم الردود على هذه التعليمة",
+  "Send an instruction to see its delivery and worker replies here.": "أرسل تعليمة لمتابعة إرسالها وردود العمال هنا.",
+  "Instructions and worker replies will appear here when a supervisor sends one.": "ستظهر التعليمات وردود العمال هنا عندما يرسل المشرف تعليمة.",
   "Send your first instruction": "أرسل أول تعليمة",
   "Choose your workers, write or record an instruction, and send it in their languages.": "اختر العمال، واكتب التعليمة أو سجلها بصوتك، ثم أرسلها بلغاتهم.",
   "Instructions will appear here after a supervisor sends one.": "ستظهر التعليمات هنا بعد أن يرسل المشرف تعليمة.",
