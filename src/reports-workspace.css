@@ -23,3 +23,7 @@
 @media(max-width:600px){.reports-filter-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:44px;padding:10px 0;border:0;border-bottom:1px solid #e6ece5;background:none;color:#4e6757;font-size:12px;margin-bottom:10px;text-align:start}.reports-filter-toggle>span{display:flex;align-items:center;gap:8px}.reports-filter-toggle[aria-expanded=true]>svg{transform:rotate(180deg)}.reports-workspace .report-scope-filters{display:none}.reports-workspace.reports-filters-open .report-scope-filters{display:grid;padding-top:8px}.reports-workspace .reports-scope{padding:16px}.reports-workspace .report-header{gap:14px}.reports-workspace .reports-applied-scope{padding-bottom:12px}.reports-workspace .report-version-scope{padding-top:14px;margin-top:0}}
 
 @media(min-width:901px){.reports-workspace .report-header{margin-bottom:18px}.reports-workspace .reports-scope{padding-block:16px}.reports-workspace .report-scope-filters{padding-block:12px}}
+
+.reports-response-lead { flex-wrap: wrap; gap: 12px; }
+.reports-response-lead .reports-response-fraction { text-align: start; gap: 2px; }
+.reports-response-lead .report-clarification-action { color: #805011; background: #fcf4e5; border-color: #e4c994; text-align: start; white-space: normal; }

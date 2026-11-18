@@ -83,10 +83,26 @@
 .dev-workspace .dashboard-sidebar .sidebar-link:hover { color: #1e6144; background: #f5f7f4; }
 .dev-workspace .dashboard-sidebar .sidebar-link.active { color: #1e6144; background: #edf3e9; font-weight: 700; }
 .dev-workspace .dashboard-sidebar .sidebar-more-trigger.has-active { color: #1e6144; }
-.dev-workspace .dashboard-sidebar .profile { color: var(--ws-ink); border-color: var(--ws-border); background: #fff; }
-.dev-workspace .dashboard-sidebar .profile:hover { background: #f5f7f4; }
-.dev-workspace .dashboard-sidebar .profile small { color: var(--ws-muted); }
-.dev-workspace .dashboard-sidebar .avatar { background: #e5eee5; color: #2e6546; border-radius: 10px; }
+.dev-workspace .dashboard-sidebar .account-disclosure { border-color: var(--ws-border); }
+.dev-workspace .dashboard-sidebar .account-disclosure > .profile {
+  color: var(--ws-ink);
+  border-color: var(--ws-border);
+  background: #fff;
+  text-align: start;
+}
+.dev-workspace .dashboard-sidebar .account-disclosure > .profile:hover,
+.dev-workspace .dashboard-sidebar .account-disclosure[open] > .profile {
+  background: #edf3e9;
+  border-color: #a8c2b1;
+}
+.dev-workspace .dashboard-sidebar .account-disclosure > .profile:focus-visible {
+  outline: 2px solid #2e6546;
+  outline-offset: 2px;
+}
+.dev-workspace .dashboard-sidebar .account-disclosure > .profile small { color: var(--ws-muted); }
+.dev-workspace .dashboard-sidebar .profile-icon {
+  color: #234d3d;
+}
 .dev-workspace .dashboard-sidebar .account-chevron { color: var(--ws-muted); }
 .dev-workspace .dashboard-sidebar .account-options { color: var(--ws-ink); background: #fff; border-color: var(--ws-border); }
 .dev-workspace .dashboard-sidebar .account-action { color: #345342; }
@@ -302,6 +318,7 @@
   .dev-workspace .topbar { height: 72px; min-height: 72px; padding-inline: 10px; gap: 6px; }
   .dev-workspace .staff-content { padding: 24px 16px calc(100px + env(safe-area-inset-bottom)); }
   .dev-workspace .page-header { align-items: stretch; flex-direction: column; gap: 16px; }
+  #staff-main .page-header > :is(div:first-child, .actions) { flex: 0 1 auto; }
   .dev-workspace .page-header h1,.dev-workspace .today-surface > .page-header h1 { font-size: 26px; }
   .dev-workspace .button { font-size: 14px; }
   .dev-workspace :is(.field input,.field select,.field textarea,.search-box input,.select-label select,.select-label input) { font-size: 16px; }
@@ -323,3 +340,14 @@
   .dev-worker .worker-card { padding: 22px 18px; }
   .dev-worker :is(input,textarea,select) { font-size: 16px; }
 }
+
+.send-source-review { padding: 14px; margin-block-end: 14px; border: 1px solid var(--ws-border); border-radius: 8px; background: #f6f8f6; overflow-wrap: anywhere; }
+.send-source-review h3 { margin: 0 0 8px; }
+.send-source-review p { margin: 6px 0 0; white-space: pre-wrap; }
+.send-source-review summary { cursor: pointer; padding-block: 8px; }
+.send-review-language { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 16px; margin-block: 12px; }
+.send-review-language > span { padding-block: 8px; }
+.usage-technical > summary { cursor: pointer; font-weight: 650; }
+.readiness-evidence th[scope="row"] { text-align: start; }
+.readiness-evidence td details { min-inline-size: 6ch; }
+.clarification-all-dates { margin-block-end: 10px; }

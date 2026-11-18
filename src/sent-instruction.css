@@ -10,3 +10,8 @@
 .sent-instruction-detail .clarification-page-heading h1{font-size:20px}
 @media(max-width:600px){.minimal-instruction-overview{padding:20px}.sent-instruction-detail .page-header h1{font-size:25px}}
 .sent-instruction-detail>.page-header>div:first-child{flex:0 1 auto;min-width:0}
+.sent-worker-view { margin-block-start: 20px; padding-block-start: 14px; border-block-start: 1px solid var(--ws-border); }
+.sent-worker-view > summary { cursor: pointer; font-weight: 650; }
+.sent-worker-view .field { max-inline-size: 300px; margin-block: 12px; }
+.sent-worker-content { overflow-wrap: anywhere; }
+.sent-worker-content audio { display: block; max-inline-size: 100%; margin-block: 10px; }

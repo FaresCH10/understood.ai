@@ -26,12 +26,38 @@ async function readProviderAllowance(client,orgId,integrationMode) {
     jobsPaused:Boolean(controls?.jobs_paused),providerPaused:Boolean(controls?.provider_paused),dataClass:integrationMode==='live'?'real':'synthetic',billingVerified:false};
 }
 
+async function pilotActivity(client, session, entitlement) {
+  const result = await client.query(`WITH delivered AS (
+    SELECT a.id, a.worker_id, a.language, p.briefing_id FROM assignments a
+    JOIN publications p ON p.id=a.publication_id AND p.org_id=a.org_id AND p.site_id=a.site_id
+    WHERE a.org_id=$1 AND a.site_id=$2 AND p.published_at >= $3 AND p.published_at < $4
+      AND a.created_at >= $3 AND a.created_at < $4
+  )
+  SELECT count(DISTINCT briefing_id)::int AS instructions,
+    count(DISTINCT worker_id)::int AS workers,
+    count(DISTINCT language)::int AS languages,
+    count(DISTINCT worker_id) FILTER (WHERE EXISTS (
+      SELECT 1 FROM submission_receipts r WHERE r.assignment_id=delivered.id AND r.org_id=$1
+        AND r.received_at >= $3 AND r.received_at < $4
+      UNION ALL
+      SELECT 1 FROM acknowledgments a WHERE a.assignment_id=delivered.id AND a.org_id=$1
+        AND a.received_at >= $3 AND a.received_at < $4
+    ))::int AS responders,
+    (SELECT count(*)::int FROM clarifications c JOIN delivered d ON d.id=c.assignment_id
+      WHERE c.org_id=$1 AND c.site_id=$2 AND c.status='resolved'
+        AND c.resolved_at >= $3 AND c.resolved_at < $4) AS resolved
+  FROM delivered`, [session.org_id, session.site_id, entitlement.startedAt, entitlement.endsAt]);
+  return result.rows[0];
+}
+
 export function getUsage(pool, session, { schema = 'public',integrationMode='synthetic' } = {}) {
   return responseRead(pool, schema, async (client) => {
     await requirePrincipal(client, session, 'staff', ['owner', 'administrator', 'supervisor', 'auditor']);
     const publication = (await client.query(`SELECT id,version,state FROM publications WHERE org_id=$1 AND site_id=$2 AND state='published' ORDER BY published_at DESC,id LIMIT 1`, [session.org_id, session.site_id])).rows[0] || null;
     const metrics = publication ? metricsFromResponses(await publicationResponses(client, session, publication.id)) : null;
     const entitlement=usageEntitlement(await entitlementState(client,session.org_id),await countActiveWorkers(client,session.org_id));
-    return {...usageModel({ mode: integrationMode==='live'?'live-credential':'synthetic-credential', metrics, latestPublication: publication,providerAllowance:await readProviderAllowance(client,session.org_id,integrationMode),entitlement }),changeRequestsAvailable:['owner','administrator','supervisor'].includes(session.role)};
+    const pilot = entitlement.plan==='pilot' && entitlement.startedAt && entitlement.endsAt
+      ? await pilotActivity(client,session,entitlement) : undefined;
+    return {...usageModel({ mode: integrationMode==='live'?'live-credential':'synthetic-credential', metrics, latestPublication: publication,providerAllowance:await readProviderAllowance(client,session.org_id,integrationMode),entitlement }),...(pilot?{pilotActivity:pilot}:{}),changeRequestsAvailable:['owner','administrator','supervisor'].includes(session.role)};
   });
 }

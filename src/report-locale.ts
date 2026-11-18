@@ -32,6 +32,8 @@ export const reportTranslations={
   'Choose a published instruction to start reporting.':['اختر تعليمات منشورة لبدء عرض التقرير.','رپورٹ دیکھنے کے لیے شائع شدہ ہدایت منتخب کریں۔'],
   'Open instruction library':['فتح مكتبة التعليمات','ہدایات کی لائبریری کھولیں'],
   'No responses yet':['لا إجابات حتى الآن','ابھی کوئی جواب نہیں'],
+  'Answers flagged for clarification':['إجابات تم تحديدها للتوضيح','وضاحت کے لیے نشان زد جوابات'],
+  'Choose instruction':['اختر التعليمات','ہدایت منتخب کریں'],
   'View instruction history':['عرض سجل التعليمات','ہدایات کی تاریخ دیکھیں'],
   'Waiting for responses':['بانتظار الإجابات','جوابات کا انتظار ہے'],
   'No clarification needed in this report.':['لا توجد إجابات تحتاج إلى توضيح في هذا التقرير.','اس رپورٹ میں کسی جواب کو وضاحت درکار نہیں۔'],

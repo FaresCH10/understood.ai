@@ -39,7 +39,7 @@
 .dashboard-sidebar .account-disclosure{padding-top:12px}
 .dashboard-sidebar .account-disclosure .profile{gap:11px;padding:11px 10px;border:1px solid transparent;border-radius:9px}
 .dashboard-sidebar .account-disclosure[open]>.profile{background:#2a4439;border-color:#415b4e}
-.dashboard-sidebar .account-disclosure .profile .avatar{width:36px;height:36px;border-radius:50%;background:#456152;font-size:12px}
+.dashboard-sidebar .profile-icon{display:grid;place-items:center;flex:none;width:36px;height:36px}
 .dashboard-sidebar .account-disclosure .profile strong{font-size:13px;line-height:1.5}
 .dashboard-sidebar .account-disclosure .profile small{font-size:11px;margin-top:2px;color:#b6c9bd}
 .account-chevron{flex:none;stroke-width:1.7}

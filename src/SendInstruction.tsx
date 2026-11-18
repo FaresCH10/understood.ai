@@ -139,8 +139,10 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
   const selectedCrew=audienceType==='crew'?(audience?.crews.find(crew=>crew.id===crewId)??null):null;
   const selectedMembers=audience?.members?.filter(member=>workerIds.includes(member.id))||[];
   const singleMember=audienceType==='members'&&selectedMembers.length===1?selectedMembers[0]:null;
-  const selectedAudience=audienceType==='members'?{total:selectedMembers.filter(member=>!member.language_selection_required).length,notSelected:selectedMembers.filter(member=>member.language_selection_required).length,byLanguage:selectedMembers.reduce<Record<string,number>>((counts,member)=>{counts[member.language]=(counts[member.language]||0)+1;return counts;},{})}:audienceType==='all'?(audience?.workers?{...audience.workers,notSelected:audience.workers.notSelected??0}:null):selectedCrew?{total:selectedCrew.members,byLanguage:selectedCrew.byLanguage,notSelected:selectedCrew.notSelected}:null;
+  const selectedAudience=audienceType==='members'?{total:selectedMembers.filter(member=>!member.language_selection_required).length,notSelected:selectedMembers.filter(member=>member.language_selection_required).length,byLanguage:selectedMembers.filter(member=>!member.language_selection_required).reduce<Record<string,number>>((counts,member)=>{counts[member.language]=(counts[member.language]||0)+1;return counts;},{})}:audienceType==='all'?(audience?.workers?{...audience.workers,notSelected:audience.workers.notSelected??0}:null):selectedCrew?{total:selectedCrew.members,byLanguage:selectedCrew.byLanguage,notSelected:selectedCrew.notSelected}:null;
   const audienceLanguages=Object.entries(selectedAudience?.byLanguage??{}).filter(([,count])=>count>0);
+  const [reviewLanguage,setReviewLanguage]=useState('');
+  const reviewedLanguage=audienceLanguages.some(([code])=>code===reviewLanguage)?reviewLanguage:audienceLanguages[0]?.[0];
   const unavailableLanguages=audienceLanguages.filter(([code])=>!readiness?.textLanguages.includes(code)
     || (deliveryMode!=='text'&&!readiness.speechLanguages.includes(code))).map(([code])=>code);
   const unavailableWorkers=unavailableLanguages.reduce((total,code)=>total+(selectedAudience?.byLanguage[code]??0),0);
@@ -461,7 +463,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
         :readiness.translationProviderLabel?`${readiness.providerLabel} writes the check question. ${readiness.translationProviderLabel} translates the instruction text. Voice availability depends on the worker’s language.`:`${readiness.providerLabel} can translate English instructions for text delivery. Voice availability depends on the worker’s language.`}</p>}
       </div><div className="send-step-review">
       {stepHeading(2)}
-      {effectiveTitle&&<div className="send-mobile-review"><strong dir="auto">{effectiveTitle}</strong>
+      {effectiveTitle&&<div className="send-source-review"><h3>{staffT('Review instruction')}</h3><strong dir="auto">{effectiveTitle}</strong>
         {source.length>300?<details><summary>{staffT("Read instruction preview")}</summary><p dir="auto">{source}</p></details>:<p dir="auto">{source}</p>}
       </div>}
       {selectedAudience&&<div className="send-review-audience">
@@ -473,6 +475,13 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
           {readiness?<>{staffT("Workers ready for this format")} <bdi>{staffT.number(readyWorkers)} / {staffT.number(selectedAudience.total)}</bdi></>:readinessError?staffT(readinessError):staffT("Checking delivery availability…")}
         </p>}
         {readinessError&&<button type="button" className="text-link" disabled={busy||audienceLoading} onClick={()=>setAudienceRevision(value=>value+1)}>{staffT("Try again")}</button>}
+      </div>}
+      {reviewedLanguage&&readiness&&<div className="send-review-language">
+        <label className="select-label">{staffT('Recipient language')}<select value={reviewedLanguage} onChange={event=>setReviewLanguage(event.target.value)}>
+          {audienceLanguages.map(([code,count])=><option key={code} value={code}>{staffT.language(code)} · {staffT.number(count)}</option>)}
+        </select></label>
+        <span>{staffT('Text')} · {staffT(readiness.textLanguages.includes(reviewedLanguage)?'Available':'Unavailable')}</span>
+        <span>{staffT('Voice')} · {staffT(readiness.speechLanguages.includes(reviewedLanguage)?'Available':'Unavailable')}</span>
       </div>}
       <p className="muted send-review-preview-note">{responseMode==='question'?staffT("This review shows the instruction text and recipients. The check question is generated when you send and then appears in the instruction."):staffT("This review shows the instruction text and recipients. Workers will only confirm receipt.")}</p>
       <MobileDisclosure title={staffT.locale==='ar'?'المرفقات (اختياري)':'Attachments (optional)'}><AttachmentComposer key={requestId.current} authority={authority} requestId={requestId.current} disabled={busy||!!pending||!draftLoaded} ready={draftReady} saveDraft={saveDraft} onBusy={setAttachmentBusy} languages={Object.keys(selectedAudience?.byLanguage||{}).sort()}/></MobileDisclosure>
@@ -520,7 +529,7 @@ export default function SendInstruction({authority,scope,navigate,onSent,draftId
       {busy&&deliveryMode!=='text'&&readiness?.speechProviderLabel&&<p role="status">{staffT(responseMode==='question'?'Preparing instruction and question audio…':'Preparing instruction audio…')}</p>}
       <div className="send-submit">
         <span className="muted"><Users size={17}/> {audience?staffT("Recipients are resolved when you send; later joiners are not added automatically."):staffT("Loading recipients...")}</span>
-        <button className="button primary" disabled={!canSubmit||!draftLoaded} onClick={()=>void submit()}>{busy?staffT("Sending..."):<><Send size={20}/>{tr("Send instruction")}</>}</button>
+        <button className="button primary" disabled={!canSubmit||!draftLoaded} onClick={()=>void submit()}>{busy?staffT("Sending..."):<><Send size={20}/>{canSubmit?staffT(readyWorkers===1?"Send to 1 worker":"Send to {p0} workers",{p0:staffT.number(readyWorkers)}):tr("Send instruction")}</>}</button>
       </div>
       </div><div className="send-mobile-footer"><button className="button outline" disabled={mobileStep===0||busy} onClick={()=>goToMobileStep(mobileStep-1)}>{staffT("Back")}</button>{mobileStep<2&&<button className="button primary" disabled={busy||(mobileStep===0?(!titleValid||!!sourceIssue):!audienceReady)} onClick={()=>goToMobileStep(mobileStep+1)}>{staffT("Continue")}</button>}</div></section>
   </>;

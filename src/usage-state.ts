@@ -58,7 +58,7 @@ export function checkedEntitlement(raw:unknown):UsageEntitlement {
 }
 export function checkedUsageModel(raw:unknown,mode:string|undefined,role:string|null|undefined):UsageModel {
   const row=raw as UsageModel,base='controls,denominator,entitlement,mode,period,plan,providerAllowance,publication,spend,units';
-  if(!(keys(row,base) || keys(row,'changeRequestsAvailable,'+base)) || row.mode!==mode || !isCredentialMode(row.mode)
+  if(!(keys(row,base) || keys(row,'changeRequestsAvailable,'+base) || keys(row,'changeRequestsAvailable,controls,denominator,entitlement,mode,period,pilotActivity,plan,providerAllowance,publication,spend,units')) || row.mode!==mode || !isCredentialMode(row.mode)
     || !['owner','administrator','supervisor','auditor'].includes(role || '') || !Array.isArray(row.units) || row.units.length!==5
     || row.changeRequestsAvailable!==undefined && (typeof row.changeRequestsAvailable!=='boolean' || row.changeRequestsAvailable!==['owner','administrator','supervisor'].includes(role || '')))throw Error('Plan and usage cannot be verified.');
   const units=row.units,assigned=units[0]?.used;
@@ -70,6 +70,13 @@ export function checkedUsageModel(raw:unknown,mode:string|undefined,role:string|
   const entitlement=checkedEntitlement(row.entitlement);
   const expected=usageModel({mode:row.mode,metrics:{assigned,responses:units[1].used,matches:units[2].used,clarifications:units[3].used,pending:units[4].used},latestPublication:publication,providerAllowance,entitlement});
   if(row.changeRequestsAvailable!==undefined)expected.changeRequestsAvailable=row.changeRequestsAvailable;
+  if(row.pilotActivity!==undefined){
+    const activity=row.pilotActivity;
+    if(entitlement.plan!=='pilot'||!entitlement.startedAt||!entitlement.endsAt
+      ||!keys(activity,'instructions,languages,resolved,responders,workers')||!Object.values(activity).every(count)
+      ||activity.responders>activity.workers)throw Error('Pilot activity cannot be verified.');
+    expected.pilotActivity=activity;
+  }
   if(!same(row,expected))throw Error('Plan, spend and allowance evidence cannot be verified.');
   return row;
 }

@@ -4,6 +4,18 @@ import {PGlite} from '@electric-sql/pglite';
 import {runMigrations} from '../server/postgres/migrate.mjs';
 import {getUsage} from '../server/postgres/usage.mjs';
 import {checkedUsageModel} from '../src/usage-state.ts';
+import {clarificationFixture} from './helpers/clarification-flow-fixture.mjs';
+
+test('pilot usage counts delivered instructions, distinct workers, replies and resolved clarifications in the pilot dates',async()=>{
+  const {db,pool}=await clarificationFixture();
+  const session={principal_id:'owner',principal_type:'staff',org_id:'org',site_id:'site',role:'owner'};
+  try{
+    await db.exec("INSERT INTO organization_entitlements VALUES('org','trial',now()-interval '1 day',now()+interval '13 days',25,'pilot','test-terms',1,'synthetic-test',now())");
+    await db.exec("UPDATE clarifications SET status='resolved'");
+    const usage=checkedUsageModel(await getUsage(pool,session),'synthetic-credential','owner');
+    assert.deepEqual(usage.pilotActivity,{instructions:1,workers:1,languages:1,responders:1,resolved:1});
+  }finally{await db.close();}
+});
 
 test('customer usage reports own UTC reservation evidence, closed/pause/exhausted states and reset without leaking global/private operation data',async()=>{
   const db=new PGlite(),schema='understood_test_usage_allowance';

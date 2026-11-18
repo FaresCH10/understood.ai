@@ -33,6 +33,7 @@ export function ClarificationsPage({refresh,navigate,authority,language='en',bri
   },[api,page,tick,refresh,briefingId,day,section,allDates]);
   return <div className="simple-clarifications clarification-inbox" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     <header className={`clarification-page-heading${briefingId?'':' page-header'}`}><div>{briefingId?<h2>{t.title}</h2>:<h1>{t.title}</h1>}<p>{briefingId?staffT('Messages about this instruction.'):copy.intro}</p></div><button className="button outline" title={t.retry} aria-label={t.retry} onClick={()=>setTick(n=>n+1)}><RefreshCw size={17}/>{staffT('Refresh')}</button></header>
+    {!allDates&&!briefingId&&<button className="text-link clarification-all-dates" onClick={()=>navigate('clarifications/inbox')}>{staffT('View requests across all dates')}</button>}
     {allDates&&<div className="clarification-day-controls"><span>{staffT('All dates')}</span><button className="button outline" onClick={()=>navigate('clarifications')}>{staffT('Browse clarification dates')}</button><button className="text-link" onClick={()=>navigate('overview')}>{staffT('Back to Today')}</button></div>}
     {!briefingId&&!allDates&&<nav className="clarification-day-controls" aria-label={staffT('Browse clarification dates')}>
       <div className="clarification-date-navigation">

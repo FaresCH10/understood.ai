@@ -25,7 +25,21 @@ export function LanguageReadiness({refresh=0,authority,navigate}:{refresh?:numbe
     {loading && !data?<p data-page-loading role="status">{staffT("Loading language readiness...")}</p>:error && !data?<p role="alert" className="record-error">{staffT.error(error)}</p>:(data&&<>
       <div className="readiness-banner"><Globe size={24}/><div><strong>{(data.realDataAllowed?staffT("Provider access is enabled."):staffT("Synthetic-only environment."))}</strong><p>{staffT(data.provider.evidence)}</p></div></div>
       {message && <p role="status">{staffT.message(message)}</p>}{error && <p role="alert" className="record-error">{staffT.error(error)}</p>}
-      <div className="readiness-grid">{data.languages.map(language=><section className="panel readiness-card" key={language.code}><div className="readiness-card-heading"><div><h2>{staffT.language(language.code)}</h2><span>{language.code.toUpperCase()} · {(language.direction==='rtl'?staffT("RTL"):staffT("LTR"))}</span></div></div><dl><div><dt>{staffT("Generation default")}</dt><dd>{(language.generationDefault?staffT("Selected"):staffT("Not selected"))}</dd></div><div><dt>{staffT("Worker UI")}</dt><dd><State value={language.ui}/></dd></div><div><dt>{staffT("Stored content")}</dt><dd><State value={language.content}/></dd></div><div><dt>{staffT("Translation")}</dt><dd><State value={language.translation}/></dd></div><div><dt>{staffT("Speech")}</dt><dd><State value={language.speech}/></dd></div></dl><p className="muted">{staffT(language.content.evidence)}</p></section>)}</div>
+      <section className="panel readiness-evidence">
+        <div className="table-wrap"><table>
+          <thead><tr><th scope="col">{staffT("Language")}</th><th scope="col">{staffT("Text")}</th><th scope="col">{staffT("Voice")}</th><th scope="col">{staffT("Details")}</th></tr></thead>
+          <tbody>{[...data.languages].sort((a,b)=>Number(b.generationDefault)-Number(a.generationDefault)).map(language=><tr key={language.code}>
+            <th scope="row">{staffT.language(language.code)}</th>
+            <td><State value={language.translation}/></td><td><State value={language.speech}/></td>
+            <td><details><summary>{staffT("Details")}</summary>
+              <p>{staffT("Generation default")} · {staffT(language.generationDefault?"Selected":"Not selected")}</p>
+              <p>{staffT("Worker UI")} · <State value={language.ui}/></p>
+              <p>{staffT("Stored content")} · <State value={language.content}/></p>
+              <p>{staffT(language.content.evidence)}</p>
+            </details></td>
+          </tr>)}</tbody>
+        </table></div>
+      </section>
       <section className="readiness-stages"><h2>{staffT("Provider stages")}</h2><ProviderStages pipeline={data.pipeline}/></section>
       <section className="panel readiness-evidence"><h2>{staffT("Production evaluation")}</h2><dl><div><dt>{staffT("Full provider pipeline")}</dt><dd><State value={data.tests.connection}/><span>{staffT(data.tests.connection.evidence)}</span></dd></div><div><dt>{staffT("Translation accuracy")}</dt><dd><State value={data.tests.translation}/><span>{staffT(data.tests.translation.evidence)}</span></dd></div><div><dt>{staffT("Speech quality")}</dt><dd><State value={data.tests.speech}/><span>{staffT(data.tests.speech.evidence)}</span></dd></div></dl><p className="muted">{staffT("Last inspected")} {staffT.date(data.generatedAt)}{staffT(". Configuration and stored content do not verify provider connection, language accuracy or permission to send real worker data.")}</p></section>
     </>)}

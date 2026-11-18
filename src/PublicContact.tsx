@@ -33,10 +33,13 @@ export function ContactPage({locale,embedded=false}:{locale:LandingLocale;embedd
     });
     return()=>media.revert();
   },{scope:root,dependencies:[locale],revertOnUpdate:true});
-  const mailto=`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t.subject)}`;
+  const supportCopy=locale==='ar'
+    ?{title:'تواصل مع الدعم',body:'صِف ما حدث وأخبرنا كيف يمكننا التواصل معك.',details:'يمكنك ذكر الموقع والتعليمات المعنية ووقت حدوث المشكلة.',subject:'دعم Understood'}
+    :{title:'Contact support',body:'Describe what happened and how we can reach you.',details:'Include the site, affected instruction and time of the issue if helpful.',subject:'Understood support'};
+  const mailto=`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(embedded?supportCopy.subject:t.subject)}`;
   return <div ref={root} className="contact-page landing-container">
     <a className="landing-text-link contact-back" href={embedded?'#overview':'#home'}><ArrowLeft size={17} className="landing-forward" aria-hidden="true"/>{embedded?(locale==='ar'?'العودة إلى مساحة العمل':'Return to workspace'):t.back}</a>
-    <header className="contact-intro"><h1 ref={heading} tabIndex={-1}>{t.title}</h1><p>{t.body}</p></header>
-    <div className="contact-layout"><section className="contact-email-panel" aria-labelledby="contact-email-title"><Mail size={28} aria-hidden="true"/><h2 id="contact-email-title">{t.email}</h2><p>{t.note}</p><a className="contact-address" href={mailto} aria-label={`${t.address}: ${CONTACT_EMAIL}`}><bdi>{CONTACT_EMAIL}</bdi></a><a className="landing-button landing-button--primary" href={mailto}>{t.email}<ArrowUpRight size={18} aria-hidden="true"/></a></section><aside className="contact-context"><h2>{t.prompt}</h2><p>{t.details}</p></aside></div>
+    <header className="contact-intro"><h1 ref={heading} tabIndex={-1}>{embedded?supportCopy.title:t.title}</h1><p>{embedded?supportCopy.body:t.body}</p></header>
+    <div className="contact-layout"><section className="contact-email-panel" aria-labelledby="contact-email-title"><Mail size={28} aria-hidden="true"/><h2 id="contact-email-title">{t.email}</h2><p>{t.note}</p><a className="contact-address" href={mailto} aria-label={`${t.address}: ${CONTACT_EMAIL}`}><bdi>{CONTACT_EMAIL}</bdi></a><a className="landing-button landing-button--primary" href={mailto}>{t.email}<ArrowUpRight size={18} aria-hidden="true"/></a></section><aside className="contact-context"><h2>{t.prompt}</h2><p>{embedded?supportCopy.details:t.details}</p></aside></div>
   </div>;
 }
