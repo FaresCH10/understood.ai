@@ -10,7 +10,7 @@ import {staffIdentityLabel} from './session-state';
 
 const copy={
   en:{title:'Site crews',intro:'Crews at',directory:'Worker directory',create:'Create crew',refresh:'Refresh crews',loading:'Loading site crews...',retry:'Retry',
-    publication:'Latest instruction',noPublication:'No instructions have been published yet.',siteContacts:'Site contacts',manageContacts:'Manage contacts',responseDetails:'Response details',replied:(received:string,total:string)=>`${received} of ${total} replied`,frozen:'Crew response counts use membership frozen at publication. Current members are shown separately.',unavailable:'Historical crew snapshot unavailable',
+    publication:'Latest instruction',noPublication:'No instructions have been published yet.',siteContacts:'Site contacts',manageContacts:'Manage contacts',frozen:'Crew response counts use membership frozen at publication. Current members are shown separately.',unavailable:'Historical crew snapshot unavailable',
     assigned:'Assigned',responses:'Responses',matches:'Matches',clarifications:'Clarifications',pending:'Awaiting response',unassessed:'Awaiting AI check',primary:'Primary contact',deputy:'Deputy contact',notSet:'Not set',
     crews:'Crews',name:'Crew name',members:'Current active members',snapshotAssigned:'Assigned at publication',open:'Open crew',actions:'Crew actions',empty:'No crews match these filters.',emptyAll:'No crews yet. Create a crew to group workers and assign instructions.',
     selected:'Selected crew',choose:'Select a crew to see its current members.',manage:'Manage membership',loadingMembers:'Loading current members...',noMembers:'No active members in this crew.',openWorker:'Open worker',
@@ -19,7 +19,7 @@ const copy={
     warning:'Response status is not proof of safe work or internal understanding.',responseInfo:'About response statuses',addToCrew:'Add worker to',restoreToAdd:'Restore this crew to add workers',workerAdded:'Worker added to',moveWarning:'Moving a worker does not change previous assignments or frozen crew reports.',
     morning:'Good morning',afternoon:'Good afternoon',evening:'Good evening'},
   ar:{title:'فرق الموقع',intro:'الفرق في',directory:'دليل العمال',create:'إنشاء فريق',refresh:'تحديث الفرق',loading:'جارٍ تحميل فرق الموقع...',retry:'إعادة المحاولة',
-    publication:'أحدث تعليمات',noPublication:'لم تُنشر أي تعليمات بعد.',siteContacts:'جهات اتصال الموقع',manageContacts:'إدارة جهات الاتصال',responseDetails:'تفاصيل الإجابات',replied:(received:string,total:string)=>`ردّ ${received} من أصل ${total}`,frozen:'تستخدم أعداد إجابات الفرق العضوية المحفوظة عند النشر. تُعرض العضوية الحالية بشكل منفصل.',unavailable:'لقطة عضوية الفرق السابقة غير متاحة',
+    publication:'أحدث تعليمات',noPublication:'لم تُنشر أي تعليمات بعد.',siteContacts:'جهات اتصال الموقع',manageContacts:'إدارة جهات الاتصال',frozen:'تستخدم أعداد إجابات الفرق العضوية المحفوظة عند النشر. تُعرض العضوية الحالية بشكل منفصل.',unavailable:'لقطة عضوية الفرق السابقة غير متاحة',
     assigned:'مسندة',responses:'الإجابات',matches:'مطابقة الإجابات',clarifications:'تحتاج توضيحاً',pending:'بانتظار الإجابة',unassessed:'بانتظار تحقق الذكاء الاصطناعي',primary:'المسؤول الأساسي',deputy:'نائب المسؤول',notSet:'غير محدد',
     crews:'الفرق',name:'اسم الفريق',members:'الأعضاء النشطون حالياً',snapshotAssigned:'مسندة عند النشر',open:'فتح الفريق',actions:'إجراءات الفريق',empty:'لا توجد فرق تطابق عوامل التصفية.',emptyAll:'لا توجد فرق بعد. أنشئ فريقاً لتجميع العمال وإسناد التعليمات.',
     selected:'الفريق المحدد',choose:'اختر فريقاً لعرض أعضائه الحاليين.',manage:'إدارة العضوية',loadingMembers:'جارٍ تحميل الأعضاء الحاليين...',noMembers:'لا يوجد أعضاء نشطون في هذا الفريق.',openWorker:'فتح العامل',
@@ -59,8 +59,8 @@ export default function SiteCrews({authority,refresh,locale,onLocaleChange,navig
     <div className="site-crews-directory">
       <section className="panel site-crew-list"><div className="people-panel-heading"><h2>{t.crews}{data?` (${data.total})`:''}</h2><button className="icon-button" aria-label={t.refresh} title={t.refresh} disabled={loading} onClick={()=>setRevision(n=>n+1)}><RefreshCw size={18}/></button></div>
         <div className="filters"><label className="field">{p.searchCrews}<input type="search" dir="auto" value={search} maxLength={80} onChange={event=>{setSearch(event.target.value);setPage(1);}}/></label><label className="field">{p.crewStatus}<select value={status} onChange={event=>{setStatus(event.target.value);setPage(1);}}><option value="all">{p.allCrews}</option><option value="active">{p.active}</option><option value="inactive">{p.archived}</option></select></label></div>
-        {!loading && data && (data.items.length?<div className="table-wrap" role="region" tabIndex={0} aria-label={t.crews}><table className="site-crew-table"><thead><tr><th>{t.name}</th><th>{t.members}</th>{data.crewSnapshotAvailable&&<><th>{t.snapshotAssigned}</th><th>{t.matches}</th><th>{t.clarifications}</th><th>{t.pending}</th></>}<th><span className="sr-only">{t.actions}</span></th></tr></thead><tbody>{data.items.map(crew=><tr key={crew.id} className="crew-directory-row" onClick={event=>{if(!(event.target as Element).closest('button,a,input,summary,dialog'))navigate(`people/crew/${encodeURIComponent(crew.id)}`);}}>
-          <td><button className="people-row-button" aria-label={`${t.open}: ${crew.name}`} onClick={()=>navigate(`people/crew/${encodeURIComponent(crew.id)}`)}><Users size={18}/><bdi>{crew.name}</bdi></button>{!crew.active && <small>{p.archived}</small>}</td><td data-label={t.members}>{crew.member_count}</td>{crew.metrics&&<><td data-label={t.snapshotAssigned}>{crew.metrics.assigned}</td><td data-label={t.matches}>{crew.metrics.matches}</td><td data-label={t.clarifications}>{crew.metrics.clarifications}</td><td data-label={t.pending}>{crew.metrics.pending}</td></>}<td><CrewActions leadingAction={<button type="button" className="icon-button crew-add-worker" disabled={!crew.active||loading} aria-label={`${t.addToCrew}: ${crew.name}`} title={crew.active?`${t.addToCrew}: ${crew.name}`:t.restoreToAdd} onClick={event=>{addWorkerTrigger.current=event.currentTarget;setAddingCrew(crew);}}><Plus size={18}/></button>} authority={authority} locale={locale} crew={crew} disabled={loading} onChanged={(success)=>{if(!current())return;setMessage(success);setRevision(n=>n+1);}}/></td>
+        {!loading && data && (data.items.length?<div className="table-wrap" role="region" tabIndex={0} aria-label={t.crews}><table className="site-crew-table"><thead><tr><th>{t.name}</th><th>{t.members}</th><th>{t.snapshotAssigned}</th><th>{t.matches}</th><th>{t.clarifications}</th><th>{t.pending}</th><th><span className="sr-only">{t.actions}</span></th></tr></thead><tbody>{data.items.map(crew=><tr key={crew.id} className="crew-directory-row" onClick={event=>{if(!(event.target as Element).closest('button,a,input,summary,dialog'))navigate(`people/crew/${encodeURIComponent(crew.id)}`);}}>
+          <td><button className="people-row-button" aria-label={`${t.open}: ${crew.name}`} onClick={()=>navigate(`people/crew/${encodeURIComponent(crew.id)}`)}><Users size={18}/><bdi>{crew.name}</bdi></button>{!crew.active && <small>{p.archived}</small>}</td><td data-label={t.members}>{crew.member_count}</td><td data-label={t.snapshotAssigned}>{crew.metrics?formatNumber.format(crew.metrics.assigned):'—'}</td><td data-label={t.matches}>{crew.metrics?formatNumber.format(crew.metrics.matches):'—'}</td><td data-label={t.clarifications}>{crew.metrics?formatNumber.format(crew.metrics.clarifications):'—'}</td><td data-label={t.pending}>{crew.metrics?formatNumber.format(crew.metrics.pending):'—'}</td><td><CrewActions leadingAction={<button type="button" className="icon-button crew-add-worker" disabled={!crew.active||loading} aria-label={`${t.addToCrew}: ${crew.name}`} title={crew.active?`${t.addToCrew}: ${crew.name}`:t.restoreToAdd} onClick={event=>{addWorkerTrigger.current=event.currentTarget;setAddingCrew(crew);}}><Plus size={18}/></button>} authority={authority} locale={locale} crew={crew} disabled={loading} onChanged={(success)=>{if(!current())return;setMessage(success);setRevision(n=>n+1);}}/></td>
         </tr>)}</tbody></table></div>:<div className="empty-state"><p>{search.trim()||status!=='all'?t.empty:t.emptyAll}</p>{!search.trim()&&status==='all'&&<button className="button outline" onClick={()=>navigate('people/new-crew')}><Plus size={18}/>{t.create}</button>}</div>)}
         {!loading && !error && data && pages>1 && <div className="crew-pagination"><span>{peoplePageText(locale,page,pages)}</span><div className="actions"><button className="icon-button direction-arrow" aria-label={p.previousCrews} title={p.previousCrews} disabled={page<=1} onClick={()=>{setPage(n=>n-1);}}><ChevronLeft size={18}/></button><button className="icon-button direction-arrow" aria-label={p.nextCrews} title={p.nextCrews} disabled={page>=pages} onClick={()=>{setPage(n=>n+1);}}><ChevronRight size={18}/></button>{page>pages && <button className="button subtle" onClick={()=>setPage(1)}>{p.firstPage}</button>}</div></div>}
       </section>
@@ -68,18 +68,18 @@ export default function SiteCrews({authority,refresh,locale,onLocaleChange,navig
     {loading?<p data-page-loading role="status">{t.loading}</p>:data&&<div className="site-crew-information">
       <section className="panel site-crew-instruction" aria-label={t.publication}>
         <h2>{t.publication}</h2>
-        {publication&&metrics?<div className="site-crew-instruction-summary">
-          <button className="text-link" onClick={()=>navigate(`briefings/${publication.briefingId}`)}><bdi>{publication.title}</bdi></button>
-          <p>{t.replied(formatNumber.format(metrics.responses),formatNumber.format(metrics.assigned))}</p>
-          <details>
-            <summary>{t.responseDetails}</summary>
-            <dl className="site-crew-response-counts">
-              {(['matches','clarifications','pending','unassessed'] as const).map(key=><div key={key}><dt>{t[key]}</dt><dd>{formatNumber.format(metrics[key])}</dd></div>)}
-            </dl>
-            <p>{data.crewSnapshotAvailable?t.frozen:t.unavailable}</p>
-            <p>{t.warning}</p>
-          </details>
-        </div>:<p>{t.noPublication}</p>}
+        {publication&&<button className="text-link" onClick={()=>navigate(`briefings/${publication.briefingId}`)}><bdi>{publication.title}</bdi></button>}
+        <dl className="site-crew-response-counts">
+          {(['assigned','responses','matches','clarifications','pending'] as const).map(key=><div key={key}>
+            <dt>{t[key]}</dt>
+            <dd className={metrics?.[key] && (key==='clarifications'||key==='pending')?'site-crew-count-attention':undefined}>
+              {metrics?formatNumber.format(metrics[key]):'—'}
+            </dd>
+          </div>)}
+        </dl>
+        <p>{!publication?t.noPublication:data.crewSnapshotAvailable?t.frozen:t.unavailable}</p>
+        {!!metrics?.unassessed&&<p>{t.unassessed} · {formatNumber.format(metrics.unassessed)}</p>}
+        {publication&&<details className="site-crew-response-note"><summary>{t.responseInfo}</summary><p>{t.warning}</p></details>}
       </section>
       <section className="panel site-crew-contacts" aria-label={t.siteContacts}>
         <div className="site-crew-contacts-heading"><h2>{t.siteContacts}</h2>
