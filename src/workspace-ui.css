@@ -108,6 +108,35 @@
 }
 .dev-workspace .topbar .staff-search-box input { background: transparent; }
 .dev-workspace .staff-content { max-width: 1400px; padding: 36px 42px 60px; width: 100%; }
+.dev-workspace {
+  --ws-card-border: #71a98a;
+  --ws-card-shadow: 0 4px 14px rgb(23 98 71 / 10%);
+}
+
+.dev-workspace #staff-main :is(
+  .panel, .settings-card, .settings-policy, .onboarding-stage,
+  .organization-sites, .invitation-list,
+  .calendar-month-panel, .calendar-agenda-day,
+  .clarification-instruction-list, .clarification-detail-card,
+  .notifications-inbox,
+  .reports-scope, .reports-filter-panel, .reports-empty,
+  .reports-response-panel, .reports-delivery-panel, .reports-reading-guide
+):not(:where(.settings-policy-content > .panel, .notice)) {
+  border-color: var(--ws-card-border);
+  box-shadow: var(--ws-card-shadow);
+}
+
+@media (max-width: 600px) {
+  .dev-workspace #staff-main .reports-workspace :is(.report-grid, .reports-summary-grid) > .mobile-disclosure {
+    border-color: var(--ws-card-border);
+    box-shadow: var(--ws-card-shadow);
+  }
+
+  .dev-workspace #staff-main .reports-workspace .mobile-disclosure > div > :is(.panel, .reports-delivery-panel) {
+    border-color: var(--ws-border);
+    box-shadow: none;
+  }
+}
 .dev-workspace .staff-main { background: var(--ws-paper); }
 .dev-workspace .page-header { align-items: center; gap: 20px; margin-bottom: 28px; }
 .dev-workspace .page-header h1 {
