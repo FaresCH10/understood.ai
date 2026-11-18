@@ -32,29 +32,36 @@ export function ClarificationsPage({refresh,navigate,authority,language='en',bri
     return()=>{live=false;controller.abort();window.clearTimeout(timer);};
   },[api,page,tick,refresh,briefingId,day,section,allDates]);
   return <div className="simple-clarifications clarification-inbox" lang={language} dir={language==='ar'?'rtl':'ltr'}>
-    <header className={`clarification-page-heading${briefingId?'':' page-header'}`}><div>{briefingId?<h2>{t.title}</h2>:<h1>{t.title}</h1>}<p>{briefingId?staffT('Messages about this instruction.'):copy.intro}</p></div><button className="button outline" title={t.retry} aria-label={t.retry} onClick={()=>setTick(n=>n+1)}><RefreshCw size={17}/>{staffT('Refresh')}</button></header>
-    {!allDates&&!briefingId&&<button className="text-link clarification-all-dates" onClick={()=>navigate('clarifications/inbox')}>{staffT('View requests across all dates')}</button>}
-    {allDates&&<div className="clarification-day-controls"><span>{staffT('All dates')}</span><button className="button outline" onClick={()=>navigate('clarifications')}>{staffT('Browse clarification dates')}</button><button className="text-link" onClick={()=>navigate('overview')}>{staffT('Back to Today')}</button></div>}
-    {!briefingId&&!allDates&&<nav className="clarification-day-controls" aria-label={staffT('Browse clarification dates')}>
+    <header className={`clarification-page-heading${briefingId?'':' page-header'}`}><div>{briefingId?<h2>{t.title}</h2>:<h1>{t.title}</h1>}<p>{briefingId?staffT('Messages about this instruction.'):copy.intro}</p></div><button className="button outline" onClick={()=>setTick(n=>n+1)}><RefreshCw size={17} aria-hidden="true"/>{staffT('Refresh')}</button></header>
+    <div className="clarification-inbox-card">
+    {!briefingId&&<div className="clarification-inbox-filters">
+      <div className="clarification-scope" role="group" aria-label={staffT('Browse clarification dates')}>
+        <button type="button" aria-pressed={!allDates} onClick={()=>{if(allDates)navigate('clarifications');}}>{staffT('By date')}</button>
+        <button type="button" aria-pressed={allDates} onClick={()=>{if(!allDates)navigate('clarifications/inbox');}}>{staffT('All dates')}</button>
+      </div>
+    {allDates&&<button className="text-link" onClick={()=>navigate('overview')}>{staffT('Back to Today')}</button>}
+    {!allDates&&<nav className="clarification-day-controls" aria-label={staffT('Clarification date')}>
       <div className="clarification-date-navigation">
       <button className="icon-button" title={staffT('Previous day')} aria-label={staffT('Previous day')} onClick={()=>selectDay(shiftClarificationDay(day,-1))}><ChevronLeft className="directional-icon" size={19}/></button>
       <label className="clarification-day-field"><span>{staffT('Date')}</span><input type="date" aria-label={staffT('Clarification date')} max={today} value={day} onChange={event=>selectDay(event.target.value)}/></label>
       <button className="icon-button" title={staffT('Next day')} aria-label={staffT('Next day')} disabled={day>=today} onClick={()=>selectDay(shiftClarificationDay(day,1))}><ChevronRight className="directional-icon" size={19}/></button>
       </div>
       <button className="button outline" disabled={day===today} onClick={()=>selectDay(today)}>{staffT('Today')}</button>
-      <span className="clarification-day-timezone">{staffT('Site time')} · {timezone}</span>
+      <span className="clarification-day-timezone">{staffT('Site time')} · <bdi>{timezone}</bdi></span>
     </nav>}
+    </div>}
     <div className="clarification-section-toolbar"><div className="briefing-status-tabs clarification-status-tabs" role="group" aria-label={staffT('Clarification status')}>
       {(['unread','done'] as const).map(value=><button type="button" key={value} aria-pressed={section===value} onClick={()=>{if(section!==value){setSection(value);setPage(1);setData(null);}}}>{staffT(value==='unread'?'Unread':'Done')}{data&&<span>{staffT.number(data[value])}</span>}</button>)}
-    </div><span className="clarification-sort-label">{staffT('Oldest first')}</span></div>
-    {error&&<p className="clarification-feedback" role="alert">{t.error}</p>}{!data&&!error&&<p role="status">{staffT('Loading clarifications...')}</p>}
+    </div>{!!data&&data.total>1&&<span className="clarification-sort-label">{staffT('Oldest first')}</span>}</div>
+    {error&&<p className="clarification-feedback" role="alert">{t.error}</p>}{!data&&!error&&<p className="clarification-list-loading" role="status">{staffT('Loading clarifications...')}</p>}
     {data&&<section className="clarification-instruction-list" aria-label={t.title}>
       {data.rows.map(item=><button type="button" className="clarification-instruction-row" key={item.id} onClick={()=>navigate(`clarifications/${item.id}`)}>
         <span className="clarification-instruction-icon" aria-hidden="true"><FileText size={21}/></span><span className="clarification-instruction-label"><strong>{briefingId?item.worker:item.title}</strong><span className="clarification-instruction-meta">{!briefingId&&<bdi>{item.worker}</bdi>}<time dateTime={item.createdAt} dir="auto">{new Intl.DateTimeFormat(language,{timeZone:timezone,dateStyle:'medium',timeStyle:'short'}).format(new Date(item.createdAt))}</time></span></span><ChevronRight className="directional-icon" size={19} aria-hidden="true"/>
       </button>)}
-      {!data.rows.length&&<div className="clarification-empty"><MessageSquareText size={25} aria-hidden="true"/><div><h2>{staffT(section==='unread'?'No unread clarification requests.':'No completed clarifications.')}</h2><p>{staffT(section==='done'?'Clarifications move here after your explanation is delivered.':allDates||briefingId?'Worker clarification requests will appear here.':'Use the date controls to review another day.')}</p></div></div>}
+      {!data.rows.length&&<div className="clarification-empty"><span className="clarification-empty-icon" aria-hidden="true"><MessageSquareText size={21}/></span><div><h2>{staffT(section==='unread'?'No unread clarification requests.':'No completed clarifications.')}</h2><p>{staffT(section==='done'?'Clarifications move here after your explanation is delivered.':allDates||briefingId?'Worker clarification requests will appear here.':'Use the date controls to review another day.')}</p></div></div>}
     </section>}
     {data&&(page>1||data.total>20)&&<div className="clarification-pagination"><button className="button outline" disabled={page===1} onClick={()=>{setData(null);setPage(n=>n-1);}}>{copy.previous}</button><span>{page}</span><button className="button outline" disabled={page*20>=data.total} onClick={()=>{setData(null);setPage(n=>n+1);}}>{copy.next}</button></div>}
+    </div>
   </div>;
 }
 

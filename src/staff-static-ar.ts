@@ -16,6 +16,7 @@ export const staffStaticArabic={
   "Use the date controls to review another day.": "استخدم أدوات التاريخ لمراجعة يوم آخر.",
   "Workers who have not yet replied to their instructions.": "العمال الذين لم يردوا على تعليماتهم بعد.",
   "All dates": "جميع التواريخ",
+  "By date": "حسب التاريخ",
   "Your instructions, worker replies, and requests needing attention.": "تعليماتك وردود العمال والطلبات التي تحتاج إلى متابعة.",
   "Current workload": "ملخص العمل الحالي",
   "Active instructions": "التعليمات النشطة",

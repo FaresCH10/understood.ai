@@ -133,7 +133,7 @@
   .panel, .settings-card, .settings-policy, .onboarding-stage,
   .organization-sites, .invitation-list,
   .calendar-month-panel, .calendar-agenda-day,
-  .clarification-instruction-list, .clarification-detail-card,
+  .clarification-inbox-card, .clarification-detail-card,
   .notifications-inbox,
   .reports-scope, .reports-filter-panel, .reports-empty,
   .reports-response-panel, .reports-delivery-panel, .reports-reading-guide
@@ -350,4 +350,3 @@
 .usage-technical > summary { cursor: pointer; font-weight: 650; }
 .readiness-evidence th[scope="row"] { text-align: start; }
 .readiness-evidence td details { min-inline-size: 6ch; }
-.clarification-all-dates { margin-block-end: 10px; }

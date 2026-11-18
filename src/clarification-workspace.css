@@ -1,30 +1,50 @@
 .dev-workspace .simple-clarifications.clarification-inbox{max-width:none;margin-inline:0;gap:20px;--ci-ink:var(--ws-ink,#183c32);--ci-muted:#52665a;--line:var(--ws-border,#dce5de);color:var(--ci-ink)}
-.dev-workspace .clarification-inbox>.page-header{margin-bottom:8px}
+.dev-workspace .clarification-inbox>.page-header{margin-bottom:0}
 .dev-workspace .clarification-inbox .clarification-page-heading>.button{flex-shrink:0}
-.dev-workspace .clarification-inbox .clarification-day-controls{gap:10px;align-items:center}
+.clarification-inbox-card{min-width:0;background:#fff;border:1px solid var(--line);border-radius:12px}
+.clarification-inbox-filters{display:flex;align-items:center;flex-wrap:wrap;gap:12px 20px;padding:16px 20px;border-block-end:1px solid var(--line);background:#f7f9f7;border-radius:11px 11px 0 0}
+.clarification-scope{display:inline-flex;gap:3px;padding:3px;background:#fff;border:1px solid var(--line);border-radius:8px}
+.clarification-scope button{padding:6px 12px;min-height:36px;border:0;border-radius:5px;background:transparent;color:var(--ci-muted);font:inherit;font-size:13px;cursor:pointer}
+.clarification-scope button[aria-pressed=true]{background:#e5efe7;color:#1c593a;font-weight:650}
+.dev-workspace .clarification-inbox .clarification-day-controls{flex:1;gap:8px;align-items:center}
 .clarification-date-navigation{display:flex;align-items:center;gap:10px;min-width:0}
 .dev-workspace .clarification-inbox .clarification-day-field{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ci-muted);flex:none}
 .dev-workspace .clarification-inbox .clarification-day-field input{width:auto;min-height:42px;font-size:13px;border-radius:8px;border-color:var(--line)}
 .dev-workspace .clarification-inbox .clarification-date-navigation>.icon-button{align-self:center;border:1px solid var(--line);border-radius:8px;background:#fff;color:#345342;min-width:42px;min-height:42px;flex-shrink:0}
 .dev-workspace .clarification-inbox .clarification-day-controls>.button{align-self:center}
 .dev-workspace .clarification-inbox .clarification-day-timezone{color:var(--ci-muted);font-size:12px}
-.dev-workspace .clarification-inbox .clarification-section-toolbar{border-bottom:1px solid var(--line);gap:16px;align-items:stretch}
+.dev-workspace .clarification-inbox .clarification-section-toolbar{border-block-end:1px solid var(--line);gap:10px;align-items:stretch;padding-inline:20px}
 .dev-workspace .clarification-inbox .clarification-status-tabs{margin:0;border:0;gap:8px;overflow:visible}
 .dev-workspace .clarification-inbox .clarification-status-tabs button{display:inline-flex;align-items:center;gap:9px;min-height:46px;padding:10px 16px;font-size:13px;color:var(--ci-muted);text-decoration:none}
 .dev-workspace .clarification-inbox .clarification-status-tabs button[aria-pressed=true]{font-weight:650;color:#22613f;border-bottom-color:#22613f;background:transparent}
 .dev-workspace .clarification-inbox .clarification-status-tabs button>span{display:inline-flex;justify-content:center;min-width:22px;padding:2px 6px;border-radius:5px;background:#edf3ee;color:#345342;font-size:12px;font-variant-numeric:tabular-nums}
 .dev-workspace .clarification-inbox .clarification-sort-label{align-self:center;font-size:12px;color:var(--ci-muted)}
-.dev-workspace .clarification-inbox .clarification-instruction-list{border-radius:12px;border-color:var(--line);background:#fff}
+.dev-workspace .clarification-inbox .clarification-instruction-list{border:0;border-radius:0 0 11px 11px}
+.clarification-inbox-card .clarification-pagination{padding:12px 20px;border-block-start:1px solid var(--line)}
+.clarification-list-loading,.clarification-inbox-card .clarification-feedback{margin:16px 20px}
 .dev-workspace .clarification-inbox .clarification-instruction-row{min-height:82px;padding:20px 24px;gap:14px}
 .dev-workspace .clarification-inbox .clarification-instruction-icon{width:38px;height:38px;border-radius:8px;background:#edf3ee;color:#38644d}
 .dev-workspace .clarification-inbox .clarification-instruction-label strong{font-size:15px;font-weight:600}
 .dev-workspace .clarification-inbox .clarification-instruction-meta{font-size:13px;color:var(--ci-muted)}
 .dev-workspace .clarification-inbox .clarification-empty{display:flex;justify-content:flex-start;align-items:flex-start;gap:16px;padding:30px 24px;text-align:start;color:var(--ci-muted)}
-.dev-workspace .clarification-inbox .clarification-empty>svg{flex-shrink:0;margin-top:2px}
+.clarification-empty-icon{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:9px;background:#edf3ee;color:#38644d}
 .dev-workspace .clarification-inbox .clarification-empty h2{font-size:16px;line-height:1.5;font-weight:600;margin:0 0 7px;color:var(--ci-ink)}
 .dev-workspace .clarification-inbox .clarification-empty p{font-size:14px;line-height:1.6;margin:0;max-width:65ch}
 .dev-workspace .clarification-inbox button:focus-visible{outline:2px solid #176247;outline-offset:3px}
 .dev-workspace .clarification-inbox button:disabled{opacity:.45;cursor:default}
-@media(hover:hover){.dev-workspace .clarification-inbox .clarification-status-tabs button:hover{color:#176247}.dev-workspace .clarification-inbox .clarification-date-navigation>.icon-button:not(:disabled):hover{background:#edf3ee}}
-@media(max-width:600px){.dev-workspace .clarification-inbox .clarification-date-navigation{flex-basis:100%;gap:8px}.dev-workspace .clarification-inbox .clarification-day-controls>.clarification-day-timezone{flex-basis:auto;margin-inline-start:auto}}
-@media(max-width:600px){.dev-workspace .simple-clarifications.clarification-inbox{gap:16px}.dev-workspace .clarification-inbox .clarification-page-heading{flex-direction:row;align-items:flex-start}.dev-workspace .clarification-inbox>.page-header{margin-bottom:4px}.dev-workspace .clarification-inbox .clarification-day-controls{gap:8px}.dev-workspace .clarification-inbox .clarification-day-field{gap:6px;flex:1;min-width:0}.dev-workspace .clarification-inbox .clarification-day-field input{min-width:0;width:100%}.dev-workspace .clarification-inbox .clarification-day-field>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.dev-workspace .clarification-inbox .clarification-day-timezone{flex-basis:100%;margin-inline-start:0}.dev-workspace .clarification-inbox .clarification-instruction-row{padding:18px 16px;gap:12px}.dev-workspace .clarification-inbox .clarification-empty{padding:24px 18px;gap:12px}.dev-workspace .clarification-inbox .clarification-status-tabs button{padding-inline:12px}.dev-workspace .clarification-inbox .clarification-section-toolbar{gap:10px}}
+@media(hover:hover){.dev-workspace .clarification-inbox .clarification-status-tabs button:hover{color:#176247}.clarification-scope button:not([aria-pressed=true]):hover,.dev-workspace .clarification-inbox .clarification-date-navigation>.icon-button:not(:disabled):hover{background:#edf3ee}}
+@media(max-width:700px){
+  .dev-workspace .simple-clarifications.clarification-inbox{gap:16px}
+  .dev-workspace .clarification-inbox .clarification-page-heading{flex-direction:row;align-items:flex-start}
+  .clarification-inbox-filters{padding:12px 14px}
+  .dev-workspace .clarification-inbox .clarification-day-controls{flex-basis:100%}
+  .dev-workspace .clarification-inbox .clarification-date-navigation{gap:6px}
+  .dev-workspace .clarification-inbox .clarification-day-field{gap:0}
+  .dev-workspace .clarification-inbox .clarification-day-field input{padding-inline:6px}
+  .dev-workspace .clarification-inbox .clarification-day-field>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .dev-workspace .clarification-inbox .clarification-day-timezone{margin-inline-start:0}
+  .dev-workspace .clarification-inbox .clarification-instruction-row{padding:16px 14px;gap:12px}
+  .dev-workspace .clarification-inbox .clarification-empty{padding:20px 14px;gap:12px}
+  .dev-workspace .clarification-inbox .clarification-status-tabs button{padding-inline:12px}
+  .dev-workspace .clarification-inbox .clarification-section-toolbar{padding-inline:14px}
+}
