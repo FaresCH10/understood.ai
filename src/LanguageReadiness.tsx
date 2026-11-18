@@ -2,13 +2,12 @@ import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useState} from 'react';
 import {ArrowLeft,CheckCircle2,Globe,RefreshCw,TriangleAlert} from 'lucide-react';
 import {ProviderStages,type PipelineStatus} from './ProviderStages';
-import {ProviderStageTests,type StageTest} from './ProviderStageTests';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {completeStaffRequest} from './staff-request';
 
 type Check={state:string;evidence:string};
 type Language={code:string;name:string;direction:'ltr'|'rtl';generationDefault:boolean;ui:Check;content:Check;translation:Check;speech:Check};
-type Readiness={generatedAt:string;mode:string;dataClass:string;realDataAllowed:boolean;pipeline:PipelineStatus;stageTests:StageTest[];provider:{adapter:string;connection:Check;evidence:string};publication:{id:string;version:number;state:string}|null;languages:Language[];tests:{connection:Check;translation:Check;speech:Check}};
+type Readiness={generatedAt:string;mode:string;dataClass:string;realDataAllowed:boolean;pipeline:PipelineStatus;provider:{adapter:string;connection:Check;evidence:string};publication:{id:string;version:number;state:string}|null;languages:Language[];tests:{connection:Check;translation:Check;speech:Check}};
 
 function stateLabel(value:string){return value.replaceAll('_',' ');}
 function State({value}:{value:Check}){const staffT=useStaffStaticText();const good=value.state==='ready',bad=value.state==='failed' || value.state==='unavailable';return <span className={`readiness-state readiness-state-${good?'ready':bad?'failed':'pending'}`}><span aria-hidden="true">{good?<CheckCircle2 size={16}/>:<TriangleAlert size={16}/>}</span>{staffT.state(value.state)}</span>;}
@@ -28,7 +27,6 @@ export function LanguageReadiness({refresh=0,authority,navigate}:{refresh?:numbe
       {message && <p role="status">{staffT.message(message)}</p>}{error && <p role="alert" className="record-error">{staffT.error(error)}</p>}
       <div className="readiness-grid">{data.languages.map(language=><section className="panel readiness-card" key={language.code}><div className="readiness-card-heading"><div><h2>{staffT.language(language.code)}</h2><span>{language.code.toUpperCase()} · {(language.direction==='rtl'?staffT("RTL"):staffT("LTR"))}</span></div></div><dl><div><dt>{staffT("Generation default")}</dt><dd>{(language.generationDefault?staffT("Selected"):staffT("Not selected"))}</dd></div><div><dt>{staffT("Worker UI")}</dt><dd><State value={language.ui}/></dd></div><div><dt>{staffT("Stored content")}</dt><dd><State value={language.content}/></dd></div><div><dt>{staffT("Translation")}</dt><dd><State value={language.translation}/></dd></div><div><dt>{staffT("Speech")}</dt><dd><State value={language.speech}/></dd></div></dl><p className="muted">{staffT(language.content.evidence)}</p></section>)}</div>
       <section className="readiness-stages"><h2>{staffT("Provider stages")}</h2><ProviderStages pipeline={data.pipeline}/></section>
-      <section className="readiness-stages"><h2>{staffT("Fixed synthetic stage tests")}</h2><ProviderStageTests tests={data.stageTests}/><p className="muted">{staffT("Technical results apply only to the current server test configuration and fixed fixtures. They do not certify language accuracy, speech quality or production readiness.")}</p></section>
       <section className="panel readiness-evidence"><h2>{staffT("Production evaluation")}</h2><dl><div><dt>{staffT("Full provider pipeline")}</dt><dd><State value={data.tests.connection}/><span>{staffT(data.tests.connection.evidence)}</span></dd></div><div><dt>{staffT("Translation accuracy")}</dt><dd><State value={data.tests.translation}/><span>{staffT(data.tests.translation.evidence)}</span></dd></div><div><dt>{staffT("Speech quality")}</dt><dd><State value={data.tests.speech}/><span>{staffT(data.tests.speech.evidence)}</span></dd></div></dl><p className="muted">{staffT("Last inspected")} {staffT.date(data.generatedAt)}{staffT(". Configuration and stored content do not verify provider connection, language accuracy or permission to send real worker data.")}</p></section>
     </>)}
   </>;
