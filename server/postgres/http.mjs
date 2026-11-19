@@ -1,4 +1,5 @@
 import {instructionReadiness} from '../instruction-readiness.mjs';
+import {handleSubscriptionWebhook,handleSubscriptionRoute} from '../subscription-http.mjs';
 import {processOneAssessment} from './assessment-worker.mjs';
 import {syntheticAssessmentAdapter} from './synthetic-assessment.mjs';
 import {processOneExport} from './exports.mjs';
@@ -314,6 +315,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         return send(res,200,{status:'ok',mode:`${config.aiMode}-credential`,backend});
       }
       if(!path.startsWith('/api/') && publicBuild)return publicBuild(req,res,url);
+      if(await handleSubscriptionWebhook(pool,req,res,url,repository))return;
       if (req.method!=='GET') verifyMutationOrigin(req,config);
       if(await handleOperationsRoute(pool,req,res,url,{schema,enabled:options.operatorAccess===true,providerVerification:options.providerVerification,pipeline,secure,clientAddress:address}))return;
       if(await handlePilotRoute(req,res,url,{save:(input)=>savePilot(pool,input,address,{...repository,mail,destination,send:options.sendPilot}),read:(id,secret)=>readPilot(pool,id,secret,repository)}))return;
@@ -402,6 +404,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         throw error;
       }
       verifyClientSession(req,session,path);
+      if(await handleSubscriptionRoute(pool,req,res,url,session,repository))return;
       if(session.principal_type==='staff' && path!=='/api/session' && isPendingWorkspacePlan(session.workspace_plan))
         return send(res,403,{error:'Workspace access is pending'});
       if(!archivedWriteAllowed(path,req.method))await domainTransaction(pool,repository.schema,client=>requireSiteOperational(client,session.org_id,session.site_id));

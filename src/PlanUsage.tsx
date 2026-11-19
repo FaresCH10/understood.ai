@@ -1,9 +1,9 @@
+import {SubscriptionPanel} from './SubscriptionPanel';
 import {PLAN_NAMES} from '../server/pilot-policy.mjs';
 import {useStaffText as useStaffStaticText} from './staff-language';
 import {useEffect,useState} from 'react';
 import {CircleDollarSign,Clock3,RefreshCw,TriangleAlert,Users} from 'lucide-react';
 import UsageRequests from './UsageRequests';
-import ActivationRequestPanel from './ActivationRequestPanel';
 import {useStaffRequest,type StaffRequestAuthority} from './useStaffRequest';
 import {completeStaffRequest} from './staff-request';
 import {checkedUsageModel,type UsageEntitlement} from './usage-state';
@@ -69,7 +69,8 @@ export function PlanUsage({refresh=0,authority}:{refresh?:number;authority:Staff
           ['Clarifications resolved',data.pilotActivity.resolved],
         ] as const).map(([label,count])=><div key={label}><dt>{staffT(label)}</dt><dd>{staffT.number(count)}</dd></div>)}</dl>
       </section>}
-      <ActivationRequestPanel authority={authority} entitlement={data.entitlement} onChanged={()=>setTick(value=>value+1)}/>
+      {authority.session.staffRole==='owner'&&<SubscriptionPanel clientContext={authority.session.clientContext!} initialPlan={data.entitlement.plan??'starter'}/>}
+
       <div className="usage-grid">
         <section className="panel"><h2>{staffT("Instruction activity")}</h2><p className="muted">{staffT(data.period.label)}</p><p className="muted">{staffT(data.denominator)}</p>{data.units.map(unit=><div className="usage-unit" key={unit.key}><div><strong>{staffT(unit.label)}</strong><span>{staffT.number(unit.used)} / {staffT.number(unit.limit)}</span></div><div className="usage-track" role="progressbar" aria-label={staffT(unit.label)} aria-valuenow={unit.used} aria-valuemin={0} aria-valuemax={Math.max(1,unit.used,unit.limit)}><span style={{width:`${unit.percent}%`}}/></div></div>)}</section>
         <details className="panel usage-technical"><summary>{staffT("Spend & controls")}</summary><div className="usage-fact"><CircleDollarSign size={22}/><div><strong>{staffT("Estimated provider cost")}</strong><span>{staffT("Unknown")}</span><small>{staffT(data.spend.estimated.evidence)}</small></div></div><div className="usage-fact"><Clock3 size={22}/><div><strong>{staffT("Actual invoice cost")}</strong><span>{staffT("Unknown")}</span><small>{staffT(data.spend.actual.evidence)}</small></div></div>{data.providerAllowance?<div className="usage-fact"><TriangleAlert size={22}/><div><strong>{staffT("Organization request allowance")}</strong><span className={`status status-${data.providerAllowance.state==='available'?'green':'amber'}`}>{staffT.state(data.providerAllowance.state)}</span><span>{staffT.number(data.providerAllowance.reserved)} / {staffT.number(data.providerAllowance.limit)} {staffT("slots reserved")}</span><small>{staffT.number(data.providerAllowance.remaining)} {staffT("unreserved organization slots ·")} {data.providerAllowance.day} UTC</small><small>{staffT("Reset")} {staffT.date(data.providerAllowance.resetsAt,'UTC')} UTC</small><small>{Object.entries(data.providerAllowance.requests).map(([state,count])=>`${staffT.number(count)} ${staffT.state(state)}`).join(' · ')}</small><small>{staffT("All jobs:")} {(data.providerAllowance.jobsPaused?staffT("paused"):staffT("not paused"))} {staffT("· Provider jobs:")} {(data.providerAllowance.providerPaused?staffT("paused"):staffT("not paused"))}</small><small>{staffT("Reservations are not invoices. Provider readiness is not verified by quota availability.")}</small></div></div>:<div className="usage-fact"><TriangleAlert size={22}/><div><strong>{staffT("Quota and pause controls")}</strong><span>{staffT("Not configured")}</span><small>{staffT(data.controls.quota.evidence)} {staffT(data.controls.pause.evidence)}</small></div></div>}</details>

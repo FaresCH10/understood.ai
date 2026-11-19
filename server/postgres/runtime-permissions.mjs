@@ -27,7 +27,7 @@ platform_operators operator_sessions operator_auth_attempts tenant_controls syst
 provider_requests provider_verifications provider_verification_authorities provider_verification_jobs provider_verification_workers storage_probes workspace_bootstraps site_creations site_access_controls site_access_requests site_lifecycle
 site_lifecycle_requests case_routing case_messages case_followups case_followup_audio case_repeats case_reviews case_voice clarification_action_receipts clarification_creations preparation_authorities
 instruction_compositions instruction_attachments assignment_completions instruction_sends instruction_deliveries instruction_retries acknowledgments assignment_evidence instruction_improvements instruction_improvement_drafts worker_language_requests worker_credentials worker_setup_tokens
-organization_entitlements organization_entitlement_transitions organization_activation_requests organization_worker_ids
+organization_entitlements organization_entitlement_transitions organization_activation_requests organization_worker_ids subscription_checkouts subscription_payment_events subscription_allowance_grants
 presentation_artifacts answer_presentation_bindings presentation_translation_jobs clarification_exchanges
 generated_bundle_operations text_retention_policies text_retention_requests text_retention_purges restore_privacy_retirements case_retention_policies
 case_retention_requests case_content_purges generated_retention_policies generated_retention_requests generated_audio_retirements generated_audio_removals
@@ -42,12 +42,12 @@ provider_policies provider_verifications provider_verification_authorities syste
 usage_change_requests site_creations site_access_requests site_lifecycle_requests onboarding_requests
 template_requests glossary_requests staff_access_requests staff_invitation_requests recording_notice_requests
 retention_requests text_retention_requests case_retention_requests generated_retention_requests activity_retention_requests briefing_retention_requests`.split(/\s+/));
-const workerHidden=new Set(['invoices','invoice_payments','invoice_voids','platform_operators','operator_sessions','operator_auth_attempts','operator_requests','provider_verifications','operator_audit','clarification_action_receipts','clarification_creations','worker_credentials','worker_setup_tokens','organization_entitlement_transitions','organization_activation_requests','template_favorites','translation_feedback']);
+const workerHidden=new Set(['subscription_checkouts','subscription_payment_events','subscription_allowance_grants','invoices','invoice_payments','invoice_voids','platform_operators','operator_sessions','operator_auth_attempts','operator_requests','provider_verifications','operator_audit','clarification_action_receipts','clarification_creations','worker_credentials','worker_setup_tokens','organization_entitlement_transitions','organization_activation_requests','template_favorites','translation_feedback']);
 const applicationHidden=new Set(['platform_operators','operator_sessions','operator_auth_attempts','operator_audit','provider_verification_authorities','provider_verification_jobs','provider_verification_workers']);
-const applicationReadOnly=new Set(['operator_requests','provider_verifications','tenant_controls','system_controls','provider_policies',
+const applicationReadOnly=new Set(['subscription_payment_events','subscription_allowance_grants','operator_requests','provider_verifications','tenant_controls','system_controls','provider_policies',
   'organization_entitlements','organization_entitlement_transitions','worker_competencies']);
 // Append-only evidence: both runtimes may create rows, but only schema triggers may reject or retain them.
-const applicationInsertOnly=new Set(['organization_entitlements','organization_entitlement_transitions']);
+const applicationInsertOnly=new Set(['subscription_payment_events','subscription_allowance_grants','organization_entitlements','organization_entitlement_transitions']);
 const workerInsertOnly=new Set(['instruction_improvements','assignment_completions']);
 export function runtimeProfile(value='application'){
   if(!['application','worker','operator'].includes(value))throw Error('Invalid runtime permission profile');return value;

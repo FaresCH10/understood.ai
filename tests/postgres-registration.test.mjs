@@ -148,7 +148,7 @@ test('Vercel Neon registration dispatches before responding and survives handler
   }finally{if(server?.listening)await new Promise(resolve=>server.close(resolve));await f.db.close();}
 });
 
-test('PostgreSQL registration verifies exactly one owner workspace with a pending pilot approval',async()=>{
+test('PostgreSQL registration verifies exactly one owner workspace with a pending paid subscription',async()=>{
   const f=await fixture();try{
     const input=value();
     assert.deepEqual(await f.request(input),{accepted:true,delivery:'queued'});
@@ -183,7 +183,7 @@ test('PostgreSQL registration verifies exactly one owner workspace with a pendin
     assert.deepEqual(await f.q('SELECT site_id,org_id,revision,primary_contact_id FROM site_settings'),
       [{site_id:site.id,org_id:organization.id,revision:0,primary_contact_id:owner.id}]);
     const [entitlement]=await f.q('SELECT * FROM organization_entitlements');
-    assert.equal(entitlement.state,'read_only');assert.equal(entitlement.worker_limit,25);assert.equal(entitlement.plan,'pilot_pending');
+    assert.equal(entitlement.state,'read_only');assert.equal(entitlement.worker_limit,1);assert.equal(entitlement.plan,'starter_pending');
     assert.equal(entitlement.revision,1);assert.equal(entitlement.updated_by,'registration');
     assert.equal(entitlement.ends_at,null);
     assert.deepEqual(await f.q('SELECT actor_type,actor_id,request_id,state,revision FROM organization_entitlement_transitions'),
@@ -275,7 +275,7 @@ test('PostgreSQL approved pilot permits 25 active workers across the company and
     const [owner]=await f.q('SELECT id,org_id,site_id,role FROM staff');
     const session={principal_type:'staff',principal_id:owner.id,org_id:owner.org_id,site_id:owner.site_id,role:'owner',access_mode:'credential'};
     await assert.rejects(createWorker(f.pool,session,{code:'BEFORE',language:'en'},options),/read-only/);
-    await f.q("UPDATE organization_entitlements SET state='trial',plan='pilot',ends_at=clock_timestamp()+interval '30 days',revision=revision+1");
+    await f.q("UPDATE organization_entitlements SET state='trial',plan='pilot',worker_limit=25,ends_at=clock_timestamp()+interval '30 days',revision=revision+1");
     for(let i=1;i<=25;i++)await createWorker(f.pool,session,{code:`CAP-${String(i).padStart(3,'0')}`,language:'en'},options);
     assert.equal((await f.q('SELECT count(*)::int n FROM workers'))[0].n,25);
     await assert.rejects(createWorker(f.pool,session,{code:'CAP-026',language:'en'},options),/Worker capacity reached/);

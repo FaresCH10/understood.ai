@@ -324,7 +324,7 @@ export async function processOneRegistration(db,config,{send=sendRegistrationVer
       token={token_hash:tokenHash(secret)};
       db.prepare('INSERT INTO registration_tokens(token_hash,registration_id,mail_id,expires_at) VALUES(?,?,?,?)')
         .run(token.token_hash,row.registration_id,row.id,row.expires_at);
-      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirm your email to finish creating your Understood account. Workspace access starts after your pilot is approved or your plan is activated. If you did not create this account, ignore this email.`;
+      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirm your email to finish creating your Understood account. Sign in after verification to complete your subscription. If you did not create this account, ignore this email.`;
       message={email:message.email,subject:'Verify your Understood account',text};
       db.prepare('UPDATE registration_mail SET payload=? WHERE id=?').run(sealMail(config,row.id,message),row.id);
     }

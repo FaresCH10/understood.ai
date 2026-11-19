@@ -15,8 +15,8 @@ const copy={
     languageNote:'Interface languages',languageDetail:'Instruction text and speech are prepared separately. Availability depends on your configured services and the versions ready for each instruction.',
     companies:'Your people. Connected.',companiesBody:'Bring workers, crews and supervisors together around the work that needs doing.',
     companyPoints:[{title:'Give everyone access',body:'Assign worker IDs and passwords. Workers do not need a company email.'},{title:'Reach the right crew',body:'Send to everyone, selected crews, or individual workers.'},{title:'Keep the context together',body:'Return to the instruction, responses and clarification when a worker needs help.'}],
-    industries:'For everyday work in',plans:'Start with one team.',plansBody:'Try the workflow with a small team, or discuss a pilot for your company.',
-    trial:'Try Understood',pilot:'Plan a company pilot',pilotBody:'Tell us about your sites, team and languages. Start with one useful instruction.',
+    industries:'For everyday work in',plans:'Start with one team.',plansBody:'Choose the monthly plan that fits your team.',
+    trial:'Try Understood',pilot:'Choose a company plan',pilotBody:'Tell us about your sites, team and languages. Start with one useful instruction.',
     faq:'Before you start',trialNote:'No card. No automatic charge.'},
   ar:{workflow:'جرّبها بنفسك.',workflowBody:'تعليمات واضحة. سؤال مرتبط بها. وإجابة يمكنك متابعتها.',
     languages:'فريقك. بلغاتهم.',languagesBody:'واجهة مألوفة للعامل، وتعليمات مُعدّة باللغات التي يستخدمها فريقك.',
@@ -24,7 +24,7 @@ const copy={
     companies:'أفراد فريقك. على تواصل.',companiesBody:'اجمع العمال والفرق والمشرفين حول العمل المطلوب إنجازه.',
     companyPoints:[{title:'دخول لكل عامل',body:'عيّن أرقام العمال وكلمات المرور. لا يحتاج العامل إلى بريد إلكتروني للشركة.'},{title:'أرسل للفريق المعني',body:'أرسل للجميع، أو لفرق محددة، أو لعمال تختارهم.'},{title:'كل التفاصيل في مكان واحد',body:'ارجع إلى التعليمات والإجابات والتوضيحات عندما يحتاج العامل إلى المساعدة.'}],
     industries:'للمهام اليومية في',plans:'ابدأ بفريق واحد.',plansBody:'جرّب سير العمل مع فريق صغير، أو ناقش تجربة مخصصة لشركتك.',
-    trial:'جرّب Understood',pilot:'خطّط لتجربة لشركتك',pilotBody:'أخبرنا عن مواقعك وفريقك ولغاتهم. ابدأ بتعليمات واحدة مفيدة.',
+    trial:'جرّب Understood',pilot:'اختر خطة لشركتك',pilotBody:'أخبرنا عن مواقعك وفريقك ولغاتهم. ابدأ بتعليمات واحدة مفيدة.',
     faq:'قبل أن تبدأ',trialNote:'دون بطاقة دفع أو رسوم تلقائية.'},
 };
 

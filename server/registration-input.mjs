@@ -36,8 +36,8 @@ export function registrationRequestInput(input,remoteAddress) {
   }
   if(input.acceptTerms!==true || input.acceptPrivacy!==true) throw invalid();
   let email;try {email=credentialInput(input.email,input.password);}catch {throw invalid();}
-  const plan=input.plan===undefined?'pilot':input.plan;
-  if(plan!=='pilot'&&!isPaidPlan(plan))throw invalid();
+  const plan=input.plan===undefined?'starter':input.plan;
+  if(!isPaidPlan(plan))throw invalid();
   return {requestId:input.requestId,ownerName,companyName,country,phone,email,password:input.password,plan};
 }
 export function registrationResendInput(input,remoteAddress) {

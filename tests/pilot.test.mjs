@@ -46,7 +46,7 @@ for(const backend of ['sqlite','postgres'])test(`${backend}: pilot persistence, 
   }finally{await db.close();}
 });
 
-test('the Vercel pilot route works without a socket and sends each Gmail notification at most once',async()=>{
+test('the Vercel pilot route rejects new pilot inquiries without sending mail',async()=>{
   const db=new PGlite();
   const pool={async connect(){return {query:async(sql,values)=>values?.length?db.query(sql,values):(await db.exec(sql)).at(-1)??{rows:[]},release(){}};}};
   const host='app.understood.co';
@@ -65,52 +65,13 @@ test('the Vercel pilot route works without a socket and sends each Gmail notific
       return {status,body};
     }
     const value=input(),saved=await invoke(handler,submit(value));
-    assert.equal(saved.status,202);
-    assert.equal(saved.body.delivery,'saved');
-    assert.deepEqual(await invoke(handler,read(value)),{status:200,body:saved.body});
-
-    const recipient='recipient@example.test';
-    const gmailEnv={...env,UNDERSTOOD_PILOT_TO:recipient,UNDERSTOOD_PILOT_GMAIL_USER:'sender@gmail.com',UNDERSTOOD_PILOT_GMAIL_APP_PASSWORD:'aaaa bbbb cccc dddd'};
-    const started=Promise.withResolvers(),accept=Promise.withResolvers();
-    const messages=[];
-    const {handler:withGmail}=await createVercelNeonHandler({env:gmailEnv,pool,createPilotTransport(options){
-      assert.equal(options.host,'smtp.gmail.com');assert.equal(options.secure,true);
-      assert.deepEqual(options.auth,{user:'sender@gmail.com',pass:'aaaabbbbccccdddd'});
-      return {async sendMail(message){
-        messages.push(message);
-        if(messages.length===1){started.resolve();await accept.promise;}
-        if(messages.length>1)throw Object.assign(Error('Synthetic SMTP failure'),{code:'EAUTH'});
-        return {accepted:[recipient],messageId:message.messageId};
-      }};
-    }});
-    assert.deepEqual(await invoke(withGmail,submit(value)),saved);
-    assert.equal(messages.length,0);
-    const current=input();
-    const inFlight=invoke(withGmail,submit(current));
-    await Promise.race([started.promise,inFlight]);
-    try {
-      assert.equal((await invoke(withGmail,submit(current))).body.delivery,'processing');
-      assert.equal((await invoke(withGmail,read(current))).body.delivery,'processing');
-    } finally {accept.resolve();}
-    const result=await inFlight;
-    assert.equal(result.status,202);
-    assert.equal(result.body.delivery,'sent');
-    assert.deepEqual(await invoke(withGmail,submit(current)),result);
-    assert.equal(messages.length,1);
-    assert.deepEqual(messages[0].to,{address:recipient});
-    assert.match(messages[0].text,/Synthetic pilot inquiry/);
-    assert.equal(messages[0].subject,'New Understood pilot request');
-
-    const failing={...input(),email:'failing@example.test'};
-    const failure=await invoke(withGmail,submit(failing,'203.0.113.11'));
-    assert.equal(failure.status,202);
-    assert.equal(failure.body.delivery,'failed');
-    assert.deepEqual(await invoke(withGmail,submit(failing,'203.0.113.11')),failure);
-    assert.equal(messages.length,2);
+    assert.equal(saved.status,410);
+    assert.match(saved.body.error,/Choose a subscription plan/);
+    assert.equal((await db.query('SELECT count(*)::int n FROM pilot_inquiries')).rows[0].n,0);
   } finally {await db.close();}
 });
 
-test('pilot input is strict; public HTTP stores without a session and never claims disabled delivery',async()=>{
+test('pilot input is strict; public HTTP retires pilot creation and preserves existing receipts',async()=>{
   const value=input();
   for(const change of [{consent:false},{teamSize:0},{teamSize:2.5},{languages:['xyz']},{languages:['en','en']},{languages:[...WORKER_LANGUAGE_CODES,'en']},{email:'x\r\n@example.test'},{company:'x\u0000'},{extra:true},{receiptToken:'abc'}])assert.throws(()=>pilotInput({...value,...change}),/Invalid/);
   assert.deepEqual(pilotInput({...value,languages:['hi','en']}).content.languages,['en','hi']);
@@ -120,7 +81,8 @@ test('pilot input is strict; public HTTP stores without a session and never clai
   await new Promise(done=>server.listen(0,'127.0.0.1',done));const origin=`http://127.0.0.1:${server.address().port}`;
   try {
     const response=await fetch(`${origin}/api/public/pilot`,{method:'POST',headers:{origin:'http://127.0.0.1:3020','content-type':'application/json'},body:JSON.stringify(value)});
-    assert.equal(response.status,202);assert.equal((await response.json()).delivery,'saved');
+    assert.equal(response.status,410);assert.match((await response.json()).error,/subscription plan/);
+    await sqlite.savePilot(db,value,'127.0.0.1',{});
     const receipt=await fetch(`${origin}/api/public/pilot/${value.requestId}`,{headers:{'x-pilot-receipt':value.receiptToken}});assert.equal(receipt.status,200);assert.equal((await receipt.json()).found,true);
     const forged=await fetch(`${origin}/api/public/pilot`,{method:'POST',headers:{origin:'https://untrusted.example','content-type':'application/json'},body:JSON.stringify(input())});assert.equal(forged.status,403);
   }finally{await new Promise(done=>server.close(done));db.close();}

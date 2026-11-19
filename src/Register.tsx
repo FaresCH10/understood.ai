@@ -1,6 +1,7 @@
+import {SUBSCRIPTION_PLANS,formatSubscriptionPrice} from '../server/subscription-plans.mjs';
 import {useEffect,useMemo,useRef,useState,type FormEvent} from 'react';
 import {ArrowLeft,ArrowRight,Check,CheckCircle2,Clock3,LoaderCircle,LogIn,Mail,RefreshCw,ShieldCheck} from 'lucide-react';
-import {isPaidPlan,PAID_PLANS,PLAN_NAMES,PILOT_DAYS} from '../server/pilot-policy.mjs';
+import {isPaidPlan,PAID_PLANS,PLAN_NAMES} from '../server/pilot-policy.mjs';
 import {countryOptions} from './country-options';
 import {AuthLanguagePicker} from './AuthLanguagePicker';
 import {staffSignInLanguages,staffSignInText} from './staff-signin-text';
@@ -9,7 +10,7 @@ import {checkRegistrationEmail} from './registration';
 
 export type RegistrationLanguage='en'|'ar';
 type AccountBody=Parameters<typeof requestAccount>[0];
-type RegistrationPlan=keyof typeof PLAN_NAMES;
+type RegistrationPlan=typeof PAID_PLANS[number];
 
 const en={
   emailChecking:'Checking email availability…',emailAvailable:'This email is available.',emailTaken:'This email is already registered or has a signup awaiting verification. Sign in or use another email.',emailCheckFailed:'Email availability could not be checked. Try again before continuing.',emailLimited:'Too many signup checks. Wait a few minutes and try again.',
@@ -27,15 +28,15 @@ const en={
   submit:'Create company account',submitting:'Preparing account...',signIn:'Already have an account? Sign in',back:'Back to Understood',languageNote:'Choose the language for this signup screen.',
   deliveryNote:'We’ll send a verification email to finish setting up your account.',
   signedInTitle:'You are already signed in',signedInBody:'Registration creates a separate workspace. Sign out first if you need another account.',continue:'Continue to my workspace',
-  unavailableEnvironment:'Online account creation is unavailable',unavailableEnvironmentBody:'This environment does not accept online registrations. Use an existing account, or open the public site for a pilot inquiry.',
+  unavailableEnvironment:'Online account creation is unavailable',unavailableEnvironmentBody:'This environment does not accept online registrations. Use an existing account, or open the public site to view subscription plans.',
   sentTitle:'Check your email',sentBody:'A verification email has been requested for',sentPrivacy:'Use the latest verification email to finish creating your account.',
   sentNote:'The verification link expires in 24 hours.',resend:'Resend verification email',resending:'Sending...',
   resent:'If this registration is still waiting for verification, a new link has been sent. Earlier links may stop working.',
   unconfirmed:'The result could not be confirmed. Retry the same registration before starting over.',retry:'Retry the same registration',
   startOver:'Start a different registration',dismiss:'Dismiss',passwordMismatch:'The passwords do not match.',storage:'This browser could not keep a registration receipt. Keep this tab open until the result is confirmed.',
-  verifyTitle:'Verify your work email',verifyLead:'Confirm your email to prepare your workspace. Pilot access remains read-only until approval.',verify:'Verify work email',verifying:'Verifying...',
+  verifyTitle:'Verify your work email',verifyLead:'Confirm your email to prepare your workspace. Subscribe after verification to activate workspace access.',verify:'Verify work email',verifying:'Verifying...',
   verifiedTitle:'Email verified',verifiedLead:'Sign in with your password to check your workspace access.',verifiedDuplicate:'This link was already used. Sign in to open your workspace.',
-  verifiedTrial:'Workspace access opens once your pilot is approved or your paid plan is activated.',openSignIn:'Sign in to continue',
+  verifiedTrial:'Sign in to complete your subscription.',openSignIn:'Sign in to continue',
   unavailableTitle:'This link is unavailable',unavailableBody:'It may have expired, been replaced, or already been used. Sign in if your account is active, or request a new link from the registration page.',newLink:'Request a new link',
   uncertainTitle:'Verification not confirmed',uncertainBody:'The result could not be confirmed. Retry this same link before signing in.',retryVerify:'Retry verification',signInShort:'Sign in',
 };
@@ -55,15 +56,15 @@ const ar={
   submit:'إنشاء حساب الشركة',submitting:'جارٍ تجهيز الحساب...',signIn:'لديك حساب بالفعل؟ سجّل الدخول',back:'العودة إلى Understood',languageNote:'اختر لغة شاشة التسجيل.',
   deliveryNote:'سنرسل رسالة تحقق لإكمال إعداد حسابك.',
   signedInTitle:'أنت مسجّل الدخول بالفعل',signedInBody:'ينشئ التسجيل مساحة عمل منفصلة. سجّل الخروج أولاً إذا كنت تحتاج إلى حساب آخر.',continue:'المتابعة إلى مساحة عملي',
-  unavailableEnvironment:'التسجيل عبر الإنترنت غير متاح',unavailableEnvironmentBody:'لا تقبل هذه البيئة التسجيلات عبر الإنترنت. استخدم حساباً موجوداً، أو افتح الموقع العام لتقديم طلب تجريبي.',
+  unavailableEnvironment:'التسجيل عبر الإنترنت غير متاح',unavailableEnvironmentBody:'لا تقبل هذه البيئة التسجيلات عبر الإنترنت. استخدم حساباً موجوداً، أو افتح الموقع العام لاستعراض خطط الاشتراك.',
   sentTitle:'تحقق من بريدك',sentBody:'طُلب إرسال رسالة تحقق إلى',sentPrivacy:'استخدم أحدث رسالة تحقق لإكمال إنشاء حسابك.',
   sentNote:'تنتهي صلاحية رابط التحقق خلال 24 ساعة.',resend:'إعادة إرسال رسالة التحقق',resending:'جارٍ الإرسال...',
   resent:'إذا كان هذا التسجيل ما زال بانتظار التحقق، فقد أُرسل رابط جديد. قد تتوقف الروابط السابقة عن العمل.',
   unconfirmed:'تعذّر تأكيد النتيجة. أعد محاولة التسجيل نفسه قبل البدء من جديد.',retry:'إعادة محاولة التسجيل نفسه',
   startOver:'بدء تسجيل مختلف',dismiss:'إغلاق',passwordMismatch:'كلمتا المرور غير متطابقتين.',storage:'تعذّر على هذا المتصفح حفظ إيصال التسجيل. أبقِ هذه النافذة مفتوحة حتى تأكيد النتيجة.',
-  verifyTitle:'تحقق من بريد العمل',verifyLead:'تحقق من البريد لتجهيز مساحة العمل. تبقى صلاحيات البرنامج للقراءة فقط حتى الموافقة.',verify:'تحقق من بريد العمل',verifying:'جارٍ التحقق...',
+  verifyTitle:'تحقق من بريد العمل',verifyLead:'تحقق من البريد لتجهيز مساحة العمل. أكمل الاشتراك بعد التحقق لتفعيل مساحة العمل.',verify:'تحقق من بريد العمل',verifying:'جارٍ التحقق...',
   verifiedTitle:'تم التحقق من البريد',verifiedLead:'سجّل الدخول بكلمة المرور لمراجعة الوصول إلى مساحة العمل.',verifiedDuplicate:'استُخدم هذا الرابط سابقاً. سجّل الدخول لفتح مساحة عملك.',
-  verifiedTrial:'يتاح الوصول عند الموافقة على البرنامج التجريبي أو تفعيل خطتك المدفوعة.',openSignIn:'سجّل الدخول للمتابعة',
+  verifiedTrial:'سجّل الدخول لإكمال الاشتراك.',openSignIn:'سجّل الدخول للمتابعة',
   unavailableTitle:'هذا الرابط غير متاح',unavailableBody:'قد يكون منتهي الصلاحية أو مستبدلاً أو مستخدماً سابقاً. سجّل الدخول إذا كان حسابك نشطاً، أو اطلب رابطاً جديداً من صفحة التسجيل.',newLink:'طلب رابط جديد',
   uncertainTitle:'لم يتم تأكيد التحقق',uncertainBody:'تعذّر تأكيد النتيجة. أعد محاولة الرابط نفسه قبل تسجيل الدخول.',retryVerify:'إعادة محاولة التحقق',signInShort:'تسجيل الدخول',
 } satisfies {[K in keyof typeof en]:typeof en[K]};
@@ -74,18 +75,14 @@ function LanguageSwitch({language,onLanguage,disabled}:{language:RegistrationLan
   return <div className="segmented-control registration-languages" role="group" aria-label="Language"><button type="button" aria-pressed={language==='en'} disabled={disabled} onClick={()=>onLanguage('en')}>English</button><button type="button" aria-pressed={language==='ar'} disabled={disabled} onClick={()=>onLanguage('ar')}>العربية</button></div>;
 }
 function AccessChoice({language,onChoose,onClose}:{language:RegistrationLanguage;onChoose:(plan:RegistrationPlan)=>void;onClose:()=>void}) {
-  const dialog=useRef<HTMLDialogElement>(null),[paid,setPaid]=useState(false);
+  const dialog=useRef<HTMLDialogElement>(null);
   const t=(en:string,ar:string)=>language==='ar'?ar:en;
   useEffect(()=>{const element=dialog.current;element?.showModal();return()=>element?.close();},[]);
   return <dialog ref={dialog} className="sign-out-confirmation registration-access-choice" aria-labelledby="registration-access-title" onCancel={event=>{event.preventDefault();onClose();}}>
-    <h2 id="registration-access-title">{t('How would you like to get started?','كيف ترغب في البدء؟')}</h2>
-    {paid?<><p>{t('Choose a plan. We’ll arrange billing and activate it with you.','اختر خطة وسنتواصل معك لترتيب الفوترة وتفعيلها.')}</p>
-      <div className="registration-access-options">{PAID_PLANS.map(plan=><button className="button outline" type="button" key={plan} onClick={()=>onChoose(plan)}>{PLAN_NAMES[plan]}<ArrowRight size={16}/></button>)}</div>
-      <button className="button subtle" type="button" onClick={()=>setPaid(false)}>{t('Back','رجوع')}</button>
-    </>:<><div className="registration-access-options">
-      <button type="button" className="button outline" onClick={()=>onChoose('pilot')}><span><strong>{t(`Request a ${PILOT_DAYS}-day pilot`,`اطلب تجربة لمدة ${PILOT_DAYS} يوماً`)}</strong><small>{t('Try Understood with one site and up to 25 workers.','جرّب Understood في موقع واحد مع ما يصل إلى 25 عاملاً.')}</small></span><ArrowRight size={16}/></button>
-      <button type="button" className="button outline" onClick={()=>setPaid(true)}><span><strong>{t('Choose a paid plan','اختر خطة مدفوعة')}</strong><small>{t('Go straight to Pro, Business or Enterprise.','ابدأ مباشرة مع Pro أو Business أو Enterprise.')}</small></span><ArrowRight size={16}/></button>
-    </div><button className="button subtle" type="button" onClick={onClose}>{t('Close','إغلاق')}</button></>}
+    <h2 id="registration-access-title">{t('Choose your plan','اختر خطتك')}</h2>
+    <p>{t('Every monthly plan includes 10% off. Verify your email before subscribing.','خصم 10% على كل خطة شهرية. تحقق من البريد قبل الاشتراك.')}</p>
+    <div className="registration-access-options">{SUBSCRIPTION_PLANS.map(plan=><button className="button outline" type="button" key={plan.id} onClick={()=>onChoose(plan.id)}><span>{plan.name} · <bdi dir="ltr">{formatSubscriptionPrice(plan.monthlyCents)}</bdi> {t('/month','/شهرياً')}</span><ArrowRight size={16}/></button>)}</div>
+    <button className="button subtle" type="button" onClick={onClose}>{t('Close','إغلاق')}</button>
   </dialog>;
 }
 
@@ -97,7 +94,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
     try {names=new Intl.DisplayNames([language],{type:'region'});} catch {}
     return countryOptions.map(([code,name])=>({code,label:names?.of(code)||name})).sort((a,b)=>a.label.localeCompare(b.label,language));
   },[language]);
-  const [plan,setPlan]=useState<RegistrationPlan|null>(isPaidPlan(initialPlan)?initialPlan:null),[choosingPlan,setChoosingPlan]=useState(false);
+  const [plan,setPlan]=useState<RegistrationPlan|null>(isPaidPlan(initialPlan)?initialPlan:'starter'),[choosingPlan,setChoosingPlan]=useState(false);
   const [receipt,setReceipt]=useState<RegistrationReceipt|null>(null),[pending,setPending]=useState<{receipt:RegistrationReceipt;body:AccountBody}|null>(null);
   const [ownerName,setOwnerName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');
   const [company,setCompany]=useState(''),[country,setCountry]=useState(''),[phone,setPhone]=useState(''),[terms,setTerms]=useState(false);
@@ -201,7 +198,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
   </section>;
   if(available===false) return <section className="registration-page" lang={language} dir={language==='ar'?'rtl':'ltr'}>
     {header}
-    <div className="registration-sent"><div className="registration-icon"><ShieldCheck size={30}/></div><h1>{t.unavailableEnvironment}</h1><p>{t.unavailableEnvironmentBody}</p><div className="actions"><button type="button" className="button outline" onClick={onSignIn}><LogIn size={18}/>{t.signInShort}</button><a className="button subtle" href="#pilot">{t.back}</a></div></div>
+    <div className="registration-sent"><div className="registration-icon"><ShieldCheck size={30}/></div><h1>{t.unavailableEnvironment}</h1><p>{t.unavailableEnvironmentBody}</p><div className="actions"><button type="button" className="button outline" onClick={onSignIn}><LogIn size={18}/>{t.signInShort}</button><a className="button subtle" href="#plans">{t.back}</a></div></div>
   </section>;
   return <section className={`registration-page ${preparing||receipt||codeComplete?'registration-email-step':'registration-start'}`} lang={language} dir={language==='ar'?'rtl':'ltr'}>
     {header}
@@ -247,7 +244,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
       <header className="registration-intro"><span className="public-kicker">{t.kicker}</span><h1>{t.title}</h1><p>{t.lead}</p></header>
       {choosingPlan&&<AccessChoice language={language} onClose={()=>setChoosingPlan(false)} onChoose={choice=>{setPlan(choice);setChoosingPlan(false);}}/>}
       <form className="registration-form" onSubmit={submit}>
-        <div className="registration-selected-plan"><div><small>{language==='ar'?'الوصول إلى مساحة العمل':'Workspace access'}</small><strong>{plan==='pilot'?(language==='ar'?'برنامج تجريبي لمدة 14 يوماً':'14-day pilot'):plan?PLAN_NAMES[plan]:(language==='ar'?'اختر خياراً':'Choose how to start')}</strong></div><button type="button" className="button outline" disabled={busy} onClick={()=>setChoosingPlan(true)}>{plan?(language==='ar'?'تغيير':'Change'):(language==='ar'?'اختيار':'Choose')}</button></div>
+        <div className="registration-selected-plan"><div><small>{language==='ar'?'الوصول إلى مساحة العمل':'Workspace access'}</small><strong>{plan?PLAN_NAMES[plan]:(language==='ar'?'اختر خياراً':'Choose how to start')}</strong></div><button type="button" className="button outline" disabled={busy} onClick={()=>setChoosingPlan(true)}>{plan?(language==='ar'?'تغيير':'Change'):(language==='ar'?'اختيار':'Choose')}</button></div>
         <fieldset className="registration-group">
           <legend>{t.accountDetails}</legend>
           <div className="registration-fields">

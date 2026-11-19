@@ -1,0 +1,13 @@
+.subscription-panel{display:grid;gap:16px;min-width:0;text-align:start}
+.subscription-panel h2,.subscription-panel p{margin:0}
+.subscription-panel .field{max-width:440px;width:100%;text-align:start}
+.subscription-panel select{width:100%;max-width:100%}
+.subscription-panel>.button{justify-self:start;min-height:44px}
+.session-recovery .subscription-panel{margin-block:20px}
+.subscription-plans .plans-card{transform:none}
+.subscription-plans .plans-card-features{flex:1}
+.marketing-site .plans-price-original{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin:0;font-size:14px;color:#52665a}
+.plans-price-original>span,.plans-offer-note{font-size:13px;font-weight:600}
+.marketing-site .plans-card--featured .plans-price-original{color:#d4e6dc}
+.plans-offer-note{margin-block:0 30px;color:var(--landing-green)}
+@media(max-width:600px){.subscription-plans .plans-card{padding:26px 20px}.subscription-panel{padding:20px}.subscription-plans .plans-price-main strong{font-size:32px}}

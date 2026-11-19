@@ -4,6 +4,7 @@ import {pilotHttpError} from './pilot-input.mjs';
 export async function handlePilotRoute(req,res,url,repository) {
   const receipt=url.pathname.match(/^\/api\/public\/pilot\/([a-f0-9-]{36})$/i);
   if(url.pathname!=='/api/public/pilot' && !receipt)return false;
+  if(!receipt){send(res,410,{error:'Pilot registration has ended. Choose a subscription plan.'});return true;}
   try {
     if(url.search || req.headers['content-encoding'])throw Error('Invalid pilot request');
     if(!receipt && req.method==='POST') {

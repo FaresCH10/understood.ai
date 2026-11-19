@@ -1,4 +1,6 @@
 export const staffStaticArabic={
+  "Workspace setup steps": "خطوات إعداد مساحة العمل",
+  "Only the workspace owner can save workspace setup progress.": "يمكن لمالك مساحة العمل فقط حفظ تقدم الإعداد.",
   "View as worker": "عرض نسخة العامل",
   "Pilot results at this site": "نتائج التجربة في هذا الموقع",
   "Instructions delivered": "التعليمات التي تم تسليمها",

@@ -265,7 +265,7 @@ export async function processOneRegistration(pool,config,{schema='public',send=s
       token={token_hash:tokenHash(secret)};
       await client.query('INSERT INTO registration_tokens(token_hash,registration_id,mail_id,expires_at) VALUES($1,$2,$3,$4)',
         [token.token_hash,row.registration_id,row.id,row.expires_at]);
-      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirm your email to finish creating your Understood account. Workspace access starts after your pilot is approved or your plan is activated. If you did not create this account, ignore this email.`;
+      const text=`Verify your Understood account by opening this one-use link within 24 hours:\n${config.publicOrigin}/#verify-registration/${secret}\n\nConfirm your email to finish creating your Understood account. Sign in after verification to complete your subscription. If you did not create this account, ignore this email.`;
       message={email:message.email,subject:'Verify your Understood account',text};
       await client.query('UPDATE registration_mail SET payload=$1 WHERE id=$2',[sealMail(config,row.id,message),row.id]);
     }

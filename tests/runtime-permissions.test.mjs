@@ -187,7 +187,7 @@ test('application SQL role cannot read operator password/session material or cre
 
 test('application role retains required control reads but cannot suspend tenants, pause dispatch, change quotas or forge operator evidence',async()=>{
   const f=await fixture();try {
-    const configured=await f.configure();assert.equal(configured.writableTables,148);assert.equal(configured.readOnlyTables,15);assert.equal(configured.hiddenTables,7);
+    const configured=await f.configure();assert.equal(configured.writableTables,149);assert.equal(configured.readOnlyTables,17);assert.equal(configured.hiddenTables,7);
     const columns=(await f.db.query('SELECT table_name,column_name FROM information_schema.columns WHERE table_schema=$1 AND ordinal_position=1',[schema])).rows;
     await f.runtime();assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema}),configured);
     for(const table of ['operator_requests','provider_verifications','tenant_controls','system_controls','provider_policies','operator_audit']) {
@@ -204,7 +204,7 @@ test('worker policy is explicit and independent, never granting hidden tables or
   const application=runtimeTablePolicy(),worker=runtimeTablePolicy('worker');
   assert.equal(runtimeProfile(),'application');assert.equal(runtimeProfile('worker'),'worker');
   assert.ok(worker.every(row=>row.readable || !row.writable));
-  assert.equal(worker.filter(row=>!row.readable).length,17);
+  assert.equal(worker.filter(row=>!row.readable).length,20);
   assert.deepEqual(worker.find(row=>row.table==='clarification_action_receipts'),{table:'clarification_action_receipts',readable:false,writable:false,insertable:false});
   assert.deepEqual(worker.find(row=>row.table==='clarification_creations'),{table:'clarification_creations',readable:false,writable:false,insertable:false});
   assert.deepEqual(worker.find(row=>row.table==='worker_credentials'),{table:'worker_credentials',readable:false,writable:false,insertable:false});
@@ -220,7 +220,7 @@ test('worker policy is explicit and independent, never granting hidden tables or
 
 test('worker role rejects billing/operator reads and policy/control/admin DML using actual SQL permissions',async()=>{
   const f=await fixture();try{
-    const configured=await f.configure('worker');assert.equal(configured.profile,'worker');assert.equal(configured.hiddenTables,17);
+    const configured=await f.configure('worker');assert.equal(configured.profile,'worker');assert.equal(configured.hiddenTables,20);
     const columns=(await f.db.query('SELECT table_name,column_name FROM information_schema.columns WHERE table_schema=$1 AND ordinal_position=1',[schema])).rows;
     await f.runtime();assert.deepEqual(await verifyRuntimePermissions(f.pool,{schema,profile:'worker'}),configured);
     await assert.rejects(verifyRuntimePermissions(f.pool,{schema}),/privileges/);
