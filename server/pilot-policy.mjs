@@ -1,3 +1,4 @@
+import {isAvailableSubscriptionPlan} from './subscription-plans.mjs';
 export const PILOT_DAYS=14;
 export const PILOT_WORKER_LIMIT=25;
 export const PILOT_PLAN='pilot';
@@ -23,6 +24,7 @@ export const requestedUpgradePlan=note=>PAID_PLANS.find(plan=>note===planUpgrade
 export function assertPlanUpgrade(note,role,currentPlan) {
   if(!note?.startsWith('Plan upgrade:'))return;
   if(role!=='owner')throw Error('Forbidden');
+  if(!isAvailableSubscriptionPlan(requestedUpgradePlan(note)))throw Error('Invalid activation request');
   if(!higherPaidPlans(currentPlan).some(plan=>planUpgradeNote(plan)===note))throw Error('Invalid activation request');
 }
 

@@ -1,4 +1,4 @@
-import {SUBSCRIPTION_PLANS,formatSubscriptionPrice} from '../server/subscription-plans.mjs';
+import {SUBSCRIPTION_PLANS,formatSubscriptionPrice,isAvailableSubscriptionPlan} from '../server/subscription-plans.mjs';
 import {useEffect,useMemo,useRef,useState,type FormEvent} from 'react';
 import {ArrowLeft,ArrowRight,Check,CheckCircle2,Clock3,LoaderCircle,LogIn,Mail,RefreshCw,ShieldCheck} from 'lucide-react';
 import {isPaidPlan,PAID_PLANS,PLAN_NAMES} from '../server/pilot-policy.mjs';
@@ -81,7 +81,7 @@ function AccessChoice({language,onChoose,onClose}:{language:RegistrationLanguage
   return <dialog ref={dialog} className="sign-out-confirmation registration-access-choice" aria-labelledby="registration-access-title" onCancel={event=>{event.preventDefault();onClose();}}>
     <h2 id="registration-access-title">{t('Choose your plan','اختر خطتك')}</h2>
     <p>{t('Every monthly plan includes 10% off. Verify your email before subscribing.','خصم 10% على كل خطة شهرية. تحقق من البريد قبل الاشتراك.')}</p>
-    <div className="registration-access-options">{SUBSCRIPTION_PLANS.map(plan=><button className="button outline" type="button" key={plan.id} onClick={()=>onChoose(plan.id)}><span>{plan.name} · <bdi dir="ltr">{formatSubscriptionPrice(plan.monthlyCents)}</bdi> {t('/month','/شهرياً')}</span><ArrowRight size={16}/></button>)}</div>
+    <div className="registration-access-options">{SUBSCRIPTION_PLANS.map(plan=><button className="button outline" type="button" key={plan.id} disabled={!plan.available} onClick={()=>onChoose(plan.id)}><span>{plan.name} · {plan.available?<><bdi dir="ltr">{formatSubscriptionPrice(plan.monthlyCents)}</bdi> {t('/month','/شهرياً')}</>:t('Coming soon','قريباً')}</span>{plan.available&&<ArrowRight size={16}/>}</button>)}</div>
     <button className="button subtle" type="button" onClick={onClose}>{t('Close','إغلاق')}</button>
   </dialog>;
 }
@@ -94,7 +94,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
     try {names=new Intl.DisplayNames([language],{type:'region'});} catch {}
     return countryOptions.map(([code,name])=>({code,label:names?.of(code)||name})).sort((a,b)=>a.label.localeCompare(b.label,language));
   },[language]);
-  const [plan,setPlan]=useState<RegistrationPlan|null>(isPaidPlan(initialPlan)?initialPlan:'starter'),[choosingPlan,setChoosingPlan]=useState(false);
+  const [plan,setPlan]=useState<RegistrationPlan|null>(isPaidPlan(initialPlan)&&isAvailableSubscriptionPlan(initialPlan)?initialPlan:'starter'),[choosingPlan,setChoosingPlan]=useState(false);
   const [receipt,setReceipt]=useState<RegistrationReceipt|null>(null),[pending,setPending]=useState<{receipt:RegistrationReceipt;body:AccountBody}|null>(null);
   const [ownerName,setOwnerName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');
   const [company,setCompany]=useState(''),[country,setCountry]=useState(''),[phone,setPhone]=useState(''),[terms,setTerms]=useState(false);
@@ -242,6 +242,7 @@ export function RegistrationPage({language,onLanguage,onBack,onSignIn,onOpenWork
       <button type="button" className="text-link" disabled={busy} onClick={onSignIn}>{t.signIn}<ArrowRight size={16}/></button>
     </div> : <div className="registration-layout">
       <header className="registration-intro"><span className="public-kicker">{t.kicker}</span><h1>{t.title}</h1><p>{t.lead}</p></header>
+      {isPaidPlan(initialPlan)&&!isAvailableSubscriptionPlan(initialPlan)&&<p role="status">{language==='ar'?'هذه الخطة قادمة قريباً. يمكنك البدء مع Starter حالياً.':'This plan is coming soon. You can start with Starter for now.'}</p>}
       {choosingPlan&&<AccessChoice language={language} onClose={()=>setChoosingPlan(false)} onChoose={choice=>{setPlan(choice);setChoosingPlan(false);}}/>}
       <form className="registration-form" onSubmit={submit}>
         <div className="registration-selected-plan"><div><small>{language==='ar'?'الوصول إلى مساحة العمل':'Workspace access'}</small><strong>{plan?PLAN_NAMES[plan]:(language==='ar'?'اختر خياراً':'Choose how to start')}</strong></div><button type="button" className="button outline" disabled={busy} onClick={()=>setChoosingPlan(true)}>{plan?(language==='ar'?'تغيير':'Change'):(language==='ar'?'اختيار':'Choose')}</button></div>

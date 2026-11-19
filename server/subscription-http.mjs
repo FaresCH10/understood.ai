@@ -28,7 +28,7 @@ export async function handleSubscriptionRoute(pool,req,res,url,session,options){
     else send(res,405,{error:'Method not allowed'});
   }catch(error){
     const message=error.message;
-    const allowed=['Invalid subscription request','Subscription request conflict','A subscription checkout already exists. Contact support to recover it.',
+    const allowed=['This plan is coming soon. Choose Starter for now.','Invalid subscription request','Subscription request conflict','A subscription checkout already exists. Contact support to recover it.',
       'Checkout outcome needs review. Contact support before starting again.','Paddle checkout is not configured','Paddle price does not match the subscription plan','Paddle request could not be confirmed'];
     send(res,message==='Forbidden'?403:message==='Invalid subscription request'?400:409,{error:allowed.includes(message)?message:'Subscription service unavailable. Try again later.'});
   }

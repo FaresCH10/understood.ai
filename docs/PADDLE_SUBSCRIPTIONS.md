@@ -2,6 +2,10 @@
 
 ## Catalog
 
+Launch availability: **Starter only**. Pro, Business and Enterprise remain visible
+as Coming soon and cannot be selected for a new signup or checkout. Existing
+records and payment reconciliation keep their original plan identities.
+
 All prices are USD per month, before applicable taxes. The 10% reduction recurs
 every month; there is no annual prepayment or extra discount code.
 

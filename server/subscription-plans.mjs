@@ -5,8 +5,9 @@ export const SUBSCRIPTION_PLANS=Object.freeze([
   {id:'pro',name:'Pro',regularCents:29900,workers:100,supervisors:5,sites:3,characters:750000,transcriptionMinutes:300},
   {id:'business',name:'Business',regularCents:79900,workers:300,supervisors:15,sites:10,characters:2500000,transcriptionMinutes:1000},
   {id:'enterprise',name:'Enterprise',regularCents:249900,workers:1000,supervisors:40,sites:25,characters:10000000,transcriptionMinutes:3000},
-].map(plan=>Object.freeze({...plan,monthlyCents:Math.round(plan.regularCents*.9)})));
+].map(plan=>Object.freeze({...plan,available:plan.id==='starter',monthlyCents:Math.round(plan.regularCents*.9)})));
 export const subscriptionPlan=id=>SUBSCRIPTION_PLANS.find(plan=>plan.id===id);
+export const isAvailableSubscriptionPlan=id=>subscriptionPlan(id)?.available===true;
 export const formatSubscriptionPrice=cents=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(cents/100);
 
 // Internal cost reserves, never a claim that money has reached a provider.

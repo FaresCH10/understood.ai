@@ -26,6 +26,9 @@
 .plans-scale{display:flex;justify-content:space-between;color:#52665a;font-size:12px;font-variant-numeric:tabular-nums;margin-top:-2px}
 .marketing-site .plans-calculator-note{margin:3px 0 0;font-size:12px;line-height:1.5;color:#61786b}
 .plans-card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;align-items:stretch}
+.subscription-plans .plans-card-grid{margin-block-start:32px}
+.subscription-plans .plans-card--coming-soon .plans-card-badge{background:#e9f1eb;color:#41584c;box-shadow:none;letter-spacing:0;text-transform:none}
+.subscription-plans .plans-card-action button:disabled{opacity:1;background:#f2f5f3;border-color:#d5e2da;color:#60766a;cursor:default;box-shadow:none;transform:none}
 .plans-card-wrap{display:flex;min-width:0}
 .plans-card-wrap>.plans-card{width:100%}
 .plans-card{position:relative;display:flex;flex-direction:column;min-width:0;padding:30px 24px 22px;background:#fff;border:1px solid #d5e2da;border-radius:14px;color:var(--landing-ink);box-shadow:0 1px 0 #104f4308;transition:border-color .25s,box-shadow .25s}

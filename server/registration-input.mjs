@@ -1,7 +1,8 @@
 import {credentialInput,normalizeEmail} from './auth-crypto.mjs';
 import {isCountryCode} from './country-codes.mjs';
 import {inputKeys} from './people.mjs';
-import {PILOT_DAYS,PILOT_WORKER_LIMIT,isPaidPlan} from './pilot-policy.mjs';
+import {PILOT_DAYS,PILOT_WORKER_LIMIT} from './pilot-policy.mjs';
+import {isAvailableSubscriptionPlan} from './subscription-plans.mjs';
 
 export const REGISTRATION_TERMS_VERSION='terms-v1';
 export const REGISTRATION_PRIVACY_VERSION='privacy-v1';
@@ -37,7 +38,7 @@ export function registrationRequestInput(input,remoteAddress) {
   if(input.acceptTerms!==true || input.acceptPrivacy!==true) throw invalid();
   let email;try {email=credentialInput(input.email,input.password);}catch {throw invalid();}
   const plan=input.plan===undefined?'starter':input.plan;
-  if(!isPaidPlan(plan))throw invalid();
+  if(!isAvailableSubscriptionPlan(plan))throw invalid();
   return {requestId:input.requestId,ownerName,companyName,country,phone,email,password:input.password,plan};
 }
 export function registrationResendInput(input,remoteAddress) {

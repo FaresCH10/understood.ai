@@ -24,9 +24,18 @@ test('four fixed-cent discounted plans, paid-only signup, no real checkout fallb
   assert.throws(()=>checkPaddlePrice({...price,unit_price_overrides:[{country_codes:['US'],unit_price:{amount:'1',currency_code:'USD'}}]},'starter'),/does not match/);
   const input={requestId:randomUUID(),ownerName:'Test owner',companyName:'Test company',country:'LB',email:'synthetic@example.com',password:'a synthetic password',acceptTerms:true,acceptPrivacy:true};
   assert.equal(registrationRequestInput(input,'127.0.0.1').plan,'starter');
+  assert.deepEqual(SUBSCRIPTION_PLANS.filter(plan=>plan.available).map(plan=>plan.id),['starter']);
+  for(const plan of ['pro','business','enterprise'])assert.throws(()=>registrationRequestInput({...input,plan},'127.0.0.1'),/Invalid/);
   assert.throws(()=>registrationRequestInput({...input,plan:'pilot'},'127.0.0.1'),/Invalid/);
   assert.equal(registrationEntitlement('starter').plan,'starter_pending');
   assert.equal(registrationEntitlement('pilot').plan,'starter_pending');
+});
+
+test('coming-soon plans cannot start checkout even through a direct API request',async()=>{
+  let contacted=false;
+  for(const plan of ['pro','business','enterprise'])await assert.rejects(createSubscriptionCheckout(null,null,{plan,requestId:randomUUID()},
+    {env,fetchImpl:async()=>{contacted=true;throw Error('Provider should not be contacted');}}),/coming soon/);
+  assert.equal(contacted,false);
 });
 
 test('Paddle verifies raw signed bytes, rotation signatures, expiry and tampering',()=>{

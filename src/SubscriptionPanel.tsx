@@ -18,7 +18,7 @@ function loadPaddle(){
 
 export function SubscriptionPanel({clientContext,initialPlan='starter'}:{clientContext:string;initialPlan?:string}){
   const language=useContext(StaffLanguageContext),ar=language==='ar';
-  const [status,setStatus]=useState<Status|null>(null),[plan,setPlan]=useState(SUBSCRIPTION_PLANS.some(p=>p.id===initialPlan)?initialPlan:'starter');
+  const [status,setStatus]=useState<Status|null>(null),[plan,setPlan]=useState(SUBSCRIPTION_PLANS.some(p=>p.id===initialPlan&&p.available)?initialPlan:'starter');
   const [error,setError]=useState(''),[busy,setBusy]=useState(false);
   const requestId=useRef<{plan:string;id:string}|null>(null),active=useRef(true),sending=useRef(false);
   const binding=useRef(clientContext);binding.current=clientContext;
@@ -49,7 +49,7 @@ export function SubscriptionPanel({clientContext,initialPlan='starter'}:{clientC
   return <section className="panel subscription-panel" aria-labelledby="subscription-heading">
     <h2 id="subscription-heading">{text('Subscription','الاشتراك')}</h2>
     <p>{text('10% off every monthly payment. Prices are in USD before applicable taxes.','خصم 10% على كل دفعة شهرية. الأسعار بالدولار قبل الضرائب.')}</p>
-    <label className="field">{text('Plan','الخطة')}<select value={plan} disabled={busy} onChange={event=>setPlan(event.target.value)}>{SUBSCRIPTION_PLANS.map(item=><option value={item.id} key={item.id}>{item.name} · {formatSubscriptionPrice(item.monthlyCents)} {text('/month','/شهرياً')}</option>)}</select></label>
+    <label className="field">{text('Plan','الخطة')}<select value={plan} disabled={busy} onChange={event=>setPlan(event.target.value)}>{SUBSCRIPTION_PLANS.map(item=><option value={item.id} key={item.id} disabled={!item.available}>{item.name} · {item.available?`${formatSubscriptionPrice(item.monthlyCents)} ${text('/month','/شهرياً')}`:text('Coming soon','قريباً')}</option>)}</select></label>
     {status?.checkoutAvailable?<><p className="notice notice-blue">{text('Sandbox checkout only. Test payments do not activate workspace access or purchase API credits.','دفع تجريبي فقط. لا تفعّل المدفوعات التجريبية مساحة العمل ولا تشتري رصيد الخدمات.')}</p><button className="button primary" disabled={busy} onClick={()=>void checkout()}>{busy?text('Preparing checkout…','جارٍ تجهيز الدفع…'):text('Open test checkout','فتح الدفع التجريبي')}</button></>:
       <p role="status" className="muted">{status?text('Online subscriptions are not open yet. No payment will be taken. Contact us for availability.','الاشتراكات عبر الإنترنت غير مفتوحة بعد. لن يتم تحصيل أي مبلغ. تواصل معنا لمعرفة التوفر.'):error?text('Subscription details are unavailable. Refresh the page to try again.','تفاصيل الاشتراك غير متاحة. حدّث الصفحة للمحاولة مجدداً.'):text('Loading subscription details…','جارٍ تحميل تفاصيل الاشتراك…')}</p>}
     {status?.grant&&<p role="status">{text('Test allowance recorded','تم تسجيل الرصيد التجريبي')}: {status.grant.characters.toLocaleString()} {text('characters. This is not spendable provider credit.','حرف. هذا ليس رصيداً قابلاً للإنفاق لدى مزوّدي الخدمات.')}</p>}

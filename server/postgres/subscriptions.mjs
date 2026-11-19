@@ -1,6 +1,6 @@
 import {domainTransaction,requirePrincipal} from './domain.mjs';
 import {paddleConfig,paddleRequest,checkPaddlePrice} from '../paddle.mjs';
-import {SUBSCRIPTION_PLANS,subscriptionPlan,providerBudget} from '../subscription-plans.mjs';
+import {SUBSCRIPTION_PLANS,subscriptionPlan,providerBudget,isAvailableSubscriptionPlan} from '../subscription-plans.mjs';
 
 export async function subscriptionStatus(pool,session,{schema='public',env=process.env}={}){
   const config=paddleConfig(env);
@@ -16,6 +16,7 @@ export async function subscriptionStatus(pool,session,{schema='public',env=proce
 export async function createSubscriptionCheckout(pool,session,input,{schema='public',env=process.env,fetchImpl=fetch}={}){
   if(!input||Object.keys(input).some(key=>!['plan','requestId'].includes(key))||!subscriptionPlan(input.plan)
     ||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input.requestId||''))throw Error('Invalid subscription request');
+  if(!isAvailableSubscriptionPlan(input.plan))throw Error('This plan is coming soon. Choose Starter for now.');
   const config=paddleConfig(env);if(!config.available)throw Error('Paddle checkout is not configured');
   const previous=await domainTransaction(pool,schema,async client=>{
     await requirePrincipal(client,session,'staff',['owner']);
