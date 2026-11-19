@@ -1,5 +1,6 @@
 import {instructionReadiness} from '../instruction-readiness.mjs';
 import {handleSubscriptionWebhook,handleSubscriptionRoute} from '../subscription-http.mjs';
+import {sessionSandboxDashboard,sandboxDashboardReadAllowed} from './sandbox-subscription.mjs';
 import {processOneAssessment} from './assessment-worker.mjs';
 import {syntheticAssessmentAdapter} from './synthetic-assessment.mjs';
 import {processOneExport} from './exports.mjs';
@@ -405,12 +406,16 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
       }
       verifyClientSession(req,session,path);
       if(await handleSubscriptionRoute(pool,req,res,url,session,repository))return;
-      if(session.principal_type==='staff' && path!=='/api/session' && isPendingWorkspacePlan(session.workspace_plan))
+      const sandboxDashboard=session.principal_type==='staff'&&isPendingWorkspacePlan(session.workspace_plan)
+        &&await domainTransaction(pool,repository.schema,client=>sessionSandboxDashboard(client,session));
+      if(sandboxDashboard&&path!=='/api/session'&&!sandboxDashboardReadAllowed(path,req.method))
+        return send(res,403,{error:'Sandbox dashboard is read-only. Test payments do not enable provider processing.'});
+      if(!sandboxDashboard&&session.principal_type==='staff' && path!=='/api/session' && isPendingWorkspacePlan(session.workspace_plan))
         return send(res,403,{error:'Workspace access is pending'});
       if(!archivedWriteAllowed(path,req.method))await domainTransaction(pool,repository.schema,client=>requireSiteOperational(client,session.org_id,session.site_id));
       // Vercel's synthetic sandbox has no durable worker. Drain bounded local
       // jobs on authenticated status reads; never run demo processing in live mode.
-      if(config.inlineSyntheticJobs && config.integrationMode==='synthetic' && !options.preparationAdapter && !config.preparationAdapter && req.method==='GET'
+      if(!sandboxDashboard&&config.inlineSyntheticJobs && config.integrationMode==='synthetic' && !options.preparationAdapter && !config.preparationAdapter && req.method==='GET'
         && /^\/api\/(?:worker\/briefings|workspace\/work|reports)(?:\/|$)/.test(path)) {
         const jobScope={schema:repository.schema,orgId:session.org_id,siteId:session.site_id};
         try{await processOneAssessment(pool,syntheticAssessmentAdapter,jobScope);await processOneExport(pool,jobScope);}
@@ -773,7 +778,7 @@ export function postgresHandler(pool,{storage,schema,config,cookieName,backend,r
         // Authorize the thread before claiming one of its jobs. Await bounded work
         // within this invocation: serverless instances have no persistent worker.
         // Polling also recovers messages queued by preceding deployments.
-        if(scheduleDrains&&repository.integrationMode!=='live'){
+        if(!sandboxDashboard&&scheduleDrains&&repository.integrationMode!=='live'){
           const exchangeId=req.method==='POST'?result.id:result.items.find(item=>['queued','processing'].includes(item.state))?.id;
           if(exchangeId){
             await processOneClarificationExchange(pool,options.clarificationTranslationAdapter,{schema:repository.schema,dataClass:'synthetic',exchangeId,orgId:session.org_id,siteId:session.site_id});

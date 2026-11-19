@@ -8,6 +8,8 @@ import {paddleConfig,verifyPaddleWebhook,checkPaddlePrice} from '../server/paddl
 import {createSubscriptionCheckout,recordSubscriptionEvent,subscriptionStatus} from '../server/postgres/subscriptions.mjs';
 import {registrationRequestInput} from '../server/registration-input.mjs';
 import {registrationEntitlement} from '../server/pilot-policy.mjs';
+import {sandboxDashboardAccess,sessionSandboxDashboard,sandboxDashboardReadAllowed} from '../server/postgres/sandbox-subscription.mjs';
+import {sessionContext} from '../server/postgres/read-models.mjs';
 
 const env={UNDERSTOOD_PADDLE_MODE:'sandbox',PADDLE_API_KEY:'synthetic_sdbx',PADDLE_WEBHOOK_SECRET:'synthetic-secret',
   PADDLE_CLIENT_TOKEN:'test_synthetic',PADDLE_PRICE_STARTER:'pri_starter',PADDLE_PRICE_PRO:'pri_pro',PADDLE_PRICE_BUSINESS:'pri_business',PADDLE_PRICE_ENTERPRISE:'pri_enterprise'};
@@ -46,6 +48,12 @@ test('Paddle verifies raw signed bytes, rotation signatures, expiry and tamperin
   assert.throws(()=>verifyPaddleWebhook(raw,`ts=${ts};h1=${hash}`,'secret',{now:now+301000}),/signature/);
 });
 
+test('sandbox browsing cannot start jobs or permit mutations',()=>{
+  assert.equal(sandboxDashboardReadAllowed('/api/overview','GET'),true);
+  for(const method of ['POST','PUT','PATCH','DELETE','HEAD'])assert.equal(sandboxDashboardReadAllowed('/api/briefings',method),false);
+  for(const path of ['/api/source-audio/test','/api/processing/test','/api/instructions/sends/test','/api/reports/exports','/api/worker/briefings/test'])assert.equal(sandboxDashboardReadAllowed(path,'GET'),false);
+});
+
 test('durable checkout, tenant authorization and signed-payment grant are replay safe without real access',async()=>{
   const db=new PGlite(),schema='subscription_test';
   const pool={async connect(){return {async query(sql,args){return args?.length?db.query(sql,args):(await db.exec(sql)).at(-1)||{rows:[]};},release(){}};}};
@@ -53,11 +61,13 @@ test('durable checkout, tenant authorization and signed-payment grant are replay
     await db.exec(`CREATE SCHEMA ${schema};SET search_path TO ${schema},pg_catalog;`);
     await runMigrations(pool,{schema});
     await db.exec("INSERT INTO organizations VALUES('a','Test A'),('b','Test B');INSERT INTO sites VALUES('a','a','Test','UTC'),('b','b','Other','UTC');INSERT INTO staff(id,org_id,site_id,name,role) VALUES('owner','a','a','Owner','owner'),('other','b','b','Other','owner'),('supervisor','a','a','Supervisor','supervisor');");
+    await db.exec("INSERT INTO organization_entitlements(org_id,state,started_at,worker_limit,plan,revision,updated_by,updated_at) VALUES('a','read_only',clock_timestamp(),1,'starter_pending',1,'registration',clock_timestamp())");
     const owner={principal_type:'staff',principal_id:'owner',org_id:'a',site_id:'a',role:'owner'},options={schema,env};
     let calls=0;
     const fetchImpl=async(url,init)=>{calls++;if(url.includes('/prices/'))return Response.json({data:price});
       assert.equal(JSON.parse(init.body).items[0].price_id,'pri_starter');return Response.json({data:{id:'txn_synthetic'}});};
     const input={plan:'starter',requestId:randomUUID()};
+    assert.equal(await sandboxDashboardAccess(db,'a'),false);
     await assert.rejects(createSubscriptionCheckout(pool,{...owner,principal_id:'supervisor',role:'supervisor'},input,{...options,fetchImpl}),/Forbidden/);
     const result=await createSubscriptionCheckout(pool,owner,input,{...options,fetchImpl});assert.equal(result.transactionId,'txn_synthetic');assert.equal(calls,2);
     await createSubscriptionCheckout(pool,owner,input,{...options,fetchImpl});assert.equal(calls,2);
@@ -71,8 +81,15 @@ test('durable checkout, tenant authorization and signed-payment grant are replay
     assert.equal((await recordSubscriptionEvent(pool,event,options)).duplicate,true);
     await recordSubscriptionEvent(pool,{...event,event_id:'evt_second_notification'},options);
     assert.equal((await db.query('SELECT count(*)::int n FROM subscription_allowance_grants')).rows[0].n,1);
-    assert.equal((await db.query('SELECT count(*)::int n FROM organization_entitlements')).rows[0].n,0);
+    assert.equal((await db.query("SELECT state FROM organization_entitlements WHERE org_id='a'")).rows[0].state,'read_only');
     assert.equal((await subscriptionStatus(pool,owner,options)).providerFunding,'not_funded');
+    assert.equal((await subscriptionStatus(pool,owner,options)).dashboardAvailable,true);
+    assert.equal((await subscriptionStatus(pool,owner,options)).checkoutAvailable,false);
+    assert.equal(await sandboxDashboardAccess(db,'b'),false);
+    assert.equal(await sessionSandboxDashboard(db,{...owner,workspace_plan:'starter_pending'}),true);
+    assert.equal(await sessionSandboxDashboard(db,{...owner,workspace_plan:'starter'}),false);
+    assert.equal((await sessionContext(pool,{...owner,workspace_plan:'starter_pending'},options)).sandboxSubscription,true);
+    await assert.rejects(createSubscriptionCheckout(pool,owner,{plan:'starter',requestId:randomUUID()},{...options,fetchImpl}),/already confirmed/);
     await assert.rejects(db.exec('DELETE FROM subscription_allowance_grants'),/immutable/);
     await assert.rejects(db.exec("UPDATE subscription_checkouts SET org_id='b'"),/immutable/);
     // An unknown network outcome must not create another bill on retry.

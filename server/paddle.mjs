@@ -1,12 +1,12 @@
 import {createHmac,timingSafeEqual} from 'node:crypto';
-import {subscriptionPlan} from './subscription-plans.mjs';
+import {subscriptionPlan,SUBSCRIPTION_PLANS} from './subscription-plans.mjs';
 
-export function paddleConfig(env=process.env){
+export function paddleConfig(env=process.env,{localReconciliation=false}={}){
   // Preparation is sandbox-only. Test payments must never buy real API usage.
   if(env.UNDERSTOOD_PADDLE_MODE!=='sandbox')return {available:false,mode:'disabled'};
   const prices=Object.fromEntries(['starter','pro','business','enterprise'].map(id=>[id,env[`PADDLE_PRICE_${id.toUpperCase()}`]]));
-  const available=!!env.PADDLE_API_KEY&&!!env.PADDLE_WEBHOOK_SECRET&&/^test_[A-Za-z0-9_]+$/.test(env.PADDLE_CLIENT_TOKEN||'')
-    &&Object.values(prices).every(id=>/^pri_[a-z0-9]+$/.test(id||''));
+  const available=!!env.PADDLE_API_KEY&&(!!env.PADDLE_WEBHOOK_SECRET||localReconciliation)&&/^test_[A-Za-z0-9_]+$/.test(env.PADDLE_CLIENT_TOKEN||'')
+    &&SUBSCRIPTION_PLANS.filter(plan=>plan.available).every(plan=>/^pri_[a-z0-9]+$/.test(prices[plan.id]||''));
   return {available,mode:'sandbox',prices,apiKey:env.PADDLE_API_KEY,webhookSecret:env.PADDLE_WEBHOOK_SECRET,clientToken:env.PADDLE_CLIENT_TOKEN};
 }
 

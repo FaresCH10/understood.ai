@@ -33,7 +33,7 @@ export function WorkspaceAccess({plan,state,onRecheck,onSignOut,onContact,client
   }
   return <SessionRecoveryScreen language={language} title={title} kind={declined?'declined':'pending'}>
     <p>{language==='ar'?'اختر خطة شهرية لمساحة عملك.':'Choose a monthly plan for your workspace.'}</p>
-    {owner?<SubscriptionPanel clientContext={clientContext} initialPlan={paidPlan??'starter'}/>:<p>{language==='ar'?'اطلب من مالك مساحة العمل إكمال الاشتراك.':'Ask your workspace owner to complete the subscription.'}</p>}
+    {owner?<SubscriptionPanel clientContext={clientContext} initialPlan={paidPlan??'starter'} onConfirmed={onRecheck}/>:<p>{language==='ar'?'اطلب من مالك مساحة العمل إكمال الاشتراك.':'Ask your workspace owner to complete the subscription.'}</p>}
     {message&&<p role="status">{t(message)}</p>}
     <div className="actions"><button className="button primary" onClick={()=>void recheck()} disabled={busy}><RefreshCw size={17}/>{t('Check access')}</button><button className="button outline" onClick={onContact}><Mail size={17}/>{t('Contact us')}</button><button className="button subtle" onClick={()=>void onSignOut()}><LogOut size={17}/>{t('Sign out')}</button></div>
   </SessionRecoveryScreen>;

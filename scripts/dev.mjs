@@ -5,6 +5,7 @@ import {existsSync} from 'node:fs';
 // Share the same private service configuration with the API and worker.
 // A provider key never changes preparation or real-data adapters. Local
 // follow-ups stay off unless --credential-test (test text only).
+if(existsSync('.env.paddle.local'))process.loadEnvFile('.env.paddle.local');
 if(existsSync('.env'))process.loadEnvFile('.env');
 
 const credentialTest = process.argv.includes('--credential-test');

@@ -1,14 +1,16 @@
 import {domainTransaction,requirePrincipal} from './domain.mjs';
 import {paddleConfig,paddleRequest,checkPaddlePrice} from '../paddle.mjs';
 import {SUBSCRIPTION_PLANS,subscriptionPlan,providerBudget,isAvailableSubscriptionPlan} from '../subscription-plans.mjs';
+import {sandboxDashboardAccess} from './sandbox-subscription.mjs';
 
 export async function subscriptionStatus(pool,session,{schema='public',env=process.env}={}){
   const config=paddleConfig(env);
   return domainTransaction(pool,schema,async client=>{
     await requirePrincipal(client,session,'staff',['owner']);
-    const grants=(await client.query(`SELECT plan,characters,transcription_minutes,funding_state,period_start,period_end
+    const grants=(await client.query(`SELECT transaction_id,plan,characters,transcription_minutes,funding_state,period_start,period_end
       FROM subscription_allowance_grants WHERE org_id=$1 ORDER BY created_at DESC LIMIT 1`,[session.org_id])).rows;
-    return {mode:config.mode,checkoutAvailable:config.available,plans:SUBSCRIPTION_PLANS,grant:grants[0]??null,
+    const dashboardAvailable=await sandboxDashboardAccess(client,session.org_id);
+    return {mode:config.mode,checkoutAvailable:config.available&&!dashboardAvailable,dashboardAvailable,plans:SUBSCRIPTION_PLANS,grant:grants[0]??null,
       providerFunding:'not_funded',liveCheckoutAvailable:false};
   });
 }
@@ -21,6 +23,7 @@ export async function createSubscriptionCheckout(pool,session,input,{schema='pub
   const previous=await domainTransaction(pool,schema,async client=>{
     await requirePrincipal(client,session,'staff',['owner']);
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`subscription:${session.org_id}`]);
+    if(await sandboxDashboardAccess(client,session.org_id))throw Error('Sandbox payment is already confirmed. Open the dashboard instead.');
     const existing=(await client.query('SELECT * FROM subscription_checkouts WHERE request_id=$1',[input.requestId])).rows[0];
     if(existing){if(existing.org_id!==session.org_id||existing.plan!==input.plan)throw Error('Subscription request conflict');return existing;}
     const open=(await client.query("SELECT request_id FROM subscription_checkouts WHERE org_id=$1 AND state IN ('creating','ready','needs_review')",[session.org_id])).rows[0];

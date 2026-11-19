@@ -1,4 +1,7 @@
 import {instructionReadiness} from './instruction-readiness.mjs';
+import {ensureSubscriptionSchema,sqliteSubscriptionRepository,sqliteSandboxDashboard} from './subscriptions.mjs';
+import {handleSubscriptionRoute,handleSubscriptionWebhook} from './subscription-http.mjs';
+import {sandboxDashboardReadAllowed} from './postgres/sandbox-subscription.mjs';
 import {isPendingWorkspacePlan} from './pilot-policy.mjs';
 import {EVIDENCE_MAX_JSON_BYTES} from './evidence-policy.mjs';
 import {requiredWorkerCreation} from './people.mjs';
@@ -357,6 +360,8 @@ export function createAppHandler(db, options = {}) {
   ensureTranslationFeedbackSchema(db);
   ensureRecoverySchema(db);
   ensureRegistrationSchema(db);
+  ensureSubscriptionSchema(db);
+  const subscriptionOptions={env:options.paddleEnv??process.env,subscriptionRepository:sqliteSubscriptionRepository(db,{env:options.paddleEnv??process.env,fetchImpl:options.paddleFetch??fetch})};
   ensurePilotSchema(db);
   ensureOnboardingSchema(db);
   ensureSiteAdmissionGuards(db);
@@ -370,6 +375,7 @@ export function createAppHandler(db, options = {}) {
           status: "ok",
           mode: `synthetic-${config.accessMode}`,
         });
+      if(await handleSubscriptionWebhook(db,req,res,url,subscriptionOptions))return;
       if (req.method !== "GET") verifyMutationOrigin(req, config);
       if(path.startsWith('/api/ops/'))return send(res,path==='/api/ops/session' && req.method==='GET'?200:404,
         path==='/api/ops/session' && req.method==='GET'?{available:false,authenticated:false}:{error:'Not found'});
@@ -436,8 +442,10 @@ export function createAppHandler(db, options = {}) {
             ? db.prepare('SELECT staff_interface_language,first_run_completed_at FROM site_settings WHERE site_id=? AND org_id=?')
               .get(session.site_id,session.org_id)
             : null;
+          const sandboxSubscription=session.principal_type==='staff'&&sqliteSandboxDashboard(db,session.org_id);
           return send(res, 200, {
             authenticated: true,
+            sandboxSubscription,
             ...clientSessionContext(session),
             mode: `synthetic-${config.accessMode}`,
             role: session.principal_type,
@@ -457,7 +465,7 @@ export function createAppHandler(db, options = {}) {
             timezone:site?.timezone,
             staffInterfaceLanguage: session.principal_type==='staff' ? siteSettings?.staff_interface_language ?? 'en' : null,
             ...(session.principal_type==='staff'?{workspacePlan:entitlementState(db,session.org_id).plan,workspaceAccessState:workspaceAccessState(db,session.org_id)}:{}),
-            firstRunRequired: session.principal_type==='staff' && session.role==='owner' && !!siteSettings && siteSettings.first_run_completed_at===null,
+            firstRunRequired: !sandboxSubscription&&session.principal_type==='staff' && session.role==='owner' && !!siteSettings && siteSettings.first_run_completed_at===null,
             language: session.language || "en",
             languageSelectionRequired: session.principal_type === "worker" ? !!session.language_selection_required : false,
             languageSelectedAt: session.principal_type === "worker" ? session.language_selected_at ?? null : null,
@@ -528,7 +536,10 @@ export function createAppHandler(db, options = {}) {
         if(error.message==='Session context changed')return send(res,409,{error:error.message});
         throw error;
       }
-      if(session.principal_type==='staff' && path!=='/api/logout' && isPendingWorkspacePlan(entitlementState(db,session.org_id).plan))
+      if(await handleSubscriptionRoute(db,req,res,url,session,subscriptionOptions))return;
+      const sandboxSubscription=session.principal_type==='staff'&&sqliteSandboxDashboard(db,session.org_id);
+      if(sandboxSubscription&&path!=='/api/logout'&&!sandboxDashboardReadAllowed(path,req.method))return send(res,403,{error:'Sandbox dashboard is read-only. Test payments do not enable provider processing.'});
+      if(!sandboxSubscription&&session.principal_type==='staff' && path!=='/api/logout' && isPendingWorkspacePlan(entitlementState(db,session.org_id).plan))
         return send(res,403,{error:'Workspace access is pending'});
       if(path==='/api/search' && req.method==='GET')return send(res,200,searchSite(db,session,searchQuery(url.searchParams)));
       if(path==='/api/auth/worker/redemption' && req.method==='GET')return send(res,200,readWorkerRedemption(db,session,redemptionHttpInput(req,url)));

@@ -41,8 +41,15 @@ silently converted into a charge or canceled.
   another possible charge.
 - Completed initial test payments create an immutable test allowance grant with
   per-service estimated cost reserves. Duplicate notifications cannot grant twice.
-- Test grants cannot activate workspace entitlements, dispatch paid provider work
-  or transfer money. No live mode exists in this release.
+- A current, server-recorded test grant lets staff browse their sandbox dashboard
+  in read-only mode. The original pending entitlement remains unchanged. Mutation
+  endpoints and GET endpoints that drain provider queues are blocked. Test grants
+  cannot activate paid workspace entitlements, dispatch paid provider work or
+  transfer money. No live mode exists in this release.
+- A matching Paddle `checkout.completed` browser event closes the overlay and
+  starts bounded server confirmation polling. Browser events alone never grant
+  access. Already-completed test payments are recovered on page load, and a
+  confirmed sandbox receipt prevents another checkout for the same period.
 
 The test ledger is deliberately separate from the existing invoice/payment ledger,
 which records invoices and already-received manual payments.
@@ -71,9 +78,10 @@ limits were changed by this implementation.
    runner and migration credential. Re-run `configureRuntimePermissions` for the
    application and worker profiles so application ledger inserts work and workers
    cannot read billing data. Never grant schema ownership to the runtime.
-2. Create four Paddle sandbox products and active monthly recurring USD prices:
-   `8910`, `26910`, `71910`, `224910` cents. Frequency 1 month, no trial,
-   quantity 1. These prices already contain 10% off; do not apply another discount.
+2. Create a Paddle sandbox Starter product with an active recurring USD price of
+   `8910` cents. Frequency 1 month, no trial, quantity 1. This price already contains
+   10% off; do not apply another discount. Future plan IDs are optional while they
+   are Coming soon (their eventual prices are `26910`, `71910`, `224910` cents).
    Avoid country overrides while using this fixed-USD preparation.
 3. Set the blank server-side environment variables in `.env.example` privately.
    Use sandbox API credentials, a `test_` client token and sandbox price IDs.
@@ -88,11 +96,34 @@ limits were changed by this implementation.
    current owner session, session-context header and same-origin mutation checks.
 5. Use Paddle test cards. Verify a correct-price checkout, an altered price,
    duplicate notification, tampered signature, unknown checkout result and a
-   non-owner attempt. Confirm test grants do not unlock real workspace activity.
+   non-owner attempt. Confirm the dashboard opens read-only after the signed receipt
+   arrives and that test grants do not unlock real workspace activity.
 6. Keep `UNDERSTOOD_PADDLE_MODE=disabled` outside the approved sandbox test.
 
 This code does not automatically create Paddle accounts/products or deploy, apply
 production migrations, transfer funds, or change existing provider credentials.
+
+## Local development
+
+`npm run dev` uses SQLite, independently of the hosted PostgreSQL database. It now
+includes its own durable subscription tables and authenticated subscription routes
+before the pending-access gate. A new local account can inspect billing and start
+sandbox checkout without a paid entitlement.
+
+Copy `.env.paddle.local.example` to the ignored `.env.paddle.local` and fill in
+the sandbox mode, API key, `test_` client token and Starter price ID. The webhook
+secret is optional for local API reconciliation; it remains required on the hosted app.
+`scripts/dev.mjs` loads this Paddle-only file before `.env`; no production database
+credential needs to be copied. Restart `npm run dev` after changing settings, then
+refresh the existing pending account. There is no need to register another account.
+
+Paddle cannot deliver a public webhook directly to localhost. The local status
+endpoint recovers a completed checkout through an authenticated GET of that
+account's server-stored Paddle transaction. It validates the transaction's tenant,
+checkout ID, price, currency and billing period before recording a sandbox grant.
+No browser-supplied payment-success flag grants access. Provider API errors leave
+the checkout unconfirmed rather than activating access. This recovery does not
+generate a second payment and does not activate paid API usage.
 
 ## Required before live subscriptions
 

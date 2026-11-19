@@ -2,7 +2,7 @@ import {isWorkerLanguage} from '../server/languages.mjs';
 export function isCredentialMode(value:unknown):value is 'synthetic-credential'|'live-credential' {
   return value==='synthetic-credential' || value==='live-credential';
 }
-export type PageSession={authenticated:boolean;role?:string;clientContext?:string;expiresAt?:string;workerId?:string|null;language?:string;mode?:string;staffRole?:string|null;staffScope?:string|null;siteState?:string;name?:string;email?:string;organization?:string;site?:string;timezone?:string;workspaceAccessState?:'pending'|'declined'|null};
+export type PageSession={authenticated:boolean;role?:string;clientContext?:string;expiresAt?:string;workerId?:string|null;language?:string;mode?:string;staffRole?:string|null;staffScope?:string|null;siteState?:string;name?:string;email?:string;organization?:string;site?:string;timezone?:string;sandboxSubscription?:boolean;workspaceAccessState?:'pending'|'declined'|null};
 
 export function validWorkerSession(value:unknown,now=Date.now()):value is PageSession {
   if(!value || typeof value!=='object' || Array.isArray(value))return false;
