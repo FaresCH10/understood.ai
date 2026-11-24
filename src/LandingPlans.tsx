@@ -1,10 +1,10 @@
 import {Check,ArrowRight} from 'lucide-react';
 import {SUBSCRIPTION_PLANS,formatSubscriptionPrice} from '../server/subscription-plans.mjs';
-import {landingCopy,type LandingLocale} from './landing-content';
+import type {LandingLocale} from './landing-content';
 import './landing-plans.css';
 
 export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocale;registrationAvailable:boolean}){
-  const ar=locale==='ar',t=landingCopy[locale];
+  const ar=locale==='ar';
   const number=(n:number)=>new Intl.NumberFormat(ar?'ar':'en-US').format(n);
   const blurbs=ar?['لفريق واحد','للفرق المتنامية','للعمليات متعددة المواقع','للمؤسسات الكبيرة']:['For one team','For growing teams','For multi-site operations','For larger organizations'];
   return <section id="plans" className="landing-section landing-container plans-studio subscription-plans" aria-labelledby="plans-title">
@@ -27,6 +27,5 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
     </article>)}</div>
     <p className="plans-pricing-note">{ar?'الأسعار بالدولار، قبل الضرائب. تُحسب كل نسخة لغوية من التعليمات والأسئلة ورسائل التوضيح ضمن الرصيد الشهري. لا يستهلك تشغيل الصوت المحفوظ رصيد توليد جديداً. تُجدّد الحصص كل فترة اشتراك ولا تنتقل للشهر التالي.':'Prices in USD, before applicable taxes. Each language version of instructions, questions and clarification messages uses the monthly allowance. Playing existing audio does not use new generation allowance. Allowances renew each subscription period and do not roll over.'}</p>
     <p className="plans-pricing-note">{ar?'تُحدَّد احتياجات التكامل والبنية التحتية المخصصة للمؤسسات بعرض منفصل.':'Enterprise integrations and dedicated infrastructure are quoted separately.'}</p>
-    <div className="plans-studio-faq"><h3>{ar?'قبل أن تبدأ':'Before you start'}</h3><div>{t.faqs.map(item=><details key={item.q}><summary>{item.q}</summary><p>{item.a}</p></details>)}</div></div>
   </section>;
 }
