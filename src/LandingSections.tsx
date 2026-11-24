@@ -45,10 +45,34 @@ export function LandingSections({locale,registrationAvailable}:{locale:LandingLo
         timeline.from(q('.landing-unified-heading > *'),{y:18,opacity:0,stagger:.1});
         if(section.id==='how-it-works')timeline.from(q('.unified-workflow-track'),{scaleY:0,duration:.85},'-.2').from(q('.unified-workflow-steps > li'),{x:locale==='ar'?18:-18,opacity:0,stagger:.15},'<').from(q('.unified-demo'),{y:26,opacity:0,duration:.75},'-.65');
 
-        if(section.id==='companies')timeline.from(q('.unified-company-points > li'),{x:locale==='ar'?-20:20,opacity:0,stagger:.15},'-.2').from(q('.unified-company-preview'),{y:24,opacity:0,duration:.7},'-.6').from(q('.unified-industry-list > li'),{y:10,opacity:0,stagger:.07},'-.25');
+        if(section.id==='companies'){
+          q('.unified-company-points > li').forEach((point:HTMLElement,index:number)=>{
+            const details=gsap.utils.selector(point);
+            gsap.timeline({defaults:{ease:'power2.out'},scrollTrigger:{
+              id:`company-point-${index}`,trigger:point,start:'clamp(top 88%)',once:true,
+            }})
+              .from(details(':scope > span'),{scale:.9,opacity:0,duration:.4,clearProps:'transform,opacity'})
+              .from(details(':scope > div'),{x:locale==='ar'?-22:22,opacity:0,duration:.55,clearProps:'transform,opacity'},'-.25');
+          });
+          gsap.timeline({defaults:{ease:'power2.out'},scrollTrigger:{
+            id:'company-preview-reveal',trigger:q('.unified-company-preview')[0],start:'clamp(top 88%)',once:true,
+          }})
+            .from(q('.landing-company-preview'),{y:28,scale:.97,opacity:0,duration:.65,clearProps:'transform,opacity'})
+            .from(q('.landing-company-preview dl > div'),{x:locale==='ar'?16:-16,opacity:0,duration:.45,stagger:.12,clearProps:'transform,opacity'},'-.3');
+          gsap.from(q('.unified-industry-list > li'),{
+            y:14,opacity:0,stagger:.07,duration:.45,ease:'power2.out',clearProps:'transform,opacity',
+            scrollTrigger:{id:'company-industries',trigger:q('.unified-company-industries')[0],start:'clamp(top 90%)',once:true},
+          });
+        }
 
         ScrollTrigger.create({id:`unified-${section.id}`,trigger:section,start:'top 78%',animation:timeline,toggleActions:'play none none none'});
       }
+    });
+    media.add('(min-width: 801px) and (prefers-reduced-motion: no-preference)',()=>{
+      gsap.fromTo('.unified-company-preview',{y:12},{y:-12,ease:'none',scrollTrigger:{
+        id:'company-preview-drift',trigger:root.current?.querySelector('#companies'),
+        start:'clamp(top bottom)',end:'clamp(bottom top)',scrub:.7,invalidateOnRefresh:true,
+      }});
     });
     const refresh=()=>{if(!disposed)ScrollTrigger.refresh();};
     void document.fonts.ready.then(refresh);

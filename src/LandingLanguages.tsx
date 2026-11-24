@@ -18,12 +18,25 @@ export function LandingLanguages({locale}:{locale:LandingLocale}){
   useGSAP(()=>{
     const media=gsap.matchMedia();
     media.add('(prefers-reduced-motion: no-preference)',()=>{
-      const timeline=gsap.timeline({defaults:{ease:'power2.out'}})
-        .from('.language-showcase-heading > *',{y:18,opacity:0,stagger:.1,duration:.55})
-        .from('.language-showcase-board',{y:24,duration:.7},'-.2')
-        .from('.language-choice',{y:12,stagger:.035,duration:.4},'-.35')
-        .from('.language-showcase-benefits li',{y:10,opacity:0,stagger:.1,duration:.4},'-.2');
-      ScrollTrigger.create({id:'language-showcase',trigger:root.current,start:'top 78%',animation:timeline,toggleActions:'play none none none'});
+      const select=gsap.utils.selector(root);
+      gsap.from(select('.language-showcase-heading > *'),{
+        y:20,opacity:0,stagger:.1,duration:.6,ease:'power2.out',clearProps:'transform,opacity',
+        scrollTrigger:{id:'language-showcase',trigger:root.current,start:'clamp(top 85%)',once:true},
+      });
+      gsap.timeline({defaults:{ease:'power2.out'},scrollTrigger:{
+        id:'language-preview-reveal',trigger:select('.language-showcase-display')[0],start:'clamp(top 88%)',once:true,
+      }})
+        .from(select('.language-showcase-count, .language-live-content'),{y:24,opacity:0,duration:.6,stagger:.12,clearProps:'transform,opacity'})
+        .from(select('.language-preview-progress, .language-preview-done'),{x:locale==='ar'?-18:18,opacity:0,duration:.45,stagger:.1,clearProps:'transform,opacity'},'-.3');
+      gsap.timeline({defaults:{ease:'power2.out'},scrollTrigger:{
+        id:'language-picker-reveal',trigger:select('.language-showcase-picker')[0],start:'clamp(top 90%)',once:true,
+      }})
+        .from(select('.language-picker-heading, .mobile-language-select'),{y:16,opacity:0,duration:.45,clearProps:'transform,opacity'})
+        .from(select('.language-choice'),{y:14,scale:.97,opacity:0,duration:.4,stagger:{each:.035,from:'start'},clearProps:'transform,opacity'},'-.15');
+      gsap.from(select('.language-showcase-benefits li'),{
+        y:12,opacity:0,stagger:.1,duration:.45,ease:'power2.out',clearProps:'transform,opacity',
+        scrollTrigger:{id:'language-benefits',trigger:select('.language-showcase-benefits')[0],start:'clamp(top 92%)',once:true},
+      });
     });
     return()=>media.revert();
   },{scope:root,dependencies:[locale],revertOnUpdate:true});
