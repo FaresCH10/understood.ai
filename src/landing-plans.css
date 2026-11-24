@@ -42,9 +42,23 @@
 .subscription-plans .plans-card .landing-button{font-size:16px;justify-content:center}
 .subscription-plans .plans-footnotes{margin-top:20px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 24px}
 .marketing-site .subscription-plans .plans-footnotes .plans-pricing-note{font-size:14px;margin:0}
-.plans-usage{flex:0 1 560px;max-width:100%}
-.plans-usage summary{display:list-item;cursor:pointer;min-height:44px;padding-block:10px;font-size:14px;color:var(--landing-green)}
-.marketing-site .plans-usage p{font-size:14px;line-height:1.65;margin:0 0 12px}
+.plans-usage{flex:1 1 100%;min-width:0;max-width:100%;border:1px solid #d5e2da;border-radius:12px;background:#f7faf7;overflow:hidden}
+.plans-usage summary{display:flex;align-items:center;gap:12px;cursor:pointer;min-height:76px;padding:18px 22px;color:var(--landing-ink);list-style:none}
+.plans-usage summary::-webkit-details-marker{display:none}
+.plans-usage summary:hover{background:#edf5ef}
+.plans-usage summary:focus-visible{outline:3px solid var(--landing-green);outline-offset:-4px;border-radius:12px}
+.plans-usage-icon{flex:none;color:var(--landing-green)}
+.plans-usage-heading{display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}
+.plans-usage-heading strong{font-size:16px;line-height:1.4;font-weight:650}
+.plans-usage-heading>span{font-size:14px;line-height:1.5;color:#52695b}
+.plans-usage-chevron{margin-inline-start:auto;flex:none;color:var(--landing-green);transition:transform .18s ease-out}
+.plans-usage[open] .plans-usage-chevron{transform:rotate(180deg)}
+.plans-usage-content{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 40px;margin:0;padding:22px;border-top:1px solid #d5e2da;background:white}
+.plans-usage-content>div{min-width:0}
+.plans-usage-content dt{font-size:15px;font-weight:650;line-height:1.5;color:var(--landing-ink);margin:0 0 5px}
+.plans-usage-content dd{font-size:14px;line-height:1.65;color:#52695b;margin:0;overflow-wrap:anywhere}
+@media(max-width:600px){.plans-usage summary{padding:16px;gap:10px}.plans-usage-content{grid-template-columns:1fr;padding:18px;gap:18px}}
+@media(prefers-reduced-motion:reduce){.plans-usage-chevron{transition:none}}
 .subscription-plans .plans-card--coming-soon .plans-card-badge{background:#e9f1eb;color:#41584c;box-shadow:none;letter-spacing:0;text-transform:none}
 .subscription-plans .plans-card-action button:disabled{opacity:1;background:#f2f5f3;border-color:#d5e2da;color:#60766a;cursor:default;box-shadow:none;transform:none}
 .plans-card-wrap{display:flex;min-width:0}

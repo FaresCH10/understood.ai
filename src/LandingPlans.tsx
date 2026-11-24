@@ -1,4 +1,4 @@
-import {Check,ArrowRight} from 'lucide-react';
+import {Check,ArrowRight,ChevronDown,Info} from 'lucide-react';
 import {useRef} from 'react';
 import {gsap,useGSAP} from './gsap-scroll';
 import {SUBSCRIPTION_PLANS,formatSubscriptionPrice} from '../server/subscription-plans.mjs';
@@ -49,9 +49,17 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
     </article>)}</div>
     <div className="plans-footnotes">
       <p className="plans-pricing-note">{ar?'الأسعار بالدولار، قبل الضرائب.':'Prices in USD, before applicable taxes.'}</p>
-      <details className="plans-usage"><summary>{ar?'كيف يُحتسب الاستخدام':'How usage is counted'}</summary>
-        <p>{ar?'تُحسب كل نسخة لغوية من التعليمات والأسئلة ورسائل التوضيح ضمن الرصيد الشهري. لا يستهلك تشغيل الصوت المحفوظ رصيد توليد جديداً. تُجدّد الحصص كل فترة اشتراك ولا تنتقل للشهر التالي.':'Each language version of instructions, questions and clarification messages uses the monthly allowance. Playing existing audio does not use new generation allowance. Allowances renew each subscription period and do not roll over.'}</p>
-        <p>{ar?'تُحدَّد احتياجات التكامل والبنية التحتية المخصصة للمؤسسات بعرض منفصل.':'Enterprise integrations and dedicated infrastructure are quoted separately.'}</p>
+      <details className="plans-usage"><summary>
+        <Info className="plans-usage-icon" size={20} aria-hidden="true"/>
+        <span className="plans-usage-heading"><strong>{ar?'كيف يُحتسب الاستخدام':'How usage is counted'}</strong><span>{ar?'الترجمة وتشغيل الصوت وتجديد الرصيد الشهري':'Translation, audio playback and monthly allowances'}</span></span>
+        <ChevronDown className="plans-usage-chevron" size={20} aria-hidden="true"/>
+      </summary>
+        <dl className="plans-usage-content">
+          <div><dt>{ar?'الترجمة والصوت':'Translation & voice'}</dt><dd>{ar?'تُحتسب كل نسخة لغوية من التعليمات والأسئلة ورسائل التوضيح ضمن الرصيد الشهري.':'Each language version of instructions, questions and clarification messages counts toward your monthly allowance.'}</dd></div>
+          <div><dt>{ar?'تشغيل الصوت':'Audio playback'}</dt><dd>{ar?'لا يستهلك تشغيل الصوت المحفوظ رصيد توليد جديداً.':'Playing existing audio does not use new generation allowance.'}</dd></div>
+          <div><dt>{ar?'تجديد الرصيد':'Monthly renewal'}</dt><dd>{ar?'يتجدد الرصيد كل فترة اشتراك، ولا ينتقل الرصيد غير المستخدم للشهر التالي.':'Allowances renew each subscription period. Unused allowance does not roll over.'}</dd></div>
+          <div><dt>{ar?'خدمات المؤسسات':'Enterprise services'}</dt><dd>{ar?'تُحدَّد احتياجات التكامل والبنية التحتية المخصصة بعرض منفصل.':'Integrations and dedicated infrastructure are quoted separately.'}</dd></div>
+        </dl>
       </details>
     </div>
   </section>;
