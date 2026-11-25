@@ -40,6 +40,12 @@ export function HeroJourney({locale,motionPaused}:{locale:LandingLocale;motionPa
     };
     measure();
     const media=gsap.matchMedia();
+    if(!motionPaused)media.add('(prefers-reduced-motion: no-preference)',()=>{
+      const select=gsap.utils.selector(section);
+      gsap.timeline({scrollTrigger:{id:'hero-journey-background',trigger:section,start:'top bottom',end:'bottom top',scrub:.25}})
+        .fromTo(select('.journey-atmosphere--green'),{xPercent:-20,yPercent:8,scale:.95},{xPercent:20,yPercent:-8,scale:1.1,duration:1,ease:'none'},0)
+        .fromTo(select('.journey-atmosphere--white'),{xPercent:15,yPercent:-8},{xPercent:-15,yPercent:8,duration:1,ease:'none'},0);
+    });
     if(!motionPaused)media.add('(min-width:768px) and (prefers-reduced-motion: no-preference)',()=>{
       gsap.fromTo(progress,{value:0},{value:1,ease:'none',onUpdate:draw,scrollTrigger:{id:'hero-journey-line',trigger:section,start:'top 70%',end:'bottom 70%',scrub:.65}});
       gsap.utils.toArray<SVGSVGElement>('.journey-ornament',section).forEach((ornament,index)=>{
@@ -52,8 +58,7 @@ export function HeroJourney({locale,motionPaused}:{locale:LandingLocale;motionPa
           .from(select('.journey-copy'),{x:-direction*25,y:10,autoAlpha:0,duration:.65},0)
           .from(select('.journey-place'),{scale:1.035,autoAlpha:0,duration:.85},0)
           .from(select('.journey-person-entrance'),{x:direction*80,y:15,autoAlpha:0,duration:.9},.12)
-          .from(select('.journey-message'),{y:18,scale:.92,autoAlpha:0,stagger:.16,duration:.5,ease:'back.out(1.3)'},1.06)
-          .from(select('figcaption'),{autoAlpha:0,duration:.3},1.35);
+          .from(select('.journey-message'),{y:18,scale:.92,autoAlpha:0,stagger:.16,duration:.5,ease:'back.out(1.3)'},1.06);
       });
       return()=>{progress.value=1;draw();};
     });
@@ -65,6 +70,7 @@ export function HeroJourney({locale,motionPaused}:{locale:LandingLocale;motionPa
   },{scope:root,dependencies:[locale,motionPaused],revertOnUpdate:true});
 
   return <section ref={root} className={`hero-journey ${motionPaused?'is-static':''}`} aria-labelledby="journey-title" data-testid="hero-journey">
+    <div className="journey-atmosphere" aria-hidden="true"><span className="journey-atmosphere--green"/><span className="journey-atmosphere--white"/></div>
     <JourneyOrnaments/>
     <svg ref={svg} className="journey-connection" aria-hidden="true" focusable="false" preserveAspectRatio="none"><path ref={track} className="journey-line-track"/><path ref={trace} className="journey-line-progress" pathLength="1"/><circle ref={signal} className="journey-signal" r="6"/></svg>
     <div className="landing-container journey-introduction"><h2 id="journey-title">{locale==='ar'?<>فرق مختلفة.<br/><span>وضوح مشترك.</span></>:<>Different teams.<br/><span>The same clarity.</span></>}</h2><p>{locale==='ar'?'من المستودع إلى الوردية التالية، تصل التعليمات باللغات التي يستخدمها فريقك.':'From the stockroom to the next shift, an instruction travels in the languages your team uses.'}</p></div>
@@ -73,7 +79,6 @@ export function HeroJourney({locale,motionPaused}:{locale:LandingLocale;motionPa
       <div className="journey-copy"><span className="journey-sector">{copy.sector}</span><h3>{copy.title}</h3><p>{copy.body}</p></div>
       <figure className="journey-visual"><div className="journey-artwork"><div className="journey-photo-window"><img className="journey-place" src={`/landing/journey/${scene.id}-place.jpg`} alt="" width="1600" height="1000" loading="lazy"/></div><div className="journey-person-window"><div className="journey-person-entrance"><img className="journey-person" src={`/landing/journey/${scene.id}.png`} alt="" width={scene.width} height={scene.height} loading="lazy"/></div></div>
         <div className="journey-messages">{scene.messages.map(message=><div className="journey-message" key={message.language}><span className="journey-language">{locale==='ar'?languageNames[message.label]:message.label}</span><div><p lang={message.language} dir={message.direction}>{message.text}</p><Volume2 size={21} aria-hidden="true"/></div></div>)}</div></div>
-        <figcaption>{locale==='ar'?'تعليمات توضيحية':'Illustrative instruction'}</figcaption>
       </figure>
     </li>;})}</ol>
     <div className="journey-end landing-container"><p>{locale==='ar'?'فريق واحد. وتعليمات مشتركة.':'One team. A shared instruction.'}</p><a className="landing-text-link" href="#how-it-works">{locale==='ar'?'جرّب المثال':'Try the example'}<ArrowRight size={17} className="landing-forward" aria-hidden="true"/></a></div>

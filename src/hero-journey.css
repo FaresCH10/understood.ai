@@ -1,4 +1,8 @@
 .hero-journey{position:relative;isolation:isolate;background:#f1f4ed;overflow:clip;padding-block:80px 55px}
+.journey-atmosphere{position:absolute;inset:0;z-index:-2;overflow:hidden;pointer-events:none;background:#f4f8f4}
+.journey-atmosphere>span{position:absolute;inset:-20%;border-radius:50%}
+.journey-atmosphere--green{background:radial-gradient(ellipse at 30% 45%,#8cc9aa99, #cbe5d560 42%,transparent 70%)}
+.journey-atmosphere--white{background:radial-gradient(ellipse at 70% 55%,#fff 5%,#ffffffb3 35%,transparent 70%)}
 .hero-journey::before{content:'';position:absolute;inset:0;z-index:-2;pointer-events:none;background-image:url('/hero/journey-paper.svg');background-size:240px 240px;opacity:.28;mix-blend-mode:multiply}
 .hero-journey::after{content:'';position:absolute;inset:0;z-index:-2;pointer-events:none;background:linear-gradient(180deg,#fff 0%,#ffffff00 9%,#ffffff00 91%,#fff 100%)}
 .journey-connection{position:absolute;inset:0;width:100%;height:100%;z-index:-1;overflow:visible;pointer-events:none}

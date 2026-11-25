@@ -24,8 +24,7 @@ export function LandingHero({locale,registrationAvailable,motionPaused}:{locale:
         .from('.hero-intro-background img',{opacity:0,scale:1.035,duration:1.15},0)
         .from('.hero-worker-slide',{x:135,autoAlpha:0,duration:1},.2)
         .addLabel('worker-arrived',1.2)
-        .from('.hero-message',{y:18,x:-8,scale:.9,autoAlpha:0,transformOrigin:'85% 100%',stagger:.18,duration:.5,ease:'back.out(1.35)'},'worker-arrived+=.08')
-        .from('.hero-intro-scene>figcaption',{autoAlpha:0,duration:.35},1.85);
+        .from('.hero-message',{y:18,x:-8,scale:.9,autoAlpha:0,transformOrigin:'85% 100%',stagger:.18,duration:.5,ease:'back.out(1.35)'},'worker-arrived+=.08');
       const worker=root.current!.querySelector<HTMLImageElement>('.hero-intro-worker')!,showScene=()=>{scene.play();};
       if(worker.complete)showScene();else{worker.addEventListener('load',showScene,{once:true});worker.addEventListener('error',showScene,{once:true});}
       const refresh=()=>ScrollTrigger.refresh();
@@ -48,7 +47,6 @@ export function LandingHero({locale,registrationAvailable,motionPaused}:{locale:
       <figure className="hero-intro-scene">
         <div className="hero-worker-parallax"><div className="hero-worker-slide"><img className="hero-intro-worker" src="/landing/site-worker.png" alt="" width="1122" height="1402" fetchPriority="high"/></div></div>
         <div className="hero-messages">{messages.map(message=><div className="hero-message" key={message.language}><span className="hero-message-language">{message.label}</span><div className="hero-message-content"><p lang={message.language} dir="ltr">{message.text}</p><Volume2 className="hero-message-speaker" size={23} aria-hidden="true"/></div></div>)}</div>
-        <figcaption>{t.heroCaption}</figcaption>
       </figure>
     </div>
   </section>;
