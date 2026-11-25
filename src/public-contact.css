@@ -1,4 +1,5 @@
 .landing-contact{background:var(--landing-green);color:#fff;padding-block:56px;margin-top:24px}
+.subscription-plans + .landing-contact{margin-top:0}
 .landing-contact-inner{display:flex;justify-content:space-between;align-items:center;gap:48px}
 .marketing-site .landing-contact h2{color:#fff;font-size:clamp(28px,3.3vw,42px);line-height:1.2;margin:0 0 14px}
 .marketing-site .landing-contact p{color:#d9e9df;font-size:17px;line-height:1.7;max-width:58ch;margin:0}
