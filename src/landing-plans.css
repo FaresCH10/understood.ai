@@ -26,7 +26,15 @@
 .plans-scale{display:flex;justify-content:space-between;color:#52665a;font-size:12px;font-variant-numeric:tabular-nums;margin-top:-2px}
 .marketing-site .plans-calculator-note{margin:3px 0 0;font-size:12px;line-height:1.5;color:#61786b}
 .plans-card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;align-items:stretch}
-.subscription-plans .plans-card-grid{margin-block-start:32px}
+.subscription-plans .plans-scroll-stage{margin-block-start:32px}
+.subscription-plans .plans-scroll-stage .plans-card-grid{margin-block-start:0}
+.plans-scroll-stage{position:relative;isolation:isolate}
+.subscription-plans{position:relative;isolation:isolate}
+.plans-ambient{position:absolute;inset:0;z-index:-1;overflow:hidden;pointer-events:none;background:#f5f9f6}
+.plans-ambient>span{position:absolute;width:85%;height:140%;top:-20%;border-radius:50%}
+.plans-ambient--mint{left:-15%;background:radial-gradient(ellipse,#7dcbb390 0%,#b2e0cf65 34%,transparent 70%)}
+.plans-ambient--gold{right:-15%;background:radial-gradient(ellipse,#f5ce8280 0%,#f9e4b950 36%,transparent 70%)}
+@media(max-width:800px){.plans-ambient>span{height:80%;top:10%}}
 .marketing-site .subscription-plans .plans-offer-note{font-size:16px;line-height:1.5;margin:0;color:var(--landing-green);font-weight:600}
 .subscription-plans .plans-card-heading>span{font-size:14px}
 .subscription-plans .plans-card-price{margin:20px 0 12px;min-height:114px;gap:6px}

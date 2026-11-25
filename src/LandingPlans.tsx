@@ -1,6 +1,6 @@
 import {Check,ArrowRight,ChevronDown,Info} from 'lucide-react';
 import {useRef} from 'react';
-import {gsap,useGSAP} from './gsap-scroll';
+import {gsap,useGSAP,ScrollTrigger} from './gsap-scroll';
 import {SUBSCRIPTION_PLANS,formatSubscriptionPrice} from '../server/subscription-plans.mjs';
 import type {LandingLocale} from './landing-content';
 import './landing-plans.css';
@@ -10,13 +10,50 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
   const root=useRef<HTMLElement>(null);
   useGSAP(()=>{
     const media=gsap.matchMedia();
-    media.add('(prefers-reduced-motion: no-preference)',()=>{
+    let disposed=false;
+    media.add({
+      motion:'(prefers-reduced-motion: no-preference)',
+      wide:'(min-width: 1241px)',
+      tall:'(min-height: 740px)',
+    },context=>{
+      if(!context.conditions?.motion)return;
+      // Wait for other responsive ScrollTriggers to finish reverting before measuring pins.
+      const frame=requestAnimationFrame(()=>context.add(()=>{
       const select=gsap.utils.selector(root);
       gsap.from(select('.plans-studio-heading > *, .plans-offer-note'),{
         y:20,opacity:0,duration:.6,stagger:.1,ease:'power2.out',clearProps:'transform,opacity',
-        scrollTrigger:{id:'plans-heading',trigger:root.current,start:'clamp(top 85%)',once:true},
+        scrollTrigger:{id:'plans-heading',trigger:root.current,start:'clamp(top 85%)',toggleActions:'play none none none'},
       });
-      select('.plans-card').forEach((card:HTMLElement,index:number)=>{
+      const stage=root.current?.querySelector<HTMLElement>('.plans-scroll-stage');
+      const cards=select('.plans-card');
+      const animateBackdrop=(timeline:gsap.core.Timeline,duration:number)=>{
+        timeline.fromTo(select('.plans-ambient--mint'),{xPercent:-20,yPercent:12,scale:.9},{xPercent:35,yPercent:-12,scale:1.15,duration,ease:'none'},0)
+          .fromTo(select('.plans-ambient--gold'),{xPercent:20,yPercent:-15,scale:1.1},{xPercent:-35,yPercent:15,scale:.95,duration,ease:'none'},0);
+      };
+      const top=()=>Math.ceil(document.querySelector('.landing-site-header')?.getBoundingClientRect().height??80)+28;
+      if(context.conditions?.wide&&context.conditions?.tall&&stage&&stage.offsetHeight<=window.innerHeight-top()-24){
+        const timeline=gsap.timeline({paused:true,defaults:{ease:'back.out(1.4)'}});
+        cards.forEach((card:HTMLElement,index:number)=>{
+          timeline.fromTo(card,{
+            y:96,scale:.86,rotation:ar?3:-3,autoAlpha:0,transformOrigin:'50% 100%',
+          },{
+            y:0,scale:1,rotation:0,autoAlpha:1,duration:1,
+          },index*.9);
+        });
+        timeline.to({},{duration:.45});
+        animateBackdrop(timeline,timeline.duration());
+        ScrollTrigger.create({
+          id:'plans-pinned-sequence',trigger:stage,pin:stage,animation:timeline,
+          start:()=>`top ${top()}px`,
+          end:()=>`+=${Math.max(1200,window.innerHeight*1.8)}`,
+          scrub:.5,anticipatePin:1,invalidateOnRefresh:true,
+        });
+        return;
+      }
+      const backdrop=gsap.timeline({paused:true});
+      animateBackdrop(backdrop,1);
+      ScrollTrigger.create({id:'plans-ambient',trigger:root.current,animation:backdrop,start:'top bottom',end:'bottom top',scrub:.8});
+      cards.forEach((card:HTMLElement,index:number)=>{
         const q=gsap.utils.selector(card);
         gsap.timeline({
           defaults:{ease:'power2.out'},
@@ -25,15 +62,21 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
           .from(card,{y:32,scale:.97,opacity:0,duration:.65,delay:window.matchMedia('(min-width: 801px)').matches?index*.09:0,clearProps:'transform,opacity'})
           .from(q('.plans-card-features > li'),{y:10,opacity:0,duration:.35,stagger:.055,clearProps:'transform,opacity'},'-.3');
       });
+      }));
+      return()=>cancelAnimationFrame(frame);
     });
-    return()=>media.revert();
+    const refresh=()=>{if(!disposed)ScrollTrigger.refresh();};
+    void document.fonts.ready.then(refresh);
+    return()=>{disposed=true;media.revert();};
   },{scope:root,dependencies:[locale],revertOnUpdate:true});
   const number=(n:number)=>new Intl.NumberFormat(ar?'ar':'en-US').format(n);
   const blurbs=ar?['لفريق واحد','للفرق المتنامية','للعمليات متعددة المواقع','للمؤسسات الكبيرة']:['For one team','For growing teams','For multi-site operations','For larger organizations'];
-  return <section ref={root} id="plans" className="landing-section landing-container plans-studio subscription-plans" aria-labelledby="plans-title">
+  return <section ref={root} id="plans" className="landing-section plans-studio subscription-plans" aria-labelledby="plans-title">
+    <div className="plans-ambient" aria-hidden="true"><span className="plans-ambient--mint"/><span className="plans-ambient--gold"/></div>
+    <div className="landing-container plans-content">
     <header className="plans-studio-heading"><h2 id="plans-title">{ar?'خطة تناسب فريقك. وسعر واضح.':'The right plan for your team.'}</h2><p>{ar?'كل خطة تشمل التعليمات والأسئلة والتوضيحات والتقارير.':'Every plan includes instructions, questions, clarifications and reports.'}</p></header>
     <p className="plans-offer-note">{ar?'وفّر 10% شهرياً. بلا التزام سنوي.':'Save 10% monthly. No annual commitment.'}</p>
-    <div className="plans-card-grid">{SUBSCRIPTION_PLANS.map((plan,index)=><article key={plan.id} className={`plans-card${plan.available?' plans-card--featured':' plans-card--coming-soon'}`}>
+    <div className="plans-scroll-stage"><div className="plans-card-grid">{SUBSCRIPTION_PLANS.map((plan,index)=><article key={plan.id} className={`plans-card${plan.available?' plans-card--featured':' plans-card--coming-soon'}`}>
       <span className="plans-card-badge">{plan.available?(ar?'متاحة الآن':'Available now'):(ar?'قريباً':'Coming soon')}</span>
       <div className="plans-card-heading"><h3>{plan.name}</h3><span>{blurbs[index]}</span></div>
       <div className="plans-card-price"><p className="plans-price-original"><del><bdi dir="ltr">{formatSubscriptionPrice(plan.regularCents)}</bdi></del></p>
@@ -46,7 +89,7 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
         <li><Check size={17} aria-hidden="true"/><span>{ar?`${number(plan.transcriptionMinutes)} دقيقة/شهر`:`${number(plan.transcriptionMinutes)} minutes/month`}<small>{ar?'تفريغ التسجيلات الصوتية':'Transcription'}</small></span></li>
       </ul>
       <div className="plans-card-action">{plan.available?<a className="landing-button landing-button--light" href={registrationAvailable?`#register/${plan.id}`:'#contact'}>{ar?`اختر ${plan.name}`:`Choose ${plan.name}`}<ArrowRight size={18} aria-hidden="true"/></a>:<button type="button" className="landing-button landing-button--outline" disabled>{ar?'قريباً':'Coming soon'}</button>}</div>
-    </article>)}</div>
+    </article>)}</div></div>
     <div className="plans-footnotes">
       <p className="plans-pricing-note">{ar?'الأسعار بالدولار، قبل الضرائب.':'Prices in USD, before applicable taxes.'}</p>
       <details className="plans-usage"><summary>
@@ -61,6 +104,7 @@ export function LandingPlans({locale,registrationAvailable}:{locale:LandingLocal
           <div><dt>{ar?'خدمات المؤسسات':'Enterprise services'}</dt><dd>{ar?'تُحدَّد احتياجات التكامل والبنية التحتية المخصصة بعرض منفصل.':'Integrations and dedicated infrastructure are quoted separately.'}</dd></div>
         </dl>
       </details>
+    </div>
     </div>
   </section>;
 }

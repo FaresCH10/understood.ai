@@ -68,11 +68,12 @@ export function LandingSections({locale,registrationAvailable}:{locale:LandingLo
         ScrollTrigger.create({id:`unified-${section.id}`,trigger:section,start:'top 78%',animation:timeline,toggleActions:'play none none none'});
       }
     });
-    media.add('(min-width: 801px) and (prefers-reduced-motion: no-preference)',()=>{
-      gsap.fromTo('.unified-company-preview',{y:12},{y:-12,ease:'none',scrollTrigger:{
+    media.add('(min-width: 801px) and (prefers-reduced-motion: no-preference)',context=>{
+      const frame=requestAnimationFrame(()=>context.add(()=>gsap.fromTo('.unified-company-preview',{y:12},{y:-12,ease:'none',scrollTrigger:{
         id:'company-preview-drift',trigger:root.current?.querySelector('#companies'),
         start:'clamp(top bottom)',end:'clamp(bottom top)',scrub:.7,invalidateOnRefresh:true,
-      }});
+      }})));
+      return()=>cancelAnimationFrame(frame);
     });
     const refresh=()=>{if(!disposed)ScrollTrigger.refresh();};
     void document.fonts.ready.then(refresh);
